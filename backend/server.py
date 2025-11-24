@@ -119,6 +119,7 @@ class MenuItem(BaseModel):
     available: bool = True
     ingredients: Optional[List[str]] = []
     preparation_time: Optional[int] = 15
+    organization_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MenuItemCreate(BaseModel):
