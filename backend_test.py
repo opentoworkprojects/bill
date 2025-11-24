@@ -77,28 +77,29 @@ class RestaurantAPITester:
                 self.critical_failures.append(f"{name}: {str(e)}")
             return False, {}
 
-    def test_user_registration(self):
+    def test_user_registration(self, business_name="testbusiness"):
         """Test user registration"""
         timestamp = int(time.time())
         user_data = {
-            "username": f"testuser_{timestamp}",
-            "email": f"test_{timestamp}@example.com",
+            "username": f"{business_name}_{timestamp}",
+            "email": f"{business_name}_{timestamp}@example.com",
             "password": "TestPass123!",
             "role": "admin"
         }
         
         success, response = self.run_test(
-            "User Registration",
+            f"User Registration ({business_name})",
             "POST",
             "auth/register",
             200,
-            data=user_data
+            data=user_data,
+            critical=True
         )
         
         if success and 'id' in response:
             self.created_items['users'].append(response['id'])
-            return user_data
-        return None
+            return user_data, response
+        return None, None
 
     def test_user_login(self, username, password):
         """Test user login and get token"""
