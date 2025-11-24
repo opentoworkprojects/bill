@@ -124,6 +124,10 @@ const MenuPage = ({ user }) => {
       preparation_time: 15
     });
     setEditingItem(null);
+    setImagePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleEdit = (item) => {
