@@ -34,19 +34,46 @@ JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+# Currency symbols mapping
+CURRENCY_SYMBOLS = {
+    "INR": "₹",
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "AED": "د.إ",
+    "SAR": "﷼",
+    "JPY": "¥",
+    "CNY": "¥",
+    "AUD": "A$",
+    "CAD": "C$"
+}
+
 # Models
+class BusinessSettings(BaseModel):
+    restaurant_name: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    gstin: Optional[str] = None
+    fssai: Optional[str] = None
+    currency: str = "INR"
+    tax_rate: float = 5.0
+    receipt_theme: str = "classic"
+    logo_url: Optional[str] = None
+
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     username: str
     email: str
     role: str
-    restaurant_name: Optional[str] = None
+    business_settings: Optional[BusinessSettings] = None
     razorpay_key_id: Optional[str] = None
     razorpay_key_secret: Optional[str] = None
     subscription_active: bool = False
     bill_count: int = 0
     subscription_expires_at: Optional[datetime] = None
+    setup_completed: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
@@ -54,7 +81,6 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: str = "admin"
-    restaurant_name: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str
@@ -174,6 +200,7 @@ class ChatMessage(BaseModel):
 class PrintData(BaseModel):
     content: str
     type: str
+    theme: Optional[str] = "classic"
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -216,6 +243,100 @@ async def check_subscription(user: dict):
             return False
     return True
 
+def get_receipt_template(theme: str, business: dict, order: dict, currency_symbol: str) -> str:
+    templates = {
+        "classic": f"""
+{'=' * 48}
+{business.get('restaurant_name', 'RESTAURANT').center(48)}
+{'=' * 48}
+{business.get('address', '').center(48)}
+Phone: {business.get('phone', 'N/A')}
+GSTIN: {business.get('gstin', 'N/A')}
+{'-' * 48}
+Bill #: {order['id'][:8]}
+Table: {order['table_number']}
+Waiter: {order['waiter_name']}
+Customer: {order.get('customer_name', 'Guest')}
+Date: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}
+{'-' * 48}
+ITEMS:
+{''.join([f"{item['quantity']}x {item['name']:<30} {currency_symbol}{item['price'] * item['quantity']:.2f}\n" for item in order['items']])}
+{'-' * 48}
+Subtotal:         {currency_symbol}{order['subtotal']:.2f}
+Tax ({business.get('tax_rate', 5)}%):          {currency_symbol}{order['tax']:.2f}
+{'-' * 48}
+TOTAL:            {currency_symbol}{order['total']:.2f}
+{'-' * 48}
+Thank you for dining with us!
+Visit again soon!
+{'=' * 48}
+""",
+        "modern": f"""
+┌{'─' * 46}┐
+│ {business.get('restaurant_name', 'RESTAURANT').center(44)} │
+├{'─' * 46}┤
+│ {business.get('address', '').center(44)} │
+│ ☎ {business.get('phone', 'N/A'):<42} │
+└{'─' * 46}┘
+
+🧾 Bill #{order['id'][:8]}
+🍽️  Table {order['table_number']} | 👤 {order['waiter_name']}
+📅 {datetime.now().strftime('%d-%m-%Y %I:%M %p')}
+
+{'─' * 48}
+{''.join([f"  {item['quantity']}× {item['name']:<28} {currency_symbol}{item['price'] * item['quantity']:.2f}\n" for item in order['items']])}
+{'─' * 48}
+Subtotal                      {currency_symbol}{order['subtotal']:.2f}
+Tax ({business.get('tax_rate', 5)}%)                        {currency_symbol}{order['tax']:.2f}
+{'═' * 48}
+💰 TOTAL                      {currency_symbol}{order['total']:.2f}
+{'═' * 48}
+
+✨ Thank you! Come again! ✨
+""",
+        "minimal": f"""
+{business.get('restaurant_name', 'RESTAURANT')}
+{business.get('address', '')}
+
+Bill: {order['id'][:8]} | Table: {order['table_number']}
+{datetime.now().strftime('%d-%m-%Y %I:%M %p')}
+
+{''.join([f"{item['quantity']}× {item['name']}: {currency_symbol}{item['price'] * item['quantity']:.2f}\n" for item in order['items']])}
+Subtotal: {currency_symbol}{order['subtotal']:.2f}
+Tax: {currency_symbol}{order['tax']:.2f}
+Total: {currency_symbol}{order['total']:.2f}
+
+Thank you!
+""",
+        "elegant": f"""
+╔{'═' * 46}╗
+║ {business.get('restaurant_name', 'RESTAURANT').center(44)} ║
+╠{'═' * 46}╣
+║ {business.get('address', '').center(44)} ║
+║ Tel: {business.get('phone', 'N/A'):<40} ║
+║ GSTIN: {business.get('gstin', 'N/A'):<38} ║
+╚{'═' * 46}╝
+
+Invoice: {order['id'][:8]}
+Table: {order['table_number']} | Server: {order['waiter_name']}
+Guest: {order.get('customer_name', 'Walk-in')}
+Date: {datetime.now().strftime('%d %B %Y, %I:%M %p')}
+
+{'-' * 48}
+{''.join([f"{item['quantity']:>3} × {item['name']:<28} {currency_symbol}{item['price'] * item['quantity']:>8.2f}\n" for item in order['items']])}
+{'-' * 48}
+                    Subtotal: {currency_symbol}{order['subtotal']:>8.2f}
+               Tax ({business.get('tax_rate', 5)}%): {currency_symbol}{order['tax']:>8.2f}
+{'═' * 48}
+                       TOTAL: {currency_symbol}{order['total']:>8.2f}
+{'═' * 48}
+
+        Thank you for your patronage
+          Please visit us again
+"""
+    }
+    return templates.get(theme, templates["classic"])
+
 # Auth routes
 @api_router.post("/auth/register", response_model=User)
 async def register(user_data: UserCreate):
@@ -226,8 +347,7 @@ async def register(user_data: UserCreate):
     user_obj = User(
         username=user_data.username,
         email=user_data.email,
-        role=user_data.role,
-        restaurant_name=user_data.restaurant_name
+        role=user_data.role
     )
     doc = user_obj.model_dump()
     doc['password'] = hash_password(user_data.password)
@@ -250,15 +370,51 @@ async def login(credentials: UserLogin):
             "username": user['username'],
             "role": user['role'],
             "email": user['email'],
-            "restaurant_name": user.get('restaurant_name'),
             "subscription_active": user.get('subscription_active', False),
-            "bill_count": user.get('bill_count', 0)
+            "bill_count": user.get('bill_count', 0),
+            "setup_completed": user.get('setup_completed', False),
+            "business_settings": user.get('business_settings')
         }
     }
 
 @api_router.get("/auth/me", response_model=User)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+# Business Setup
+@api_router.post("/business/setup")
+async def setup_business(settings: BusinessSettings, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can setup business")
+    
+    await db.users.update_one(
+        {"id": current_user['id']},
+        {"$set": {
+            "business_settings": settings.model_dump(),
+            "setup_completed": True
+        }}
+    )
+    return {"message": "Business setup completed", "settings": settings.model_dump()}
+
+@api_router.get("/business/settings")
+async def get_business_settings(current_user: dict = Depends(get_current_user)):
+    return {
+        "business_settings": current_user.get('business_settings'),
+        "setup_completed": current_user.get('setup_completed', False)
+    }
+
+@api_router.get("/currencies")
+async def get_currencies():
+    return [{"code": code, "symbol": symbol} for code, symbol in CURRENCY_SYMBOLS.items()]
+
+@api_router.get("/receipt-themes")
+async def get_receipt_themes():
+    return [
+        {"id": "classic", "name": "Classic", "description": "Traditional receipt format"},
+        {"id": "modern", "name": "Modern", "description": "Modern with emojis and borders"},
+        {"id": "minimal", "name": "Minimal", "description": "Clean and simple design"},
+        {"id": "elegant", "name": "Elegant", "description": "Professional and elegant"}
+    ]
 
 # Razorpay Settings
 @api_router.post("/settings/razorpay")
@@ -295,7 +451,6 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
 
 @api_router.post("/subscription/create-order")
 async def create_subscription_order(current_user: dict = Depends(get_current_user)):
-    # Use user's Razorpay keys if configured, otherwise use system keys
     razorpay_key_id = current_user.get('razorpay_key_id') or os.environ.get('RAZORPAY_KEY_ID')
     razorpay_key_secret = current_user.get('razorpay_key_secret') or os.environ.get('RAZORPAY_KEY_SECRET')
     
@@ -304,7 +459,7 @@ async def create_subscription_order(current_user: dict = Depends(get_current_use
     
     razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
     
-    amount_paise = 9900  # ₹99
+    amount_paise = 9900
     razor_order = razorpay_client.order.create({
         "amount": amount_paise,
         "currency": "INR",
@@ -320,7 +475,7 @@ async def create_subscription_order(current_user: dict = Depends(get_current_use
 
 @api_router.post("/subscription/verify")
 async def verify_subscription_payment(razorpay_payment_id: str, razorpay_order_id: str, current_user: dict = Depends(get_current_user)):
-    expires_at = datetime.now(timezone.utc) + timedelta(days=365)  # 1 year subscription
+    expires_at = datetime.now(timezone.utc) + timedelta(days=365)
     
     await db.users.update_one(
         {"id": current_user['id']},
@@ -339,10 +494,9 @@ async def upload_image(file: UploadFile = File(...), current_user: dict = Depend
         raise HTTPException(status_code=400, detail="Only image files allowed")
     
     contents = await file.read()
-    if len(contents) > 5 * 1024 * 1024:  # 5MB limit
+    if len(contents) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB")
     
-    # Convert to base64
     image_data = base64.b64encode(contents).decode('utf-8')
     image_url = f"data:{file.content_type};base64,{image_data}"
     
@@ -432,12 +586,14 @@ async def update_table(table_id: str, table: TableCreate, current_user: dict = D
 # Order routes
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: dict = Depends(get_current_user)):
-    # Check subscription
     if not await check_subscription(current_user):
         raise HTTPException(status_code=402, detail="Subscription required. You have reached 50 bills. Please subscribe to continue.")
     
+    business = current_user.get('business_settings', {})
+    tax_rate = business.get('tax_rate', 5.0) / 100
+    
     subtotal = sum(item.price * item.quantity for item in order_data.items)
-    tax = subtotal * 0.05
+    tax = subtotal * tax_rate
     total = subtotal + tax
     
     order_obj = Order(
@@ -544,11 +700,7 @@ async def create_payment_order(payment_data: PaymentCreate, current_user: dict =
         await db.payments.insert_one(doc)
         
         await db.orders.update_one({"id": payment_data.order_id}, {"$set": {"status": "completed"}})
-        
-        # Increment bill count
-        admin_user = await db.users.find_one({"id": current_user['id']}, {"_id": 0})
-        if admin_user:
-            await db.users.update_one({"id": current_user['id']}, {"$inc": {"bill_count": 1}})
+        await db.users.update_one({"id": current_user['id']}, {"$inc": {"bill_count": 1}})
         
         return {"payment_id": payment_obj.id, "status": "completed"}
 
@@ -564,8 +716,6 @@ async def verify_payment(razorpay_payment_id: str, razorpay_order_id: str, order
     )
     
     await db.orders.update_one({"id": order_id}, {"$set": {"status": "completed"}})
-    
-    # Increment bill count
     await db.users.update_one({"id": current_user['id']}, {"$inc": {"bill_count": 1}})
     
     return {"status": "payment_verified"}
@@ -727,24 +877,38 @@ async def export_report(start_date: str, end_date: str):
 
 # Thermal printer route
 @api_router.post("/print")
-async def print_receipt(print_data: PrintData):
-    escpos_commands = {
-        'init': b'\x1b\x40',
-        'bold_on': b'\x1b\x45\x01',
-        'bold_off': b'\x1b\x45\x00',
-        'center': b'\x1b\x61\x01',
-        'left': b'\x1b\x61\x00',
-        'cut': b'\x1d\x56\x00',
-        'newline': b'\n'
-    }
-    
-    print_content = print_data.content
+async def print_receipt(print_data: PrintData, current_user: dict = Depends(get_current_user)):
+    business = current_user.get('business_settings', {})
+    currency_code = business.get('currency', 'INR')
+    currency_symbol = CURRENCY_SYMBOLS.get(currency_code, '₹')
+    theme = print_data.theme or business.get('receipt_theme', 'classic')
     
     return {
         "print_ready": True,
-        "content": print_content,
+        "content": print_data.content,
         "format": "text",
-        "escpos_available": True
+        "escpos_available": True,
+        "theme": theme
+    }
+
+@api_router.post("/print/bill/{order_id}")
+async def print_bill(order_id: str, theme: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    business = current_user.get('business_settings', {})
+    currency_code = business.get('currency', 'INR')
+    currency_symbol = CURRENCY_SYMBOLS.get(currency_code, '₹')
+    receipt_theme = theme or business.get('receipt_theme', 'classic')
+    
+    receipt_content = get_receipt_template(receipt_theme, business, order, currency_symbol)
+    
+    return {
+        "print_ready": True,
+        "content": receipt_content,
+        "format": "text",
+        "theme": receipt_theme
     }
 
 app.include_router(api_router)
