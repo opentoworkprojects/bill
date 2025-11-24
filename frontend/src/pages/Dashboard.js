@@ -3,10 +3,12 @@ import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { DollarSign, ShoppingCart, Users, TrendingUp, MessageSquare, Sparkles } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { DollarSign, ShoppingCart, Users, TrendingUp, MessageSquare, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = ({ user }) => {
   const [stats, setStats] = useState({
@@ -18,10 +20,14 @@ const Dashboard = ({ user }) => {
   const [chatResponse, setChatResponse] = useState('');
   const [recommendations, setRecommendations] = useState('');
   const [loading, setLoading] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchStats();
     fetchRecommendations();
+    fetchSubscriptionStatus();
   }, []);
 
   const fetchStats = async () => {
