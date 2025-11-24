@@ -185,11 +185,14 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Order create/read/update endpoints working with organization_id filtering. Includes subscription check."
+      - working: true
+        agent: "testing"
+        comment: "VERIFIED: Order create, read operations working correctly. Data isolation confirmed - each business only sees its own orders. Minor: Order status update API needs status in request body, not query params."
         
   - task: "Inventory Management"
     implemented: true
