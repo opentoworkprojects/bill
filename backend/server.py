@@ -140,6 +140,7 @@ class Table(BaseModel):
     capacity: int
     status: str = "available"
     current_order_id: Optional[str] = None
+    organization_id: Optional[str] = None
 
 class TableCreate(BaseModel):
     table_number: int
