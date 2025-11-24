@@ -533,6 +533,29 @@ async def delete_staff(staff_id: str, current_user: dict = Depends(get_current_u
     await db.users.delete_one({"id": staff_id})
     return {"message": "Staff deleted"}
 
+# Database Migration (Run once to fix existing data)
+@api_router.post("/admin/migrate-organizations")
+async def migrate_organizations(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    # Update all admin users to have their own organization_id
+    admins = await db.users.find({"role": "admin"}, {"_id": 0}).to_list(1000)
+    for admin in admins:
+        if not admin.get('organization_id'):
+            await db.users.update_one(
+                {"id": admin['id']},
+                {"$set": {"organization_id": admin['id']}}
+            )
+    
+    # Update all non-admin users without organization_id to set it to null
+    await db.users.update_many(
+        {"role": {"$ne": "admin"}, "organization_id": {"$exists": False}},
+        {"$set": {"organization_id": None}}
+    )
+    
+    return {"message": "Migration completed", "admins_updated": len(admins)}
+
 # Business Setup
 @api_router.post("/business/setup")
 async def setup_business(settings: BusinessSettings, current_user: dict = Depends(get_current_user)):
