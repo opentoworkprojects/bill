@@ -401,6 +401,10 @@ async def register(user_data: UserCreate):
     doc['password'] = hash_password(user_data.password)
     doc['created_at'] = doc['created_at'].isoformat()
     
+    # If admin, they are their own organization
+    if user_data.role == 'admin':
+        doc['organization_id'] = user_obj.id
+    
     await db.users.insert_one(doc)
     return user_obj
 
