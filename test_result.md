@@ -398,13 +398,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Multi-Tenancy Data Isolation (CRITICAL)"
-    - "Authentication Flow"
-    - "Business Setup"
-    - "Staff Management"
-    - "Menu Management"
-  stuck_tasks:
-    - "Business Setup (user reported unable to save)"
+    - "Payment Integration (Razorpay)" 
+    - "AI Features (Chat/Recommendations)"
+    - "Thermal Printer Integration"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
