@@ -67,6 +67,7 @@ class User(BaseModel):
     username: str
     email: str
     role: str
+    organization_id: Optional[str] = None  # Links staff to their admin/organization
     business_settings: Optional[BusinessSettings] = None
     razorpay_key_id: Optional[str] = None
     razorpay_key_secret: Optional[str] = None
