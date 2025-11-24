@@ -698,8 +698,11 @@ async def create_menu_item(item: MenuItemCreate, current_user: dict = Depends(ge
     return menu_obj
 
 @api_router.get("/menu", response_model=List[MenuItem])
-async def get_menu():
-    items = await db.menu_items.find({}, {"_id": 0}).to_list(1000)
+async def get_menu(current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    items = await db.menu_items.find({"organization_id": user_org_id}, {"_id": 0}).to_list(1000)
     for item in items:
         if isinstance(item['created_at'], str):
             item['created_at'] = datetime.fromisoformat(item['created_at'])
