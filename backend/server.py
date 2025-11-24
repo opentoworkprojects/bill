@@ -964,8 +964,11 @@ async def create_inventory_item(item: InventoryItemCreate, current_user: dict = 
     return inv_obj
 
 @api_router.get("/inventory", response_model=List[InventoryItem])
-async def get_inventory():
-    items = await db.inventory.find({}, {"_id": 0}).to_list(1000)
+async def get_inventory(current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    items = await db.inventory.find({"organization_id": user_org_id}, {"_id": 0}).to_list(1000)
     for item in items:
         if isinstance(item['last_updated'], str):
             item['last_updated'] = datetime.fromisoformat(item['last_updated'])
