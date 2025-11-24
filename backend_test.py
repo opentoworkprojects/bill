@@ -101,21 +101,20 @@ class RestaurantAPITester:
             return user_data, response
         return None, None
 
-    def test_user_login(self, username, password):
+    def test_user_login(self, username, password, business_name=""):
         """Test user login and get token"""
         success, response = self.run_test(
-            "User Login",
+            f"User Login ({business_name})" if business_name else "User Login",
             "POST",
             "auth/login",
             200,
-            data={"username": username, "password": password}
+            data={"username": username, "password": password},
+            critical=True
         )
         
         if success and 'token' in response:
-            self.token = response['token']
-            self.user_id = response['user']['id']
-            return True
-        return False
+            return response['token'], response['user']
+        return None, None
 
     def test_get_current_user(self):
         """Test getting current user info"""
