@@ -46,7 +46,7 @@ const SubscriptionPage = ({ user }) => {
             });
             toast.success('Subscription activated! Thank you!');
             fetchSubscriptionStatus();
-            setTimeout(() => navigate('/'), 2000);
+            setTimeout(() => navigate('/dashboard'), 2000);
           } catch (error) {
             toast.error('Subscription verification failed');
           }
