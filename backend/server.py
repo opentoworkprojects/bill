@@ -443,10 +443,14 @@ async def create_staff(staff_data: StaffCreate, current_user: dict = Depends(get
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
     
+    # Get admin's organization_id
+    admin_org_id = current_user.get('organization_id') or current_user['id']
+    
     user_obj = User(
         username=staff_data.username,
         email=staff_data.email,
-        role=staff_data.role
+        role=staff_data.role,
+        organization_id=admin_org_id  # Link staff to this organization
     )
     
     doc = user_obj.model_dump()
@@ -463,7 +467,14 @@ async def get_staff(current_user: dict = Depends(get_current_user)):
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Only admin can view staff")
     
-    staff = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    # Get admin's organization_id
+    admin_org_id = current_user.get('organization_id') or current_user['id']
+    
+    # Only fetch staff belonging to this organization
+    staff = await db.users.find(
+        {"organization_id": admin_org_id},
+        {"_id": 0, "password": 0}
+    ).to_list(1000)
     return staff
 
 @api_router.put("/staff/{staff_id}")
