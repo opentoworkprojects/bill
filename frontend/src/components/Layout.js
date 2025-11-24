@@ -37,6 +37,7 @@ const Layout = ({ user, children }) => {
 
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => {
+            if (item.adminOnly && user?.role !== 'admin') return null;
             const isActive = location.pathname === item.path;
             return (
               <Link key={item.path} to={item.path} data-testid={`nav-${item.label.toLowerCase()}`}>
