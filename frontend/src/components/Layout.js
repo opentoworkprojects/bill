@@ -15,7 +15,7 @@ const Layout = ({ user, children }) => {
   };
 
   const navItems = [
-    { path: '/', icon: Home, label: 'Dashboard' },
+    { path: '/dashboard', icon: Home, label: 'Dashboard' },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu' },
     { path: '/orders', icon: ShoppingBag, label: 'Orders' },
     { path: '/tables', icon: Table, label: 'Tables' },
