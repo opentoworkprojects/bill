@@ -992,8 +992,11 @@ async def update_inventory_item(item_id: str, item: InventoryItemCreate, current
     return updated
 
 @api_router.get("/inventory/low-stock")
-async def get_low_stock():
-    items = await db.inventory.find({}, {"_id": 0}).to_list(1000)
+async def get_low_stock(current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    items = await db.inventory.find({"organization_id": user_org_id}, {"_id": 0}).to_list(1000)
     low_stock = [item for item in items if item['quantity'] <= item['min_quantity']]
     return low_stock
 
