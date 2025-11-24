@@ -92,7 +92,7 @@ const BusinessSetupPage = ({ user }) => {
     try {
       await axios.post(`${API}/business/setup`, formData);
       toast.success('Business setup completed!');
-      setTimeout(() => navigate('/'), 1500);
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to complete setup');
     } finally {
