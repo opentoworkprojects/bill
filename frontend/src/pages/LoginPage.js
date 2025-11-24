@@ -36,7 +36,7 @@ const LoginPage = ({ setUser }) => {
         if (response.data.user.role === 'admin' && !response.data.user.setup_completed) {
           navigate('/setup');
         } else {
-          navigate('/');
+          navigate('/dashboard');
         }
       } else {
         await axios.post(`${API}/auth/register`, formData);
