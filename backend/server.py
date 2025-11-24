@@ -418,6 +418,80 @@ async def login(credentials: UserLogin):
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
+# Staff Management
+@api_router.post("/staff/create")
+async def create_staff(staff_data: StaffCreate, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can create staff")
+    
+    existing = await db.users.find_one({"username": staff_data.username}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    user_obj = User(
+        username=staff_data.username,
+        email=staff_data.email,
+        role=staff_data.role
+    )
+    
+    doc = user_obj.model_dump()
+    doc['password'] = hash_password(staff_data.password)
+    doc['phone'] = staff_data.phone
+    doc['salary'] = staff_data.salary
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.users.insert_one(doc)
+    return {"message": "Staff member created", "id": user_obj.id}
+
+@api_router.get("/staff")
+async def get_staff(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can view staff")
+    
+    staff = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    return staff
+
+@api_router.put("/staff/{staff_id}")
+async def update_staff(staff_id: str, staff_data: StaffUpdate, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can update staff")
+    
+    existing = await db.users.find_one({"id": staff_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    
+    update_data = {}
+    if staff_data.username:
+        update_data['username'] = staff_data.username
+    if staff_data.email:
+        update_data['email'] = staff_data.email
+    if staff_data.password:
+        update_data['password'] = hash_password(staff_data.password)
+    if staff_data.role:
+        update_data['role'] = staff_data.role
+    if staff_data.phone is not None:
+        update_data['phone'] = staff_data.phone
+    if staff_data.salary is not None:
+        update_data['salary'] = staff_data.salary
+    
+    await db.users.update_one({"id": staff_id}, {"$set": update_data})
+    return {"message": "Staff updated"}
+
+@api_router.delete("/staff/{staff_id}")
+async def delete_staff(staff_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can delete staff")
+    
+    staff = await db.users.find_one({"id": staff_id}, {"_id": 0})
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    
+    if staff['role'] == 'admin':
+        raise HTTPException(status_code=400, detail="Cannot delete admin user")
+    
+    await db.users.delete_one({"id": staff_id})
+    return {"message": "Staff deleted"}
+
 # Business Setup
 @api_router.post("/business/setup")
 async def setup_business(settings: BusinessSettings, current_user: dict = Depends(get_current_user)):
