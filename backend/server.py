@@ -725,14 +725,17 @@ async def update_menu_item(item_id: str, item: MenuItemCreate, current_user: dic
     if current_user['role'] not in ['admin', 'cashier']:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    existing = await db.menu_items.find_one({"id": item_id}, {"_id": 0})
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    existing = await db.menu_items.find_one({"id": item_id, "organization_id": user_org_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Item not found")
     
     update_data = item.model_dump()
-    await db.menu_items.update_one({"id": item_id}, {"$set": update_data})
+    await db.menu_items.update_one({"id": item_id, "organization_id": user_org_id}, {"$set": update_data})
     
-    updated = await db.menu_items.find_one({"id": item_id}, {"_id": 0})
+    updated = await db.menu_items.find_one({"id": item_id, "organization_id": user_org_id}, {"_id": 0})
     if isinstance(updated['created_at'], str):
         updated['created_at'] = datetime.fromisoformat(updated['created_at'])
     return updated
