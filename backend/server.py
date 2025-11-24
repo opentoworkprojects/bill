@@ -267,14 +267,16 @@ def get_receipt_template(theme: str, business: dict, order: dict, currency_symbo
     phone = business.get('phone', 'N/A')
     gstin = business.get('gstin', 'N/A')
     
+    tax_rate = business.get('tax_rate', 5)
+    
     templates = {
         "classic": f"""
 {sep_eq}
-{business.get('restaurant_name', 'RESTAURANT').center(48)}
+{rest_name_48}
 {sep_eq}
-{business.get('address', '').center(48)}
-Phone: {business.get('phone', 'N/A')}
-GSTIN: {business.get('gstin', 'N/A')}
+{address_48}
+Phone: {phone}
+GSTIN: {gstin}
 {sep_dash}
 Bill #: {order['id'][:8]}
 Table: {order['table_number']}
@@ -285,7 +287,7 @@ Date: {now_str}
 ITEMS:
 {items_text}{sep_dash}
 Subtotal:         {currency_symbol}{order['subtotal']:.2f}
-Tax ({business.get('tax_rate', 5)}%):          {currency_symbol}{order['tax']:.2f}
+Tax ({tax_rate}%):          {currency_symbol}{order['tax']:.2f}
 {sep_dash}
 TOTAL:            {currency_symbol}{order['total']:.2f}
 {sep_dash}
@@ -295,10 +297,10 @@ Visit again soon!
 """,
         "modern": f"""
 ┌{sep_light}┐
-│ {business.get('restaurant_name', 'RESTAURANT').center(44)} │
+│ {rest_name_44} │
 ├{sep_light}┤
-│ {business.get('address', '').center(44)} │
-│ ☎ {business.get('phone', 'N/A'):<42} │
+│ {address_44} │
+│ ☎ {phone:<42} │
 └{sep_light}┘
 
 🧾 Bill #{order['id'][:8]}
@@ -308,7 +310,7 @@ Visit again soon!
 {sep_light}
 {items_modern}{sep_light}
 Subtotal                      {currency_symbol}{order['subtotal']:.2f}
-Tax ({business.get('tax_rate', 5)}%)                        {currency_symbol}{order['tax']:.2f}
+Tax ({tax_rate}%)                        {currency_symbol}{order['tax']:.2f}
 {sep_heavy}
 💰 TOTAL                      {currency_symbol}{order['total']:.2f}
 {sep_heavy}
@@ -316,8 +318,8 @@ Tax ({business.get('tax_rate', 5)}%)                        {currency_symbol}{or
 ✨ Thank you! Come again! ✨
 """,
         "minimal": f"""
-{business.get('restaurant_name', 'RESTAURANT')}
-{business.get('address', '')}
+{rest_name}
+{address}
 
 Bill: {order['id'][:8]} | Table: {order['table_number']}
 {now_str}
@@ -330,11 +332,11 @@ Thank you!
 """,
         "elegant": f"""
 ╔{sep_heavy}╗
-║ {business.get('restaurant_name', 'RESTAURANT').center(44)} ║
+║ {rest_name_44} ║
 ╠{sep_heavy}╣
-║ {business.get('address', '').center(44)} ║
-║ Tel: {business.get('phone', 'N/A'):<40} ║
-║ GSTIN: {business.get('gstin', 'N/A'):<38} ║
+║ {address_44} ║
+║ Tel: {phone:<40} ║
+║ GSTIN: {gstin:<38} ║
 ╚{sep_heavy}╝
 
 Invoice: {order['id'][:8]}
@@ -345,7 +347,7 @@ Date: {now_elegant}
 {sep_dash}
 {items_elegant}{sep_dash}
                     Subtotal: {currency_symbol}{order['subtotal']:>8.2f}
-               Tax ({business.get('tax_rate', 5)}%): {currency_symbol}{order['tax']:>8.2f}
+               Tax ({tax_rate}%): {currency_symbol}{order['tax']:>8.2f}
 {sep_heavy}
                        TOTAL: {currency_symbol}{order['total']:>8.2f}
 {sep_heavy}
