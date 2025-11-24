@@ -217,12 +217,53 @@ const MenuPage = ({ user }) => {
                     />
                   </div>
                   <div>
-                    <Label>Image URL</Label>
-                    <Input
-                      value={formData.image_url}
-                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                      placeholder="https://example.com/image.jpg"
-                    />
+                    <Label>Menu Image</Label>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          className="flex-1"
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          {uploading ? 'Uploading...' : 'Upload Image'}
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </div>
+                      {imagePreview && (
+                        <div className="relative">
+                          <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImagePreview('');
+                              setFormData({ ...formData, image_url: '' });
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500">Or enter image URL below (optional)</p>
+                      <Input
+                        value={formData.image_url}
+                        onChange={(e) => {
+                          setFormData({ ...formData, image_url: e.target.value });
+                          setImagePreview(e.target.value);
+                        }}
+                        placeholder="https://example.com/image.jpg"
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
