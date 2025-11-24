@@ -949,8 +949,11 @@ async def verify_payment(razorpay_payment_id: str, razorpay_order_id: str, order
     return {"status": "payment_verified"}
 
 @api_router.get("/payments")
-async def get_payments():
-    payments = await db.payments.find({}, {"_id": 0}).to_list(1000)
+async def get_payments(current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    payments = await db.payments.find({"organization_id": user_org_id}, {"_id": 0}).to_list(1000)
     for payment in payments:
         if isinstance(payment['created_at'], str):
             payment['created_at'] = datetime.fromisoformat(payment['created_at'])
