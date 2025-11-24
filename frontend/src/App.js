@@ -11,6 +11,8 @@ import KitchenPage from './pages/KitchenPage';
 import InventoryPage from './pages/InventoryPage';
 import ReportsPage from './pages/ReportsPage';
 import BillingPage from './pages/BillingPage';
+import SettingsPage from './pages/SettingsPage';
+import SubscriptionPage from './pages/SubscriptionPage';
 import { Toaster } from './components/ui/sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
