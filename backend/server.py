@@ -826,8 +826,14 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     return order_obj
 
 @api_router.get("/orders", response_model=List[Order])
-async def get_orders(status: Optional[str] = None):
-    query = {} if not status else {"status": status}
+async def get_orders(status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    query = {"organization_id": user_org_id}
+    if status:
+        query["status"] = status
+    
     orders = await db.orders.find(query, {"_id": 0}).to_list(1000)
     for order in orders:
         if isinstance(order['created_at'], str):
