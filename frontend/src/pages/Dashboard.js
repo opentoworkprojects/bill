@@ -89,7 +89,55 @@ const Dashboard = ({ user }) => {
 
   return (
     <Layout user={user}>
+      <Dialog open={showSubscriptionModal} onOpenChange={setShowSubscriptionModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-6 h-6" />
+              Subscription Required
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-700">
+              You've reached 50 bills! To continue using RestoBill AI, please subscribe for just ₹99/year.
+            </p>
+            <div className="bg-violet-50 p-4 rounded-lg">
+              <p className="font-medium text-violet-900">Get unlimited bills and premium features!</p>
+              <ul className="text-sm text-violet-700 mt-2 space-y-1">
+                <li>✓ Unlimited bills</li>
+                <li>✓ All AI features</li>
+                <li>✓ Priority support</li>
+                <li>✓ Advanced analytics</li>
+              </ul>
+            </div>
+            <Button 
+              onClick={() => navigate('/subscription')} 
+              className="w-full bg-gradient-to-r from-violet-600 to-purple-600"
+            >
+              Subscribe Now - ₹99/Year
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-6" data-testid="dashboard-page">
+        {subscriptionStatus?.needs_subscription && (
+          <Card className="border-0 shadow-lg border-l-4 border-l-orange-500">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
+                <div>
+                  <p className="font-medium text-orange-900">Subscription Required</p>
+                  <p className="text-sm text-orange-700">You've used {subscriptionStatus.bill_count} bills. Subscribe to continue.</p>
+                </div>
+              </div>
+              <Button onClick={() => navigate('/subscription')} className="bg-gradient-to-r from-violet-600 to-purple-600">
+                Subscribe
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Welcome back, {user?.username}!</h1>
           <p className="text-gray-600 mt-2">Here's what's happening with your restaurant today</p>
