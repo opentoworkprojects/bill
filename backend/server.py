@@ -709,8 +709,11 @@ async def get_menu(current_user: dict = Depends(get_current_user)):
     return items
 
 @api_router.get("/menu/{item_id}", response_model=MenuItem)
-async def get_menu_item(item_id: str):
-    item = await db.menu_items.find_one({"id": item_id}, {"_id": 0})
+async def get_menu_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    item = await db.menu_items.find_one({"id": item_id, "organization_id": user_org_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     if isinstance(item['created_at'], str):
