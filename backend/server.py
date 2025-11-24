@@ -1136,7 +1136,10 @@ async def print_receipt(print_data: PrintData, current_user: dict = Depends(get_
 
 @api_router.post("/print/bill/{order_id}")
 async def print_bill(order_id: str, theme: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    order = await db.orders.find_one({"id": order_id, "organization_id": user_org_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
