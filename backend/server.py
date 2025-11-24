@@ -90,6 +90,22 @@ class RazorpaySettings(BaseModel):
     razorpay_key_id: str
     razorpay_key_secret: str
 
+class StaffCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: str
+    phone: Optional[str] = None
+    salary: Optional[float] = None
+
+class StaffUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    phone: Optional[str] = None
+    salary: Optional[float] = None
+
 class MenuItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
