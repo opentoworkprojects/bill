@@ -223,15 +223,18 @@ backend:
         
   - task: "Subscription Model (₹99 after 50 bills)"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Logic implemented. Needs testing with bill creation and subscription flow."
+      - working: true
+        agent: "testing"
+        comment: "VERIFIED: Subscription logic working. Order creation includes subscription check. Bill count tracking functional. Subscription status endpoint working."
         
   - task: "Business Setup/Settings"
     implemented: true
