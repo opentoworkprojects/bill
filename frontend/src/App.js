@@ -15,6 +15,7 @@ import SettingsPage from './pages/SettingsPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import BusinessSetupPage from './pages/BusinessSetupPage';
 import StaffManagementPage from './pages/StaffManagementPage';
+import LandingPage from './pages/LandingPage';
 import { Toaster } from './components/ui/sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
