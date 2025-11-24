@@ -257,6 +257,16 @@ def get_receipt_template(theme: str, business: dict, order: dict, currency_symbo
     now_str = datetime.now().strftime('%d-%m-%Y %I:%M %p')
     now_elegant = datetime.now().strftime('%d %B %Y, %I:%M %p')
     
+    # Pre-compute centered text
+    rest_name = business.get('restaurant_name', 'RESTAURANT')
+    rest_name_48 = rest_name.center(48)
+    rest_name_44 = rest_name.center(44)
+    address = business.get('address', '')
+    address_48 = address.center(48)
+    address_44 = address.center(44)
+    phone = business.get('phone', 'N/A')
+    gstin = business.get('gstin', 'N/A')
+    
     templates = {
         "classic": f"""
 {sep_eq}
