@@ -251,6 +251,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user.setdefault('razorpay_key_id', None)
         user.setdefault('razorpay_key_secret', None)
         user.setdefault('subscription_expires_at', None)
+        user.setdefault('organization_id', user['id'] if user['role'] == 'admin' else None)
         
         return user
     except jwt.ExpiredSignatureError:
