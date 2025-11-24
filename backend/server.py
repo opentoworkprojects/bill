@@ -745,7 +745,10 @@ async def delete_menu_item(item_id: str, current_user: dict = Depends(get_curren
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    result = await db.menu_items.delete_one({"id": item_id})
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    result = await db.menu_items.delete_one({"id": item_id, "organization_id": user_org_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"message": "Item deleted"}
