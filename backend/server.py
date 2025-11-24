@@ -843,8 +843,11 @@ async def get_orders(status: Optional[str] = None, current_user: dict = Depends(
     return orders
 
 @api_router.get("/orders/{order_id}", response_model=Order)
-async def get_order(order_id: str):
-    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+async def get_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    order = await db.orders.find_one({"id": order_id, "organization_id": user_org_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     if isinstance(order['created_at'], str):
