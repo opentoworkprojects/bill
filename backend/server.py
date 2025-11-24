@@ -515,9 +515,16 @@ async def delete_staff(staff_id: str, current_user: dict = Depends(get_current_u
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Only admin can delete staff")
     
-    staff = await db.users.find_one({"id": staff_id}, {"_id": 0})
+    # Get admin's organization_id
+    admin_org_id = current_user.get('organization_id') or current_user['id']
+    
+    # Only allow deleting staff from same organization
+    staff = await db.users.find_one({
+        "id": staff_id,
+        "organization_id": admin_org_id
+    }, {"_id": 0})
     if not staff:
-        raise HTTPException(status_code=404, detail="Staff not found")
+        raise HTTPException(status_code=404, detail="Staff not found or access denied")
     
     if staff['role'] == 'admin':
         raise HTTPException(status_code=400, detail="Cannot delete admin user")
