@@ -858,14 +858,17 @@ async def get_order(order_id: str, current_user: dict = Depends(get_current_user
 
 @api_router.put("/orders/{order_id}/status")
 async def update_order_status(order_id: str, status: str, current_user: dict = Depends(get_current_user)):
-    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    order = await db.orders.find_one({"id": order_id, "organization_id": user_org_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    await db.orders.update_one({"id": order_id}, {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    await db.orders.update_one({"id": order_id, "organization_id": user_org_id}, {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}})
     
     if status == "completed":
-        await db.tables.update_one({"id": order['table_id']}, {"$set": {"status": "available", "current_order_id": None}})
+        await db.tables.update_one({"id": order['table_id'], "organization_id": user_org_id}, {"$set": {"status": "available", "current_order_id": None}})
     
     return {"message": "Order status updated"}
 
