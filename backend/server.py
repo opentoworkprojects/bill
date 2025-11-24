@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -31,9 +31,6 @@ security = HTTPBearer()
 JWT_SECRET = os.environ.get('JWT_SECRET')
 JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
 
-# Razorpay client
-razorpay_client = razorpay.Client(auth=(os.environ.get('RAZORPAY_KEY_ID', ''), os.environ.get('RAZORPAY_KEY_SECRET', '')))
-
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
@@ -43,18 +40,29 @@ class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     username: str
     email: str
-    role: str  # admin, waiter, cashier, kitchen
+    role: str
+    restaurant_name: Optional[str] = None
+    razorpay_key_id: Optional[str] = None
+    razorpay_key_secret: Optional[str] = None
+    subscription_active: bool = False
+    bill_count: int = 0
+    subscription_expires_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    role: str = "waiter"
+    role: str = "admin"
+    restaurant_name: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str
     password: str
+
+class RazorpaySettings(BaseModel):
+    razorpay_key_id: str
+    razorpay_key_secret: str
 
 class MenuItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -64,9 +72,10 @@ class MenuItem(BaseModel):
     price: float
     description: Optional[str] = None
     image_url: Optional[str] = None
+    image_data: Optional[str] = None
     available: bool = True
     ingredients: Optional[List[str]] = []
-    preparation_time: Optional[int] = 15  # minutes
+    preparation_time: Optional[int] = 15
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MenuItemCreate(BaseModel):
@@ -75,6 +84,7 @@ class MenuItemCreate(BaseModel):
     price: float
     description: Optional[str] = None
     image_url: Optional[str] = None
+    image_data: Optional[str] = None
     available: bool = True
     ingredients: Optional[List[str]] = []
     preparation_time: Optional[int] = 15
@@ -84,7 +94,7 @@ class Table(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     table_number: int
     capacity: int
-    status: str = "available"  # available, occupied, reserved
+    status: str = "available"
     current_order_id: Optional[str] = None
 
 class TableCreate(BaseModel):
@@ -109,7 +119,7 @@ class Order(BaseModel):
     tax: float
     discount: float = 0
     total: float
-    status: str = "pending"  # pending, preparing, ready, completed, cancelled
+    status: str = "pending"
     waiter_id: str
     waiter_name: str
     customer_name: Optional[str] = None
@@ -127,16 +137,19 @@ class Payment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     order_id: str
     amount: float
-    payment_method: str  # cash, card, upi, razorpay
+    payment_method: str
     razorpay_order_id: Optional[str] = None
     razorpay_payment_id: Optional[str] = None
-    status: str = "pending"  # pending, completed, failed
+    status: str = "pending"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PaymentCreate(BaseModel):
     order_id: str
     amount: float
     payment_method: str
+
+class SubscriptionPayment(BaseModel):
+    amount: float = 99.0
 
 class InventoryItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -158,12 +171,9 @@ class InventoryItemCreate(BaseModel):
 class ChatMessage(BaseModel):
     message: str
 
-class AIRecommendation(BaseModel):
-    recommendations: List[str]
-
 class PrintData(BaseModel):
     content: str
-    type: str  # bill, kot
+    type: str
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -194,6 +204,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+async def check_subscription(user: dict):
+    if user['bill_count'] >= 50 and not user['subscription_active']:
+        return False
+    if user['subscription_active'] and user.get('subscription_expires_at'):
+        expires = user['subscription_expires_at']
+        if isinstance(expires, str):
+            expires = datetime.fromisoformat(expires)
+        if expires < datetime.now(timezone.utc):
+            await db.users.update_one({"id": user['id']}, {"$set": {"subscription_active": False}})
+            return False
+    return True
+
 # Auth routes
 @api_router.post("/auth/register", response_model=User)
 async def register(user_data: UserCreate):
@@ -204,7 +226,8 @@ async def register(user_data: UserCreate):
     user_obj = User(
         username=user_data.username,
         email=user_data.email,
-        role=user_data.role
+        role=user_data.role,
+        restaurant_name=user_data.restaurant_name
     )
     doc = user_obj.model_dump()
     doc['password'] = hash_password(user_data.password)
@@ -220,11 +243,110 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_access_token({"user_id": user['id'], "role": user['role']})
-    return {"token": token, "user": {"id": user['id'], "username": user['username'], "role": user['role'], "email": user['email']}}
+    return {
+        "token": token,
+        "user": {
+            "id": user['id'],
+            "username": user['username'],
+            "role": user['role'],
+            "email": user['email'],
+            "restaurant_name": user.get('restaurant_name'),
+            "subscription_active": user.get('subscription_active', False),
+            "bill_count": user.get('bill_count', 0)
+        }
+    }
 
 @api_router.get("/auth/me", response_model=User)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+# Razorpay Settings
+@api_router.post("/settings/razorpay")
+async def update_razorpay_settings(settings: RazorpaySettings, current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Only admin can update settings")
+    
+    await db.users.update_one(
+        {"id": current_user['id']},
+        {"$set": {
+            "razorpay_key_id": settings.razorpay_key_id,
+            "razorpay_key_secret": settings.razorpay_key_secret
+        }}
+    )
+    return {"message": "Razorpay settings updated successfully"}
+
+@api_router.get("/settings/razorpay")
+async def get_razorpay_settings(current_user: dict = Depends(get_current_user)):
+    return {
+        "razorpay_key_id": current_user.get('razorpay_key_id', ''),
+        "razorpay_configured": bool(current_user.get('razorpay_key_id'))
+    }
+
+# Subscription
+@api_router.get("/subscription/status")
+async def get_subscription_status(current_user: dict = Depends(get_current_user)):
+    is_active = await check_subscription(current_user)
+    return {
+        "subscription_active": current_user.get('subscription_active', False),
+        "bill_count": current_user.get('bill_count', 0),
+        "needs_subscription": current_user.get('bill_count', 0) >= 50 and not current_user.get('subscription_active', False),
+        "subscription_expires_at": current_user.get('subscription_expires_at')
+    }
+
+@api_router.post("/subscription/create-order")
+async def create_subscription_order(current_user: dict = Depends(get_current_user)):
+    # Use user's Razorpay keys if configured, otherwise use system keys
+    razorpay_key_id = current_user.get('razorpay_key_id') or os.environ.get('RAZORPAY_KEY_ID')
+    razorpay_key_secret = current_user.get('razorpay_key_secret') or os.environ.get('RAZORPAY_KEY_SECRET')
+    
+    if not razorpay_key_id or not razorpay_key_secret:
+        raise HTTPException(status_code=400, detail="Razorpay not configured. Please configure in settings.")
+    
+    razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
+    
+    amount_paise = 9900  # ₹99
+    razor_order = razorpay_client.order.create({
+        "amount": amount_paise,
+        "currency": "INR",
+        "payment_capture": 1
+    })
+    
+    return {
+        "razorpay_order_id": razor_order['id'],
+        "amount": amount_paise,
+        "currency": "INR",
+        "key_id": razorpay_key_id
+    }
+
+@api_router.post("/subscription/verify")
+async def verify_subscription_payment(razorpay_payment_id: str, razorpay_order_id: str, current_user: dict = Depends(get_current_user)):
+    expires_at = datetime.now(timezone.utc) + timedelta(days=365)  # 1 year subscription
+    
+    await db.users.update_one(
+        {"id": current_user['id']},
+        {"$set": {
+            "subscription_active": True,
+            "subscription_expires_at": expires_at.isoformat()
+        }}
+    )
+    
+    return {"status": "subscription_activated", "expires_at": expires_at.isoformat()}
+
+# Image Upload
+@api_router.post("/upload/image")
+async def upload_image(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    if file.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/webp"]:
+        raise HTTPException(status_code=400, detail="Only image files allowed")
+    
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB")
+    
+    # Convert to base64
+    image_data = base64.b64encode(contents).decode('utf-8')
+    image_url = f"data:{file.content_type};base64,{image_data}"
+    
+    return {"image_url": image_url}
 
 # Menu routes
 @api_router.post("/menu", response_model=MenuItem)
@@ -310,8 +432,12 @@ async def update_table(table_id: str, table: TableCreate, current_user: dict = D
 # Order routes
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: dict = Depends(get_current_user)):
+    # Check subscription
+    if not await check_subscription(current_user):
+        raise HTTPException(status_code=402, detail="Subscription required. You have reached 50 bills. Please subscribe to continue.")
+    
     subtotal = sum(item.price * item.quantity for item in order_data.items)
-    tax = subtotal * 0.05  # 5% tax
+    tax = subtotal * 0.05
     total = subtotal + tax
     
     order_obj = Order(
@@ -372,12 +498,20 @@ async def update_order_status(order_id: str, status: str, current_user: dict = D
 
 # Payment routes
 @api_router.post("/payments/create-order")
-async def create_payment_order(payment_data: PaymentCreate):
+async def create_payment_order(payment_data: PaymentCreate, current_user: dict = Depends(get_current_user)):
     order = await db.orders.find_one({"id": payment_data.order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
     if payment_data.payment_method == "razorpay":
+        razorpay_key_id = current_user.get('razorpay_key_id') or os.environ.get('RAZORPAY_KEY_ID')
+        razorpay_key_secret = current_user.get('razorpay_key_secret') or os.environ.get('RAZORPAY_KEY_SECRET')
+        
+        if not razorpay_key_id or not razorpay_key_secret:
+            raise HTTPException(status_code=400, detail="Razorpay not configured")
+        
+        razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
+        
         amount_paise = int(payment_data.amount * 100)
         razor_order = razorpay_client.order.create({
             "amount": amount_paise,
@@ -396,7 +530,7 @@ async def create_payment_order(payment_data: PaymentCreate):
         doc['created_at'] = doc['created_at'].isoformat()
         await db.payments.insert_one(doc)
         
-        return {"razorpay_order_id": razor_order['id'], "amount": amount_paise, "currency": "INR", "key_id": os.environ.get('RAZORPAY_KEY_ID')}
+        return {"razorpay_order_id": razor_order['id'], "amount": amount_paise, "currency": "INR", "key_id": razorpay_key_id}
     else:
         payment_obj = Payment(
             order_id=payment_data.order_id,
@@ -411,10 +545,15 @@ async def create_payment_order(payment_data: PaymentCreate):
         
         await db.orders.update_one({"id": payment_data.order_id}, {"$set": {"status": "completed"}})
         
+        # Increment bill count
+        admin_user = await db.users.find_one({"id": current_user['id']}, {"_id": 0})
+        if admin_user:
+            await db.users.update_one({"id": current_user['id']}, {"$inc": {"bill_count": 1}})
+        
         return {"payment_id": payment_obj.id, "status": "completed"}
 
 @api_router.post("/payments/verify")
-async def verify_payment(razorpay_payment_id: str, razorpay_order_id: str, order_id: str):
+async def verify_payment(razorpay_payment_id: str, razorpay_order_id: str, order_id: str, current_user: dict = Depends(get_current_user)):
     payment = await db.payments.find_one({"razorpay_order_id": razorpay_order_id}, {"_id": 0})
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
@@ -425,6 +564,9 @@ async def verify_payment(razorpay_payment_id: str, razorpay_order_id: str, order
     )
     
     await db.orders.update_one({"id": order_id}, {"$set": {"status": "completed"}})
+    
+    # Increment bill count
+    await db.users.update_one({"id": current_user['id']}, {"$inc": {"bill_count": 1}})
     
     return {"status": "payment_verified"}
 
@@ -586,21 +728,18 @@ async def export_report(start_date: str, end_date: str):
 # Thermal printer route
 @api_router.post("/print")
 async def print_receipt(print_data: PrintData):
-    # ESC/POS commands for thermal printer
     escpos_commands = {
-        'init': b'\x1b\x40',  # Initialize
-        'bold_on': b'\x1b\x45\x01',  # Bold on
-        'bold_off': b'\x1b\x45\x00',  # Bold off
-        'center': b'\x1b\x61\x01',  # Center align
-        'left': b'\x1b\x61\x00',  # Left align
-        'cut': b'\x1d\x56\x00',  # Cut paper
+        'init': b'\x1b\x40',
+        'bold_on': b'\x1b\x45\x01',
+        'bold_off': b'\x1b\x45\x00',
+        'center': b'\x1b\x61\x01',
+        'left': b'\x1b\x61\x00',
+        'cut': b'\x1d\x56\x00',
         'newline': b'\n'
     }
     
-    # Convert content to ESC/POS format
     print_content = print_data.content
     
-    # For browser-based printing, return formatted content
     return {
         "print_ready": True,
         "content": print_content,
