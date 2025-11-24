@@ -793,6 +793,9 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     if not await check_subscription(current_user):
         raise HTTPException(status_code=402, detail="Subscription required. You have reached 50 bills. Please subscribe to continue.")
     
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
     business = current_user.get('business_settings', {})
     tax_rate = business.get('tax_rate', 5.0) / 100
     
@@ -809,7 +812,8 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         total=total,
         waiter_id=current_user['id'],
         waiter_name=current_user['username'],
-        customer_name=order_data.customer_name
+        customer_name=order_data.customer_name,
+        organization_id=user_org_id
     )
     
     doc = order_obj.model_dump()
@@ -817,7 +821,7 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     doc['updated_at'] = doc['updated_at'].isoformat()
     
     await db.orders.insert_one(doc)
-    await db.tables.update_one({"id": order_data.table_id}, {"$set": {"status": "occupied", "current_order_id": order_obj.id}})
+    await db.tables.update_one({"id": order_data.table_id, "organization_id": user_org_id}, {"$set": {"status": "occupied", "current_order_id": order_obj.id}})
     
     return order_obj
 
