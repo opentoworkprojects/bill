@@ -875,7 +875,10 @@ async def update_order_status(order_id: str, status: str, current_user: dict = D
 # Payment routes
 @api_router.post("/payments/create-order")
 async def create_payment_order(payment_data: PaymentCreate, current_user: dict = Depends(get_current_user)):
-    order = await db.orders.find_one({"id": payment_data.order_id}, {"_id": 0})
+    # Get user's organization_id
+    user_org_id = current_user.get('organization_id') or current_user['id']
+    
+    order = await db.orders.find_one({"id": payment_data.order_id, "organization_id": user_org_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
@@ -899,7 +902,8 @@ async def create_payment_order(payment_data: PaymentCreate, current_user: dict =
             order_id=payment_data.order_id,
             amount=payment_data.amount,
             payment_method=payment_data.payment_method,
-            razorpay_order_id=razor_order['id']
+            razorpay_order_id=razor_order['id'],
+            organization_id=user_org_id
         )
         
         doc = payment_obj.model_dump()
@@ -912,14 +916,15 @@ async def create_payment_order(payment_data: PaymentCreate, current_user: dict =
             order_id=payment_data.order_id,
             amount=payment_data.amount,
             payment_method=payment_data.payment_method,
-            status="completed"
+            status="completed",
+            organization_id=user_org_id
         )
         
         doc = payment_obj.model_dump()
         doc['created_at'] = doc['created_at'].isoformat()
         await db.payments.insert_one(doc)
         
-        await db.orders.update_one({"id": payment_data.order_id}, {"$set": {"status": "completed"}})
+        await db.orders.update_one({"id": payment_data.order_id, "organization_id": user_org_id}, {"$set": {"status": "completed"}})
         await db.users.update_one({"id": current_user['id']}, {"$inc": {"bill_count": 1}})
         
         return {"payment_id": payment_obj.id, "status": "completed"}
