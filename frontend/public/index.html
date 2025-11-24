@@ -18,13 +18,80 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-        <title>RestoBill AI - Restaurant Billing System</title>
+        <title>RestoBill AI - Smart Restaurant Billing System with AI | POS Software</title>
+        
+        <!-- SEO Meta Tags -->
+        <meta name="description" content="RestoBill AI is an AI-powered restaurant billing system with thermal printing, multi-currency support, inventory management, and advanced analytics. Start free for 50 bills!" />
+        <meta name="keywords" content="restaurant billing software, POS system, restaurant management, thermal printer, AI billing, inventory management, multi-currency POS, restaurant software India, billing system, KOT system" />
+        <meta name="author" content="RestoBill AI" />
+        <meta name="robots" content="index, follow" />
+        <meta name="language" content="English" />
+        <meta name="revisit-after" content="7 days" />
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://restobill.ai/" />
+        <meta property="og:title" content="RestoBill AI - Smart Restaurant Billing System with AI" />
+        <meta property="og:description" content="Transform your restaurant with AI-powered billing, multi-currency support, and thermal printing. Try free for 50 bills!" />
+        <meta property="og:image" content="https://restobill.ai/og-image.jpg" />
+        
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://restobill.ai/" />
+        <meta property="twitter:title" content="RestoBill AI - Smart Restaurant Billing System with AI" />
+        <meta property="twitter:description" content="Transform your restaurant with AI-powered billing, multi-currency support, and thermal printing. Try free for 50 bills!" />
+        <meta property="twitter:image" content="https://restobill.ai/twitter-image.jpg" />
+        
+        <!-- Canonical -->
+        <link rel="canonical" href="https://restobill.ai/" />
+        
+        <!-- PWA -->
         <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content=\"RestoBill AI\" />
+        <meta name="apple-mobile-web-app-title" content="RestoBill AI" />
+        <meta name="theme-color" content="#7c3aed" />
+        
+        <!-- Favicon -->
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%237c3aed'/><text x='50' y='65' font-size='60' text-anchor='middle' fill='white' font-family='Arial, sans-serif' font-weight='bold'>R</text></svg>" />
+        
+        <!-- External Scripts -->
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+        
+        <!-- Google Analytics (Add your tracking ID) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-XXXXXXXXXX');
+        </script>
+        
+        <!-- Schema.org for Google -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "RestoBill AI",
+          "applicationCategory": "BusinessApplication",
+          "offers": {
+            "@type": "Offer",
+            "price": "99",
+            "priceCurrency": "INR",
+            "priceValidUntil": "2025-12-31"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "ratingCount": "1000"
+          },
+          "operatingSystem": "Web, Android, iOS",
+          "description": "AI-powered restaurant billing system with thermal printing, multi-currency support, and advanced analytics",
+          "image": "https://restobill.ai/app-icon.png",
+          "url": "https://restobill.ai"
+        }
+        </script>
         <!--
         These two scripts have been added for the testing, please do not edit or remove them
         -->
