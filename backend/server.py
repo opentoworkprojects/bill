@@ -117,6 +117,7 @@ def is_allowed_origin(origin: str) -> bool:
         "https://restro-ai.onrender.com",
         "https://restro-ai-u9kz.vercel.app",
         "https://finverge.tech",
+        "https://www.finverge.tech",
     ]
 
     # Check exact matches
@@ -124,7 +125,7 @@ def is_allowed_origin(origin: str) -> bool:
         return True
 
     # Check pattern matches
-    domain_patterns = [".vercel.app", ".netlify.app", ".onrender.com", ".render.com"]
+    domain_patterns = [".vercel.app", ".netlify.app", ".onrender.com", ".render.com", ".finverge.tech"]
 
     for pattern in domain_patterns:
         if origin.endswith(pattern):
@@ -142,6 +143,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://restro-ai.onrender.com",
+    "https://finverge.tech",
+    "https://www.finverge.tech",
     # exact current frontend origin:
     "https://restro-ai-u9kz-ed0v8idw3-shivs-projects-db2d52eb.vercel.app",
 ]
