@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 
 class RestaurantAPITester:
-    def __init__(self, base_url="https://resto-bill-hub.preview.emergentagent.com/api"):
+    def __init__(self, base_url="http://localhost:5000/api"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
@@ -29,7 +29,7 @@ class RestaurantAPITester:
         """Run a single API test"""
         url = f"{self.base_url}/{endpoint}"
         headers = {'Content-Type': 'application/json'}
-        
+
         # Use provided token or default token
         auth_token = token or self.token
         if auth_token:
@@ -37,7 +37,7 @@ class RestaurantAPITester:
 
         self.tests_run += 1
         print(f"\n🔍 Testing {name}...")
-        
+
         try:
             if method == 'GET':
                 response = requests.get(url, headers=headers, params=params)
@@ -86,7 +86,7 @@ class RestaurantAPITester:
             "password": "TestPass123!",
             "role": "admin"
         }
-        
+
         success, response = self.run_test(
             f"User Registration ({business_name})",
             "POST",
@@ -95,7 +95,7 @@ class RestaurantAPITester:
             data=user_data,
             critical=True
         )
-        
+
         if success and 'id' in response:
             self.created_items['users'].append(response['id'])
             return user_data, response
@@ -111,7 +111,7 @@ class RestaurantAPITester:
             data={"username": username, "password": password},
             critical=True
         )
-        
+
         if success and 'token' in response:
             return response['token'], response['user']
         return None, None
@@ -137,7 +137,7 @@ class RestaurantAPITester:
             "available": True,
             "preparation_time": 20
         }
-        
+
         success, response = self.run_test(
             "Create Menu Item",
             "POST",
@@ -145,12 +145,12 @@ class RestaurantAPITester:
             200,
             data=menu_data
         )
-        
+
         menu_id = None
         if success and 'id' in response:
             menu_id = response['id']
             self.created_items['menu_items'].append(menu_id)
-        
+
         # Get all menu items
         self.run_test(
             "Get Menu Items",
@@ -158,7 +158,7 @@ class RestaurantAPITester:
             "menu",
             200
         )
-        
+
         # Get specific menu item
         if menu_id:
             self.run_test(
@@ -167,7 +167,7 @@ class RestaurantAPITester:
                 f"menu/{menu_id}",
                 200
             )
-            
+
             # Update menu item
             update_data = {**menu_data, "price": 349.99}
             self.run_test(
@@ -177,7 +177,7 @@ class RestaurantAPITester:
                 200,
                 data=update_data
             )
-        
+
         return menu_id
 
     def test_table_operations(self):
@@ -188,7 +188,7 @@ class RestaurantAPITester:
             "capacity": 4,
             "status": "available"
         }
-        
+
         success, response = self.run_test(
             "Create Table",
             "POST",
@@ -196,12 +196,12 @@ class RestaurantAPITester:
             200,
             data=table_data
         )
-        
+
         table_id = None
         if success and 'id' in response:
             table_id = response['id']
             self.created_items['tables'].append(table_id)
-        
+
         # Get all tables
         self.run_test(
             "Get Tables",
@@ -209,7 +209,7 @@ class RestaurantAPITester:
             "tables",
             200
         )
-        
+
         return table_id
 
     def test_order_operations(self, table_id, menu_id):
@@ -217,7 +217,7 @@ class RestaurantAPITester:
         if not table_id or not menu_id:
             print("⚠️  Skipping order tests - missing table or menu item")
             return None
-            
+
         # Create order
         order_data = {
             "table_id": table_id,
@@ -233,7 +233,7 @@ class RestaurantAPITester:
             ],
             "customer_name": "Test Customer"
         }
-        
+
         success, response = self.run_test(
             "Create Order",
             "POST",
@@ -241,12 +241,12 @@ class RestaurantAPITester:
             200,
             data=order_data
         )
-        
+
         order_id = None
         if success and 'id' in response:
             order_id = response['id']
             self.created_items['orders'].append(order_id)
-        
+
         # Get all orders
         self.run_test(
             "Get Orders",
@@ -254,7 +254,7 @@ class RestaurantAPITester:
             "orders",
             200
         )
-        
+
         # Get specific order
         if order_id:
             self.run_test(
@@ -263,7 +263,7 @@ class RestaurantAPITester:
                 f"orders/{order_id}",
                 200
             )
-            
+
             # Update order status
             self.run_test(
                 "Update Order Status",
@@ -272,7 +272,7 @@ class RestaurantAPITester:
                 200,
                 params={"status": "preparing"}
             )
-        
+
         return order_id
 
     def test_payment_operations(self, order_id):
@@ -280,14 +280,14 @@ class RestaurantAPITester:
         if not order_id:
             print("⚠️  Skipping payment tests - missing order")
             return
-            
+
         # Test cash payment
         payment_data = {
             "order_id": order_id,
             "amount": 629.98,  # 2 * 299.99 + tax
             "payment_method": "cash"
         }
-        
+
         self.run_test(
             "Create Cash Payment",
             "POST",
@@ -295,14 +295,14 @@ class RestaurantAPITester:
             200,
             data=payment_data
         )
-        
+
         # Test Razorpay payment creation (will fail with test keys but should return proper error)
         razorpay_data = {
             "order_id": order_id,
             "amount": 629.98,
             "payment_method": "razorpay"
         }
-        
+
         success, response = self.run_test(
             "Create Razorpay Payment",
             "POST",
@@ -310,7 +310,7 @@ class RestaurantAPITester:
             200,
             data=razorpay_data
         )
-        
+
         # Get payments
         self.run_test(
             "Get Payments",
@@ -329,7 +329,7 @@ class RestaurantAPITester:
             "min_quantity": 10.0,
             "price_per_unit": 50.0
         }
-        
+
         success, response = self.run_test(
             "Create Inventory Item",
             "POST",
@@ -337,12 +337,12 @@ class RestaurantAPITester:
             200,
             data=inventory_data
         )
-        
+
         inventory_id = None
         if success and 'id' in response:
             inventory_id = response['id']
             self.created_items['inventory'].append(inventory_id)
-        
+
         # Get all inventory
         self.run_test(
             "Get Inventory",
@@ -350,7 +350,7 @@ class RestaurantAPITester:
             "inventory",
             200
         )
-        
+
         # Get low stock items
         self.run_test(
             "Get Low Stock Items",
@@ -358,7 +358,7 @@ class RestaurantAPITester:
             "inventory/low-stock",
             200
         )
-        
+
         return inventory_id
 
     def test_ai_features(self):
@@ -367,7 +367,7 @@ class RestaurantAPITester:
         chat_data = {
             "message": "What are your popular menu items?"
         }
-        
+
         print("\n🤖 Testing AI Chat (may take a few seconds)...")
         success, response = self.run_test(
             "AI Chat",
@@ -376,10 +376,10 @@ class RestaurantAPITester:
             200,
             data=chat_data
         )
-        
+
         if success and 'response' in response:
             print(f"   AI Response: {response['response'][:100]}...")
-        
+
         # Test AI recommendations
         print("\n🤖 Testing AI Recommendations (may take a few seconds)...")
         self.run_test(
@@ -388,7 +388,7 @@ class RestaurantAPITester:
             "ai/recommendations",
             200
         )
-        
+
         # Test sales forecast
         print("\n🤖 Testing AI Sales Forecast (may take a few seconds)...")
         self.run_test(
@@ -407,11 +407,11 @@ class RestaurantAPITester:
             "reports/daily",
             200
         )
-        
+
         # Export report
         today = datetime.now().strftime('%Y-%m-%d')
         yesterday = datetime.now().replace(day=datetime.now().day-1).strftime('%Y-%m-%d')
-        
+
         self.run_test(
             "Export Report",
             "GET",
@@ -426,7 +426,7 @@ class RestaurantAPITester:
             "content": "Test receipt content\nItem 1: $10.00\nTotal: $10.00",
             "type": "bill"
         }
-        
+
         self.run_test(
             "Print Receipt",
             "POST",
@@ -440,68 +440,68 @@ class RestaurantAPITester:
         print("\n" + "="*60)
         print("🔒 CRITICAL TEST: Multi-Tenancy Data Isolation")
         print("="*60)
-        
+
         # Step 1: Register two separate businesses
         print("\n📝 Step 1: Registering two separate businesses...")
-        
+
         business1_data, business1_user = self.test_user_registration("restaurant_alpha")
         if not business1_data:
             self.critical_failures.append("Failed to register Business 1")
             return False
-            
+
         business2_data, business2_user = self.test_user_registration("restaurant_beta")
         if not business2_data:
             self.critical_failures.append("Failed to register Business 2")
             return False
-        
+
         # Step 2: Login both businesses
         print("\n🔑 Step 2: Logging in both businesses...")
-        
+
         self.business1_token, self.business1_user = self.test_user_login(
             business1_data['username'], business1_data['password'], "Business 1"
         )
         if not self.business1_token:
             self.critical_failures.append("Failed to login Business 1")
             return False
-            
+
         self.business2_token, self.business2_user = self.test_user_login(
             business2_data['username'], business2_data['password'], "Business 2"
         )
         if not self.business2_token:
             self.critical_failures.append("Failed to login Business 2")
             return False
-        
+
         print(f"✅ Business 1 ID: {self.business1_user['id']}")
         print(f"✅ Business 2 ID: {self.business2_user['id']}")
-        
+
         # Step 3: Setup business settings for both
         print("\n🏢 Step 3: Setting up business configurations...")
         self.test_business_setup_isolation()
-        
+
         # Step 4: Create staff for both businesses
         print("\n👥 Step 4: Testing staff isolation...")
         self.test_staff_isolation()
-        
+
         # Step 5: Create menu items for both businesses
         print("\n🍽️ Step 5: Testing menu isolation...")
         menu1_id, menu2_id = self.test_menu_isolation()
-        
+
         # Step 6: Create tables for both businesses
         print("\n🪑 Step 6: Testing table isolation...")
         table1_id, table2_id = self.test_table_isolation()
-        
+
         # Step 7: Create orders for both businesses
         print("\n📋 Step 7: Testing order isolation...")
         self.test_order_isolation(table1_id, menu1_id, table2_id, menu2_id)
-        
+
         # Step 8: Create inventory for both businesses
         print("\n📦 Step 8: Testing inventory isolation...")
         self.test_inventory_isolation()
-        
+
         # Step 9: Verify cross-business data access is blocked
         print("\n🚫 Step 9: Verifying cross-business access is blocked...")
         self.test_cross_business_access_blocked(menu1_id, menu2_id, table1_id, table2_id)
-        
+
         return len(self.critical_failures) == 0
 
     def test_business_setup_isolation(self):
@@ -514,16 +514,16 @@ class RestaurantAPITester:
             "currency": "USD",
             "tax_rate": 8.5
         }
-        
+
         business2_settings = {
             "restaurant_name": "Beta Bistro",
             "address": "456 Beta Avenue",
-            "phone": "+1-555-0002", 
+            "phone": "+1-555-0002",
             "email": "beta@bistro.com",
             "currency": "EUR",
             "tax_rate": 10.0
         }
-        
+
         # Setup Business 1
         success1, _ = self.run_test(
             "Business 1 Setup",
@@ -534,10 +534,10 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         # Setup Business 2
         success2, _ = self.run_test(
-            "Business 2 Setup", 
+            "Business 2 Setup",
             "POST",
             "business/setup",
             200,
@@ -545,7 +545,7 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         # Verify Business 1 can only see its settings
         success, response = self.run_test(
             "Business 1 Get Settings",
@@ -555,20 +555,20 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if success and response.get('business_settings', {}).get('restaurant_name') != "Alpha Restaurant":
             self.critical_failures.append("Business 1 settings not isolated")
-        
+
         # Verify Business 2 can only see its settings
         success, response = self.run_test(
             "Business 2 Get Settings",
-            "GET", 
+            "GET",
             "business/settings",
             200,
             token=self.business2_token,
             critical=True
         )
-        
+
         if success and response.get('business_settings', {}).get('restaurant_name') != "Beta Bistro":
             self.critical_failures.append("Business 2 settings not isolated")
 
@@ -583,7 +583,7 @@ class RestaurantAPITester:
             "phone": "+1-555-1001",
             "salary": 2500.0
         }
-        
+
         success1, response1 = self.run_test(
             "Business 1 Create Staff",
             "POST",
@@ -593,27 +593,27 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         # Business 2 creates staff
         staff2_data = {
             "username": "waiter_beta",
-            "email": "waiter@beta.com", 
+            "email": "waiter@beta.com",
             "password": "StaffPass123!",
             "role": "cashier",
             "phone": "+1-555-2001",
             "salary": 3000.0
         }
-        
+
         success2, response2 = self.run_test(
             "Business 2 Create Staff",
             "POST",
-            "staff/create", 
+            "staff/create",
             200,
             data=staff2_data,
             token=self.business2_token,
             critical=True
         )
-        
+
         # Verify Business 1 can only see its staff
         success, response = self.run_test(
             "Business 1 Get Staff",
@@ -623,15 +623,15 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if success:
             staff_usernames = [staff['username'] for staff in response]
             if 'waiter_beta' in staff_usernames:
                 self.critical_failures.append("Business 1 can see Business 2's staff - DATA LEAK!")
             if 'waiter_alpha' not in staff_usernames and len(response) > 0:
                 print(f"   Business 1 staff: {staff_usernames}")
-        
-        # Verify Business 2 can only see its staff  
+
+        # Verify Business 2 can only see its staff
         success, response = self.run_test(
             "Business 2 Get Staff",
             "GET",
@@ -640,7 +640,7 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if success:
             staff_usernames = [staff['username'] for staff in response]
             if 'waiter_alpha' in staff_usernames:
@@ -658,7 +658,7 @@ class RestaurantAPITester:
             "description": "Alpha's signature burger",
             "available": True
         }
-        
+
         success1, response1 = self.run_test(
             "Business 1 Create Menu Item",
             "POST",
@@ -668,9 +668,9 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         menu1_id = response1.get('id') if success1 else None
-        
+
         # Business 2 creates menu items
         menu2_data = {
             "name": "Beta Pizza",
@@ -679,7 +679,7 @@ class RestaurantAPITester:
             "description": "Beta's wood-fired pizza",
             "available": True
         }
-        
+
         success2, response2 = self.run_test(
             "Business 2 Create Menu Item",
             "POST",
@@ -689,9 +689,9 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         menu2_id = response2.get('id') if success2 else None
-        
+
         # Verify Business 1 can only see its menu
         success, response = self.run_test(
             "Business 1 Get Menu",
@@ -701,14 +701,14 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if success:
             menu_names = [item['name'] for item in response]
             if 'Beta Pizza' in menu_names:
                 self.critical_failures.append("Business 1 can see Business 2's menu - DATA LEAK!")
             if 'Alpha Burger' not in menu_names and len(response) > 0:
                 print(f"   Business 1 menu: {menu_names}")
-        
+
         # Verify Business 2 can only see its menu
         success, response = self.run_test(
             "Business 2 Get Menu",
@@ -718,14 +718,14 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if success:
             menu_names = [item['name'] for item in response]
             if 'Alpha Burger' in menu_names:
                 self.critical_failures.append("Business 2 can see Business 1's menu - DATA LEAK!")
             if 'Beta Pizza' not in menu_names and len(response) > 0:
                 print(f"   Business 2 menu: {menu_names}")
-        
+
         return menu1_id, menu2_id
 
     def test_table_isolation(self):
@@ -736,7 +736,7 @@ class RestaurantAPITester:
             "capacity": 4,
             "status": "available"
         }
-        
+
         success1, response1 = self.run_test(
             "Business 1 Create Table",
             "POST",
@@ -746,16 +746,16 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         table1_id = response1.get('id') if success1 else None
-        
+
         # Business 2 creates tables
         table2_data = {
             "table_number": 201,
             "capacity": 6,
             "status": "available"
         }
-        
+
         success2, response2 = self.run_test(
             "Business 2 Create Table",
             "POST",
@@ -765,9 +765,9 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         table2_id = response2.get('id') if success2 else None
-        
+
         # Verify Business 1 can only see its tables
         success, response = self.run_test(
             "Business 1 Get Tables",
@@ -777,14 +777,14 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if success:
             table_numbers = [table['table_number'] for table in response]
             if 201 in table_numbers:
                 self.critical_failures.append("Business 1 can see Business 2's tables - DATA LEAK!")
             if 101 not in table_numbers and len(response) > 0:
                 print(f"   Business 1 tables: {table_numbers}")
-        
+
         # Verify Business 2 can only see its tables
         success, response = self.run_test(
             "Business 2 Get Tables",
@@ -794,14 +794,14 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if success:
             table_numbers = [table['table_number'] for table in response]
             if 101 in table_numbers:
                 self.critical_failures.append("Business 2 can see Business 1's tables - DATA LEAK!")
             if 201 not in table_numbers and len(response) > 0:
                 print(f"   Business 2 tables: {table_numbers}")
-        
+
         return table1_id, table2_id
 
     def test_order_isolation(self, table1_id, menu1_id, table2_id, menu2_id):
@@ -809,7 +809,7 @@ class RestaurantAPITester:
         if not all([table1_id, menu1_id, table2_id, menu2_id]):
             print("⚠️  Skipping order isolation test - missing prerequisites")
             return
-        
+
         # Business 1 creates order
         order1_data = {
             "table_id": table1_id,
@@ -822,7 +822,7 @@ class RestaurantAPITester:
             }],
             "customer_name": "Alpha Customer"
         }
-        
+
         success1, response1 = self.run_test(
             "Business 1 Create Order",
             "POST",
@@ -832,7 +832,7 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         # Business 2 creates order
         order2_data = {
             "table_id": table2_id,
@@ -845,7 +845,7 @@ class RestaurantAPITester:
             }],
             "customer_name": "Beta Customer"
         }
-        
+
         success2, response2 = self.run_test(
             "Business 2 Create Order",
             "POST",
@@ -855,7 +855,7 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         # Verify Business 1 can only see its orders
         success, response = self.run_test(
             "Business 1 Get Orders",
@@ -865,14 +865,14 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if success:
             customer_names = [order.get('customer_name') for order in response]
             if 'Beta Customer' in customer_names:
                 self.critical_failures.append("Business 1 can see Business 2's orders - DATA LEAK!")
             if 'Alpha Customer' not in customer_names and len(response) > 0:
                 print(f"   Business 1 orders: {customer_names}")
-        
+
         # Verify Business 2 can only see its orders
         success, response = self.run_test(
             "Business 2 Get Orders",
@@ -882,7 +882,7 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if success:
             customer_names = [order.get('customer_name') for order in response]
             if 'Alpha Customer' in customer_names:
@@ -900,7 +900,7 @@ class RestaurantAPITester:
             "min_quantity": 10.0,
             "price_per_unit": 2.50
         }
-        
+
         success1, response1 = self.run_test(
             "Business 1 Create Inventory",
             "POST",
@@ -910,7 +910,7 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         # Business 2 creates inventory
         inventory2_data = {
             "name": "Beta Pizza Dough",
@@ -919,7 +919,7 @@ class RestaurantAPITester:
             "min_quantity": 5.0,
             "price_per_unit": 3.75
         }
-        
+
         success2, response2 = self.run_test(
             "Business 2 Create Inventory",
             "POST",
@@ -929,7 +929,7 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         # Verify Business 1 can only see its inventory
         success, response = self.run_test(
             "Business 1 Get Inventory",
@@ -939,14 +939,14 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if success:
             inventory_names = [item['name'] for item in response]
             if 'Beta Pizza Dough' in inventory_names:
                 self.critical_failures.append("Business 1 can see Business 2's inventory - DATA LEAK!")
             if 'Alpha Beef Patties' not in inventory_names and len(response) > 0:
                 print(f"   Business 1 inventory: {inventory_names}")
-        
+
         # Verify Business 2 can only see its inventory
         success, response = self.run_test(
             "Business 2 Get Inventory",
@@ -956,7 +956,7 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if success:
             inventory_names = [item['name'] for item in response]
             if 'Alpha Beef Patties' in inventory_names:
@@ -969,7 +969,7 @@ class RestaurantAPITester:
         if not all([menu1_id, menu2_id, table1_id, table2_id]):
             print("⚠️  Skipping cross-business access test - missing IDs")
             return
-        
+
         # Business 1 tries to access Business 2's menu item
         success, response = self.run_test(
             "Business 1 Access Business 2 Menu Item (Should Fail)",
@@ -979,10 +979,10 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if not success:
             self.critical_failures.append("Business 1 can access Business 2's menu item - SECURITY BREACH!")
-        
+
         # Business 2 tries to access Business 1's menu item
         success, response = self.run_test(
             "Business 2 Access Business 1 Menu Item (Should Fail)",
@@ -992,10 +992,10 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if not success:
             self.critical_failures.append("Business 2 can access Business 1's menu item - SECURITY BREACH!")
-        
+
         # Business 1 tries to update Business 2's table
         table_update = {"table_number": 999, "capacity": 10, "status": "occupied"}
         success, response = self.run_test(
@@ -1007,10 +1007,10 @@ class RestaurantAPITester:
             token=self.business1_token,
             critical=True
         )
-        
+
         if not success:
             self.critical_failures.append("Business 1 can update Business 2's table - SECURITY BREACH!")
-        
+
         # Business 2 tries to update Business 1's table
         success, response = self.run_test(
             "Business 2 Update Business 1 Table (Should Fail)",
@@ -1021,60 +1021,60 @@ class RestaurantAPITester:
             token=self.business2_token,
             critical=True
         )
-        
+
         if not success:
             self.critical_failures.append("Business 2 can update Business 1's table - SECURITY BREACH!")
 
 def main():
     print("🏪 Starting Restaurant Billing API Tests...")
     print("=" * 50)
-    
+
     tester = RestaurantAPITester()
-    
+
     # PRIORITY 1: CRITICAL Multi-Tenancy Data Isolation Test
     print("\n🔒 PRIORITY 1: CRITICAL Multi-Tenancy Data Isolation Test")
     isolation_success = tester.test_multi_tenancy_data_isolation()
-    
+
     if not isolation_success:
         print("\n" + "="*60)
         print("🚨 CRITICAL FAILURES DETECTED:")
         for failure in tester.critical_failures:
             print(f"   ❌ {failure}")
         print("="*60)
-    
+
     # Continue with other tests using one of the created businesses
     if tester.business1_token:
         tester.token = tester.business1_token
         tester.user_id = tester.business1_user['id']
-        
+
         print("\n📝 Testing Authentication Flow...")
         tester.test_get_current_user()
-        
+
         # Test core functionality with Business 1
         print("\n🍽️  Testing Menu Management...")
         menu_id = tester.test_menu_operations()
-        
+
         print("\n🪑 Testing Table Management...")
         table_id = tester.test_table_operations()
-        
+
         print("\n📋 Testing Order Management...")
         order_id = tester.test_order_operations(table_id, menu_id)
-        
+
         print("\n💳 Testing Payment Processing...")
         tester.test_payment_operations(order_id)
-        
+
         print("\n📦 Testing Inventory Management...")
         tester.test_inventory_operations()
-        
+
         print("\n🤖 Testing AI Features...")
         tester.test_ai_features()
-        
+
         print("\n📊 Testing Reports...")
         tester.test_reports()
-        
+
         print("\n🖨️  Testing Print Functionality...")
         tester.test_print_functionality()
-    
+
     # Print final results
     print("\n" + "=" * 60)
     print("📊 FINAL TEST RESULTS")
@@ -1083,7 +1083,7 @@ def main():
     print(f"Passed: {tester.tests_passed}")
     print(f"Failed: {tester.tests_run - tester.tests_passed}")
     print(f"Success Rate: {(tester.tests_passed/tester.tests_run)*100:.1f}%")
-    
+
     if tester.critical_failures:
         print(f"\n🚨 CRITICAL FAILURES: {len(tester.critical_failures)}")
         for failure in tester.critical_failures:
