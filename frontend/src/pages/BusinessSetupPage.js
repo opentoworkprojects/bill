@@ -27,7 +27,10 @@ const BusinessSetupPage = ({ user }) => {
     currency: 'INR',
     tax_rate: 5.0,
     receipt_theme: 'classic',
-    logo_url: ''
+    logo_url: '',
+    website: '',
+    tagline: '',
+    footer_message: 'Thank you for dining with us!'
   });
 
   useEffect(() => {
@@ -232,6 +235,33 @@ const BusinessSetupPage = ({ user }) => {
                   value={formData.fssai}
                   onChange={(e) => setFormData({ ...formData, fssai: e.target.value })}
                   placeholder="12345678901234"
+                />
+              </div>
+
+              <div>
+                <Label>Website (Optional)</Label>
+                <Input
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  placeholder="www.yourrestaurant.com"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Tagline (Optional)</Label>
+                <Input
+                  value={formData.tagline}
+                  onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
+                  placeholder="Delicious food, memorable moments"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Receipt Footer Message</Label>
+                <Input
+                  value={formData.footer_message}
+                  onChange={(e) => setFormData({ ...formData, footer_message: e.target.value })}
+                  placeholder="Thank you for dining with us!"
                 />
               </div>
             </div>

@@ -183,6 +183,9 @@ class BusinessSettings(BaseModel):
     tax_rate: float = 5.0
     receipt_theme: str = "classic"
     logo_url: Optional[str] = None
+    website: Optional[str] = None
+    tagline: Optional[str] = None
+    footer_message: Optional[str] = "Thank you for dining with us!"
 
 
 class User(BaseModel):
@@ -463,19 +466,33 @@ def get_receipt_template(
             for item in order["items"]
         ]
     )
+    items_compact = "".join(
+        [
+            f"{item['quantity']}x {item['name'][:20]:<20} {currency_symbol}{item['price'] * item['quantity']:.2f}\n"
+            for item in order["items"]
+        ]
+    )
 
     now_str = datetime.now().strftime("%d-%m-%Y %I:%M %p")
     now_elegant = datetime.now().strftime("%d %B %Y, %I:%M %p")
+    now_compact = datetime.now().strftime("%d/%m/%y %H:%M")
 
     # Pre-compute centered text
     rest_name = business.get("restaurant_name", "RESTAURANT")
     rest_name_48 = rest_name.center(48)
     rest_name_44 = rest_name.center(44)
+    rest_name_32 = rest_name.center(32) if len(rest_name) <= 32 else rest_name[:32]
     address = business.get("address", "")
-    address_48 = address.center(48)
-    address_44 = address.center(44)
+    address_48 = address.center(48) if len(address) <= 48 else address[:48]
+    address_44 = address.center(44) if len(address) <= 44 else address[:44]
+    address_32 = address.center(32) if len(address) <= 32 else address[:32]
     phone = business.get("phone", "N/A")
+    email = business.get("email", "")
     gstin = business.get("gstin", "N/A")
+    fssai = business.get("fssai", "")
+    website = business.get("website", "")
+    tagline = business.get("tagline", "")
+    footer_msg = business.get("footer_message", "Thank you for dining with us!")
 
     tax_rate = business.get("tax_rate", 5)
 
@@ -486,7 +503,9 @@ def get_receipt_template(
 {sep_eq}
 {address_48}
 Phone: {phone}
+{f"Email: {email}" if email else ""}
 GSTIN: {gstin}
+{f"FSSAI: {fssai}" if fssai else ""}
 {sep_dash}
 Bill #: {order["id"][:8]}
 Table: {order["table_number"]}
@@ -501,20 +520,23 @@ Tax ({tax_rate}%):          {currency_symbol}{order["tax"]:.2f}
 {sep_dash}
 TOTAL:            {currency_symbol}{order["total"]:.2f}
 {sep_dash}
-Thank you for dining with us!
-Visit again soon!
+{footer_msg}
+{f"Visit: {website}" if website else "Visit again soon!"}
 {sep_eq}
 """,
         "modern": f"""
 ┌{sep_light}┐
 │ {rest_name_44} │
+{f"│ {tagline.center(44)} │" if tagline else ""}
 ├{sep_light}┤
 │ {address_44} │
 │ ☎ {phone:<42} │
+{f"│ 🌐 {website:<42} │" if website else ""}
 └{sep_light}┘
 
 🧾 Bill #{order["id"][:8]}
 🍽️  Table {order["table_number"]} | 👤 {order["waiter_name"]}
+👥 {order.get("customer_name", "Guest")}
 📅 {now_str}
 
 {sep_light}
@@ -525,28 +547,34 @@ Tax ({tax_rate}%)                        {currency_symbol}{order["tax"]:.2f}
 💰 TOTAL                      {currency_symbol}{order["total"]:.2f}
 {sep_heavy}
 
-✨ Thank you! Come again! ✨
+✨ {footer_msg} ✨
+{f"GSTIN: {gstin}" if gstin != "N/A" else ""}
 """,
         "minimal": f"""
 {rest_name}
 {address}
+{phone}
 
 Bill: {order["id"][:8]} | Table: {order["table_number"]}
 {now_str}
 
-{items_minimal}Subtotal: {currency_symbol}{order["subtotal"]:.2f}
-Tax: {currency_symbol}{order["tax"]:.2f}
+{items_minimal}
+Subtotal: {currency_symbol}{order["subtotal"]:.2f}
+Tax ({tax_rate}%): {currency_symbol}{order["tax"]:.2f}
 Total: {currency_symbol}{order["total"]:.2f}
 
-Thank you!
+{footer_msg}
 """,
         "elegant": f"""
 ╔{sep_heavy}╗
 ║ {rest_name_44} ║
+{f"║ {tagline.center(44)} ║" if tagline else ""}
 ╠{sep_heavy}╣
 ║ {address_44} ║
 ║ Tel: {phone:<40} ║
+{f"║ Email: {email:<38} ║" if email else ""}
 ║ GSTIN: {gstin:<38} ║
+{f"║ FSSAI: {fssai:<38} ║" if fssai else ""}
 ╚{sep_heavy}╝
 
 Invoice: {order["id"][:8]}
@@ -562,8 +590,68 @@ Date: {now_elegant}
                        TOTAL: {currency_symbol}{order["total"]:>8.2f}
 {sep_heavy}
 
-        Thank you for your patronage
-          Please visit us again
+        {footer_msg}
+{f"          {website}" if website else "          Please visit us again"}
+""",
+        "compact": f"""
+{rest_name_32}
+{address_32}
+Ph: {phone}
+{sep_dash[:32]}
+Bill: {order["id"][:8]}
+Table: {order["table_number"]} | {order["waiter_name"]}
+{now_compact}
+{sep_dash[:32]}
+{items_compact}{sep_dash[:32]}
+Subtotal: {currency_symbol}{order["subtotal"]:.2f}
+Tax ({tax_rate}%): {currency_symbol}{order["tax"]:.2f}
+TOTAL: {currency_symbol}{order["total"]:.2f}
+{sep_dash[:32]}
+{footer_msg[:32]}
+GSTIN: {gstin}
+""",
+        "detailed": f"""
+{sep_eq}
+{rest_name_48}
+{f"{tagline.center(48)}" if tagline else ""}
+{sep_eq}
+Address: {address}
+Phone: {phone}
+{f"Email: {email}" if email else ""}
+{f"Website: {website}" if website else ""}
+GSTIN: {gstin}
+{f"FSSAI License: {fssai}" if fssai else ""}
+{sep_eq}
+
+INVOICE DETAILS
+{sep_dash}
+Invoice No: {order["id"][:8]}
+Table Number: {order["table_number"]}
+Server: {order["waiter_name"]}
+Customer: {order.get("customer_name", "Walk-in Guest")}
+Date & Time: {now_str}
+{sep_dash}
+
+ORDER ITEMS
+{sep_dash}
+{"Item":<30} {"Qty":>4} {"Price":>10}
+{sep_dash}
+{items_text}{sep_dash}
+
+PAYMENT SUMMARY
+{sep_dash}
+Subtotal:                 {currency_symbol}{order["subtotal"]:.2f}
+Tax ({tax_rate}%):                  {currency_symbol}{order["tax"]:.2f}
+{sep_eq}
+GRAND TOTAL:              {currency_symbol}{order["total"]:.2f}
+{sep_eq}
+
+{footer_msg}
+{f"Visit us at: {website}" if website else ""}
+
+{sep_dash}
+This is a computer generated receipt
+{sep_eq}
 """,
     }
     return templates.get(theme, templates["classic"])
@@ -764,6 +852,20 @@ async def setup_business(
     return {"message": "Business setup completed", "settings": settings.model_dump()}
 
 
+@api_router.put("/business/settings")
+async def update_business_settings(
+    settings: BusinessSettings, current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can update business settings")
+
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"business_settings": settings.model_dump()}},
+    )
+    return {"message": "Business settings updated successfully", "settings": settings.model_dump()}
+
+
 @api_router.get("/business/settings")
 async def get_business_settings(current_user: dict = Depends(get_current_user)):
     return {
@@ -786,14 +888,38 @@ async def get_receipt_themes():
             "id": "classic",
             "name": "Classic",
             "description": "Traditional receipt format",
+            "width": "80mm"
         },
         {
             "id": "modern",
             "name": "Modern",
             "description": "Modern with emojis and borders",
+            "width": "80mm"
         },
-        {"id": "minimal", "name": "Minimal", "description": "Clean and simple design"},
-        {"id": "elegant", "name": "Elegant", "description": "Professional and elegant"},
+        {
+            "id": "minimal",
+            "name": "Minimal",
+            "description": "Clean and simple design",
+            "width": "80mm"
+        },
+        {
+            "id": "elegant",
+            "name": "Elegant",
+            "description": "Professional and elegant",
+            "width": "80mm"
+        },
+        {
+            "id": "compact",
+            "name": "Compact",
+            "description": "Space-saving 58mm format",
+            "width": "58mm"
+        },
+        {
+            "id": "detailed",
+            "name": "Detailed",
+            "description": "Comprehensive invoice format",
+            "width": "80mm"
+        },
     ]
 
 

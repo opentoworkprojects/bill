@@ -107,62 +107,117 @@ const BillingPage = ({ user }) => {
         params: { theme: businessSettings?.receipt_theme || 'classic' }
       });
       
+      // Determine paper width based on theme
+      const isCompact = businessSettings?.receipt_theme === 'compact';
+      const paperWidth = isCompact ? '58mm' : '80mm';
+      const fontSize = isCompact ? '10px' : '12px';
+      
       // Create a printable window with thermal receipt styling
-      const printWindow = window.open('', '', 'width=300,height=600');
+      const printWindow = window.open('', '', 'width=400,height=700');
       printWindow.document.write(`
         <html>
           <head>
-            <title>Receipt - Order #${order.id.slice(0, 8)}</title>
+            <title>Thermal Receipt - Order #${order.id.slice(0, 8)}</title>
             <style>
               @media print {
                 @page {
-                  size: 80mm auto;
+                  size: ${paperWidth} auto;
                   margin: 0;
                 }
                 body {
                   margin: 0;
                   padding: 0;
                 }
+                .no-print {
+                  display: none !important;
+                }
               }
               body {
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-                line-height: 1.4;
-                padding: 10px;
+                font-family: 'Courier New', 'Consolas', monospace;
+                font-size: ${fontSize};
+                line-height: 1.3;
+                padding: 5mm;
                 margin: 0;
-                width: 80mm;
+                width: ${paperWidth};
                 background: white;
+                color: black;
               }
               pre {
                 margin: 0;
                 padding: 0;
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
+                font-family: 'Courier New', 'Consolas', monospace;
+                font-size: ${fontSize};
                 white-space: pre-wrap;
                 word-wrap: break-word;
+                line-height: 1.3;
               }
               .no-print {
-                display: block;
-                text-align: center;
+                display: flex;
+                gap: 10px;
+                justify-content: center;
                 margin: 20px 0;
+                padding: 20px;
+                background: #f3f4f6;
+                border-radius: 8px;
+              }
+              .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: all 0.2s;
+              }
+              .btn-print {
+                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+                color: white;
+              }
+              .btn-print:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+              }
+              .btn-close {
+                background: #6b7280;
+                color: white;
+              }
+              .btn-close:hover {
+                background: #4b5563;
+              }
+              .preview-header {
+                text-align: center;
+                padding: 15px;
+                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+                color: white;
+                margin: -5mm -5mm 10px -5mm;
+                font-family: Arial, sans-serif;
               }
               @media print {
-                .no-print {
+                .preview-header {
                   display: none;
                 }
               }
             </style>
           </head>
           <body>
+            <div class="preview-header no-print">
+              <h2 style="margin: 0; font-size: 18px;">🧾 Thermal Receipt Preview</h2>
+              <p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.9;">Format: ${businessSettings?.receipt_theme || 'classic'} (${paperWidth})</p>
+            </div>
             <pre>${response.data.content}</pre>
             <div class="no-print">
-              <button onclick="window.print()" style="padding: 10px 20px; background: #7c3aed; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Print Receipt</button>
-              <button onclick="window.close()" style="padding: 10px 20px; background: #gray; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; margin-left: 10px;">Close</button>
+              <button onclick="window.print()" class="btn btn-print">🖨️ Print Receipt</button>
+              <button onclick="window.close()" class="btn btn-close">✕ Close</button>
             </div>
           </body>
         </html>
       `);
       printWindow.document.close();
+      
+      // Auto-trigger print dialog after a short delay
+      setTimeout(() => {
+        printWindow.focus();
+      }, 250);
       
       toast.success('Receipt ready for printing!');
     } catch (error) {
