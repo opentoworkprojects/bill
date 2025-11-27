@@ -1508,6 +1508,8 @@ async def api_health_check():
 @app.on_event("startup")
 async def startup_validation():
     """Validate configuration and database connection on startup"""
+    global client, db
+
     print("🍽️  Starting RestoBill AI Server...")
 
     # Check required environment variables
@@ -1561,7 +1563,6 @@ async def startup_validation():
             await alt_db.command("ping")
 
             # Replace global client with working one
-            global client, db
             client = alt_client
             db = alt_db
             print(f"✅ Alternative connection successful: {db.name}")
