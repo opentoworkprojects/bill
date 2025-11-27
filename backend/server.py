@@ -2,7 +2,6 @@ import base64
 import json
 import logging
 import os
-import ssl
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -46,16 +45,26 @@ load_dotenv(ROOT_DIR / ".env")
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017/restrobill")
 
+# Add SSL/TLS parameters to Atlas URLs if not already present
+if "mongodb+srv://" in mongo_url and "?" not in mongo_url:
+    mongo_url += "?retryWrites=true&w=majority&tls=true&tlsInsecure=true"
+elif "mongodb+srv://" in mongo_url and "tls=" not in mongo_url:
+    # Add TLS parameters if not present
+    separator = "&" if "?" in mongo_url else "?"
+    mongo_url += f"{separator}tls=true&tlsInsecure=true"
+
 # Configure MongoDB client with SSL settings for Atlas compatibility
 try:
-    if "mongodb+srv://" in mongo_url or "ssl=true" in mongo_url:
-        # For MongoDB Atlas, use SSL with proper certificate handling
+    if (
+        "mongodb+srv://" in mongo_url
+        or "ssl=true" in mongo_url
+        or "tls=true" in mongo_url
+    ):
+        # For MongoDB Atlas, use TLS with proper certificate handling
         client = AsyncIOMotorClient(
             mongo_url,
-            ssl=True,
-            ssl_cert_reqs=ssl.CERT_NONE,  # Allow invalid certificates for Render compatibility
-            tlsAllowInvalidCertificates=True,
-            tlsAllowInvalidHostnames=True,
+            tls=True,
+            tlsInsecure=True,  # Allow invalid certificates for Render compatibility
             serverSelectionTimeoutMS=5000,
             connectTimeoutMS=10000,
             socketTimeoutMS=10000,
@@ -65,8 +74,14 @@ try:
         client = AsyncIOMotorClient(mongo_url)
 except Exception as e:
     print(f"MongoDB client creation failed: {e}")
-    # Fallback to basic client
-    client = AsyncIOMotorClient(mongo_url)
+    # Fallback to basic client with minimal TLS settings
+    try:
+        client = AsyncIOMotorClient(
+            mongo_url, tls=True, tlsInsecure=True, serverSelectionTimeoutMS=5000
+        )
+    except Exception as e2:
+        print(f"Fallback client creation failed: {e2}")
+        client = AsyncIOMotorClient(mongo_url)
 
 db = client[os.getenv("DB_NAME", "restrobill")]
 
@@ -1540,6 +1555,7 @@ async def startup_validation():
 
     # Test database connection with multiple strategies
     connection_successful = False
+    last_error = None
 
     # Strategy 1: Try current connection
     try:
@@ -1547,6 +1563,7 @@ async def startup_validation():
         print(f"✅ Database connected: {db.name}")
         connection_successful = True
     except Exception as e:
+        last_error = e
         print(f"❌ Primary connection failed: {e}")
 
         # Strategy 2: Try alternative client with different SSL settings
@@ -1569,23 +1586,47 @@ async def startup_validation():
             connection_successful = True
 
         except Exception as e2:
+            last_error = e2
             print(f"❌ Alternative connection failed: {e2}")
 
-            # Strategy 3: Try without SSL for local/development
-            if "localhost" in mongo_url or "127.0.0.1" in mongo_url:
-                try:
-                    print("🔄 Trying local connection without SSL...")
-                    local_client = AsyncIOMotorClient(mongo_url, ssl=False)
-                    local_db = local_client[os.getenv("DB_NAME", "restrobill")]
-                    await local_db.command("ping")
+            # Strategy 3: Try with different SSL/TLS options
+            try:
+                print("🔄 Trying with minimal SSL settings...")
+                min_client = AsyncIOMotorClient(
+                    mongo_url,
+                    tls=True,
+                    tlsInsecure=True,
+                    serverSelectionTimeoutMS=3000,
+                    connectTimeoutMS=5000,
+                )
+                min_db = min_client[os.getenv("DB_NAME", "restrobill")]
+                await min_db.command("ping")
 
-                    client = local_client
-                    db = local_db
-                    print(f"✅ Local connection successful: {db.name}")
-                    connection_successful = True
+                client = min_client
+                db = min_db
+                print(f"✅ Minimal SSL connection successful: {db.name}")
+                connection_successful = True
 
-                except Exception as e3:
-                    print(f"❌ Local connection failed: {e3}")
+            except Exception as e3:
+                last_error = e3
+                print(f"❌ Minimal SSL connection failed: {e3}")
+
+                # Strategy 4: Try without SSL for local/development
+                if "localhost" in mongo_url or "127.0.0.1" in mongo_url:
+                    try:
+                        print("🔄 Trying local connection without SSL...")
+                        local_client = AsyncIOMotorClient(mongo_url, ssl=False)
+                        local_db = local_client[os.getenv("DB_NAME", "restrobill")]
+                        await local_db.command("ping")
+
+                        client = local_client
+                        db = local_db
+                        print(f"✅ Local connection successful: {db.name}")
+                        connection_successful = True
+
+                    except Exception as e4:
+                        last_error = e4
+                        print(f"❌ Local connection failed: {e4}")
 
     if not connection_successful:
         print(
@@ -1593,23 +1634,28 @@ async def startup_validation():
         )
 
         # Provide specific troubleshooting for SSL errors
-        error_str = str(e)
-        if "SSL" in error_str or "TLS" in error_str:
-            print("💡 SSL/TLS Connection Issue Detected:")
-            print("   Try setting these environment variables:")
-            print(
-                "   MONGO_URL=mongodb+srv://user:pass@cluster.net/db?ssl=true&tlsInsecure=true"
-            )
-            print("   Or contact your MongoDB Atlas admin for connection string")
-        elif "authentication" in error_str.lower():
-            print("💡 Authentication Issue Detected:")
-            print("   1. Verify username and password in connection string")
-            print("   2. Check database user permissions in MongoDB Atlas")
-        elif "timeout" in error_str.lower():
-            print("💡 Connection Timeout Issue:")
-            print("   1. Check network connectivity")
-            print("   2. Verify MongoDB Atlas cluster is running")
-            print("   3. Check if IP whitelist includes 0.0.0.0/0")
+        if last_error:
+            error_str = str(last_error)
+            if "SSL" in error_str or "TLS" in error_str:
+                print("💡 SSL/TLS Connection Issue Detected:")
+                print("   Try setting these environment variables:")
+                print("   MONGO_TLS_INSECURE=true")
+                print("   Or update your MongoDB connection string with:")
+                print(
+                    "   mongodb+srv://user:pass@cluster.net/db?retryWrites=true&w=majority&tls=true&tlsInsecure=true"
+                )
+                print("   Contact your MongoDB Atlas admin for proper SSL certificates")
+            elif "authentication" in error_str.lower():
+                print("💡 Authentication Issue Detected:")
+                print("   1. Verify username and password in connection string")
+                print("   2. Check database user permissions in MongoDB Atlas")
+            elif "timeout" in error_str.lower():
+                print("💡 Connection Timeout Issue:")
+                print("   1. Check network connectivity")
+                print("   2. Verify MongoDB Atlas cluster is running")
+                print("   3. Check if IP whitelist includes 0.0.0.0/0")
+        else:
+            print("💡 Unknown connection issue occurred")
 
         print("🔄 Server will continue running with degraded functionality")
 
