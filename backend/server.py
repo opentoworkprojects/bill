@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import ssl
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -45,13 +46,22 @@ load_dotenv(ROOT_DIR / ".env")
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017/restrobill")
 
-# Add SSL/TLS parameters to Atlas URLs if not already present
-if "mongodb+srv://" in mongo_url and "?" not in mongo_url:
-    mongo_url += "?retryWrites=true&w=majority&tls=true&tlsInsecure=true"
-elif "mongodb+srv://" in mongo_url and "tls=" not in mongo_url:
-    # Add TLS parameters if not present
-    separator = "&" if "?" in mongo_url else "?"
-    mongo_url += f"{separator}tls=true&tlsInsecure=true"
+# Clean up and optimize MongoDB Atlas connection string
+if "mongodb+srv://" in mongo_url:
+    # Remove duplicate parameters and optimize for Atlas
+    base_url = mongo_url.split("?")[0] if "?" in mongo_url else mongo_url
+
+    # Standard Atlas parameters for optimal connection
+    params = [
+        "retryWrites=true",
+        "w=majority",
+        "tls=true",
+        "tlsInsecure=true",
+        "authSource=admin",
+        "readPreference=primary",
+    ]
+
+    mongo_url = f"{base_url}?{'&'.join(params)}"
 
 # Configure MongoDB client with SSL settings for Atlas compatibility
 try:
@@ -1519,6 +1529,25 @@ async def api_health_check():
     return await health_check()
 
 
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint - basic server info"""
+    return {
+        "service": "RestoBill AI Server",
+        "version": "1.0.0",
+        "status": "running",
+        "message": "Welcome to RestoBill AI - Restaurant Management System",
+        "endpoints": {
+            "health": "/health",
+            "api_health": "/api/health",
+            "api_docs": "/docs",
+            "api_base": "/api",
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # Startup validation
 @app.on_event("startup")
 async def startup_validation():
@@ -1571,10 +1600,11 @@ async def startup_validation():
             print("🔄 Trying alternative SSL configuration...")
             alt_client = AsyncIOMotorClient(
                 mongo_url,
-                ssl=True,
+                tls=True,
                 tlsInsecure=True,
-                serverSelectionTimeoutMS=3000,
-                connectTimeoutMS=5000,
+                tlsAllowInvalidCertificates=True,
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=8000,
             )
             alt_db = alt_client[os.getenv("DB_NAME", "restrobill")]
             await alt_db.command("ping")
@@ -1589,44 +1619,55 @@ async def startup_validation():
             last_error = e2
             print(f"❌ Alternative connection failed: {e2}")
 
-            # Strategy 3: Try with different SSL/TLS options
+            # Strategy 3: Try with pymongo legacy SSL options
             try:
-                print("🔄 Trying with minimal SSL settings...")
+                print("🔄 Trying with legacy SSL settings...")
                 min_client = AsyncIOMotorClient(
                     mongo_url,
-                    tls=True,
-                    tlsInsecure=True,
-                    serverSelectionTimeoutMS=3000,
-                    connectTimeoutMS=5000,
+                    ssl=True,
+                    ssl_cert_reqs=ssl.CERT_NONE,
+                    serverSelectionTimeoutMS=8000,
+                    connectTimeoutMS=10000,
+                    socketTimeoutMS=20000,
                 )
                 min_db = min_client[os.getenv("DB_NAME", "restrobill")]
                 await min_db.command("ping")
 
                 client = min_client
                 db = min_db
-                print(f"✅ Minimal SSL connection successful: {db.name}")
+                print(f"✅ Legacy SSL connection successful: {db.name}")
                 connection_successful = True
 
             except Exception as e3:
                 last_error = e3
-                print(f"❌ Minimal SSL connection failed: {e3}")
+                print(f"❌ Legacy SSL connection failed: {e3}")
 
-                # Strategy 4: Try without SSL for local/development
-                if "localhost" in mongo_url or "127.0.0.1" in mongo_url:
-                    try:
-                        print("🔄 Trying local connection without SSL...")
-                        local_client = AsyncIOMotorClient(mongo_url, ssl=False)
-                        local_db = local_client[os.getenv("DB_NAME", "restrobill")]
-                        await local_db.command("ping")
+                # Strategy 4: Try with different connection approach
+                try:
+                    print("🔄 Trying direct connection without TLS validation...")
+                    # Use base URL without TLS parameters for this attempt
+                    base_mongo_url = (
+                        mongo_url.split("?")[0] if "?" in mongo_url else mongo_url
+                    )
+                    direct_url = f"{base_mongo_url}?retryWrites=true&w=majority"
 
-                        client = local_client
-                        db = local_db
-                        print(f"✅ Local connection successful: {db.name}")
-                        connection_successful = True
+                    direct_client = AsyncIOMotorClient(
+                        direct_url,
+                        serverSelectionTimeoutMS=10000,
+                        connectTimeoutMS=15000,
+                        socketTimeoutMS=20000,
+                    )
+                    direct_db = direct_client[os.getenv("DB_NAME", "restrobill")]
+                    await direct_db.command("ping")
 
-                    except Exception as e4:
-                        last_error = e4
-                        print(f"❌ Local connection failed: {e4}")
+                    client = direct_client
+                    db = direct_db
+                    print(f"✅ Direct connection successful: {db.name}")
+                    connection_successful = True
+
+                except Exception as e4:
+                    last_error = e4
+                    print(f"❌ Direct connection failed: {e4}")
 
     if not connection_successful:
         print(
