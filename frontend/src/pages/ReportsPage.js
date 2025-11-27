@@ -39,7 +39,6 @@ const ReportsPage = ({ user }) => {
 
   useEffect(() => {
     fetchAllReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllReports = async () => {
@@ -221,7 +220,7 @@ const ReportsPage = ({ user }) => {
                 >
                   <CardHeader>
                     <CardTitle className="text-sm text-gray-600">
-                      Today&apos;s Orders
+                      Today's Orders
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -237,7 +236,7 @@ const ReportsPage = ({ user }) => {
                 >
                   <CardHeader>
                     <CardTitle className="text-sm text-gray-600">
-                      Today&apos;s Sales
+                      Today's Sales
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -368,7 +367,7 @@ const ReportsPage = ({ user }) => {
                 data-testid="today-orders-list"
               >
                 <CardHeader>
-                  <CardTitle>Today&apos;s Orders</CardTitle>
+                  <CardTitle>Today's Orders</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -397,24 +396,11 @@ const ReportsPage = ({ user }) => {
             )}
           </TabsContent>
 
-          {/* Other tabs – you can fill later */}
-          <TabsContent value="sales">
-            {/* TODO: add sales charts / trends */}
-          </TabsContent>
-
-          <TabsContent value="items">
-            {/* TODO: show best-selling items using bestSelling */}
-          </TabsContent>
-
-          <TabsContent value="staff">
-            {/* TODO: show staffPerformance */}
-          </TabsContent>
-
-          <TabsContent value="hours">{/* TODO: show peakHours */}</TabsContent>
-
-          <TabsContent value="export">
-            {/* You can reuse the Export card here if you want it as separate tab */}
-          </TabsContent>
+          {/* You can add other tabs like:
+          <TabsContent value="sales">...</TabsContent>
+          <TabsContent value="items">...</TabsContent>
+          etc.
+          */}
         </Tabs>
       </div>
     </Layout>
