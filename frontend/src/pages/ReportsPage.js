@@ -58,7 +58,61 @@ const ReportsPage = ({ user }) => {
       const response = await axios.get(`${API}/reports/daily`);
       setDailyReport(response.data);
     } catch (error) {
-      toast.error('Failed to fetch daily report');
+      console.error('Failed to fetch daily report', error);
+    }
+  };
+
+  const fetchWeeklyReport = async () => {
+    try {
+      const response = await axios.get(`${API}/reports/weekly`);
+      setWeeklyReport(response.data);
+    } catch (error) {
+      console.error('Failed to fetch weekly report', error);
+    }
+  };
+
+  const fetchMonthlyReport = async () => {
+    try {
+      const response = await axios.get(`${API}/reports/monthly`);
+      setMonthlyReport(response.data);
+    } catch (error) {
+      console.error('Failed to fetch monthly report', error);
+    }
+  };
+
+  const fetchBestSelling = async () => {
+    try {
+      const response = await axios.get(`${API}/reports/best-selling`);
+      setBestSelling(response.data);
+    } catch (error) {
+      console.error('Failed to fetch best selling items', error);
+    }
+  };
+
+  const fetchStaffPerformance = async () => {
+    try {
+      const response = await axios.get(`${API}/reports/staff-performance`);
+      setStaffPerformance(response.data);
+    } catch (error) {
+      console.error('Failed to fetch staff performance', error);
+    }
+  };
+
+  const fetchPeakHours = async () => {
+    try {
+      const response = await axios.get(`${API}/reports/peak-hours`);
+      setPeakHours(response.data);
+    } catch (error) {
+      console.error('Failed to fetch peak hours', error);
+    }
+  };
+
+  const fetchCategoryAnalysis = async () => {
+    try {
+      const response = await axios.get(`${API}/reports/category-analysis`);
+      setCategoryAnalysis(response.data);
+    } catch (error) {
+      console.error('Failed to fetch category analysis', error);
     }
   };
 
