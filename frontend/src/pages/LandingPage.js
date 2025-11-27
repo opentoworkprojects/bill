@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import PrivacyPolicy from "./privacy";
+import PrivacyPolicy from "./privacypolicy";
 import {
   Card,
   CardContent,
