@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { API } from '../App';
+import { API, setAuthToken } from '../App';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -90,9 +90,23 @@ const BusinessSetupPage = ({ user }) => {
 
     setLoading(true);
     try {
+      // Submit business settings
       await axios.post(`${API}/business/setup`, formData);
+      
+      // Fetch updated user data
+      const userResponse = await axios.get(`${API}/auth/me`);
+      const updatedUser = userResponse.data;
+      
+      // Update localStorage with new user data
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
       toast.success('Business setup completed!');
-      setTimeout(() => navigate('/dashboard'), 1500);
+      
+      // Navigate to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/dashboard');
+        window.location.reload(); // Force reload to update app state
+      }, 1000);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to complete setup');
     } finally {
@@ -281,7 +295,7 @@ const BusinessSetupPage = ({ user }) => {
               className="w-full bg-gradient-to-r from-violet-600 to-purple-600 h-12 text-lg"
               data-testid="complete-setup-button"
             >
-              {loading ? 'Setting up...' : 'Complete Setup'}
+              {loading ? 'Setting up...' : 'Complete Setup & Go to Dashboard'}
             </Button>
           </form>
         </CardContent>

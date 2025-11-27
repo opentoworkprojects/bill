@@ -1486,6 +1486,198 @@ async def export_report(start_date: str, end_date: str):
     }
 
 
+@api_router.get("/reports/weekly")
+async def weekly_report(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    
+    orders = await db.orders.find({
+        "status": "completed", 
+        "organization_id": user_org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    weekly_orders = []
+    for order in orders:
+        order_date = order["created_at"]
+        if isinstance(order_date, str):
+            order_date = datetime.fromisoformat(order_date)
+        if order_date >= week_ago:
+            weekly_orders.append(order)
+    
+    total_sales = sum(order["total"] for order in weekly_orders)
+    total_orders = len(weekly_orders)
+    avg_order_value = total_sales / total_orders if total_orders > 0 else 0
+    
+    return {
+        "total_orders": total_orders,
+        "total_sales": total_sales,
+        "avg_order_value": avg_order_value,
+        "period": "last_7_days"
+    }
+
+
+@api_router.get("/reports/monthly")
+async def monthly_report(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    
+    orders = await db.orders.find({
+        "status": "completed",
+        "organization_id": user_org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    monthly_orders = []
+    for order in orders:
+        order_date = order["created_at"]
+        if isinstance(order_date, str):
+            order_date = datetime.fromisoformat(order_date)
+        if order_date >= month_ago:
+            monthly_orders.append(order)
+    
+    total_sales = sum(order["total"] for order in monthly_orders)
+    total_orders = len(monthly_orders)
+    avg_order_value = total_sales / total_orders if total_orders > 0 else 0
+    
+    return {
+        "total_orders": total_orders,
+        "total_sales": total_sales,
+        "avg_order_value": avg_order_value,
+        "period": "last_30_days"
+    }
+
+
+@api_router.get("/reports/best-selling")
+async def best_selling_report(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    orders = await db.orders.find({
+        "status": "completed",
+        "organization_id": user_org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    from collections import defaultdict
+    item_stats = defaultdict(lambda: {"total_sold": 0, "total_revenue": 0, "name": "", "category": ""})
+    
+    for order in orders:
+        for item in order["items"]:
+            item_id = item.get("menu_item_id", item["name"])
+            item_stats[item_id]["name"] = item["name"]
+            item_stats[item_id]["total_sold"] += item["quantity"]
+            item_stats[item_id]["total_revenue"] += item["price"] * item["quantity"]
+    
+    # Get category info from menu
+    for item_id, stats in item_stats.items():
+        menu_item = await db.menu_items.find_one({"name": stats["name"], "organization_id": user_org_id}, {"_id": 0})
+        if menu_item:
+            stats["category"] = menu_item.get("category", "Uncategorized")
+    
+    sorted_items = sorted(item_stats.values(), key=lambda x: x["total_sold"], reverse=True)[:10]
+    return sorted_items
+
+
+@api_router.get("/reports/staff-performance")
+async def staff_performance_report(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    orders = await db.orders.find({
+        "status": "completed",
+        "organization_id": user_org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    from collections import defaultdict
+    staff_stats = defaultdict(lambda: {"total_orders": 0, "total_sales": 0, "waiter_name": ""})
+    
+    for order in orders:
+        waiter_id = order["waiter_id"]
+        staff_stats[waiter_id]["waiter_name"] = order["waiter_name"]
+        staff_stats[waiter_id]["total_orders"] += 1
+        staff_stats[waiter_id]["total_sales"] += order["total"]
+    
+    # Calculate average order value
+    for staff_id, stats in staff_stats.items():
+        stats["avg_order_value"] = stats["total_sales"] / stats["total_orders"] if stats["total_orders"] > 0 else 0
+        # Get role from users collection
+        staff_user = await db.users.find_one({"id": staff_id}, {"_id": 0})
+        if staff_user:
+            stats["role"] = staff_user.get("role", "waiter")
+    
+    sorted_staff = sorted(staff_stats.values(), key=lambda x: x["total_orders"], reverse=True)
+    return sorted_staff
+
+
+@api_router.get("/reports/peak-hours")
+async def peak_hours_report(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    orders = await db.orders.find({
+        "status": "completed",
+        "organization_id": user_org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    from collections import defaultdict
+    hour_stats = defaultdict(int)
+    
+    for order in orders:
+        order_date = order["created_at"]
+        if isinstance(order_date, str):
+            order_date = datetime.fromisoformat(order_date)
+        hour = order_date.hour
+        hour_stats[hour] += 1
+    
+    # Format hours
+    formatted_hours = []
+    for hour, count in sorted(hour_stats.items()):
+        formatted_hours.append({
+            "hour": f"{hour:02d}:00 - {hour:02d}:59",
+            "order_count": count
+        })
+    
+    return sorted(formatted_hours, key=lambda x: x["order_count"], reverse=True)[:12]
+
+
+@api_router.get("/reports/category-analysis")
+async def category_analysis_report(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    orders = await db.orders.find({
+        "status": "completed",
+        "organization_id": user_org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    from collections import defaultdict
+    category_stats = defaultdict(lambda: {"total_sold": 0, "total_revenue": 0})
+    
+    for order in orders:
+        for item in order["items"]:
+            # Get category from menu
+            menu_item = await db.menu_items.find_one({
+                "name": item["name"],
+                "organization_id": user_org_id
+            }, {"_id": 0})
+            
+            category = "Uncategorized"
+            if menu_item:
+                category = menu_item.get("category", "Uncategorized")
+            
+            category_stats[category]["total_sold"] += item["quantity"]
+            category_stats[category]["total_revenue"] += item["price"] * item["quantity"]
+    
+    # Calculate percentages
+    total_revenue = sum(stats["total_revenue"] for stats in category_stats.values())
+    
+    result = []
+    for category, stats in category_stats.items():
+        percentage = (stats["total_revenue"] / total_revenue * 100) if total_revenue > 0 else 0
+        result.append({
+            "category": category,
+            "total_sold": stats["total_sold"],
+            "total_revenue": stats["total_revenue"],
+            "percentage": percentage
+        })
+    
+    return sorted(result, key=lambda x: x["total_revenue"], reverse=True)
+
+
 # Thermal printer route
 @api_router.post("/print")
 async def print_receipt(

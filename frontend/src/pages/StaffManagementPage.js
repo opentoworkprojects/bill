@@ -33,24 +33,60 @@ const StaffManagementPage = ({ user }) => {
       setStaff(response.data);
     } catch (error) {
       toast.error('Failed to fetch staff');
+      console.error(error);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.username || !formData.email) {
+      toast.error('Username and email are required');
+      return;
+    }
+    
+    if (!editingStaff && !formData.password) {
+      toast.error('Password is required for new staff');
+      return;
+    }
+
     try {
       if (editingStaff) {
-        await axios.put(`${API}/staff/${editingStaff.id}`, formData);
-        toast.success('Staff updated!');
+        // Only send fields that have values for update
+        const updateData = {};
+        if (formData.username) updateData.username = formData.username;
+        if (formData.email) updateData.email = formData.email;
+        if (formData.password) updateData.password = formData.password;
+        if (formData.role) updateData.role = formData.role;
+        if (formData.phone) updateData.phone = formData.phone;
+        if (formData.salary) updateData.salary = parseFloat(formData.salary);
+        
+        await axios.put(`${API}/staff/${editingStaff.id}`, updateData);
+        toast.success('Staff updated successfully!');
       } else {
-        await axios.post(`${API}/staff/create`, formData);
-        toast.success('Staff member added!');
+        // Create new staff with all required fields
+        const createData = {
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role || 'waiter'
+        };
+        
+        if (formData.phone) createData.phone = formData.phone;
+        if (formData.salary) createData.salary = parseFloat(formData.salary);
+        
+        await axios.post(`${API}/staff/create`, createData);
+        toast.success('Staff member added successfully!');
       }
+      
       setDialogOpen(false);
       fetchStaff();
       resetForm();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save staff');
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to save staff';
+      toast.error(errorMsg);
+      console.error('Staff save error:', error);
     }
   };
 
@@ -233,7 +269,7 @@ const StaffManagementPage = ({ user }) => {
 
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" data-testid="save-staff-button">
-                    {editingStaff ? 'Update' : 'Add Staff'}
+                    {editingStaff ? 'Update Staff' : 'Add Staff'}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
                 </div>
