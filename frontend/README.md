@@ -1,70 +1,504 @@
-# Getting Started with Create React App
+# RestoBill AI Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Overview
 
-## Available Scripts
+RestoBill AI Frontend is a modern React application that provides a comprehensive restaurant management interface. Built with React 18, it features a responsive design using Tailwind CSS and Radix UI components, offering an intuitive experience for restaurant staff and managers.
 
-In the project directory, you can run:
+## 🚀 Quick Start
 
-### `npm start`
+### 1. Prerequisites
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Node.js**: Version 18 or higher
+- **npm**: Version 8 or higher
+- **Backend Server**: RestoBill AI backend running (see `../backend/README.md`)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 2. Installation
 
-### `npm test`
+```bash
+# Navigate to frontend directory
+cd frontend
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+# Install dependencies
+npm install
 
-### `npm run build`
+# Set up environment variables
+npm run env:setup
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+# Edit your local environment file
+# Update REACT_APP_BACKEND_URL and API keys
+nano .env.local
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 3. Environment Setup
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+# Copy environment template
+cp .env.local.template .env.local
 
-### `npm run eject`
+# Edit with your actual values
+# Required: REACT_APP_BACKEND_URL
+# Optional: REACT_APP_RAZORPAY_KEY_ID, REACT_APP_GOOGLE_MAPS_API_KEY
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 4. Start Development Server
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+# Validate environment and start server
+npm start
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Or start without validation
+npm run start:direct
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+The application will open at [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+## 📁 Project Structure
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```
+frontend/
+├── public/                 # Static assets
+├── src/
+│   ├── components/        # Reusable UI components
+│   │   ├── ui/           # Base UI components (shadcn/ui)
+│   │   └── Layout.js     # Main layout component
+│   ├── pages/            # Page components
+│   │   ├── LoginPage.js
+│   │   ├── Dashboard.js
+│   │   ├── MenuPage.js
+│   │   ├── OrdersPage.js
+│   │   ├── BillingPage.js
+│   │   └── ...
+│   ├── hooks/            # Custom React hooks
+│   ├── lib/              # Utility functions
+│   │   └── utils.js
+│   ├── App.js            # Main app component
+│   ├── App.css           # Global styles
+│   └── index.js          # Entry point
+├── scripts/              # Build and utility scripts
+│   └── validate-env.js   # Environment validation
+├── .env                  # Default environment variables
+├── .env.development      # Development environment
+├── .env.production       # Production environment
+├── .env.staging          # Staging environment
+├── .env.local.template   # Local environment template
+└── package.json          # Dependencies and scripts
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 🔧 Environment Configuration
 
-### Code Splitting
+### Essential Variables
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```bash
+# Backend Connection (Required)
+REACT_APP_BACKEND_URL=http://localhost:5000
 
-### Analyzing the Bundle Size
+# Payment Gateway (Recommended)
+REACT_APP_RAZORPAY_KEY_ID=rzp_test_your_key_here
+REACT_APP_RAZORPAY_ENABLED=true
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+# Google Maps (Optional but recommended)
+REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_key_here
+```
 
-### Making a Progressive Web App
+### Environment Validation
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```bash
+# Validate current environment setup
+npm run validate-env
 
-### Advanced Configuration
+# Get setup guidance
+npm run validate-env:guide
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+# Create .env.local from template
+npm run env:setup
+```
 
-### Deployment
+### Environment Files Priority
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+1. `.env.local` (highest priority, gitignored)
+2. `.env.development` (when NODE_ENV=development)
+3. `.env.production` (when NODE_ENV=production)
+4. `.env` (default fallback)
 
-### `npm run build` fails to minify
+## 🎨 UI Components
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Built with modern React patterns and components:
+
+- **Radix UI**: Accessible component primitives
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: Pre-built component library
+- **Lucide React**: Beautiful icons
+- **React Hook Form**: Form management
+- **Sonner**: Toast notifications
+
+### Key Components
+
+- **Layout**: Main application layout with navigation
+- **Dashboard**: Overview with analytics and quick actions
+- **Menu Management**: Create and manage restaurant menus
+- **Order Processing**: Real-time order management
+- **Kitchen Display**: Order preparation interface
+- **Billing System**: Integrated payment processing
+- **Inventory**: Stock management and tracking
+- **Reports**: Analytics and business insights
+
+## 🔌 API Integration
+
+### Backend Connection
+
+```javascript
+// Automatic API base URL construction
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Authentication handling
+import { setAuthToken } from './App';
+setAuthToken(localStorage.getItem('token'));
+```
+
+### Real-time Features
+
+```javascript
+// WebSocket connection for real-time updates
+const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
+// Features: Live orders, kitchen updates, notifications
+```
+
+## 📱 Features
+
+### Core Restaurant Management
+- **Dashboard**: Real-time metrics and quick actions
+- **Menu Management**: Categories, items, pricing, variations
+- **Order Processing**: Take orders, modify items, track status
+- **Table Management**: Table layouts, reservations, occupancy
+- **Kitchen Display**: Order queue, preparation status
+- **Billing & Payments**: Invoice generation, payment processing
+
+### Advanced Features
+- **AI Recommendations**: Smart menu suggestions and insights
+- **QR Code Ordering**: Customer self-service ordering
+- **Inventory Management**: Stock tracking, low-stock alerts
+- **Staff Management**: Employee roles, permissions, scheduling
+- **Analytics & Reports**: Sales reports, performance metrics
+- **Multi-location**: Support for restaurant chains
+
+### Customer Features
+- **Online Ordering**: Web-based ordering system
+- **Loyalty Program**: Points, rewards, customer retention
+- **Feedback System**: Reviews and rating collection
+
+## 🔧 Development
+
+### Available Scripts
+
+```bash
+# Development
+npm start              # Start development server with validation
+npm run start:direct   # Start without environment validation
+npm run build          # Create production build
+npm test               # Run test suite
+
+# Environment Management
+npm run validate-env         # Validate environment variables
+npm run validate-env:guide   # Show setup guide
+npm run env:setup           # Create .env.local from template
+
+# Maintenance
+npm run clean-install  # Clean install dependencies
+npm run lint          # Run ESLint (if configured)
+npm run format        # Format code (if configured)
+```
+
+### Development Workflow
+
+1. **Setup**: Clone repo, install dependencies, configure environment
+2. **Development**: Use `npm start` for hot-reload development
+3. **Testing**: Write and run tests for new features
+4. **Building**: Use `npm run build` for production builds
+5. **Deployment**: Deploy to hosting platform (Vercel, Render, etc.)
+
+### Code Style
+
+- **ES6+**: Modern JavaScript features
+- **Functional Components**: React hooks over class components
+- **Custom Hooks**: Reusable stateful logic
+- **Component Composition**: Small, focused components
+- **Tailwind Classes**: Utility-first styling approach
+
+## 🔐 Authentication & Security
+
+### Authentication Flow
+
+```javascript
+// Login process
+const login = async (credentials) => {
+  const response = await axios.post(`${API}/auth/login`, credentials);
+  setAuthToken(response.data.token);
+  localStorage.setItem('user', JSON.stringify(response.data.user));
+};
+
+// Protected routes
+const PrivateRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  return token ? children : <Navigate to="/login" />;
+};
+```
+
+### Security Features
+
+- **JWT Token Management**: Secure token storage and refresh
+- **Role-based Access**: Different permissions for staff roles
+- **Route Protection**: Authenticated routes and role checks
+- **CORS Configuration**: Secure cross-origin requests
+- **Input Validation**: Form validation and sanitization
+
+## 📦 Dependencies
+
+### Core Dependencies
+
+```json
+{
+  "react": "^18.2.0",
+  "react-dom": "^18.2.0",
+  "react-router-dom": "^7.5.1",
+  "axios": "^1.8.4",
+  "react-hook-form": "^7.56.2"
+}
+```
+
+### UI Framework
+
+```json
+{
+  "@radix-ui/react-*": "Latest",
+  "tailwindcss": "^3.4.17",
+  "lucide-react": "^0.507.0",
+  "class-variance-authority": "^0.7.1",
+  "clsx": "^2.1.1",
+  "tailwind-merge": "^3.2.0"
+}
+```
+
+### Build Tools
+
+```json
+{
+  "@craco/craco": "^7.1.0",
+  "react-scripts": "5.0.1",
+  "postcss": "^8.4.49",
+  "autoprefixer": "^10.4.20"
+}
+```
+
+## 🚀 Deployment
+
+### Build for Production
+
+```bash
+# Create optimized production build
+npm run build
+
+# The build folder contains the production-ready files
+```
+
+### Environment Variables for Production
+
+```bash
+# Update these for your production environment
+REACT_APP_BACKEND_URL=https://your-backend-prod.onrender.com
+REACT_APP_RAZORPAY_KEY_ID=rzp_live_your_live_key
+REACT_APP_ENVIRONMENT=production
+GENERATE_SOURCEMAP=false
+```
+
+### Deployment Platforms
+
+#### Render
+```bash
+# Build Command
+npm run build
+
+# Environment Variables
+Set in Render dashboard:
+- REACT_APP_BACKEND_URL
+- REACT_APP_RAZORPAY_KEY_ID
+- NODE_ENV=production
+```
+
+#### Vercel
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+vercel --prod
+```
+
+#### Netlify
+```bash
+# Build settings
+Build command: npm run build
+Publish directory: build
+```
+
+### Docker Deployment
+
+```dockerfile
+# Multi-stage build
+FROM node:18-alpine as builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+#### Backend Connection Failed
+```bash
+# Check backend URL format
+REACT_APP_BACKEND_URL=http://localhost:5000  # ✅ Correct
+REACT_APP_BACKEND_URL=http://localhost:5000/ # ❌ Wrong
+
+# Verify backend is running
+curl http://localhost:5000/api/health
+
+# Check CORS settings in backend
+```
+
+#### Environment Variables Not Loading
+```bash
+# Ensure variables have REACT_APP_ prefix
+REACT_APP_API_URL=...  # ✅ Available in React
+API_URL=...            # ❌ Not available
+
+# Restart development server after changes
+npm start
+```
+
+#### Payment Integration Issues
+```bash
+# Check Razorpay key format
+REACT_APP_RAZORPAY_KEY_ID=rzp_test_...  # Test environment
+REACT_APP_RAZORPAY_KEY_ID=rzp_live_...  # Production
+
+# Verify payment gateway is enabled
+REACT_APP_RAZORPAY_ENABLED=true
+```
+
+#### Build Failures
+```bash
+# Clear cache and reinstall
+npm run clean-install
+
+# Check Node.js version
+node --version  # Should be 18+
+
+# Update dependencies
+npm update
+```
+
+### Debug Tools
+
+```javascript
+// Environment debugging (development only)
+if (process.env.NODE_ENV === 'development') {
+  console.log('Environment:', {
+    BACKEND_URL: process.env.REACT_APP_BACKEND_URL,
+    ENVIRONMENT: process.env.REACT_APP_ENVIRONMENT,
+    RAZORPAY_ENABLED: process.env.REACT_APP_RAZORPAY_ENABLED
+  });
+}
+```
+
+### Performance Monitoring
+
+- **React DevTools**: Browser extension for React debugging
+- **Web Vitals**: Built-in performance metrics
+- **Bundle Analyzer**: Analyze build size (`npm run build -- --analyze`)
+
+## 🧪 Testing
+
+### Test Structure
+
+```bash
+src/
+├── components/__tests__/
+├── pages/__tests__/
+├── hooks/__tests__/
+└── __tests__/
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage
+npm test -- --coverage
+```
+
+## 📖 API Documentation
+
+### Authentication Endpoints
+- `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current user
+
+### Restaurant Management
+- `GET /api/menu` - Get menu items
+- `POST /api/orders` - Create new order
+- `GET /api/orders` - Get orders list
+- `POST /api/payments/create-order` - Process payment
+
+For complete API documentation, see the backend README.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow existing code style and patterns
+- Write tests for new features
+- Update documentation as needed
+- Test on multiple devices and browsers
+- Validate environment setup works correctly
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+- **Documentation**: See `FRONTEND_ENV_SETUP.md` for detailed environment setup
+- **Issues**: Report bugs and feature requests on GitHub
+- **Environment Help**: Run `npm run validate-env:guide` for setup guidance
+
+## 📞 Contact
+
+- **Developer**: RestoBill AI Team
+- **Email**: support@restobill-ai.com
+- **Website**: https://restobill-ai.com
+
+---
+
+**Made with ❤️ by the RestoBill AI Team**
+
+*Transforming restaurant management with intelligent technology*

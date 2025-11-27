@@ -65,7 +65,11 @@
     "build": "craco build",
     "test": "craco test",
     "clean-install": "rm -rf node_modules package-lock.json && npm install",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build",
+    "validate-env": "node scripts/validate-env.js",
+    "validate-env:guide": "node scripts/validate-env.js --guide",
+    "env:setup": "cp .env.local.template .env.local && echo '✅ .env.local created from template. Please edit it with your actual values.'",
+    "prestart": "node scripts/validate-env.js --summary"
   },
   "browserslist": {
     "production": [
