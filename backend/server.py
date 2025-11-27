@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import ssl
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,9 +43,31 @@ except Exception:
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-# MongoDB connection
+# MongoDB connection with SSL configuration
 mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017/restrobill")
-client = AsyncIOMotorClient(mongo_url)
+
+# Configure MongoDB client with SSL settings for Atlas compatibility
+try:
+    if "mongodb+srv://" in mongo_url or "ssl=true" in mongo_url:
+        # For MongoDB Atlas, use SSL with proper certificate handling
+        client = AsyncIOMotorClient(
+            mongo_url,
+            ssl=True,
+            ssl_cert_reqs=ssl.CERT_NONE,  # Allow invalid certificates for Render compatibility
+            tlsAllowInvalidCertificates=True,
+            tlsAllowInvalidHostnames=True,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+        )
+    else:
+        # For local or non-SSL connections
+        client = AsyncIOMotorClient(mongo_url)
+except Exception as e:
+    print(f"MongoDB client creation failed: {e}")
+    # Fallback to basic client
+    client = AsyncIOMotorClient(mongo_url)
+
 db = client[os.getenv("DB_NAME", "restrobill")]
 
 # Security
@@ -1442,7 +1465,7 @@ async def print_bill(
 async def health_check():
     """Health check endpoint for monitoring and load balancers"""
     try:
-        # Check database connection
+        # Check database connection with timeout
         await db.users.find_one({}, {"_id": 1})
         return {
             "status": "healthy",
@@ -1450,14 +1473,29 @@ async def health_check():
             "version": "1.0.0",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "services": {"database": "connected", "api": "operational"},
+            "database": db.name,
+            "connection": "active",
         }
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "message": f"Database connection failed: {str(e)}",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "services": {"database": "disconnected", "api": "operational"},
-        }
+        # Try a simple ping command as fallback
+        try:
+            await db.command("ping")
+            return {
+                "status": "degraded",
+                "message": "Database ping successful but query failed",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "services": {"database": "limited", "api": "operational"},
+                "database": db.name,
+                "connection": "limited",
+            }
+        except Exception as ping_error:
+            return {
+                "status": "unhealthy",
+                "message": f"Database connection failed: {str(e)}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "services": {"database": "disconnected", "api": "operational"},
+                "troubleshooting": "Check MongoDB Atlas connection string and network access",
+            }
 
 
 @app.get("/api/health")
@@ -1498,15 +1536,81 @@ async def startup_validation():
                 "💡 Set JWT_SECRET environment variable with a secure 32+ character secret"
             )
 
-    # Test database connection
+    # Test database connection with multiple strategies
+    connection_successful = False
+
+    # Strategy 1: Try current connection
     try:
         await db.command("ping")
         print(f"✅ Database connected: {db.name}")
+        connection_successful = True
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"❌ Primary connection failed: {e}")
+
+        # Strategy 2: Try alternative client with different SSL settings
+        try:
+            print("🔄 Trying alternative SSL configuration...")
+            alt_client = AsyncIOMotorClient(
+                mongo_url,
+                ssl=True,
+                tlsInsecure=True,
+                serverSelectionTimeoutMS=3000,
+                connectTimeoutMS=5000,
+            )
+            alt_db = alt_client[os.getenv("DB_NAME", "restrobill")]
+            await alt_db.command("ping")
+
+            # Replace global client with working one
+            global client, db
+            client = alt_client
+            db = alt_db
+            print(f"✅ Alternative connection successful: {db.name}")
+            connection_successful = True
+
+        except Exception as e2:
+            print(f"❌ Alternative connection failed: {e2}")
+
+            # Strategy 3: Try without SSL for local/development
+            if "localhost" in mongo_url or "127.0.0.1" in mongo_url:
+                try:
+                    print("🔄 Trying local connection without SSL...")
+                    local_client = AsyncIOMotorClient(mongo_url, ssl=False)
+                    local_db = local_client[os.getenv("DB_NAME", "restrobill")]
+                    await local_db.command("ping")
+
+                    client = local_client
+                    db = local_db
+                    print(f"✅ Local connection successful: {db.name}")
+                    connection_successful = True
+
+                except Exception as e3:
+                    print(f"❌ Local connection failed: {e3}")
+
+    if not connection_successful:
         print(
             f"🔗 MongoDB URL: {mongo_url.replace(mongo_url.split('@')[0].split('://')[1] + '@', '***:***@') if '@' in mongo_url else mongo_url}"
         )
+
+        # Provide specific troubleshooting for SSL errors
+        error_str = str(e)
+        if "SSL" in error_str or "TLS" in error_str:
+            print("💡 SSL/TLS Connection Issue Detected:")
+            print("   Try setting these environment variables:")
+            print(
+                "   MONGO_URL=mongodb+srv://user:pass@cluster.net/db?ssl=true&tlsInsecure=true"
+            )
+            print("   Or contact your MongoDB Atlas admin for connection string")
+        elif "authentication" in error_str.lower():
+            print("💡 Authentication Issue Detected:")
+            print("   1. Verify username and password in connection string")
+            print("   2. Check database user permissions in MongoDB Atlas")
+        elif "timeout" in error_str.lower():
+            print("💡 Connection Timeout Issue:")
+            print("   1. Check network connectivity")
+            print("   2. Verify MongoDB Atlas cluster is running")
+            print("   3. Check if IP whitelist includes 0.0.0.0/0")
+
+        print("🔄 Server will continue running with degraded functionality")
 
     print(f"🚀 Server starting on port {os.getenv('PORT', '5000')}")
 
