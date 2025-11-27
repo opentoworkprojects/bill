@@ -176,6 +176,38 @@ CURRENCY_SYMBOLS = {
 
 
 # Models
+class PrintCustomization(BaseModel):
+    """Print customization settings"""
+    paper_width: str = "80mm"  # 58mm, 80mm, 110mm, custom
+    custom_width: Optional[int] = None  # in mm if paper_width is "custom"
+    font_size: int = 12  # 8-16px
+    line_spacing: float = 1.3  # 1.0-2.0
+    margin_top: int = 5  # in mm
+    margin_bottom: int = 5  # in mm
+    margin_left: int = 5  # in mm
+    margin_right: int = 5  # in mm
+    show_logo: bool = True
+    show_qr_code: bool = False
+    qr_code_content: str = "website"  # website, order_id, custom
+    custom_qr_text: Optional[str] = None
+    header_style: str = "centered"  # centered, left, right
+    item_layout: str = "detailed"  # detailed, compact, minimal
+    show_item_notes: bool = True
+    show_preparation_time: bool = False
+    show_server_name: bool = True
+    show_table_number: bool = True
+    show_customer_name: bool = True
+    show_order_date: bool = True
+    show_order_time: bool = True
+    date_format: str = "DD-MM-YYYY"  # DD-MM-YYYY, MM-DD-YYYY, YYYY-MM-DD
+    time_format: str = "12h"  # 12h, 24h
+    separator_style: str = "dash"  # dash, equal, heavy, light, none
+    total_style: str = "bold"  # bold, boxed, highlighted
+    print_copies: int = 1  # 1-5
+    auto_cut: bool = True
+    beep_on_print: bool = False
+
+
 class BusinessSettings(BaseModel):
     restaurant_name: Optional[str] = None
     address: Optional[str] = None
@@ -190,6 +222,7 @@ class BusinessSettings(BaseModel):
     website: Optional[str] = None
     tagline: Optional[str] = None
     footer_message: Optional[str] = "Thank you for dining with us!"
+    print_customization: Optional[PrintCustomization] = None
 
 
 class User(BaseModel):
@@ -438,13 +471,83 @@ async def check_subscription(user: dict):
     return True
 
 
+def get_paper_width_chars(paper_width: str, custom_width: Optional[int] = None) -> int:
+    """Calculate character width based on paper size"""
+    width_map = {
+        "58mm": 32,
+        "80mm": 48,
+        "110mm": 64,
+        "custom": custom_width // 2 if custom_width else 48
+    }
+    return width_map.get(paper_width, 48)
+
+
+def format_date_time(dt: datetime, date_format: str, time_format: str) -> tuple:
+    """Format date and time based on settings"""
+    date_formats = {
+        "DD-MM-YYYY": "%d-%m-%Y",
+        "MM-DD-YYYY": "%m-%d-%Y",
+        "YYYY-MM-DD": "%Y-%m-%d"
+    }
+    time_formats = {
+        "12h": "%I:%M %p",
+        "24h": "%H:%M"
+    }
+    
+    date_str = dt.strftime(date_formats.get(date_format, "%d-%m-%Y"))
+    time_str = dt.strftime(time_formats.get(time_format, "%I:%M %p"))
+    return date_str, time_str
+
+
+def get_separator(style: str, width: int) -> str:
+    """Get separator based on style and width"""
+    separators = {
+        "dash": "-" * width,
+        "equal": "=" * width,
+        "heavy": "═" * width,
+        "light": "─" * width,
+        "none": ""
+    }
+    return separators.get(style, "-" * width)
+
+
 def get_receipt_template(
-    theme: str, business: dict, order: dict, currency_symbol: str
+    theme: str, business: dict, order: dict, currency_symbol: str, customization: Optional[dict] = None
 ) -> str:
+    # Get customization settings or use defaults
+    custom = customization or {}
+    paper_width = custom.get("paper_width", "80mm")
+    custom_width_mm = custom.get("custom_width")
+    font_size = custom.get("font_size", 12)
+    separator_style = custom.get("separator_style", "dash")
+    show_logo = custom.get("show_logo", True)
+    show_server = custom.get("show_server_name", True)
+    show_table = custom.get("show_table_number", True)
+    show_customer = custom.get("show_customer_name", True)
+    show_date = custom.get("show_order_date", True)
+    show_time = custom.get("show_order_time", True)
+    date_format = custom.get("date_format", "DD-MM-YYYY")
+    time_format = custom.get("time_format", "12h")
+    item_layout = custom.get("item_layout", "detailed")
+    show_notes = custom.get("show_item_notes", True)
+    header_style = custom.get("header_style", "centered")
+    
+    # Calculate character width
+    char_width = get_paper_width_chars(paper_width, custom_width_mm)
+    
+    # Get separators
+    sep_main = get_separator(separator_style, char_width)
+    sep_light = get_separator("light", char_width)
+    
+    # Format date and time
+    now = datetime.now()
+    date_str, time_str = format_date_time(now, date_format, time_format)
+    
+    # Legacy separators for backward compatibility
     sep_eq = "=" * 48
     sep_dash = "-" * 48
     sep_heavy = "═" * 48
-    sep_light = "─" * 48
+    sep_light_48 = "─" * 48
 
     items_text = "".join(
         [
@@ -892,39 +995,110 @@ async def get_receipt_themes():
             "id": "classic",
             "name": "Classic",
             "description": "Traditional receipt format",
-            "width": "80mm"
+            "recommended_width": "80mm",
+            "supports_logo": True,
+            "supports_qr": True
         },
         {
             "id": "modern",
             "name": "Modern",
             "description": "Modern with emojis and borders",
-            "width": "80mm"
+            "recommended_width": "80mm",
+            "supports_logo": True,
+            "supports_qr": True
         },
         {
             "id": "minimal",
             "name": "Minimal",
             "description": "Clean and simple design",
-            "width": "80mm"
+            "recommended_width": "80mm",
+            "supports_logo": False,
+            "supports_qr": False
         },
         {
             "id": "elegant",
             "name": "Elegant",
             "description": "Professional and elegant",
-            "width": "80mm"
+            "recommended_width": "80mm",
+            "supports_logo": True,
+            "supports_qr": True
         },
         {
             "id": "compact",
             "name": "Compact",
             "description": "Space-saving 58mm format",
-            "width": "58mm"
+            "recommended_width": "58mm",
+            "supports_logo": False,
+            "supports_qr": False
         },
         {
             "id": "detailed",
             "name": "Detailed",
             "description": "Comprehensive invoice format",
-            "width": "80mm"
+            "recommended_width": "80mm",
+            "supports_logo": True,
+            "supports_qr": True
         },
     ]
+
+
+@api_router.get("/paper-sizes")
+async def get_paper_sizes():
+    return [
+        {
+            "id": "58mm",
+            "name": "58mm (2.28 inches)",
+            "width_mm": 58,
+            "width_inches": 2.28,
+            "char_width": 32,
+            "description": "Compact thermal paper for small printers",
+            "common_use": "Food trucks, kiosks, mobile POS"
+        },
+        {
+            "id": "80mm",
+            "name": "80mm (3.15 inches)",
+            "width_mm": 80,
+            "width_inches": 3.15,
+            "char_width": 48,
+            "description": "Standard thermal paper size",
+            "common_use": "Most restaurants, retail stores"
+        },
+        {
+            "id": "110mm",
+            "name": "110mm (4.33 inches)",
+            "width_mm": 110,
+            "width_inches": 4.33,
+            "char_width": 64,
+            "description": "Wide format for detailed receipts",
+            "common_use": "Fine dining, detailed invoices"
+        },
+        {
+            "id": "custom",
+            "name": "Custom Size",
+            "width_mm": None,
+            "width_inches": None,
+            "char_width": None,
+            "description": "Specify custom paper width",
+            "common_use": "Special printer requirements"
+        }
+    ]
+
+
+@api_router.get("/print-customization-options")
+async def get_print_customization_options():
+    return {
+        "paper_widths": ["58mm", "80mm", "110mm", "custom"],
+        "font_sizes": [8, 9, 10, 11, 12, 13, 14, 15, 16],
+        "line_spacing": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0],
+        "date_formats": ["DD-MM-YYYY", "MM-DD-YYYY", "YYYY-MM-DD"],
+        "time_formats": ["12h", "24h"],
+        "separator_styles": ["dash", "equal", "heavy", "light", "none"],
+        "header_styles": ["centered", "left", "right"],
+        "item_layouts": ["detailed", "compact", "minimal"],
+        "total_styles": ["bold", "boxed", "highlighted"],
+        "qr_code_content": ["website", "order_id", "custom"],
+        "print_copies": [1, 2, 3, 4, 5]
+    }
 
 
 # Razorpay Settings
@@ -1846,14 +2020,27 @@ async def print_bill(
     currency_code = business.get("currency", "INR")
     currency_symbol = CURRENCY_SYMBOLS.get(currency_code, "₹")
     receipt_theme = theme or business.get("receipt_theme", "classic")
+    
+    # Get print customization settings
+    customization = business.get("print_customization")
 
     receipt_content = get_receipt_template(
-        receipt_theme, business, order, currency_symbol
+        receipt_theme, business, order, currency_symbol, customization
     )
+    
+    # Get paper width for response
+    paper_width = "80mm"
+    if customization:
+        paper_width = customization.get("paper_width", "80mm")
+        if paper_width == "custom" and customization.get("custom_width"):
+            paper_width = f"{customization.get('custom_width')}mm"
 
     return {
         "print_ready": True,
         "content": receipt_content,
+        "paper_width": paper_width,
+        "font_size": customization.get("font_size", 12) if customization else 12,
+        "copies": customization.get("print_copies", 1) if customization else 1,
         "format": "text",
         "theme": receipt_theme,
     }
