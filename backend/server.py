@@ -137,33 +137,24 @@ def is_allowed_origin(origin: str) -> bool:
 
 
 # Add CORS middleware to allow frontend connections
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://restro-ai.onrender.com",
+    # exact current frontend origin:
+    "https://restro-ai-u9kz-ed0v8idw3-shivs-projects-db2d52eb.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*(vercel\.app|netlify\.app|onrender\.com|render\.com)$",
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://restro-ai.onrender.com",
-        "https://restro-ai-u9kz.vercel.app",
-        "*",  # Allow all origins temporarily for debugging
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=[
-        "Authorization",
-        "Content-Type",
-        "Accept",
-        "Origin",
-        "User-Agent",
-        "DNT",
-        "Cache-Control",
-        "X-Mx-ReqToken",
-        "Keep-Alive",
-        "X-Requested-With",
-        "If-Modified-Since",
-        "Access-Control-Allow-Origin",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
+    # if you want to allow all your future Vercel previews:
+    allow_origin_regex=r"https://.*\.vercel\.app$",
+    allow_credentials=True,  # keep this if you ever use cookies/auth headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 
 # Currency symbols mapping
 CURRENCY_SYMBOLS = {
@@ -1766,13 +1757,6 @@ async def startup_validation():
 
 app.include_router(api_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
