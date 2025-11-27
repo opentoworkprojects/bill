@@ -1,0 +1,60 @@
+services:
+  # Backend API Service
+  - type: web
+    name: restobill-backend
+    env: python
+    repo: https://github.com/shivshankar9/restro-ai.git
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && python main.py
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
+      - key: DEBUG
+        value: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        value: https://restobill-frontend.onrender.com
+      - key: DB_NAME
+        value: restrobill
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: MAX_FILE_SIZE
+        value: 5242880
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 100
+      - key: MONGO_URL
+        fromDatabase:
+          name: restobill-mongodb
+          property: connectionString
+
+  # Frontend Web Service
+  - type: web
+    name: restobill-frontend
+    env: static
+    repo: https://github.com/shivshankar9/restro-ai.git
+    buildCommand: cd frontend && npm install --legacy-peer-deps && npm run build
+    staticPublishPath: frontend/build
+    plan: starter
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://restobill-backend.onrender.com/api
+      - key: REACT_APP_ENVIRONMENT
+        value: production
+      - key: CI
+        value: false
+
+databases:
+  - name: restobill-mongodb
+    databaseName: restrobill
+    user: restobill
+    plan: starter

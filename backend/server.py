@@ -1437,6 +1437,35 @@ async def print_bill(
     }
 
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and load balancers"""
+    try:
+        # Check database connection
+        await db.users.find_one({}, {"_id": 1})
+        return {
+            "status": "healthy",
+            "message": "RestoBill AI Server is running",
+            "version": "1.0.0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "services": {"database": "connected", "api": "operational"},
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "message": f"Database connection failed: {str(e)}",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "services": {"database": "disconnected", "api": "operational"},
+        }
+
+
+@app.get("/api/health")
+async def api_health_check():
+    """API health check endpoint"""
+    return await health_check()
+
+
 app.include_router(api_router)
 
 app.add_middleware(

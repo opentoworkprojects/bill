@@ -1,0 +1,176 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: restobill-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: restobill
+      MONGO_INITDB_ROOT_PASSWORD: restobill123
+      MONGO_INITDB_DATABASE: restrobill
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - restobill-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: restobill-backend
+    restart: unless-stopped
+    environment:
+      # Database
+      - MONGO_URL=mongodb://restobill:restobill123@mongodb:27017/restrobill?authSource=admin
+      - DB_NAME=restrobill
+
+      # JWT
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-${RANDOM_SUFFIX:-12345}
+      - JWT_ALGORITHM=HS256
+
+      # Server
+      - HOST=0.0.0.0
+      - PORT=5000
+      - ENVIRONMENT=production
+      - DEBUG=false
+
+      # CORS
+      - CORS_ORIGINS=http://localhost:3000,http://localhost,https://yourdomain.com
+
+      # Optional: Payment Gateway
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+
+      # Optional: AI/LLM
+      - LLM_API_KEY=${LLM_API_KEY:-}
+
+      # Logging
+      - LOG_LEVEL=INFO
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+      - backend_backups:/app/backups
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - restobill-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/auth/me"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: restobill-frontend
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_ENVIRONMENT=production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - restobill-network
+    volumes:
+      - frontend_build:/app/build
+
+  # Nginx Reverse Proxy (Optional - for production)
+  nginx:
+    image: nginx:alpine
+    container_name: restobill-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - frontend_build:/usr/share/nginx/html
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - restobill-network
+
+  # Redis for Caching (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: restobill-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass restobill123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - restobill-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "restobill123", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Express (Database Admin UI - Development only)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: restobill-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: restobill
+      ME_CONFIG_MONGODB_ADMINPASSWORD: restobill123
+      ME_CONFIG_MONGODB_URL: mongodb://restobill:restobill123@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - restobill-network
+    profiles:
+      - development
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local
+  backend_backups:
+    driver: local
+  frontend_build:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  restobill-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
