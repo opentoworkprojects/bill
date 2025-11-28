@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import '@/App.css';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
@@ -18,7 +18,23 @@ import StaffManagementPage from './pages/StaffManagementPage';
 import LandingPage from './pages/LandingPage';
 import TrackOrderPage from './pages/TrackOrderPage';
 import CustomerOrderPage from './pages/CustomerOrderPage';
+import DesktopInfo from './components/DesktopInfo';
 import { Toaster } from './components/ui/sonner';
+
+// Electron navigation handler component
+const ElectronNavigator = () => {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (window.electronAPI?.onNavigate) {
+      window.electronAPI.onNavigate((path) => {
+        navigate(path);
+      });
+    }
+  }, [navigate]);
+  
+  return null;
+};
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -75,6 +91,7 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
+        <ElectronNavigator />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage setUser={setUser} />} />
@@ -180,6 +197,7 @@ function App() {
         </Routes>
       </BrowserRouter>
       <Toaster position="top-center" richColors />
+      <DesktopInfo />
     </div>
   );
 }

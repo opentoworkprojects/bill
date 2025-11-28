@@ -1,7 +1,15 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
+  "name": "restobill",
+  "version": "1.0.0",
+  "description": "RestoBill - Restaurant Billing & Management System by FinVerge",
+  "author": {
+    "name": "FinVerge",
+    "email": "support@finverge.tech",
+    "url": "https://finverge.tech"
+  },
   "private": true,
+  "main": "electron/main.js",
+  "homepage": "https://finverge.tech",
   "overrides": {
     "react-day-picker": "9.10.0",
     "date-fns": "4.1.0"
@@ -69,7 +77,14 @@
     "validate-env": "node scripts/validate-env.js",
     "validate-env:guide": "node scripts/validate-env.js --guide",
     "env:setup": "cp .env.local.template .env.local && echo '✅ .env.local created from template. Please edit it with your actual values.'",
-    "start:validate": "node scripts/validate-env.js --summary && craco start"
+    "start:validate": "node scripts/validate-env.js --summary && craco start",
+    "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux",
+    "electron:build:all": "npm run build && electron-builder -mwl",
+    "postinstall": "electron-builder install-app-deps"
   },
   "browserslist": {
     "production": [
@@ -88,12 +103,73 @@
     "@craco/craco": "^7.1.0",
     "@eslint/js": "9.23.0",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
     "eslint": "9.23.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.4",
     "globals": "15.15.0",
     "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "tech.finverge.restobill",
+    "productName": "RestoBill",
+    "copyright": "Copyright © 2024 FinVerge Tech",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/logo512.png",
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/logo512.png",
+      "uninstallerIcon": "public/logo512.png",
+      "installerHeaderIcon": "public/logo512.png",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RestoBill"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "public/logo512.png",
+      "category": "public.app-category.business",
+      "artifactName": "${productName}-${version}-${os}.${ext}"
+    },
+    "dmg": {
+      "title": "RestoBill Installer",
+      "icon": "public/logo512.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "public/logo512.png",
+      "category": "Office",
+      "artifactName": "${productName}-${version}-${os}.${ext}"
+    }
   }
 }

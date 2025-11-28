@@ -34,7 +34,230 @@ import {
   Bell,
   Rocket,
   Gift,
+  Monitor,
+  Apple,
+  MessageCircle,
 } from "lucide-react";
+
+// Desktop App Download Section Component
+const DesktopDownloadSection = () => {
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  
+  // Detect user's operating system
+  const getOS = () => {
+    const userAgent = window.navigator.userAgent;
+    if (userAgent.indexOf("Win") !== -1) return "windows";
+    if (userAgent.indexOf("Mac") !== -1) return "mac";
+    if (userAgent.indexOf("Linux") !== -1) return "linux";
+    if (/Android/i.test(userAgent)) return "android";
+    if (/iPhone|iPad|iPod/i.test(userAgent)) return "ios";
+    return "unknown";
+  };
+  
+  const os = getOS();
+  const isMobile = os === "android" || os === "ios";
+  
+  // Download URLs - Update these with your actual hosted files
+  const downloadUrls = {
+    windows: "https://github.com/finverge/restobill-desktop/releases/latest/download/RestoBill-Setup.exe",
+    mac: "https://github.com/finverge/restobill-desktop/releases/latest/download/RestoBill.dmg",
+    linux: "https://github.com/finverge/restobill-desktop/releases/latest/download/RestoBill.AppImage",
+  };
+  
+  const handleDownload = (platform) => {
+    const url = downloadUrls[platform];
+    if (url) {
+      window.open(url, "_blank");
+      toast.success(`Downloading RestoBill for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
+    } else {
+      toast.error("Download not available yet. Please try again later.");
+    }
+  };
+  
+  const handleSendLink = (e) => {
+    e.preventDefault();
+    if (phoneNumber) {
+      // Generate WhatsApp link with download info
+      const message = encodeURIComponent(
+        `🖥️ Download RestoBill Desktop App:\n\n` +
+        `Windows: ${downloadUrls.windows}\n\n` +
+        `Mac: ${downloadUrls.mac}\n\n` +
+        `Or visit: https://finverge.tech/download`
+      );
+      window.open(`https://wa.me/${phoneNumber.replace(/\D/g, "")}?text=${message}`, "_blank");
+      toast.success("Opening WhatsApp to send download link!");
+      setPhoneNumber("");
+      setShowPhoneInput(false);
+    }
+  };
+  
+  return (
+    <section id="desktop-app" className="py-20 bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50">
+      <div className="container mx-auto px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-full mb-4">
+              <Monitor className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-600">Desktop App Available</span>
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+              Get RestoBill for
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"> Desktop</span>
+            </h2>
+            
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Download the native desktop app for the best experience. 
+              Works offline and integrates with your thermal printer.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            {/* Download Options */}
+            <div className="space-y-6">
+              {/* Auto-detected OS */}
+              {!isMobile && (
+                <Card className="border-2 border-blue-200 bg-blue-50/50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
+                        {os === "windows" && <Monitor className="w-7 h-7 text-white" />}
+                        {os === "mac" && <Apple className="w-7 h-7 text-white" />}
+                        {os === "linux" && <Monitor className="w-7 h-7 text-white" />}
+                      </div>
+                      <div>
+                        <p className="text-sm text-blue-600 font-medium">Recommended for you</p>
+                        <h3 className="text-xl font-bold">
+                          {os === "windows" && "Windows"}
+                          {os === "mac" && "macOS"}
+                          {os === "linux" && "Linux"}
+                        </h3>
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-lg"
+                      onClick={() => handleDownload(os)}
+                    >
+                      <Download className="w-5 h-5 mr-2" />
+                      Download for {os === "windows" ? "Windows" : os === "mac" ? "macOS" : "Linux"}
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      {os === "windows" && "Windows 10/11 • 64-bit • ~80MB"}
+                      {os === "mac" && "macOS 10.15+ • Intel & Apple Silicon • ~90MB"}
+                      {os === "linux" && "Ubuntu 20.04+ • AppImage • ~85MB"}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Other platforms */}
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => handleDownload("windows")}
+                  className={`p-4 rounded-xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${os === "windows" && !isMobile ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}
+                >
+                  <Monitor className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                  <p className="text-sm font-medium">Windows</p>
+                  <p className="text-xs text-gray-500">.exe</p>
+                </button>
+                
+                <button
+                  onClick={() => handleDownload("mac")}
+                  className={`p-4 rounded-xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${os === "mac" && !isMobile ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}
+                >
+                  <Apple className="w-8 h-8 mx-auto mb-2 text-gray-700" />
+                  <p className="text-sm font-medium">macOS</p>
+                  <p className="text-xs text-gray-500">.dmg</p>
+                </button>
+                
+                <button
+                  onClick={() => handleDownload("linux")}
+                  className={`p-4 rounded-xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${os === "linux" && !isMobile ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}
+                >
+                  <Monitor className="w-8 h-8 mx-auto mb-2 text-orange-600" />
+                  <p className="text-sm font-medium">Linux</p>
+                  <p className="text-xs text-gray-500">.AppImage</p>
+                </button>
+              </div>
+              
+              {/* Send link via WhatsApp */}
+              <div className="bg-white rounded-xl p-4 border border-gray-200">
+                {!showPhoneInput ? (
+                  <button
+                    onClick={() => setShowPhoneInput(true)}
+                    className="w-full flex items-center justify-center gap-2 text-green-600 hover:text-green-700 font-medium"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    Send download link via WhatsApp
+                  </button>
+                ) : (
+                  <form onSubmit={handleSendLink} className="space-y-3">
+                    <p className="text-sm text-gray-600 mb-2">Enter phone number to receive download link:</p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="tel"
+                        placeholder="+91 9876543210"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="h-10"
+                        required
+                      />
+                      <Button type="submit" className="bg-green-600 hover:bg-green-700 h-10 px-4">
+                        <MessageCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhoneInput(false)}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+            
+            {/* Features */}
+            <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-100">
+              <h3 className="text-lg font-bold mb-4">Desktop App Features</h3>
+              <div className="space-y-4">
+                {[
+                  { icon: Zap, title: "Lightning Fast", desc: "Native performance, instant startup" },
+                  { icon: Printer, title: "Direct Printing", desc: "Print receipts directly to thermal printer" },
+                  { icon: Shield, title: "Secure", desc: "Your data stays on your computer" },
+                  { icon: Globe, title: "Works Offline", desc: "Continue billing even without internet" },
+                  { icon: Bell, title: "Notifications", desc: "Get alerts for new orders" },
+                  { icon: Monitor, title: "Multi-Monitor", desc: "Use on multiple screens" },
+                ].map((feature, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <feature.icon className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">{feature.title}</h4>
+                      <p className="text-sm text-gray-600">{feature.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
+                <p className="text-sm text-gray-700">
+                  <strong>Version 1.0.0</strong> • Released Nov 2024
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Connects to finverge.tech • Auto-updates enabled
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -239,11 +462,18 @@ const LandingPage = () => {
                 Pricing
               </a>
               <a
+                href="#desktop-app"
+                className="text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-1"
+              >
+                <Monitor className="w-4 h-4" />
+                Desktop
+              </a>
+              <a
                 href="#app"
                 className="text-gray-600 hover:text-violet-600 transition-colors flex items-center gap-1"
               >
                 <Smartphone className="w-4 h-4" />
-                App
+                Mobile
                 <span className="bg-green-100 text-green-600 text-xs px-1.5 py-0.5 rounded-full font-medium">NEW</span>
               </a>
               <a
@@ -292,11 +522,18 @@ const LandingPage = () => {
                 Pricing
               </a>
               <a
+                href="#desktop-app"
+                className="flex items-center gap-2 text-gray-600 hover:text-blue-600"
+              >
+                <Monitor className="w-4 h-4" />
+                Desktop App
+              </a>
+              <a
                 href="#app"
                 className="flex items-center gap-2 text-gray-600 hover:text-violet-600"
               >
                 <Smartphone className="w-4 h-4" />
-                Android App
+                Mobile App
                 <span className="bg-green-100 text-green-600 text-xs px-1.5 py-0.5 rounded-full font-medium">NEW</span>
               </a>
               <a
@@ -830,6 +1067,9 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* Desktop App Download Section */}
+      <DesktopDownloadSection />
 
       {/* CTA Section */}
       <section
