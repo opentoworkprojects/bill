@@ -30,6 +30,10 @@ import {
   Clock,
   DollarSign,
   Package,
+  Download,
+  Bell,
+  Rocket,
+  Gift,
 } from "lucide-react";
 
 const LandingPage = () => {
@@ -157,40 +161,43 @@ const LandingPage = () => {
 
   const pricingPlans = [
     {
-      name: "Free",
+      name: "Free Trial",
       price: "₹0",
-      period: "First 50 Bills",
+      period: "7 Days Free",
       features: [
-        "Up to 50 bills",
-        "All core features",
+        "7 days full access",
+        "All premium features",
         "AI recommendations",
-        "Basic support",
+        "Unlimited bills (trial)",
         "Single restaurant",
         "Email support",
       ],
-      cta: "Start Free",
+      cta: "Start Free Trial",
       popular: false,
     },
     {
       name: "Premium",
-      price: "₹99",
+      price: "₹499",
       period: "per year",
+      originalPrice: "₹999",
       features: [
-        "Unlimited bills",
+        "Unlimited bills forever",
         "All premium features",
         "Advanced AI analytics",
-        "Priority support",
+        "Priority 24/7 support",
         "Multiple restaurants",
         "Phone & chat support",
         "Custom integrations",
         "Export to CSV/PDF",
         "Multi-currency",
-        "Thermal printer themes",
+        "6 thermal printer themes",
       ],
-      cta: "Get Premium",
+      cta: "Get Premium - 50% OFF",
       popular: true,
     },
   ];
+
+  const [earlyAccessEmail, setEarlyAccessEmail] = useState("");
 
   const stats = [
     { value: "10,000+", label: "Active Restaurants" },
@@ -232,16 +239,18 @@ const LandingPage = () => {
                 Pricing
               </a>
               <a
+                href="#app"
+                className="text-gray-600 hover:text-violet-600 transition-colors flex items-center gap-1"
+              >
+                <Smartphone className="w-4 h-4" />
+                App
+                <span className="bg-green-100 text-green-600 text-xs px-1.5 py-0.5 rounded-full font-medium">NEW</span>
+              </a>
+              <a
                 href="#testimonials"
                 className="text-gray-600 hover:text-violet-600 transition-colors"
               >
                 Reviews
-              </a>
-              <a
-                href="#faq"
-                className="text-gray-600 hover:text-violet-600 transition-colors"
-              >
-                FAQ
               </a>
               <Button variant="outline" onClick={() => navigate("/login")}>
                 Login
@@ -250,7 +259,7 @@ const LandingPage = () => {
                 className="bg-gradient-to-r from-violet-600 to-purple-600"
                 onClick={handleGetStarted}
               >
-                Get Started Free
+                Start Free Trial
               </Button>
             </div>
 
@@ -283,16 +292,18 @@ const LandingPage = () => {
                 Pricing
               </a>
               <a
+                href="#app"
+                className="flex items-center gap-2 text-gray-600 hover:text-violet-600"
+              >
+                <Smartphone className="w-4 h-4" />
+                Android App
+                <span className="bg-green-100 text-green-600 text-xs px-1.5 py-0.5 rounded-full font-medium">NEW</span>
+              </a>
+              <a
                 href="#testimonials"
                 className="block text-gray-600 hover:text-violet-600"
               >
                 Reviews
-              </a>
-              <a
-                href="#faq"
-                className="block text-gray-600 hover:text-violet-600"
-              >
-                FAQ
               </a>
               <Button
                 variant="outline"
@@ -305,7 +316,7 @@ const LandingPage = () => {
                 className="w-full bg-gradient-to-r from-violet-600 to-purple-600"
                 onClick={handleGetStarted}
               >
-                Get Started Free
+                Start Free Trial
               </Button>
             </div>
           )}
@@ -539,6 +550,12 @@ const LandingPage = () => {
                 <CardHeader className="text-center pb-8">
                   <CardTitle className="text-2xl mb-4">{plan.name}</CardTitle>
                   <div className="mb-2">
+                    {plan.originalPrice && (
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <span className="text-xl text-gray-400 line-through">{plan.originalPrice}</span>
+                        <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-bold">50% OFF</span>
+                      </div>
+                    )}
                     <span className="text-5xl font-bold">{plan.price}</span>
                     <span className="text-gray-600 ml-2">{plan.period}</span>
                   </div>
@@ -582,7 +599,7 @@ const LandingPage = () => {
             {[
               {
                 q: "How does the free trial work?",
-                a: "You get 50 bills completely free with all features included. No credit card required. After 50 bills, upgrade to Premium for just ₹99/year.",
+                a: "You get 7 days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ₹499/year (50% off!).",
               },
               {
                 q: "Can I use my own Razorpay account?",
@@ -590,7 +607,7 @@ const LandingPage = () => {
               },
               {
                 q: "Which thermal printers are supported?",
-                a: "We support all ESC/POS standard thermal printers. Choose from 4 professional receipt themes.",
+                a: "We support all ESC/POS standard thermal printers (58mm & 80mm). Choose from 6 professional receipt themes including Classic, Modern, Elegant, and more.",
               },
               {
                 q: "Can I add multiple staff members?",
@@ -598,11 +615,15 @@ const LandingPage = () => {
               },
               {
                 q: "Is my data secure?",
-                a: "Absolutely! We use bank-grade encryption, secure MongoDB storage, and HTTPS. Your data is completely safe.",
+                a: "Absolutely! We use bank-grade encryption, secure MongoDB storage, and HTTPS. Your data is completely safe with 99.9% uptime guarantee.",
               },
               {
                 q: "Can I use RestoBill AI on mobile?",
-                a: "Yes! It works on any device. You can also install it as an Android app from Google Play Store.",
+                a: "Yes! It works on any device. Join our early access program to get the Android app from Google Play Store when it launches!",
+              },
+              {
+                q: "What's included in the Premium plan?",
+                a: "Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, and all future features. Just ₹499/year!",
               },
             ].map((faq, index) => (
               <Card key={index} className="border-0 shadow-lg">
@@ -614,6 +635,198 @@ const LandingPage = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Early Access Android App Section */}
+      <section id="app" className="py-20 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              {/* Left Content */}
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 rounded-full">
+                  <Rocket className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-600">Early Access Program</span>
+                </div>
+                
+                <h2 className="text-4xl md:text-5xl font-bold" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                  Get the
+                  <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"> Android App</span>
+                </h2>
+                
+                <p className="text-xl text-gray-600">
+                  Be among the first to experience RestoBill AI on your Android device. 
+                  Join our early access program and get exclusive benefits!
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Gift className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Exclusive Early Bird Pricing</h4>
+                      <p className="text-gray-600 text-sm">Get 50% off on your first year subscription</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Bell className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Priority Feature Requests</h4>
+                      <p className="text-gray-600 text-sm">Your feedback shapes the app's future</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Lifetime Early Adopter Badge</h4>
+                      <p className="text-gray-600 text-sm">Special recognition in the app forever</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Early Access Form */}
+                <div className="bg-white p-6 rounded-2xl shadow-xl border border-green-100">
+                  <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
+                    <Smartphone className="w-5 h-5 text-green-600" />
+                    Join Early Access Waitlist
+                  </h4>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (earlyAccessEmail) {
+                      toast.success("🎉 You're on the list! We'll notify you when the app launches.");
+                      setEarlyAccessEmail("");
+                    }
+                  }} className="space-y-3">
+                    <Input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={earlyAccessEmail}
+                      onChange={(e) => setEarlyAccessEmail(e.target.value)}
+                      className="h-12"
+                      required
+                    />
+                    <Button type="submit" className="w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 text-lg">
+                      <Download className="w-5 h-5 mr-2" />
+                      Join Early Access
+                    </Button>
+                  </form>
+                  <p className="text-xs text-gray-500 mt-3 text-center">
+                    🔒 No spam. We'll only notify you about the app launch.
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Content - Phone Mockup */}
+              <div className="relative">
+                <div className="relative mx-auto w-72 md:w-80">
+                  {/* Phone Frame */}
+                  <div className="bg-gray-900 rounded-[3rem] p-3 shadow-2xl">
+                    <div className="bg-gray-800 rounded-[2.5rem] p-2">
+                      {/* Screen */}
+                      <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-[2rem] overflow-hidden aspect-[9/19]">
+                        {/* Status Bar */}
+                        <div className="bg-black/20 px-6 py-2 flex justify-between items-center text-white text-xs">
+                          <span>9:41</span>
+                          <div className="flex gap-1">
+                            <div className="w-4 h-2 bg-white/80 rounded-sm"></div>
+                            <div className="w-4 h-2 bg-white/80 rounded-sm"></div>
+                            <div className="w-6 h-3 bg-white/80 rounded-sm"></div>
+                          </div>
+                        </div>
+                        
+                        {/* App Content Preview */}
+                        <div className="p-4 space-y-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                              <ChefHat className="w-7 h-7 text-white" />
+                            </div>
+                            <div>
+                              <h3 className="text-white font-bold text-lg">RestoBill AI</h3>
+                              <p className="text-white/70 text-xs">Smart Restaurant Billing</p>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                              <p className="text-white/70 text-xs">Today's Sales</p>
+                              <p className="text-white font-bold text-xl">₹24,500</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                              <p className="text-white/70 text-xs">Orders</p>
+                              <p className="text-white font-bold text-xl">47</p>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                            <p className="text-white/70 text-xs mb-2">Quick Actions</p>
+                            <div className="grid grid-cols-4 gap-2">
+                              {['New Order', 'Menu', 'Tables', 'Reports'].map((item, i) => (
+                                <div key={i} className="bg-white/20 rounded-lg p-2 text-center">
+                                  <div className="w-6 h-6 bg-white/30 rounded-lg mx-auto mb-1"></div>
+                                  <p className="text-white text-[8px]">{item}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-white/70 text-xs">Active Orders</p>
+                              <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full">3 pending</span>
+                            </div>
+                            <div className="space-y-2">
+                              {[1, 2].map((_, i) => (
+                                <div key={i} className="bg-white/10 rounded-lg p-2 flex justify-between items-center">
+                                  <div>
+                                    <p className="text-white text-xs font-medium">Table {i + 1}</p>
+                                    <p className="text-white/60 text-[10px]">2 items</p>
+                                  </div>
+                                  <span className="text-white text-xs">₹450</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Floating Elements */}
+                  <div className="absolute -top-4 -right-4 bg-white rounded-2xl shadow-xl p-3 animate-bounce">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-900">Coming Soon</p>
+                        <p className="text-[10px] text-gray-500">Play Store</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-xl p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-violet-100 rounded-full flex items-center justify-center">
+                        <Star className="w-5 h-5 text-violet-600 fill-violet-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-900">4.9 Rating</p>
+                        <p className="text-[10px] text-gray-500">Beta Testers</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -631,8 +844,7 @@ const LandingPage = () => {
             Ready to Transform Your Restaurant?
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join 10,000+ restaurants using RestoBill AI. Start free, no credit
-            card required.
+            Join 10,000+ restaurants using RestoBill AI. Start your 7-day free trial today!
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -641,15 +853,17 @@ const LandingPage = () => {
               className="bg-white text-violet-600 hover:bg-gray-100 h-14 px-8 text-lg"
               onClick={handleGetStarted}
             >
-              Start Free Trial
+              Start 7-Day Free Trial
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button
               size="lg"
               variant="outline"
               className="h-14 px-8 text-lg border-white text-white hover:bg-white/10"
+              onClick={() => document.getElementById("app").scrollIntoView({ behavior: "smooth" })}
             >
-              Talk to Sales
+              <Smartphone className="w-5 h-5 mr-2" />
+              Get Android App
             </Button>
           </div>
 
