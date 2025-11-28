@@ -369,6 +369,7 @@ class OrderCreate(BaseModel):
     items: List[OrderItem]
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None  # For WhatsApp notifications
+    frontend_origin: Optional[str] = None  # For generating tracking links
 
 
 class Payment(BaseModel):
@@ -1445,15 +1446,16 @@ def generate_whatsapp_notification(phone: str, message: str) -> str:
     return f"https://wa.me/{phone_clean}?text={encoded_message}"
 
 
-def get_status_message(status: str, order: dict, business: dict) -> str:
+def get_status_message(status: str, order: dict, business: dict, frontend_url: str = "") -> str:
     """Generate status-specific WhatsApp message"""
     restaurant_name = business.get("restaurant_name", "Restaurant")
     currency = CURRENCY_SYMBOLS.get(business.get("currency", "INR"), "₹")
     order_id = order["id"][:8]
     tracking_token = order.get("tracking_token", "")
-    frontend_url = business.get("frontend_url", "")
     
-    tracking_link = f"{frontend_url}/track/{tracking_token}" if frontend_url and tracking_token else ""
+    # Use provided frontend_url or fall back to business settings
+    base_url = frontend_url or business.get("frontend_url", "")
+    tracking_link = f"{base_url}/track/{tracking_token}" if base_url and tracking_token else ""
     
     messages = {
         "pending": f"""🍽️ *{restaurant_name}*
@@ -1556,14 +1558,16 @@ async def create_order(
     
     # Generate WhatsApp notification if enabled and phone provided
     whatsapp_link = None
+    frontend_url = order_data.frontend_origin or ""
     if order_data.customer_phone and business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
-        message = get_status_message("pending", doc, business)
+        message = get_status_message("pending", doc, business, frontend_url)
         whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
 
     return {
         **order_obj.model_dump(),
         "whatsapp_link": whatsapp_link,
-        "tracking_token": tracking_token
+        "tracking_token": tracking_token,
+        "tracking_url": f"{frontend_url}/track/{tracking_token}" if frontend_url else ""
     }
 
 
@@ -1606,7 +1610,10 @@ async def get_order(order_id: str, current_user: dict = Depends(get_current_user
 
 @api_router.put("/orders/{order_id}/status")
 async def update_order_status(
-    order_id: str, status: str, current_user: dict = Depends(get_current_user)
+    order_id: str, 
+    status: str, 
+    frontend_origin: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
     # Get user's organization_id
     user_org_id = current_user.get("organization_id") or current_user["id"]
@@ -1650,7 +1657,7 @@ async def update_order_status(
         if should_notify:
             # Update order with current status for message generation
             order["status"] = status
-            message = get_status_message(status, order, business)
+            message = get_status_message(status, order, business, frontend_origin or "")
             whatsapp_link = generate_whatsapp_notification(customer_phone, message)
 
     return {
@@ -2514,6 +2521,7 @@ class CustomerOrderCreate(BaseModel):
     customer_name: str
     customer_phone: str
     org_id: str
+    frontend_origin: Optional[str] = None  # For generating tracking links
 
 
 @app.post("/api/public/order")
@@ -2562,13 +2570,15 @@ async def create_customer_order(order_data: CustomerOrderCreate):
         {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
     )
     
+    # Use frontend_origin from request for tracking links
+    frontend_url = order_data.frontend_origin or ""
+    
     # Generate WhatsApp notification
     whatsapp_link = None
     if business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
-        message = get_status_message("pending", doc, business)
+        message = get_status_message("pending", doc, business, frontend_url)
         whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
     
-    frontend_url = business.get("frontend_url", "")
     tracking_url = f"{frontend_url}/track/{tracking_token}" if frontend_url else ""
     
     return {

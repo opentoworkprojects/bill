@@ -115,7 +115,8 @@ const CustomerOrderPage = () => {
         items: cart,
         customer_name: customerInfo.name,
         customer_phone: customerInfo.phone,
-        org_id: orgId
+        org_id: orgId,
+        frontend_origin: window.location.origin  // Auto-pass for tracking links
       });
 
       toast.success('Order placed successfully!');

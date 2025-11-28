@@ -100,7 +100,8 @@ const OrdersPage = ({ user }) => {
         table_number: selectedTable.table_number,
         items: selectedItems,
         customer_name: formData.customer_name,
-        customer_phone: formData.customer_phone
+        customer_phone: formData.customer_phone,
+        frontend_origin: window.location.origin  // Auto-pass current URL for tracking links
       });
       toast.success('Order created!');
       
@@ -128,7 +129,8 @@ const OrdersPage = ({ user }) => {
 
   const handleStatusChange = async (orderId, status) => {
     try {
-      const response = await axios.put(`${API}/orders/${orderId}/status?status=${status}`);
+      // Pass frontend_origin for tracking link generation
+      const response = await axios.put(`${API}/orders/${orderId}/status?status=${status}&frontend_origin=${encodeURIComponent(window.location.origin)}`);
       toast.success('Order status updated!');
       
       // If WhatsApp link is returned, offer to send notification

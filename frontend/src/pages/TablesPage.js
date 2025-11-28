@@ -14,7 +14,7 @@ const TablesPage = ({ user }) => {
   const [tables, setTables] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [qrModal, setQrModal] = useState({ open: false, table: null });
-  const [whatsappSettings, setWhatsappSettings] = useState(null);
+  const [selfOrderEnabled, setSelfOrderEnabled] = useState(false);
   const [formData, setFormData] = useState({
     table_number: '',
     capacity: '',
@@ -29,15 +29,22 @@ const TablesPage = ({ user }) => {
   const fetchWhatsappSettings = async () => {
     try {
       const response = await axios.get(`${API}/whatsapp/settings`);
-      setWhatsappSettings(response.data);
+      setSelfOrderEnabled(response.data.customer_self_order_enabled || false);
     } catch (error) {
       console.error('Failed to fetch WhatsApp settings');
     }
   };
 
+  // Auto-generate QR URL using current window location
   const generateQRUrl = (tableNumber) => {
-    const frontendUrl = whatsappSettings?.frontend_url || window.location.origin;
-    return `${frontendUrl}/order/${user?.id}?table=${tableNumber}`;
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/order/${user?.id}?table=${tableNumber}`;
+  };
+  
+  // Generate tracking URL
+  const generateTrackingUrl = (trackingToken) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/track/${trackingToken}`;
   };
 
   const fetchTables = async () => {
@@ -164,7 +171,7 @@ const TablesPage = ({ user }) => {
                 }`}>
                   {table.status}
                 </div>
-                {whatsappSettings?.customer_self_order_enabled && (
+                {selfOrderEnabled && (
                   <Button
                     size="sm"
                     variant="outline"

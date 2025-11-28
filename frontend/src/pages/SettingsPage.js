@@ -40,8 +40,7 @@ const SettingsPage = ({ user }) => {
     whatsapp_notify_on_preparing: true,
     whatsapp_notify_on_ready: true,
     whatsapp_notify_on_completed: true,
-    customer_self_order_enabled: false,
-    frontend_url: ''
+    customer_self_order_enabled: false
   });
   const [themes, setThemes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -117,8 +116,7 @@ const SettingsPage = ({ user }) => {
         whatsapp_notify_on_preparing: response.data.whatsapp_notify_on_preparing !== false,
         whatsapp_notify_on_ready: response.data.whatsapp_notify_on_ready !== false,
         whatsapp_notify_on_completed: response.data.whatsapp_notify_on_completed !== false,
-        customer_self_order_enabled: response.data.customer_self_order_enabled || false,
-        frontend_url: response.data.frontend_url || ''
+        customer_self_order_enabled: response.data.customer_self_order_enabled || false
       });
     } catch (error) {
       console.error('Failed to fetch WhatsApp settings', error);
@@ -395,17 +393,7 @@ const SettingsPage = ({ user }) => {
                   </label>
                 </div>
 
-                <div>
-                  <Label>Frontend URL (for QR codes & tracking links)</Label>
-                  <Input
-                    placeholder="https://your-restaurant.vercel.app"
-                    value={whatsappSettings.frontend_url}
-                    onChange={(e) => setWhatsappSettings({ ...whatsappSettings, frontend_url: e.target.value })}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Your deployed frontend URL for generating QR codes and tracking links</p>
-                </div>
-
-                {whatsappSettings.customer_self_order_enabled && whatsappSettings.frontend_url && (
+                {whatsappSettings.customer_self_order_enabled && (
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <p className="text-sm font-medium mb-2">📍 Customer Features:</p>
                     <ul className="text-sm text-gray-600 space-y-1">
@@ -413,7 +401,8 @@ const SettingsPage = ({ user }) => {
                       <li>• Get WhatsApp updates on order status</li>
                       <li>• Track order live via tracking link</li>
                     </ul>
-                    <p className="text-xs text-gray-500 mt-3">Go to Tables page to generate QR codes for each table</p>
+                    <p className="text-xs text-green-600 mt-3 font-medium">✓ QR codes auto-generated using your current URL</p>
+                    <p className="text-xs text-gray-500">Go to Tables page to generate & print QR codes for each table</p>
                   </div>
                 )}
               </CardContent>
