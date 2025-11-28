@@ -197,9 +197,9 @@ function App() {
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/download" element={<DownloadPage />} />
         </Routes>
+        <DesktopInfo />
       </BrowserRouter>
       <Toaster position="top-center" richColors />
-      <DesktopInfo />
     </div>
   );
 }

@@ -1,25 +1,17 @@
 import { useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 /**
  * Hook to integrate Electron features with React
  * Provides navigation, notifications, and printing capabilities
+ * Note: Navigation is handled by ElectronNavigator component in App.js
  */
 export const useElectron = () => {
-  const navigate = useNavigate();
   
   // Check if running in Electron
   const isElectron = window.electronAPI?.isElectron || false;
   const platform = window.electronAPI?.platform || 'web';
   
-  // Handle navigation from Electron menu
-  useEffect(() => {
-    if (isElectron && window.electronAPI?.onNavigate) {
-      window.electronAPI.onNavigate((path) => {
-        navigate(path);
-      });
-    }
-  }, [navigate, isElectron]);
+  // Navigation is handled by ElectronNavigator component in App.js
   
   // Handle update check from Electron menu
   useEffect(() => {
