@@ -16,6 +16,8 @@ import SubscriptionPage from './pages/SubscriptionPage';
 import BusinessSetupPage from './pages/BusinessSetupPage';
 import StaffManagementPage from './pages/StaffManagementPage';
 import LandingPage from './pages/LandingPage';
+import TrackOrderPage from './pages/TrackOrderPage';
+import CustomerOrderPage from './pages/CustomerOrderPage';
 import { Toaster } from './components/ui/sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -172,6 +174,9 @@ function App() {
               </PrivateRoute>
             }
           />
+          {/* Public Routes - No Auth Required */}
+          <Route path="/track/:trackingToken" element={<TrackOrderPage />} />
+          <Route path="/order/:orgId" element={<CustomerOrderPage />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-center" richColors />

@@ -19,7 +19,8 @@ const OrdersPage = ({ user }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [formData, setFormData] = useState({
     table_id: '',
-    customer_name: ''
+    customer_name: '',
+    customer_phone: ''
   });
   const [whatsappModal, setWhatsappModal] = useState({ open: false, orderId: null, customerName: '' });
   const [whatsappPhone, setWhatsappPhone] = useState('');
@@ -94,13 +95,23 @@ const OrdersPage = ({ user }) => {
     }
     try {
       const selectedTable = tables.find(t => t.id === formData.table_id);
-      await axios.post(`${API}/orders`, {
+      const response = await axios.post(`${API}/orders`, {
         table_id: formData.table_id,
         table_number: selectedTable.table_number,
         items: selectedItems,
-        customer_name: formData.customer_name
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone
       });
       toast.success('Order created!');
+      
+      // If WhatsApp link is returned, offer to send notification
+      if (response.data.whatsapp_link) {
+        const sendNow = window.confirm('Send order confirmation to customer via WhatsApp?');
+        if (sendNow) {
+          window.open(response.data.whatsapp_link, '_blank');
+        }
+      }
+      
       setDialogOpen(false);
       fetchOrders();
       fetchTables();
@@ -111,14 +122,23 @@ const OrdersPage = ({ user }) => {
   };
 
   const resetForm = () => {
-    setFormData({ table_id: '', customer_name: '' });
+    setFormData({ table_id: '', customer_name: '', customer_phone: '' });
     setSelectedItems([]);
   };
 
   const handleStatusChange = async (orderId, status) => {
     try {
-      await axios.put(`${API}/orders/${orderId}/status?status=${status}`);
+      const response = await axios.put(`${API}/orders/${orderId}/status?status=${status}`);
       toast.success('Order status updated!');
+      
+      // If WhatsApp link is returned, offer to send notification
+      if (response.data.whatsapp_link && response.data.customer_phone) {
+        const sendNow = window.confirm(`Send "${status}" update to customer via WhatsApp?`);
+        if (sendNow) {
+          window.open(response.data.whatsapp_link, '_blank');
+        }
+      }
+      
       fetchOrders();
       fetchTables();
     } catch (error) {
@@ -207,7 +227,7 @@ Status: ${order.status.toUpperCase()}
                   <DialogTitle>Create New Order</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <Label>Table</Label>
                       <select
@@ -224,10 +244,19 @@ Status: ${order.status.toUpperCase()}
                       </select>
                     </div>
                     <div>
-                      <Label>Customer Name (Optional)</Label>
+                      <Label>Customer Name</Label>
                       <Input
                         value={formData.customer_name}
                         onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                        placeholder="Customer name"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Customer Phone (for WhatsApp updates)</Label>
+                      <Input
+                        value={formData.customer_phone}
+                        onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                        placeholder="+91 9876543210"
                         placeholder="Enter customer name"
                       />
                     </div>

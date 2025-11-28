@@ -8,11 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, QrCode, X } from 'lucide-react';
 
 const TablesPage = ({ user }) => {
   const [tables, setTables] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [qrModal, setQrModal] = useState({ open: false, table: null });
+  const [whatsappSettings, setWhatsappSettings] = useState(null);
   const [formData, setFormData] = useState({
     table_number: '',
     capacity: '',
@@ -21,7 +23,22 @@ const TablesPage = ({ user }) => {
 
   useEffect(() => {
     fetchTables();
+    fetchWhatsappSettings();
   }, []);
+
+  const fetchWhatsappSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/whatsapp/settings`);
+      setWhatsappSettings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch WhatsApp settings');
+    }
+  };
+
+  const generateQRUrl = (tableNumber) => {
+    const frontendUrl = whatsappSettings?.frontend_url || window.location.origin;
+    return `${frontendUrl}/order/${user?.id}?table=${tableNumber}`;
+  };
 
   const fetchTables = async () => {
     try {
@@ -147,6 +164,17 @@ const TablesPage = ({ user }) => {
                 }`}>
                   {table.status}
                 </div>
+                {whatsappSettings?.customer_self_order_enabled && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setQrModal({ open: true, table })}
+                    className="mt-2 w-full"
+                  >
+                    <QrCode className="w-4 h-4 mr-1" />
+                    QR Code
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -157,6 +185,68 @@ const TablesPage = ({ user }) => {
             </div>
           )}
         </div>
+
+        {/* QR Code Modal */}
+        {qrModal.open && qrModal.table && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md border-0 shadow-2xl">
+              <CardHeader className="relative text-center">
+                <button
+                  onClick={() => setQrModal({ open: false, table: null })}
+                  className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <CardTitle>Table {qrModal.table.table_number} QR Code</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center space-y-4">
+                <div className="bg-white p-4 rounded-lg inline-block">
+                  {/* QR Code using Google Charts API */}
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(generateQRUrl(qrModal.table.table_number))}`}
+                    alt={`QR Code for Table ${qrModal.table.table_number}`}
+                    className="w-48 h-48 mx-auto"
+                  />
+                </div>
+                <div className="text-sm text-gray-600">
+                  <p className="font-medium">Scan to order from Table {qrModal.table.table_number}</p>
+                  <p className="text-xs mt-1 break-all">{generateQRUrl(qrModal.table.table_number)}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      const printWindow = window.open('', '', 'width=400,height=500');
+                      printWindow.document.write(`
+                        <html>
+                          <head><title>Table ${qrModal.table.table_number} QR</title></head>
+                          <body style="text-align:center;padding:20px;font-family:sans-serif;">
+                            <h2>Table ${qrModal.table.table_number}</h2>
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(generateQRUrl(qrModal.table.table_number))}" />
+                            <p>Scan to view menu & order</p>
+                          </body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                      printWindow.print();
+                    }}
+                    className="flex-1 bg-violet-600"
+                  >
+                    Print QR
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generateQRUrl(qrModal.table.table_number));
+                      toast.success('Link copied!');
+                    }}
+                  >
+                    Copy Link
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );

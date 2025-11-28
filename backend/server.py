@@ -227,6 +227,15 @@ class BusinessSettings(BaseModel):
     whatsapp_enabled: bool = False
     whatsapp_business_number: Optional[str] = None
     whatsapp_message_template: Optional[str] = "Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}"
+    # Auto WhatsApp Notifications
+    whatsapp_auto_notify: bool = False
+    whatsapp_notify_on_placed: bool = True
+    whatsapp_notify_on_preparing: bool = True
+    whatsapp_notify_on_ready: bool = True
+    whatsapp_notify_on_completed: bool = True
+    # Customer Self-Order Settings
+    customer_self_order_enabled: bool = False
+    frontend_url: Optional[str] = None  # For generating QR codes
 
 
 class User(BaseModel):
@@ -347,6 +356,8 @@ class Order(BaseModel):
     waiter_id: str
     waiter_name: str
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None  # For WhatsApp notifications
+    tracking_token: Optional[str] = None  # For customer live tracking
     organization_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -357,6 +368,7 @@ class OrderCreate(BaseModel):
     table_number: int
     items: List[OrderItem]
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None  # For WhatsApp notifications
 
 
 class Payment(BaseModel):
@@ -1413,6 +1425,86 @@ async def update_table(
     return updated
 
 
+# Helper function to generate WhatsApp notification link
+def generate_whatsapp_notification(phone: str, message: str) -> str:
+    """Generate WhatsApp link for notification"""
+    import urllib.parse
+    
+    # Clean phone number
+    phone_clean = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    if not phone_clean.startswith("+"):
+        if phone_clean.startswith("0"):
+            phone_clean = "+91" + phone_clean[1:]
+        elif len(phone_clean) == 10:
+            phone_clean = "+91" + phone_clean
+        else:
+            phone_clean = "+" + phone_clean
+    
+    phone_clean = phone_clean.replace("+", "")
+    encoded_message = urllib.parse.quote(message)
+    return f"https://wa.me/{phone_clean}?text={encoded_message}"
+
+
+def get_status_message(status: str, order: dict, business: dict) -> str:
+    """Generate status-specific WhatsApp message"""
+    restaurant_name = business.get("restaurant_name", "Restaurant")
+    currency = CURRENCY_SYMBOLS.get(business.get("currency", "INR"), "₹")
+    order_id = order["id"][:8]
+    tracking_token = order.get("tracking_token", "")
+    frontend_url = business.get("frontend_url", "")
+    
+    tracking_link = f"{frontend_url}/track/{tracking_token}" if frontend_url and tracking_token else ""
+    
+    messages = {
+        "pending": f"""🍽️ *{restaurant_name}*
+
+✅ *Order Confirmed!*
+Order #{order_id}
+Table: {order.get('table_number', 'N/A')}
+
+Your order has been received and will be prepared shortly.
+
+{f'📍 Track your order: {tracking_link}' if tracking_link else ''}
+
+Thank you for your order! 🙏""",
+        
+        "preparing": f"""🍽️ *{restaurant_name}*
+
+👨‍🍳 *Order Being Prepared*
+Order #{order_id}
+
+Great news! Our chef is now preparing your delicious meal.
+
+Estimated time: 15-20 minutes
+
+{f'📍 Track live: {tracking_link}' if tracking_link else ''}""",
+        
+        "ready": f"""🍽️ *{restaurant_name}*
+
+🔔 *Order Ready!*
+Order #{order_id}
+Table: {order.get('table_number', 'N/A')}
+
+Your order is ready and will be served shortly!
+
+Enjoy your meal! 😋""",
+        
+        "completed": f"""🍽️ *{restaurant_name}*
+
+✅ *Payment Completed*
+Order #{order_id}
+
+Amount: {currency}{order.get('total', 0):.2f}
+
+Thank you for dining with us!
+We hope to see you again soon! 🙏
+
+{business.get('footer_message', '')}"""
+    }
+    
+    return messages.get(status, f"Order #{order_id} status: {status}")
+
+
 # Order routes
 @api_router.post("/orders", response_model=Order)
 async def create_order(
@@ -1433,6 +1525,9 @@ async def create_order(
     subtotal = sum(item.price * item.quantity for item in order_data.items)
     tax = subtotal * tax_rate
     total = subtotal + tax
+    
+    # Generate tracking token for customer live tracking
+    tracking_token = str(uuid.uuid4())[:12]
 
     order_obj = Order(
         table_id=order_data.table_id,
@@ -1444,6 +1539,8 @@ async def create_order(
         waiter_id=current_user["id"],
         waiter_name=current_user["username"],
         customer_name=order_data.customer_name,
+        customer_phone=order_data.customer_phone,
+        tracking_token=tracking_token,
         organization_id=user_org_id,
     )
 
@@ -1456,8 +1553,18 @@ async def create_order(
         {"id": order_data.table_id, "organization_id": user_org_id},
         {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
     )
+    
+    # Generate WhatsApp notification if enabled and phone provided
+    whatsapp_link = None
+    if order_data.customer_phone and business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
+        message = get_status_message("pending", doc, business)
+        whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
 
-    return order_obj
+    return {
+        **order_obj.model_dump(),
+        "whatsapp_link": whatsapp_link,
+        "tracking_token": tracking_token
+    }
 
 
 @api_router.get("/orders", response_model=List[Order])
@@ -1525,8 +1632,32 @@ async def update_order_status(
             {"id": order["table_id"], "organization_id": user_org_id},
             {"$set": {"status": "available", "current_order_id": None}},
         )
+    
+    # Generate WhatsApp notification if enabled
+    business = current_user.get("business_settings", {})
+    whatsapp_link = None
+    customer_phone = order.get("customer_phone")
+    
+    if customer_phone and business.get("whatsapp_auto_notify"):
+        should_notify = False
+        if status == "preparing" and business.get("whatsapp_notify_on_preparing"):
+            should_notify = True
+        elif status == "ready" and business.get("whatsapp_notify_on_ready"):
+            should_notify = True
+        elif status == "completed" and business.get("whatsapp_notify_on_completed"):
+            should_notify = True
+        
+        if should_notify:
+            # Update order with current status for message generation
+            order["status"] = status
+            message = get_status_message(status, order, business)
+            whatsapp_link = generate_whatsapp_notification(customer_phone, message)
 
-    return {"message": "Order status updated"}
+    return {
+        "message": "Order status updated",
+        "whatsapp_link": whatsapp_link,
+        "customer_phone": customer_phone
+    }
 
 
 # Payment routes
@@ -2222,7 +2353,14 @@ async def get_whatsapp_settings(current_user: dict = Depends(get_current_user)):
         "whatsapp_enabled": business.get("whatsapp_enabled", False),
         "whatsapp_business_number": business.get("whatsapp_business_number", ""),
         "whatsapp_message_template": business.get("whatsapp_message_template", 
-            "Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}")
+            "Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}"),
+        "whatsapp_auto_notify": business.get("whatsapp_auto_notify", False),
+        "whatsapp_notify_on_placed": business.get("whatsapp_notify_on_placed", True),
+        "whatsapp_notify_on_preparing": business.get("whatsapp_notify_on_preparing", True),
+        "whatsapp_notify_on_ready": business.get("whatsapp_notify_on_ready", True),
+        "whatsapp_notify_on_completed": business.get("whatsapp_notify_on_completed", True),
+        "customer_self_order_enabled": business.get("customer_self_order_enabled", False),
+        "frontend_url": business.get("frontend_url", "")
     }
 
 
@@ -2230,6 +2368,13 @@ class WhatsAppSettings(BaseModel):
     whatsapp_enabled: bool = False
     whatsapp_business_number: Optional[str] = None
     whatsapp_message_template: Optional[str] = None
+    whatsapp_auto_notify: bool = False
+    whatsapp_notify_on_placed: bool = True
+    whatsapp_notify_on_preparing: bool = True
+    whatsapp_notify_on_ready: bool = True
+    whatsapp_notify_on_completed: bool = True
+    customer_self_order_enabled: bool = False
+    frontend_url: Optional[str] = None
 
 
 @api_router.put("/whatsapp/settings")
@@ -2246,10 +2391,19 @@ async def update_whatsapp_settings(
     
     # Update WhatsApp specific settings
     business["whatsapp_enabled"] = settings.whatsapp_enabled
+    business["whatsapp_auto_notify"] = settings.whatsapp_auto_notify
+    business["whatsapp_notify_on_placed"] = settings.whatsapp_notify_on_placed
+    business["whatsapp_notify_on_preparing"] = settings.whatsapp_notify_on_preparing
+    business["whatsapp_notify_on_ready"] = settings.whatsapp_notify_on_ready
+    business["whatsapp_notify_on_completed"] = settings.whatsapp_notify_on_completed
+    business["customer_self_order_enabled"] = settings.customer_self_order_enabled
+    
     if settings.whatsapp_business_number:
         business["whatsapp_business_number"] = settings.whatsapp_business_number
     if settings.whatsapp_message_template:
         business["whatsapp_message_template"] = settings.whatsapp_message_template
+    if settings.frontend_url:
+        business["frontend_url"] = settings.frontend_url
     
     await db.users.update_one(
         {"id": current_user["id"]},
@@ -2257,6 +2411,202 @@ async def update_whatsapp_settings(
     )
     
     return {"message": "WhatsApp settings updated successfully", "settings": settings.model_dump()}
+
+
+# ============ PUBLIC ENDPOINTS (No Auth Required) ============
+# These endpoints are for customer-facing features like order tracking and self-ordering
+
+@app.get("/api/public/track/{tracking_token}")
+async def track_order_public(tracking_token: str):
+    """Public endpoint for customers to track their order status"""
+    order = await db.orders.find_one(
+        {"tracking_token": tracking_token}, 
+        {"_id": 0, "waiter_id": 0, "organization_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Get business info for display
+    admin = await db.users.find_one(
+        {"id": order.get("organization_id") or order.get("waiter_id")},
+        {"_id": 0, "business_settings": 1}
+    )
+    business = admin.get("business_settings", {}) if admin else {}
+    
+    return {
+        "order_id": order["id"][:8],
+        "status": order["status"],
+        "table_number": order.get("table_number"),
+        "customer_name": order.get("customer_name"),
+        "items": order["items"],
+        "subtotal": order["subtotal"],
+        "tax": order["tax"],
+        "total": order["total"],
+        "created_at": order["created_at"],
+        "updated_at": order["updated_at"],
+        "restaurant_name": business.get("restaurant_name", "Restaurant"),
+        "restaurant_phone": business.get("phone", ""),
+        "currency": business.get("currency", "INR")
+    }
+
+
+@app.get("/api/public/menu/{org_id}")
+async def get_public_menu(org_id: str):
+    """Public endpoint for customers to view menu (for self-ordering)"""
+    # Check if self-ordering is enabled
+    admin = await db.users.find_one({"id": org_id}, {"_id": 0})
+    if not admin:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    business = admin.get("business_settings", {})
+    if not business.get("customer_self_order_enabled"):
+        raise HTTPException(status_code=403, detail="Self-ordering not enabled")
+    
+    # Get available menu items
+    items = await db.menu_items.find(
+        {"organization_id": org_id, "available": True},
+        {"_id": 0, "organization_id": 0}
+    ).to_list(1000)
+    
+    # Group by category
+    categories = {}
+    for item in items:
+        cat = item.get("category", "Other")
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(item)
+    
+    return {
+        "restaurant_name": business.get("restaurant_name", "Restaurant"),
+        "currency": business.get("currency", "INR"),
+        "tax_rate": business.get("tax_rate", 5.0),
+        "categories": categories,
+        "items": items
+    }
+
+
+@app.get("/api/public/tables/{org_id}")
+async def get_public_tables(org_id: str):
+    """Public endpoint to get available tables for self-ordering"""
+    admin = await db.users.find_one({"id": org_id}, {"_id": 0})
+    if not admin:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    business = admin.get("business_settings", {})
+    if not business.get("customer_self_order_enabled"):
+        raise HTTPException(status_code=403, detail="Self-ordering not enabled")
+    
+    tables = await db.tables.find(
+        {"organization_id": org_id},
+        {"_id": 0, "organization_id": 0}
+    ).to_list(100)
+    
+    return {
+        "restaurant_name": business.get("restaurant_name", "Restaurant"),
+        "tables": tables
+    }
+
+
+class CustomerOrderCreate(BaseModel):
+    table_id: str
+    table_number: int
+    items: List[OrderItem]
+    customer_name: str
+    customer_phone: str
+    org_id: str
+
+
+@app.post("/api/public/order")
+async def create_customer_order(order_data: CustomerOrderCreate):
+    """Public endpoint for customers to place orders (self-ordering)"""
+    # Verify restaurant and self-ordering enabled
+    admin = await db.users.find_one({"id": order_data.org_id}, {"_id": 0})
+    if not admin:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    business = admin.get("business_settings", {})
+    if not business.get("customer_self_order_enabled"):
+        raise HTTPException(status_code=403, detail="Self-ordering not enabled")
+    
+    # Calculate totals
+    tax_rate = business.get("tax_rate", 5.0) / 100
+    subtotal = sum(item.price * item.quantity for item in order_data.items)
+    tax = subtotal * tax_rate
+    total = subtotal + tax
+    
+    # Generate tracking token
+    tracking_token = str(uuid.uuid4())[:12]
+    
+    order_obj = Order(
+        table_id=order_data.table_id,
+        table_number=order_data.table_number,
+        items=[item.model_dump() for item in order_data.items],
+        subtotal=subtotal,
+        tax=tax,
+        total=total,
+        waiter_id=order_data.org_id,  # Use org_id as waiter for self-orders
+        waiter_name="Self-Order",
+        customer_name=order_data.customer_name,
+        customer_phone=order_data.customer_phone,
+        tracking_token=tracking_token,
+        organization_id=order_data.org_id,
+    )
+    
+    doc = order_obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    doc["updated_at"] = doc["updated_at"].isoformat()
+    
+    await db.orders.insert_one(doc)
+    await db.tables.update_one(
+        {"id": order_data.table_id, "organization_id": order_data.org_id},
+        {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
+    )
+    
+    # Generate WhatsApp notification
+    whatsapp_link = None
+    if business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
+        message = get_status_message("pending", doc, business)
+        whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
+    
+    frontend_url = business.get("frontend_url", "")
+    tracking_url = f"{frontend_url}/track/{tracking_token}" if frontend_url else ""
+    
+    return {
+        "success": True,
+        "order_id": order_obj.id[:8],
+        "tracking_token": tracking_token,
+        "tracking_url": tracking_url,
+        "whatsapp_link": whatsapp_link,
+        "total": total,
+        "message": "Order placed successfully! You will receive updates on WhatsApp."
+    }
+
+
+@app.get("/api/public/qr/{org_id}/{table_number}")
+async def get_table_qr_data(org_id: str, table_number: int):
+    """Get data for generating table QR code"""
+    admin = await db.users.find_one({"id": org_id}, {"_id": 0})
+    if not admin:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    business = admin.get("business_settings", {})
+    frontend_url = business.get("frontend_url", "")
+    
+    # Find table
+    table = await db.tables.find_one(
+        {"organization_id": org_id, "table_number": table_number},
+        {"_id": 0}
+    )
+    
+    return {
+        "restaurant_name": business.get("restaurant_name", "Restaurant"),
+        "table_number": table_number,
+        "table_id": table["id"] if table else None,
+        "org_id": org_id,
+        "self_order_enabled": business.get("customer_self_order_enabled", False),
+        "menu_url": f"{frontend_url}/order/{org_id}?table={table_number}" if frontend_url else "",
+        "qr_content": f"{frontend_url}/order/{org_id}?table={table_number}" if frontend_url else f"Order at Table {table_number}"
+    }
 
 
 # Health check endpoint

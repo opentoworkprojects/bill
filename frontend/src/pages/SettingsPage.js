@@ -34,7 +34,14 @@ const SettingsPage = ({ user }) => {
   const [whatsappSettings, setWhatsappSettings] = useState({
     whatsapp_enabled: false,
     whatsapp_business_number: '',
-    whatsapp_message_template: 'Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}'
+    whatsapp_message_template: 'Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}',
+    whatsapp_auto_notify: false,
+    whatsapp_notify_on_placed: true,
+    whatsapp_notify_on_preparing: true,
+    whatsapp_notify_on_ready: true,
+    whatsapp_notify_on_completed: true,
+    customer_self_order_enabled: false,
+    frontend_url: ''
   });
   const [themes, setThemes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -104,7 +111,14 @@ const SettingsPage = ({ user }) => {
       setWhatsappSettings({
         whatsapp_enabled: response.data.whatsapp_enabled || false,
         whatsapp_business_number: response.data.whatsapp_business_number || '',
-        whatsapp_message_template: response.data.whatsapp_message_template || 'Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}'
+        whatsapp_message_template: response.data.whatsapp_message_template || 'Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}',
+        whatsapp_auto_notify: response.data.whatsapp_auto_notify || false,
+        whatsapp_notify_on_placed: response.data.whatsapp_notify_on_placed !== false,
+        whatsapp_notify_on_preparing: response.data.whatsapp_notify_on_preparing !== false,
+        whatsapp_notify_on_ready: response.data.whatsapp_notify_on_ready !== false,
+        whatsapp_notify_on_completed: response.data.whatsapp_notify_on_completed !== false,
+        customer_self_order_enabled: response.data.customer_self_order_enabled || false,
+        frontend_url: response.data.frontend_url || ''
       });
     } catch (error) {
       console.error('Failed to fetch WhatsApp settings', error);
@@ -232,100 +246,207 @@ const SettingsPage = ({ user }) => {
 
         {/* WhatsApp Tab */}
         {activeTab === 'whatsapp' && (
-          <Card className="border-0 shadow-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-green-600" />
-                WhatsApp Integration
-              </CardTitle>
-              <CardDescription>
-                Send receipts and notifications to customers via WhatsApp
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex gap-3">
-                <MessageCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-green-900">
-                  <p className="font-medium mb-1">How WhatsApp Integration Works:</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>After payment, share receipt directly to customer's WhatsApp</li>
-                    <li>Customize the message template with order details</li>
-                    <li>Works with WhatsApp Web and mobile app</li>
-                    <li>No API key required - uses WhatsApp's share feature</li>
-                  </ul>
+          <div className="space-y-6">
+            {/* Basic WhatsApp Settings */}
+            <Card className="border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-green-600" />
+                  WhatsApp Integration
+                </CardTitle>
+                <CardDescription>
+                  Send receipts and live order updates to customers via WhatsApp
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">Enable WhatsApp Sharing</p>
+                    <p className="text-sm text-gray-500">Allow manual sharing of receipts via WhatsApp</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappSettings.whatsapp_enabled}
+                      onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_enabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                  </label>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <p className="font-medium">Enable WhatsApp Sharing</p>
-                  <p className="text-sm text-gray-500">Allow sharing receipts via WhatsApp after payment</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={whatsappSettings.whatsapp_enabled}
-                    onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_enabled: e.target.checked })}
-                    className="sr-only peer"
+                  <Label>Your WhatsApp Business Number</Label>
+                  <Input
+                    placeholder="+91 9876543210"
+                    value={whatsappSettings.whatsapp_business_number}
+                    onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_business_number: e.target.value })}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-              </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div>
-                <Label>Your WhatsApp Business Number (Optional)</Label>
-                <Input
-                  placeholder="+91 9876543210"
-                  value={whatsappSettings.whatsapp_business_number}
-                  onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_business_number: e.target.value })}
-                />
-                <p className="text-xs text-gray-500 mt-1">This will be shown on receipts for customer support</p>
-              </div>
+            {/* Auto Notifications */}
+            <Card className="border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🔔 Auto Notifications
+                </CardTitle>
+                <CardDescription>
+                  Automatically send WhatsApp updates when order status changes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div>
+                    <p className="font-medium text-green-800">Enable Auto Notifications</p>
+                    <p className="text-sm text-green-600">Send automatic WhatsApp messages on order updates</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappSettings.whatsapp_auto_notify}
+                      onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_auto_notify: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                  </label>
+                </div>
 
-              <div>
-                <Label>Message Template</Label>
+                {whatsappSettings.whatsapp_auto_notify && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={whatsappSettings.whatsapp_notify_on_placed}
+                        onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_notify_on_placed: e.target.checked })}
+                        className="w-4 h-4 text-green-600 rounded"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">✅ Order Placed</p>
+                        <p className="text-xs text-gray-500">Confirmation message</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={whatsappSettings.whatsapp_notify_on_preparing}
+                        onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_notify_on_preparing: e.target.checked })}
+                        className="w-4 h-4 text-green-600 rounded"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">👨‍🍳 Preparing</p>
+                        <p className="text-xs text-gray-500">Chef started cooking</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={whatsappSettings.whatsapp_notify_on_ready}
+                        onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_notify_on_ready: e.target.checked })}
+                        className="w-4 h-4 text-green-600 rounded"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">🔔 Ready</p>
+                        <p className="text-xs text-gray-500">Food is ready to serve</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={whatsappSettings.whatsapp_notify_on_completed}
+                        onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_notify_on_completed: e.target.checked })}
+                        className="w-4 h-4 text-green-600 rounded"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">💳 Completed</p>
+                        <p className="text-xs text-gray-500">Payment receipt</p>
+                      </div>
+                    </label>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Customer Self-Order & QR */}
+            <Card className="border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  📱 Customer Self-Order & Live Tracking
+                </CardTitle>
+                <CardDescription>
+                  Let customers scan QR to order and track their order live
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div>
+                    <p className="font-medium text-blue-800">Enable Customer Self-Ordering</p>
+                    <p className="text-sm text-blue-600">Customers can scan QR code to view menu and place orders</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappSettings.customer_self_order_enabled}
+                      onChange={(e) => setWhatsappSettings({ ...whatsappSettings, customer_self_order_enabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                <div>
+                  <Label>Frontend URL (for QR codes & tracking links)</Label>
+                  <Input
+                    placeholder="https://your-restaurant.vercel.app"
+                    value={whatsappSettings.frontend_url}
+                    onChange={(e) => setWhatsappSettings({ ...whatsappSettings, frontend_url: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Your deployed frontend URL for generating QR codes and tracking links</p>
+                </div>
+
+                {whatsappSettings.customer_self_order_enabled && whatsappSettings.frontend_url && (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium mb-2">📍 Customer Features:</p>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Scan table QR → View menu → Place order</li>
+                      <li>• Get WhatsApp updates on order status</li>
+                      <li>• Track order live via tracking link</li>
+                    </ul>
+                    <p className="text-xs text-gray-500 mt-3">Go to Tables page to generate QR codes for each table</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Message Template */}
+            <Card className="border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle>Receipt Message Template</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <textarea
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[120px] font-mono text-sm"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[100px] font-mono text-sm"
                   value={whatsappSettings.whatsapp_message_template}
                   onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_message_template: e.target.value })}
-                  placeholder="Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid."
+                  placeholder="Thank you for dining at {restaurant_name}!"
                 />
-                <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Available Variables:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {['{restaurant_name}', '{currency}', '{total}', '{order_id}', '{customer_name}', '{subtotal}', '{tax}', '{table_number}', '{waiter_name}', '{items}'].map((variable) => (
-                      <code key={variable} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">{variable}</code>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {['{restaurant_name}', '{currency}', '{total}', '{order_id}', '{customer_name}', '{table_number}'].map((v) => (
+                    <code key={v} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">{v}</code>
+                  ))}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-700 mb-2">Preview Message:</p>
-                <div className="p-3 bg-white rounded-lg border text-sm whitespace-pre-wrap">
-                  {whatsappSettings.whatsapp_message_template
-                    .replace('{restaurant_name}', businessSettings.restaurant_name || 'Your Restaurant')
-                    .replace('{currency}', '₹')
-                    .replace('{total}', '500.00')
-                    .replace('{order_id}', 'ABC12345')
-                    .replace('{customer_name}', 'John Doe')
-                    .replace('{subtotal}', '476.19')
-                    .replace('{tax}', '23.81')
-                    .replace('{table_number}', '5')
-                    .replace('{waiter_name}', 'Staff')
-                    .replace('{items}', '• 2x Butter Chicken - ₹400.00\n• 1x Naan - ₹50.00')}
-                </div>
-              </div>
-
-              <Button
-                onClick={handleSaveWhatsappSettings}
-                disabled={whatsappLoading}
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600"
-              >
-                {whatsappLoading ? 'Saving...' : 'Save WhatsApp Settings'}
-              </Button>
-            </CardContent>
-          </Card>
+            <Button
+              onClick={handleSaveWhatsappSettings}
+              disabled={whatsappLoading}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600"
+            >
+              {whatsappLoading ? 'Saving...' : 'Save All WhatsApp Settings'}
+            </Button>
+          </div>
         )}
 
         {/* Payment Tab */}
