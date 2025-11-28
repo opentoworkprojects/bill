@@ -2105,6 +2105,160 @@ async def print_bill(
     }
 
 
+# WhatsApp Integration
+class WhatsAppMessage(BaseModel):
+    phone_number: str
+    customer_name: Optional[str] = None
+
+
+@api_router.post("/whatsapp/send-receipt/{order_id}")
+async def send_whatsapp_receipt(
+    order_id: str,
+    message_data: WhatsAppMessage,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate WhatsApp share link for order receipt"""
+    # Get user's organization_id
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+
+    order = await db.orders.find_one(
+        {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    business = current_user.get("business_settings", {})
+    currency_code = business.get("currency", "INR")
+    currency_symbol = CURRENCY_SYMBOLS.get(currency_code, "₹")
+    
+    # Get WhatsApp settings
+    whatsapp_enabled = business.get("whatsapp_enabled", False)
+    message_template = business.get("whatsapp_message_template", 
+        "Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}")
+    
+    restaurant_name = business.get("restaurant_name", "Our Restaurant")
+    
+    # Build items list for message
+    items_list = "\n".join([
+        f"• {item['quantity']}x {item['name']} - {currency_symbol}{item['price'] * item['quantity']:.2f}"
+        for item in order["items"]
+    ])
+    
+    # Format the message
+    message = message_template.format(
+        restaurant_name=restaurant_name,
+        currency=currency_symbol,
+        total=f"{order['total']:.2f}",
+        order_id=order_id[:8],
+        customer_name=message_data.customer_name or order.get("customer_name", "Guest"),
+        subtotal=f"{order['subtotal']:.2f}",
+        tax=f"{order['tax']:.2f}",
+        table_number=order.get("table_number", "N/A"),
+        waiter_name=order.get("waiter_name", "Staff"),
+        items=items_list
+    )
+    
+    # Add detailed receipt if template doesn't include items
+    if "{items}" not in message_template:
+        detailed_message = f"""
+🧾 *{restaurant_name}*
+━━━━━━━━━━━━━━━━━━━━
+
+📋 *Order #{order_id[:8]}*
+🍽️ Table: {order.get("table_number", "N/A")}
+👤 Customer: {message_data.customer_name or order.get("customer_name", "Guest")}
+
+*Items:*
+{items_list}
+
+━━━━━━━━━━━━━━━━━━━━
+Subtotal: {currency_symbol}{order['subtotal']:.2f}
+Tax: {currency_symbol}{order['tax']:.2f}
+*Total: {currency_symbol}{order['total']:.2f}*
+━━━━━━━━━━━━━━━━━━━━
+
+✅ Payment Completed
+
+{business.get('footer_message', 'Thank you for dining with us!')}
+"""
+        message = detailed_message
+    
+    # Clean phone number (remove spaces, dashes, etc.)
+    phone = message_data.phone_number.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    if not phone.startswith("+"):
+        # Assume Indian number if no country code
+        if phone.startswith("0"):
+            phone = "+91" + phone[1:]
+        elif len(phone) == 10:
+            phone = "+91" + phone
+        else:
+            phone = "+" + phone
+    
+    # Remove the + for WhatsApp API
+    phone_clean = phone.replace("+", "")
+    
+    # URL encode the message
+    import urllib.parse
+    encoded_message = urllib.parse.quote(message)
+    
+    # Generate WhatsApp link
+    whatsapp_link = f"https://wa.me/{phone_clean}?text={encoded_message}"
+    
+    return {
+        "success": True,
+        "whatsapp_link": whatsapp_link,
+        "message": message,
+        "phone_number": phone,
+        "order_id": order_id,
+        "whatsapp_enabled": whatsapp_enabled
+    }
+
+
+@api_router.get("/whatsapp/settings")
+async def get_whatsapp_settings(current_user: dict = Depends(get_current_user)):
+    """Get WhatsApp settings for the business"""
+    business = current_user.get("business_settings", {})
+    return {
+        "whatsapp_enabled": business.get("whatsapp_enabled", False),
+        "whatsapp_business_number": business.get("whatsapp_business_number", ""),
+        "whatsapp_message_template": business.get("whatsapp_message_template", 
+            "Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}")
+    }
+
+
+class WhatsAppSettings(BaseModel):
+    whatsapp_enabled: bool = False
+    whatsapp_business_number: Optional[str] = None
+    whatsapp_message_template: Optional[str] = None
+
+
+@api_router.put("/whatsapp/settings")
+async def update_whatsapp_settings(
+    settings: WhatsAppSettings,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update WhatsApp settings for the business"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can update WhatsApp settings")
+    
+    # Get current business settings
+    business = current_user.get("business_settings", {}) or {}
+    
+    # Update WhatsApp specific settings
+    business["whatsapp_enabled"] = settings.whatsapp_enabled
+    if settings.whatsapp_business_number:
+        business["whatsapp_business_number"] = settings.whatsapp_business_number
+    if settings.whatsapp_message_template:
+        business["whatsapp_message_template"] = settings.whatsapp_message_template
+    
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"business_settings": business}}
+    )
+    
+    return {"message": "WhatsApp settings updated successfully", "settings": settings.model_dump()}
+
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():

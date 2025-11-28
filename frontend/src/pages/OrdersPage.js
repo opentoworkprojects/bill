@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, CreditCard } from 'lucide-react';
+import { Plus, Eye, Printer, CreditCard, MessageCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const OrdersPage = ({ user }) => {
@@ -21,6 +21,8 @@ const OrdersPage = ({ user }) => {
     table_id: '',
     customer_name: ''
   });
+  const [whatsappModal, setWhatsappModal] = useState({ open: false, orderId: null, customerName: '' });
+  const [whatsappPhone, setWhatsappPhone] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -161,6 +163,27 @@ Status: ${order.status.toUpperCase()}
       cancelled: 'bg-red-100 text-red-700'
     };
     return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const handleWhatsappShare = async () => {
+    if (!whatsappPhone.trim()) {
+      toast.error('Please enter a phone number');
+      return;
+    }
+    
+    try {
+      const response = await axios.post(`${API}/whatsapp/send-receipt/${whatsappModal.orderId}`, {
+        phone_number: whatsappPhone,
+        customer_name: whatsappModal.customerName
+      });
+      
+      window.open(response.data.whatsapp_link, '_blank');
+      toast.success('Opening WhatsApp...');
+      setWhatsappModal({ open: false, orderId: null, customerName: '' });
+      setWhatsappPhone('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to generate WhatsApp link');
+    }
   };
 
   return (
@@ -330,6 +353,18 @@ Status: ${order.status.toUpperCase()}
                         Billing
                       </Button>
                     )}
+                    {order.status === 'completed' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-green-500 text-green-600 hover:bg-green-50"
+                        onClick={() => setWhatsappModal({ open: true, orderId: order.id, customerName: order.customer_name || 'Guest' })}
+                        data-testid={`whatsapp-${order.id}`}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        WhatsApp
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -342,6 +377,58 @@ Status: ${order.status.toUpperCase()}
             </div>
           )}
         </div>
+
+        {/* WhatsApp Modal */}
+        {whatsappModal.open && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md border-0 shadow-2xl">
+              <CardHeader className="relative">
+                <button
+                  onClick={() => { setWhatsappModal({ open: false, orderId: null, customerName: '' }); setWhatsappPhone(''); }}
+                  className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-green-600" />
+                  Share Receipt via WhatsApp
+                </CardTitle>
+              </CardHeader>
+              <div className="p-6 space-y-4">
+                <div>
+                  <Label>Customer Phone Number</Label>
+                  <Input
+                    placeholder="+91 9876543210"
+                    value={whatsappPhone}
+                    onChange={(e) => setWhatsappPhone(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Enter with country code</p>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+                  <strong>Order:</strong> #{whatsappModal.orderId?.slice(0, 8)}<br />
+                  <strong>Customer:</strong> {whatsappModal.customerName}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleWhatsappShare}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    Open WhatsApp
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setWhatsappModal({ open: false, orderId: null, customerName: '' }); setWhatsappPhone(''); }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );

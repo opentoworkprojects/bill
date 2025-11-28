@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Settings as SettingsIcon, CreditCard, Shield, Info, Printer, Building2, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, CreditCard, Shield, Info, Printer, Building2, Palette, MessageCircle } from 'lucide-react';
 import PrintCustomization from '../components/PrintCustomization';
 
 const SettingsPage = ({ user }) => {
@@ -31,10 +31,16 @@ const SettingsPage = ({ user }) => {
     tagline: '',
     footer_message: 'Thank you for dining with us!'
   });
+  const [whatsappSettings, setWhatsappSettings] = useState({
+    whatsapp_enabled: false,
+    whatsapp_business_number: '',
+    whatsapp_message_template: 'Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}'
+  });
   const [themes, setThemes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [businessLoading, setBusinessLoading] = useState(false);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [razorpayConfigured, setRazorpayConfigured] = useState(false);
 
   useEffect(() => {
@@ -42,6 +48,7 @@ const SettingsPage = ({ user }) => {
     fetchBusinessSettings();
     fetchThemes();
     fetchCurrencies();
+    fetchWhatsappSettings();
   }, []);
 
   const fetchRazorpaySettings = async () => {
@@ -88,6 +95,31 @@ const SettingsPage = ({ user }) => {
       setCurrencies(response.data);
     } catch (error) {
       console.error('Failed to fetch currencies', error);
+    }
+  };
+
+  const fetchWhatsappSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/whatsapp/settings`);
+      setWhatsappSettings({
+        whatsapp_enabled: response.data.whatsapp_enabled || false,
+        whatsapp_business_number: response.data.whatsapp_business_number || '',
+        whatsapp_message_template: response.data.whatsapp_message_template || 'Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}'
+      });
+    } catch (error) {
+      console.error('Failed to fetch WhatsApp settings', error);
+    }
+  };
+
+  const handleSaveWhatsappSettings = async () => {
+    setWhatsappLoading(true);
+    try {
+      await axios.put(`${API}/whatsapp/settings`, whatsappSettings);
+      toast.success('WhatsApp settings updated successfully!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update WhatsApp settings');
+    } finally {
+      setWhatsappLoading(false);
     }
   };
 
@@ -151,7 +183,7 @@ const SettingsPage = ({ user }) => {
         </div>
 
         {/* Settings Tabs */}
-        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+        <div className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg w-fit">
           <button
             onClick={() => setActiveTab('business')}
             className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
@@ -171,6 +203,15 @@ const SettingsPage = ({ user }) => {
             Print Customization
           </button>
           <button
+            onClick={() => setActiveTab('whatsapp')}
+            className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'whatsapp' ? 'bg-white shadow text-green-600' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            WhatsApp
+          </button>
+          <button
             onClick={() => setActiveTab('payment')}
             className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
               activeTab === 'payment' ? 'bg-white shadow text-violet-600' : 'text-gray-600 hover:text-gray-900'
@@ -187,6 +228,104 @@ const SettingsPage = ({ user }) => {
             businessSettings={businessSettings} 
             onUpdate={(updated) => setBusinessSettings(updated)}
           />
+        )}
+
+        {/* WhatsApp Tab */}
+        {activeTab === 'whatsapp' && (
+          <Card className="border-0 shadow-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-green-600" />
+                WhatsApp Integration
+              </CardTitle>
+              <CardDescription>
+                Send receipts and notifications to customers via WhatsApp
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex gap-3">
+                <MessageCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-green-900">
+                  <p className="font-medium mb-1">How WhatsApp Integration Works:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>After payment, share receipt directly to customer's WhatsApp</li>
+                    <li>Customize the message template with order details</li>
+                    <li>Works with WhatsApp Web and mobile app</li>
+                    <li>No API key required - uses WhatsApp's share feature</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium">Enable WhatsApp Sharing</p>
+                  <p className="text-sm text-gray-500">Allow sharing receipts via WhatsApp after payment</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={whatsappSettings.whatsapp_enabled}
+                    onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_enabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                </label>
+              </div>
+
+              <div>
+                <Label>Your WhatsApp Business Number (Optional)</Label>
+                <Input
+                  placeholder="+91 9876543210"
+                  value={whatsappSettings.whatsapp_business_number}
+                  onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_business_number: e.target.value })}
+                />
+                <p className="text-xs text-gray-500 mt-1">This will be shown on receipts for customer support</p>
+              </div>
+
+              <div>
+                <Label>Message Template</Label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[120px] font-mono text-sm"
+                  value={whatsappSettings.whatsapp_message_template}
+                  onChange={(e) => setWhatsappSettings({ ...whatsappSettings, whatsapp_message_template: e.target.value })}
+                  placeholder="Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid."
+                />
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Available Variables:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['{restaurant_name}', '{currency}', '{total}', '{order_id}', '{customer_name}', '{subtotal}', '{tax}', '{table_number}', '{waiter_name}', '{items}'].map((variable) => (
+                      <code key={variable} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">{variable}</code>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-700 mb-2">Preview Message:</p>
+                <div className="p-3 bg-white rounded-lg border text-sm whitespace-pre-wrap">
+                  {whatsappSettings.whatsapp_message_template
+                    .replace('{restaurant_name}', businessSettings.restaurant_name || 'Your Restaurant')
+                    .replace('{currency}', '₹')
+                    .replace('{total}', '500.00')
+                    .replace('{order_id}', 'ABC12345')
+                    .replace('{customer_name}', 'John Doe')
+                    .replace('{subtotal}', '476.19')
+                    .replace('{tax}', '23.81')
+                    .replace('{table_number}', '5')
+                    .replace('{waiter_name}', 'Staff')
+                    .replace('{items}', '• 2x Butter Chicken - ₹400.00\n• 1x Naan - ₹50.00')}
+                </div>
+              </div>
+
+              <Button
+                onClick={handleSaveWhatsappSettings}
+                disabled={whatsappLoading}
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600"
+              >
+                {whatsappLoading ? 'Saving...' : 'Save WhatsApp Settings'}
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Payment Tab */}
