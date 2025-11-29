@@ -4,6 +4,8 @@ import logging
 import os
 import ssl
 import uuid
+import httpx
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -2824,7 +2826,19 @@ async def reject_aggregator_order(
     return {"message": "Order rejected", "order_id": order_id, "reason": reason}
 
 
-# ============ PUBLIC ENDPOINTS (No Auth Required) ============
+# ============ ZOMATO API INTEGRATION ============
+# Based on Zomato Partner API documentation
+
+ZOMATO_API_BASE = "https://api.zomato.com/v2"
+SWIGGY_API_BASE = "https://partner-api.swiggy.com/v1"
+
+
+class ZomatoCredentials(BaseModel):
+    restaurant_id: str
+    api_key: str
+
+
+class SwiggyCredentials(BaseMo
 # These endpoints are for customer-facing features like order tracking and self-ordering
 
 @app.get("/api/public/track/{tracking_token}")

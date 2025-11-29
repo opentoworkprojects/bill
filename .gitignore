@@ -89,3 +89,10 @@ frontend/dist-electron/
 *.exe
 *.dmg
 *.AppImage
+
+# Android build files
+frontend/and/app/build/
+frontend/and/.gradle/
+frontend/and/store_icon.png
+*.aab
+*.apk
