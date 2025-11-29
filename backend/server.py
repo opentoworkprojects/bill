@@ -1361,57 +1361,93 @@ async def start_trial(current_user: dict = Depends(get_current_user)):
 
 @api_router.post("/subscription/create-order")
 async def create_subscription_order(current_user: dict = Depends(get_current_user)):
-    razorpay_key_id = current_user.get("razorpay_key_id") or os.environ.get(
-        "RAZORPAY_KEY_ID"
-    )
-    razorpay_key_secret = current_user.get("razorpay_key_secret") or os.environ.get(
-        "RAZORPAY_KEY_SECRET"
-    )
+    # Default Razorpay keys for RestoBill subscription
+    DEFAULT_RAZORPAY_KEY_ID = "rzp_live_Rkrije1wn9KaCC"
+    DEFAULT_RAZORPAY_KEY_SECRET = "hZ4eIAxyhF77lShkyQS48l3D"
+    SUBSCRIPTION_PRICE_PAISE = 49900  # ₹499 in paise
+    
+    razorpay_key_id = os.environ.get("RAZORPAY_KEY_ID") or DEFAULT_RAZORPAY_KEY_ID
+    razorpay_key_secret = os.environ.get("RAZORPAY_KEY_SECRET") or DEFAULT_RAZORPAY_KEY_SECRET
 
-    if not razorpay_key_id or not razorpay_key_secret:
-        raise HTTPException(
-            status_code=400,
-            detail="Razorpay not configured. Please configure in settings.",
+    try:
+        razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
+
+        razor_order = razorpay_client.order.create(
+            {"amount": SUBSCRIPTION_PRICE_PAISE, "currency": "INR", "payment_capture": 1}
         )
 
-    razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
+        return {
+            "razorpay_order_id": razor_order["id"],
+            "amount": SUBSCRIPTION_PRICE_PAISE,
+            "currency": "INR",
+            "key_id": razorpay_key_id,
+            "price_display": "₹499"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create payment order: {str(e)}"
+        )
 
-    razor_order = razorpay_client.order.create(
-        {"amount": SUBSCRIPTION_PRICE_PAISE, "currency": "INR", "payment_capture": 1}
-    )
 
-    return {
-        "razorpay_order_id": razor_order["id"],
-        "amount": SUBSCRIPTION_PRICE_PAISE,
-        "currency": "INR",
-        "key_id": razorpay_key_id,
-        "price_display": "₹499"
-    }
+class SubscriptionVerifyRequest(BaseModel):
+    razorpay_payment_id: str
+    razorpay_order_id: str
+    razorpay_signature: Optional[str] = None
 
 
 @api_router.post("/subscription/verify")
 async def verify_subscription_payment(
-    razorpay_payment_id: str,
-    razorpay_order_id: str,
+    data: SubscriptionVerifyRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    expires_at = datetime.now(timezone.utc) + timedelta(days=SUBSCRIPTION_DAYS)
+    DEFAULT_RAZORPAY_KEY_ID = "rzp_live_Rkrije1wn9KaCC"
+    DEFAULT_RAZORPAY_KEY_SECRET = "hZ4eIAxyhF77lShkyQS48l3D"
+    
+    razorpay_key_id = os.environ.get("RAZORPAY_KEY_ID") or DEFAULT_RAZORPAY_KEY_ID
+    razorpay_key_secret = os.environ.get("RAZORPAY_KEY_SECRET") or DEFAULT_RAZORPAY_KEY_SECRET
+    
+    try:
+        razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
+        
+        # Verify signature if provided
+        if data.razorpay_signature:
+            razorpay_client.utility.verify_payment_signature({
+                'razorpay_order_id': data.razorpay_order_id,
+                'razorpay_payment_id': data.razorpay_payment_id,
+                'razorpay_signature': data.razorpay_signature
+            })
+        
+        # Fetch payment to verify it's captured
+        payment = razorpay_client.payment.fetch(data.razorpay_payment_id)
+        
+        if payment['status'] != 'captured':
+            raise HTTPException(status_code=400, detail="Payment not captured")
+        
+        expires_at = datetime.now(timezone.utc) + timedelta(days=SUBSCRIPTION_DAYS)
 
-    await db.users.update_one(
-        {"id": current_user["id"]},
-        {
-            "$set": {
-                "subscription_active": True,
-                "subscription_expires_at": expires_at.isoformat(),
-            }
-        },
-    )
+        await db.users.update_one(
+            {"id": current_user["id"]},
+            {
+                "$set": {
+                    "subscription_active": True,
+                    "subscription_expires_at": expires_at.isoformat(),
+                    "subscription_payment_id": data.razorpay_payment_id,
+                    "subscription_order_id": data.razorpay_order_id,
+                }
+            },
+        )
 
-    return {
-        "status": "subscription_activated", 
-        "expires_at": expires_at.isoformat(),
-        "days": SUBSCRIPTION_DAYS
-    }
+        return {
+            "status": "subscription_activated", 
+            "expires_at": expires_at.isoformat(),
+            "days": SUBSCRIPTION_DAYS,
+            "message": "🎉 Premium subscription activated successfully!"
+        }
+    except razorpay.errors.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid payment signature")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
 
 
 # Image Upload

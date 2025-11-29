@@ -45,13 +45,18 @@ const SubscriptionPage = ({ user }) => {
           try {
             await axios.post(`${API}/subscription/verify`, {
               razorpay_payment_id: razorpayResponse.razorpay_payment_id,
-              razorpay_order_id: razorpayResponse.razorpay_order_id
+              razorpay_order_id: razorpayResponse.razorpay_order_id,
+              razorpay_signature: razorpayResponse.razorpay_signature
             });
             toast.success('🎉 Premium activated! Welcome to RestoBill AI Pro!');
             fetchSubscriptionStatus();
+            // Update local user data
+            const userData = JSON.parse(localStorage.getItem('user') || '{}');
+            userData.subscription_active = true;
+            localStorage.setItem('user', JSON.stringify(userData));
             setTimeout(() => navigate('/dashboard'), 2000);
           } catch (error) {
-            toast.error('Subscription verification failed');
+            toast.error(error.response?.data?.detail || 'Subscription verification failed');
           }
         },
         theme: { color: '#7c3aed' }
