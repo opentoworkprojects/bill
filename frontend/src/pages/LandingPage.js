@@ -715,6 +715,114 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Demo Section - Screenshot Tutorial */}
+      <section id="demo" className="py-20 bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 text-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full mb-4">
+              <Sparkles className="w-4 h-4 text-yellow-400" />
+              <span className="text-sm font-medium text-yellow-400">See It In Action</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+              How RestoBill Works
+            </h2>
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+              Simple, powerful, and designed for busy restaurants. Get started in minutes.
+            </p>
+          </div>
+
+          {/* Demo Steps */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {[
+              {
+                step: "1",
+                title: "Create Account",
+                desc: "Sign up in 30 seconds. No credit card required.",
+                icon: "👤",
+                color: "from-blue-500 to-cyan-500"
+              },
+              {
+                step: "2", 
+                title: "Setup Menu",
+                desc: "Add your dishes with prices, categories & images.",
+                icon: "🍽️",
+                color: "from-green-500 to-emerald-500"
+              },
+              {
+                step: "3",
+                title: "Take Orders",
+                desc: "Quick order entry with table management & KOT.",
+                icon: "📝",
+                color: "from-orange-500 to-amber-500"
+              },
+              {
+                step: "4",
+                title: "Print & Pay",
+                desc: "Generate bills, print receipts, accept payments.",
+                icon: "🧾",
+                color: "from-purple-500 to-pink-500"
+              }
+            ].map((item, i) => (
+              <div key={i} className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center hover:bg-white/20 transition-all">
+                <div className={`w-16 h-16 bg-gradient-to-br ${item.color} rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl`}>
+                  {item.icon}
+                </div>
+                <div className="text-xs font-bold text-violet-300 mb-2">STEP {item.step}</div>
+                <h3 className="text-xl font-bold mb-2">{item.title}</h3>
+                <p className="text-gray-300 text-sm">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Feature Screenshots */}
+          <div className="mt-16 max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all">
+                <div className="aspect-video bg-gradient-to-br from-violet-600/30 to-purple-600/30 rounded-lg mb-4 flex items-center justify-center">
+                  <div className="text-center">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-violet-300" />
+                    <span className="text-sm text-violet-200">Dashboard</span>
+                  </div>
+                </div>
+                <h4 className="font-semibold mb-1">Real-time Dashboard</h4>
+                <p className="text-sm text-gray-400">Track sales, orders, and revenue at a glance</p>
+              </div>
+              
+              <div className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all">
+                <div className="aspect-video bg-gradient-to-br from-green-600/30 to-emerald-600/30 rounded-lg mb-4 flex items-center justify-center">
+                  <div className="text-center">
+                    <Package className="w-12 h-12 mx-auto mb-2 text-green-300" />
+                    <span className="text-sm text-green-200">Menu</span>
+                  </div>
+                </div>
+                <h4 className="font-semibold mb-1">Menu Management</h4>
+                <p className="text-sm text-gray-400">Organize items by category with images</p>
+              </div>
+              
+              <div className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all">
+                <div className="aspect-video bg-gradient-to-br from-orange-600/30 to-amber-600/30 rounded-lg mb-4 flex items-center justify-center">
+                  <div className="text-center">
+                    <Printer className="w-12 h-12 mx-auto mb-2 text-orange-300" />
+                    <span className="text-sm text-orange-200">Billing</span>
+                  </div>
+                </div>
+                <h4 className="font-semibold mb-1">Thermal Printing</h4>
+                <p className="text-sm text-gray-400">6 professional receipt themes</p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="text-center mt-12">
+            <Button size="lg" onClick={handleGetStarted} className="bg-white text-violet-900 hover:bg-gray-100 h-14 px-8 text-lg font-semibold">
+              Try Free for 50 Bills
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+            <p className="text-sm text-gray-400 mt-4">No credit card required • Setup in 2 minutes</p>
+          </div>
+        </div>
+      </section>
+
       {/* Benefits Section */}
       <section className="py-20 bg-white">
         <div className="container mx-auto px-4">
