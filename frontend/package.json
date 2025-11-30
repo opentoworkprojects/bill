@@ -9,7 +9,7 @@
   },
   "private": true,
   "main": "electron/main.js",
-  "homepage": "./",
+  "homepage": "https://finverge.tech",
   "overrides": {
     "react-day-picker": "9.10.0",
     "date-fns": "4.1.0"

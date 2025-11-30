@@ -27,24 +27,29 @@ function createWindow() {
     backgroundColor: CONFIG.WINDOW.BACKGROUND_COLOR
   });
 
-  // Load the app
-  // In dev: localhost, In production: load from local build
-  if (isDev) {
-    const startUrl = CONFIG.DEV_URL;
-    console.log(`[RestoBill Desktop] Loading from: ${startUrl}`);
-    mainWindow.loadURL(startUrl);
-  } else {
-    // Production: Load from local build files
-    const indexPath = path.join(__dirname, '../build/index.html');
-    console.log(`[RestoBill Desktop] Loading from local file: ${indexPath}`);
-    console.log(`[RestoBill Desktop] Backend: ${CONFIG.BACKEND_URL}`);
-    mainWindow.loadFile(indexPath).catch(err => {
-      console.error('[RestoBill Desktop] Failed to load local file:', err);
-      // Fallback to web if local files fail
-      console.log('[RestoBill Desktop] Falling back to web URL');
-      mainWindow.loadURL(CONFIG.PRODUCTION_URL);
-    });
-  }
+  // Load the app from web (finverge.tech)
+  const startUrl = isDev ? CONFIG.DEV_URL : CONFIG.PRODUCTION_URL;
+  
+  console.log(`[RestoBill Desktop] Loading from: ${startUrl}`);
+  console.log(`[RestoBill Desktop] Backend: ${CONFIG.BACKEND_URL}`);
+  
+  mainWindow.loadURL(startUrl);
+  
+  // Inject electronAPI verification into the page after it loads
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[RestoBill Desktop] Page loaded, verifying electronAPI');
+    mainWindow.webContents.executeJavaScript(`
+      window.__ELECTRON__ = true;
+      window.__ELECTRON_VERSION__ = '${CONFIG.APP_VERSION}';
+      console.log('[RestoBill Desktop] Electron flag injected');
+      console.log('[RestoBill Desktop] electronAPI available:', typeof window.electronAPI !== 'undefined');
+      if (window.electronAPI) {
+        console.log('[RestoBill Desktop] electronAPI functions:', Object.keys(window.electronAPI));
+      } else {
+        console.error('[RestoBill Desktop] electronAPI NOT AVAILABLE - preload failed!');
+      }
+    `);
+  });
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {

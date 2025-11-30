@@ -25,6 +25,7 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
   const isElectron = isElectronProp !== undefined 
     ? isElectronProp 
     : (typeof window !== 'undefined' && (
+        window.__ELECTRON__ === true ||
         window.electronAPI?.isElectron === true || 
         window.electronAPI !== undefined ||
         navigator.userAgent.toLowerCase().includes('electron')
@@ -33,7 +34,9 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
   // Debug log
   useEffect(() => {
     console.log('WhatsApp Desktop - isElectron:', isElectron);
+    console.log('WhatsApp Desktop - window.__ELECTRON__:', window.__ELECTRON__);
     console.log('WhatsApp Desktop - window.electronAPI:', window.electronAPI);
+    console.log('WhatsApp Desktop - electronAPI functions:', window.electronAPI ? Object.keys(window.electronAPI) : 'N/A');
   }, [isElectron]);
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
