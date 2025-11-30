@@ -129,12 +129,21 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
   const handleConnectWhatsApp = async () => {
     setConnecting(true);
 
+    // Debug logging
+    console.log('handleConnectWhatsApp called');
+    console.log('isElectron:', isElectron);
+    console.log('window.electronAPI:', window.electronAPI);
+    console.log('openWhatsAppWeb available:', !!window.electronAPI?.openWhatsAppWeb);
+
     if (isElectron && window.electronAPI?.openWhatsAppWeb) {
+      console.log('Opening WhatsApp Web via Electron API');
       window.electronAPI.openWhatsAppWeb();
-      toast.info('WhatsApp Web opened. Scan the QR code with your phone to login.');
+      toast.info('WhatsApp Web opened inside app. Scan QR code to login.');
     } else {
+      console.log('Fallback: Opening WhatsApp Web in browser');
+      console.log('Reason - isElectron:', isElectron, 'electronAPI:', !!window.electronAPI);
       window.open('https://web.whatsapp.com', '_blank');
-      toast.info('Please login to WhatsApp Web in the new window');
+      toast.warning('Opening in browser. For embedded WhatsApp, use desktop app.');
       setConnecting(false);
     }
   };
