@@ -1,6 +1,6 @@
 {
   "name": "restobill",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "RestoBill - Restaurant Billing & Management System by FinVerge",
   "author": {
     "name": "FinVerge",
@@ -9,7 +9,7 @@
   },
   "private": true,
   "main": "electron/main.js",
-  "homepage": "https://finverge.tech",
+  "homepage": "./",
   "overrides": {
     "react-day-picker": "9.10.0",
     "date-fns": "4.1.0"

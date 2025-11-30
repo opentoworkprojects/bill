@@ -28,14 +28,23 @@ function createWindow() {
   });
 
   // Load the app
-  // In dev: localhost, In production: finverge.tech (web app)
-  const startUrl = isDev 
-    ? CONFIG.DEV_URL 
-    : CONFIG.PRODUCTION_URL;
-  
-  console.log(`[RestoBill Desktop] Loading from: ${startUrl}`);
-  console.log(`[RestoBill Desktop] Backend: ${CONFIG.BACKEND_URL}`);
-  mainWindow.loadURL(startUrl);
+  // In dev: localhost, In production: load from local build
+  if (isDev) {
+    const startUrl = CONFIG.DEV_URL;
+    console.log(`[RestoBill Desktop] Loading from: ${startUrl}`);
+    mainWindow.loadURL(startUrl);
+  } else {
+    // Production: Load from local build files
+    const indexPath = path.join(__dirname, '../build/index.html');
+    console.log(`[RestoBill Desktop] Loading from local file: ${indexPath}`);
+    console.log(`[RestoBill Desktop] Backend: ${CONFIG.BACKEND_URL}`);
+    mainWindow.loadFile(indexPath).catch(err => {
+      console.error('[RestoBill Desktop] Failed to load local file:', err);
+      // Fallback to web if local files fail
+      console.log('[RestoBill Desktop] Falling back to web URL');
+      mainWindow.loadURL(CONFIG.PRODUCTION_URL);
+    });
+  }
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
