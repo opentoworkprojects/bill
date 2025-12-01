@@ -2,7 +2,7 @@
 
 ## 🎯 Current Status
 
-Your RestoBill AI application is **SUCCESSFULLY DEPLOYED** on Render at:
+Your BillByteKOT AI application is **SUCCESSFULLY DEPLOYED** on Render at:
 **https://restro-ai.onrender.com**
 
 The server is running but has MongoDB connection issues causing degraded functionality.
@@ -158,7 +158,7 @@ Should return:
 ```json
 {
   "status": "healthy",
-  "message": "RestoBill AI Server is running",
+  "message": "BillByteKOT AI Server is running",
   "services": {"database": "connected"}
 }
 ```
@@ -214,7 +214,7 @@ You'll know it's fixed when you see:
 
 ```
 ✅ Database connected: restrobill
-🍽️  RestoBill AI Server Starting...
+🍽️  BillByteKOT AI Server Starting...
 🚀 Server starting on port 10000
 INFO: Uvicorn running on http://0.0.0.0:10000
 ```

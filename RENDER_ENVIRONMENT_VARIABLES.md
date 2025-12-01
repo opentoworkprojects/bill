@@ -1,4 +1,4 @@
-# Render Environment Variables for RestoBill AI
+# Render Environment Variables for BillByteKOT AI
 ================================================
 
 ## Quick Setup Instructions
@@ -138,7 +138,7 @@ production
 After deployment, look for these in the logs:
 ```
 ✅ Database connected: restrobill
-🍽️  RestoBill AI Server Starting...
+🍽️  BillByteKOT AI Server Starting...
 🚀 Server starting on port 10000
 INFO: Uvicorn running on http://0.0.0.0:10000
 ```
@@ -154,7 +154,7 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "message": "RestoBill AI Server is running",
+  "message": "BillByteKOT AI Server is running",
   "services": {
     "database": "connected"
   }
@@ -261,4 +261,4 @@ If you encounter issues:
 3. Test connection strings locally
 4. Monitor health check endpoint
 
-Your RestoBill AI is ready to serve customers! 🍽️✨
+Your BillByteKOT AI is ready to serve customers! 🍽️✨

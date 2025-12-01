@@ -30,14 +30,14 @@ function createWindow() {
   // Load the app from web (finverge.tech)
   const startUrl = isDev ? CONFIG.DEV_URL : CONFIG.PRODUCTION_URL;
   
-  console.log(`[RestoBill Desktop] Loading from: ${startUrl}`);
-  console.log(`[RestoBill Desktop] Backend: ${CONFIG.BACKEND_URL}`);
+  console.log(`[BillByteKOT Desktop] Loading from: ${startUrl}`);
+  console.log(`[BillByteKOT Desktop] Backend: ${CONFIG.BACKEND_URL}`);
   
   mainWindow.loadURL(startUrl);
   
   // Inject electronAPI bridge into the page after it loads
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[RestoBill Desktop] Page loaded, injecting Electron bridge');
+    console.log('[BillByteKOT Desktop] Page loaded, injecting Electron bridge');
     
     // Inject a bridge that uses postMessage for communication
     mainWindow.webContents.executeJavaScript(`
@@ -91,7 +91,7 @@ function createWindow() {
             });
           }
         };
-        console.log('[RestoBill Desktop] electronAPI bridge created');
+        console.log('[BillByteKOT Desktop] electronAPI bridge created');
       }
     `);
   });
@@ -116,7 +116,7 @@ function createWindow() {
   }, 100);
   
   function handleElectronMessage(msg) {
-    console.log('[RestoBill Desktop] Received message:', msg.type);
+    console.log('[BillByteKOT Desktop] Received message:', msg.type);
     
     if (msg.type === 'ELECTRON_OPEN_WHATSAPP') {
       createWhatsAppView();
@@ -160,9 +160,9 @@ function createWindow() {
 function createMenu() {
   const template = [
     {
-      label: 'RestoBill',
+      label: 'BillByteKOT',
       submenu: [
-        { label: 'About RestoBill', role: 'about' },
+        { label: 'About BillByteKOT', role: 'about' },
         { type: 'separator' },
         { label: 'Preferences', accelerator: 'CmdOrCtrl+,', click: () => mainWindow.webContents.send('navigate', '/settings') },
         { type: 'separator' },

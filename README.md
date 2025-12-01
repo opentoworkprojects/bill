@@ -1,4 +1,4 @@
-# 🍽️ RestoBill AI - Smart Restaurant Management System
+# 🍽️ BillByteKOT - Smart Restaurant Billing & KOT System
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/shivshankar9/restro-ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -7,7 +7,7 @@
 
 > **Transform your restaurant operations with AI-powered billing, inventory management, and customer insights.**
 
-RestoBill AI is a comprehensive restaurant management system that combines modern web technology with artificial intelligence to streamline your restaurant operations. From order management to payment processing, analytics to inventory tracking - everything you need in one powerful platform.
+BillByteKOT is a comprehensive restaurant management system with powerful KOT (Kitchen Order Ticket) management, billing, and analytics. From order management to payment processing, inventory tracking to WhatsApp integration - everything you need in one powerful platform.
 
 ## ✨ Features
 
@@ -38,7 +38,7 @@ RestoBill AI is a comprehensive restaurant management system that combines moder
 
 ### One-Click Deployment (Recommended)
 
-Deploy RestoBill AI to Render with just one click:
+Deploy BillByteKOT AI to Render with just one click:
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/shivshankar9/restro-ai)
 
@@ -170,7 +170,7 @@ REACT_APP_RAZORPAY_KEY_ID=your_razorpay_key_id
 ## 🏗️ Architecture
 
 ```
-RestoBill AI
+BillByteKOT AI
 ├── frontend/           # React.js frontend
 │   ├── src/
 │   ├── public/
@@ -260,7 +260,7 @@ POST /api/ai/sales-forecast    # Sales forecasting
 ## 🎨 Screenshots
 
 ### Dashboard
-![Dashboard](https://via.placeholder.com/800x400?text=RestoBill+AI+Dashboard)
+![Dashboard](https://via.placeholder.com/800x400?text=BillByteKOT+AI+Dashboard)
 
 ### Order Management
 ![Orders](https://via.placeholder.com/800x400?text=Order+Management+System)
@@ -299,7 +299,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Need help? We've got you covered:
 
-- 📧 **Email**: admin@restobill.ai
+- 📧 **Email**: admin@BillByteKOT.ai
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/shivshankar9/restro-ai/issues)
 - 📚 **Documentation**: [Wiki](https://github.com/shivshankar9/restro-ai/wiki)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/shivshankar9/restro-ai/discussions)
@@ -374,7 +374,7 @@ sudo kill -9 <PID>
 ## 🏆 Achievements
 
 - ⭐ **1000+ Stars** on GitHub
-- 🍽️ **500+ Restaurants** using RestoBill AI
+- 🍽️ **500+ Restaurants** using BillByteKOT AI
 - 🌍 **25+ Countries** worldwide
 - 💰 **$10M+ Transactions** processed
 - 👥 **50+ Contributors** from the community
@@ -388,17 +388,17 @@ sudo kill -9 <PID>
 
 ## 🎉 Acknowledgments
 
-- Thanks to all contributors who have helped build RestoBill AI
+- Thanks to all contributors who have helped build BillByteKOT AI
 - Inspired by modern restaurant management needs
 - Built with love by the open-source community
 - Special thanks to early adopters and beta testers
 
 ---
 
-**RestoBill AI** - Revolutionizing restaurant management with AI
+**BillByteKOT AI** - Revolutionizing restaurant management with AI
 
 *Made with ❤️ in India*
 
-For updates and announcements, follow us on [Twitter](https://twitter.com/RestoBillAI) | [LinkedIn](https://linkedin.com/company/restobill-ai)
+For updates and announcements, follow us on [Twitter](https://twitter.com/BillByteKOTAI) | [LinkedIn](https://linkedin.com/company/BillByteKOT-ai)
 
-© 2024 RestoBill AI. All rights reserved.
+© 2024 BillByteKOT AI. All rights reserved.

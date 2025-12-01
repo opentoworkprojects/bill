@@ -39,18 +39,18 @@ The new **v1.1.0** has the WhatsApp Pro tab, but you need to:
 2. Follow the on-screen instructions
 
 ### Option 2: Manual Installation
-1. **Close RestoBill** completely
+1. **Close BillByteKOT** completely
 2. **Uninstall old version:**
    - Press `Win + I`
    - Go to Apps → Apps & Features
-   - Search "RestoBill"
+   - Search "BillByteKOT"
    - Click Uninstall
 3. **Install new version:**
    - Go to: `frontend/dist-electron/`
-   - Double-click: `RestoBill-Setup-1.1.0-win.exe`
+   - Double-click: `BillByteKOT-Setup-1.1.0-win.exe`
    - Follow installation wizard
 4. **Launch and verify:**
-   - Open RestoBill
+   - Open BillByteKOT
    - Login
    - Go to Settings
    - You should see **6 tabs** now (not 5)
@@ -93,7 +93,7 @@ If you don't see these, you're still on the old version!
 ## Still Not Working?
 
 1. Make sure you **completely closed** the old app
-2. Check Windows Task Manager - kill any "RestoBill" processes
+2. Check Windows Task Manager - kill any "BillByteKOT" processes
 3. Uninstall again from Apps & Features
 4. Restart your computer
 5. Install v1.1.0 fresh
@@ -101,8 +101,8 @@ If you don't see these, you're still on the old version!
 ---
 
 **File Locations:**
-- Old version: `RestoBill-Setup-1.0.0-win.exe` (106 MB)
-- New version: `RestoBill-Setup-1.1.0-win.exe` (106 MB)
+- Old version: `BillByteKOT-Setup-1.0.0-win.exe` (106 MB)
+- New version: `BillByteKOT-Setup-1.1.0-win.exe` (106 MB)
 - Location: `C:\Users\shivs\da\restro-ai\frontend\dist-electron\`
 
 **Need Help?** Open the installer location in File Explorer:

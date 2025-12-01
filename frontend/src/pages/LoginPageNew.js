@@ -28,7 +28,7 @@ const LoginPageNew = ({ setUser }) => {
   const completeLogin = (user) => {
     setAuthToken(localStorage.getItem('token'));
     setUser(user);
-    toast.success('Welcome to RestoBill!');
+    toast.success('Welcome to BillByteKOT!');
     
     if (user.role === 'admin' && !user.setup_completed) {
       navigate('/setup');
@@ -86,7 +86,7 @@ const LoginPageNew = ({ setUser }) => {
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center">
               <ChefHat className="w-10 h-10 text-violet-600" />
             </div>
-            <h1 className="text-4xl font-bold">RestoBill</h1>
+            <h1 className="text-4xl font-bold">BillByteKOT</h1>
           </div>
           
           <h2 className="text-3xl lg:text-4xl font-bold leading-tight">

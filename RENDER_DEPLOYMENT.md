@@ -1,6 +1,6 @@
-# 🚀 RestoBill AI - Render Deployment Guide
+# 🚀 BillByteKOT AI - Render Deployment Guide
 
-Complete guide for deploying RestoBill AI to Render.com - the fastest and easiest way to deploy your restaurant management system.
+Complete guide for deploying BillByteKOT AI to Render.com - the fastest and easiest way to deploy your restaurant management system.
 
 ## 📋 Table of Contents
 
@@ -219,7 +219,7 @@ REACT_APP_ENABLE_ANALYTICS=true
 REACT_APP_ENABLE_PWA=true
 
 # Branding (Optional)
-REACT_APP_APP_NAME=RestoBill AI
+REACT_APP_APP_NAME=BillByteKOT AI
 REACT_APP_COMPANY_NAME=Your Restaurant
 ```
 
@@ -242,11 +242,11 @@ REACT_APP_COMPANY_NAME=Your Restaurant
 3. **Configure Database**
    ```bash
    # Database Name: restrobill
-   # Username: restobill_user
+   # Username: BillByteKOT_user
    # Password: Generate secure password
    
    # Get connection string:
-   mongodb+srv://restobill_user:password@cluster.mongodb.net/restrobill
+   mongodb+srv://BillByteKOT_user:password@cluster.mongodb.net/restrobill
    ```
 
 4. **Network Access**
@@ -584,16 +584,16 @@ CORS_ORIGINS=https://yourdomain.com
 - [Deploy Python](https://render.com/docs/deploy-fastapi)
 - [Static Sites](https://render.com/docs/deploy-create-react-app)
 
-### RestoBill AI Support
+### BillByteKOT AI Support
 
-- 📧 Email: support@restobill.ai
+- 📧 Email: support@BillByteKOT.ai
 - 💬 GitHub Issues: [Create Issue](https://github.com/your-username/restro-ai/issues)
 - 📚 Documentation: See main README.md
-- 🌐 Website: https://restobill.ai
+- 🌐 Website: https://BillByteKOT.ai
 
 ## 🎉 Success!
 
-Your RestoBill AI is now live on Render! 🍽️
+Your BillByteKOT AI is now live on Render! 🍽️
 
 **Access Your Application:**
 - Frontend: `https://your-frontend.onrender.com`
@@ -609,6 +609,6 @@ Your RestoBill AI is now live on Render! 🍽️
 
 ---
 
-**RestoBill AI** - Smart Restaurant Management Made Simple
+**BillByteKOT AI** - Smart Restaurant Management Made Simple
 
 *Deployed with ❤️ on Render*

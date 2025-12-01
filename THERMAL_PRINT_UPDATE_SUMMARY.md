@@ -425,7 +425,7 @@
 
 ## 🎊 Summary
 
-This update brings professional thermal printing capabilities to RestoBill AI with:
+This update brings professional thermal printing capabilities to BillByteKOT AI with:
 - **6 print formats** for different needs
 - **Complete business management** in settings
 - **Enhanced user experience** throughout

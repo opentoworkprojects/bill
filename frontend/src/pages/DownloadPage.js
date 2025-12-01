@@ -35,16 +35,16 @@ const DownloadPage = () => {
 
   // Download URLs - GitHub Releases
   const downloadUrls = {
-    windows: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/RestoBill-Setup-1.0.0-win.exe",
-    mac: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/RestoBill-1.0.0-mac.dmg",
-    linux: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/RestoBill-1.0.0-linux.AppImage",
+    windows: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/BillByteKOT-Setup-1.0.0-win.exe",
+    mac: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/BillByteKOT-1.0.0-mac.dmg",
+    linux: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/BillByteKOT-1.0.0-linux.AppImage",
   };
 
   const handleDownload = (platform) => {
     const url = downloadUrls[platform];
     if (url) {
       window.open(url, "_blank");
-      toast.success(`Downloading RestoBill for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
+      toast.success(`Downloading BillByteKOT for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
     } else {
       toast.error("Download not available yet. Please try again later.");
     }
@@ -76,7 +76,7 @@ const DownloadPage = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <ChefHat className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-lg">RestoBill</span>
+              <span className="font-bold text-lg">BillByteKOT</span>
             </div>
             <Button onClick={() => navigate("/login")} variant="outline">
               Login
@@ -94,7 +94,7 @@ const DownloadPage = () => {
               <span className="text-sm font-medium text-blue-600">Download Center</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              Download RestoBill
+              Download BillByteKOT
               <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"> Desktop</span>
             </h1>
             <p className="text-xl text-gray-600">
@@ -181,7 +181,7 @@ const DownloadPage = () => {
                     <h3 className="font-bold text-lg mb-2">On Mobile?</h3>
                     <p className="text-gray-600 mb-4">
                       The desktop app is for Windows, Mac, and Linux computers. 
-                      You can use RestoBill on mobile through our web app.
+                      You can use BillByteKOT on mobile through our web app.
                     </p>
                     <Button onClick={() => navigate("/login")} className="bg-green-600">
                       Use Web App

@@ -1,4 +1,4 @@
-# Google Play Store Deployment Guide - RestoBill AI
+# Google Play Store Deployment Guide - BillByteKOT AI
 
 ## Complete Step-by-Step Guide to Publish on Play Store
 
@@ -8,7 +8,7 @@
 
 ### 1. Requirements
 - [ ] Google Play Developer Account ($25 one-time fee)
-- [ ] Valid domain with HTTPS (e.g., restobill.com)
+- [ ] Valid domain with HTTPS (e.g., BillByteKOT.com)
 - [ ] Android device for testing
 - [ ] Node.js 18+ installed
 - [ ] Java JDK 17+ installed
@@ -51,8 +51,8 @@ npm install -g @bubblewrap/cli
 
 ```bash
 # Create a new directory for your Android app
-mkdir restobill-android
-cd restobill-android
+mkdir BillByteKOT-android
+cd BillByteKOT-android
 
 # Initialize with your PWA URL
 bubblewrap init --manifest https://yourdomain.com/manifest.json
@@ -61,8 +61,8 @@ bubblewrap init --manifest https://yourdomain.com/manifest.json
 You'll be prompted for:
 - **Domain**: yourdomain.com
 - **Host**: https://yourdomain.com
-- **Name**: RestoBill AI
-- **Package ID**: com.restobill.ai
+- **Name**: BillByteKOT AI
+- **Package ID**: com.BillByteKOT.ai
 - **Icon**: Automatically fetched from manifest
 - **Theme Color**: #7c3aed
 
@@ -73,7 +73,7 @@ bubblewrap build
 
 # When prompted, create new signing key:
 # Keystore password: [create strong password]
-# Key alias: restobill-key
+# Key alias: BillByteKOT-key
 # Key password: [create strong password]
 ```
 
@@ -84,7 +84,7 @@ The keystore file will be created at: `android.keystore`
 ### Step 5: Get SHA-256 Fingerprint
 
 ```bash
-keytool -list -v -keystore android.keystore -alias restobill-key
+keytool -list -v -keystore android.keystore -alias BillByteKOT-key
 ```
 
 Copy the SHA-256 fingerprint (looks like: AA:BB:CC:DD:... )
@@ -98,7 +98,7 @@ Create file on your server at: `https://yourdomain.com/.well-known/assetlinks.js
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "com.restobill.ai",
+    "package_name": "com.BillByteKOT.ai",
     "sha256_cert_fingerprints": ["YOUR_SHA256_FINGERPRINT_HERE"]
   }
 }]
@@ -140,8 +140,8 @@ npx cap init
 ```
 
 When prompted:
-- App name: **RestoBill AI**
-- App package ID: **com.restobill.ai**
+- App name: **BillByteKOT AI**
+- App package ID: **com.BillByteKOT.ai**
 - Web asset directory: **build**
 
 ### Step 2: Add Android Platform
@@ -169,7 +169,7 @@ Edit `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
 <application
-    android:label="RestoBill AI"
+    android:label="BillByteKOT AI"
     android:icon="@mipmap/ic_launcher"
     android:theme="@style/AppTheme"
     android:usesCleartextTraffic="false">
@@ -235,7 +235,7 @@ AI-powered restaurant billing with thermal printing & payment integration
 
 **Full Description** (4000 chars max):
 ```
-🍽️ RestoBill AI - Complete Restaurant Management Solution
+🍽️ BillByteKOT AI - Complete Restaurant Management Solution
 
 Transform your restaurant with AI-powered billing system!
 
@@ -291,8 +291,8 @@ Perfect for:
 
 Download now and revolutionize your restaurant management!
 
-Support: support@restobill.com
-Website: https://restobill.com
+Support: support@BillByteKOT.com
+Website: https://BillByteKOT.com
 ```
 
 ### 5. Privacy Policy (Required)
@@ -301,7 +301,7 @@ Create a privacy policy page at: `https://yourdomain.com/privacy-policy`
 
 Basic template:
 ```
-RestoBill AI Privacy Policy
+BillByteKOT AI Privacy Policy
 
 Data Collection:
 - We collect restaurant business information
@@ -318,7 +318,7 @@ Data Storage:
 - Encrypted connections
 - User controls their own data
 
-Contact: privacy@restobill.com
+Contact: privacy@BillByteKOT.com
 ```
 
 ---
@@ -330,7 +330,7 @@ Contact: privacy@restobill.com
 1. Go to: https://play.google.com/console
 2. Click **Create app**
 3. Fill details:
-   - **App name**: RestoBill AI
+   - **App name**: BillByteKOT AI
    - **Default language**: English (United States)
    - **App or game**: App
    - **Free or paid**: Free
@@ -340,7 +340,7 @@ Contact: privacy@restobill.com
 ### Step 2: Setup App Details
 
 #### Store Listing
-1. **App name**: RestoBill AI - Restaurant Billing
+1. **App name**: BillByteKOT AI - Restaurant Billing
 2. **Short description**: [Use above]
 3. **Full description**: [Use above]
 4. **App icon**: Upload 512x512 PNG
@@ -405,7 +405,7 @@ v1.0.0 - Initial Release
 # Users will automatically get updates when they open the app
 
 # For major changes requiring new APK:
-cd restobill-android
+cd BillByteKOT-android
 bubblewrap update
 bubblewrap build --release
 ```

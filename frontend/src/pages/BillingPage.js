@@ -61,7 +61,7 @@ const BillingPage = ({ user }) => {
           amount: response.data.amount,
           currency: response.data.currency,
           order_id: response.data.razorpay_order_id,
-          name: businessSettings?.restaurant_name || 'RestoBill AI',
+          name: businessSettings?.restaurant_name || 'BillByteKOT AI',
           description: `Payment for Order #${orderId.slice(0, 8)}`,
           handler: async (razorpayResponse) => {
             try {

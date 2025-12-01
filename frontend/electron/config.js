@@ -13,14 +13,14 @@ module.exports = {
   BACKEND_URL: 'https://restro-ai.onrender.com',
   
   // App Information
-  APP_NAME: 'RestoBill',
+  APP_NAME: 'BillByteKOT',
   APP_VERSION: '1.3.0',
-  APP_DESCRIPTION: 'Restaurant Billing & Management System',
+  APP_DESCRIPTION: 'Restaurant Billing & KOT Management System',
   
   // Company Information
-  COMPANY_NAME: 'FinVerge Tech',
+  COMPANY_NAME: 'BillByte',
   COMPANY_URL: 'https://finverge.tech',
-  SUPPORT_EMAIL: 'support@finverge.tech',
+  SUPPORT_EMAIL: 'support@billbytekot.com',
   
   // Window Settings
   WINDOW: {

@@ -1,8 +1,8 @@
-# RestoBill AI Frontend
+# BillByteKOT AI Frontend
 
 ## Overview
 
-RestoBill AI Frontend is a modern React application that provides a comprehensive restaurant management interface. Built with React 18, it features a responsive design using Tailwind CSS and Radix UI components, offering an intuitive experience for restaurant staff and managers.
+BillByteKOT AI Frontend is a modern React application that provides a comprehensive restaurant management interface. Built with React 18, it features a responsive design using Tailwind CSS and Radix UI components, offering an intuitive experience for restaurant staff and managers.
 
 ## 🚀 Quick Start
 
@@ -10,7 +10,7 @@ RestoBill AI Frontend is a modern React application that provides a comprehensiv
 
 - **Node.js**: Version 18 or higher
 - **npm**: Version 8 or higher
-- **Backend Server**: RestoBill AI backend running (see `../backend/README.md`)
+- **Backend Server**: BillByteKOT AI backend running (see `../backend/README.md`)
 
 ### 2. Installation
 
@@ -493,12 +493,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📞 Contact
 
-- **Developer**: RestoBill AI Team
-- **Email**: support@restobill-ai.com
-- **Website**: https://restobill-ai.com
+- **Developer**: BillByteKOT AI Team
+- **Email**: support@BillByteKOT-ai.com
+- **Website**: https://BillByteKOT-ai.com
 
 ---
 
-**Made with ❤️ by the RestoBill AI Team**
+**Made with ❤️ by the BillByteKOT AI Team**
 
 *Transforming restaurant management with intelligent technology*

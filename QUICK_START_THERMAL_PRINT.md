@@ -4,7 +4,7 @@
 
 ### Step 1: Configure Your Business (2 minutes)
 
-1. **Login to RestoBill AI**
+1. **Login to BillByteKOT AI**
    - Use your admin credentials
    - Navigate to dashboard
 

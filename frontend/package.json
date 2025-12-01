@@ -1,10 +1,10 @@
 {
-  "name": "restobill",
+  "name": "billbytekot",
   "version": "1.3.0",
-  "description": "RestoBill - Restaurant Billing & Management System by FinVerge",
+  "description": "BillByteKOT - Restaurant Billing & KOT Management System",
   "author": {
-    "name": "FinVerge",
-    "email": "support@finverge.tech",
+    "name": "BillByte",
+    "email": "support@billbytekot.com",
     "url": "https://finverge.tech"
   },
   "private": true,

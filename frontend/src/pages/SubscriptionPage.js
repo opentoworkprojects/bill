@@ -39,7 +39,7 @@ const SubscriptionPage = ({ user }) => {
         amount: response.data.amount,
         currency: response.data.currency,
         order_id: response.data.razorpay_order_id,
-        name: 'RestoBill AI',
+        name: 'BillByteKOT AI',
         description: 'Premium Subscription - 1 Year Unlimited Access',
         handler: async (razorpayResponse) => {
           try {
@@ -48,7 +48,7 @@ const SubscriptionPage = ({ user }) => {
               razorpay_order_id: razorpayResponse.razorpay_order_id,
               razorpay_signature: razorpayResponse.razorpay_signature
             });
-            toast.success('🎉 Premium activated! Welcome to RestoBill AI Pro!');
+            toast.success('🎉 Premium activated! Welcome to BillByteKOT AI Pro!');
             fetchSubscriptionStatus();
             // Update local user data
             const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -129,7 +129,7 @@ const SubscriptionPage = ({ user }) => {
               <AlertCircle className="w-10 h-10 text-red-500" />
               <div>
                 <h3 className="text-lg font-bold text-red-700">Trial Expired - Subscription Required</h3>
-                <p className="text-red-600">Your 7-day trial has ended. Subscribe now to continue using RestoBill AI.</p>
+                <p className="text-red-600">Your 7-day trial has ended. Subscribe now to continue using BillByteKOT AI.</p>
               </div>
             </CardContent>
           </Card>
@@ -253,7 +253,7 @@ const SubscriptionPage = ({ user }) => {
         {/* Why Choose Us */}
         <Card className="border-0 shadow-xl bg-gradient-to-br from-violet-50 to-purple-50">
           <CardContent className="p-8">
-            <h2 className="text-2xl font-bold text-center mb-8">Why 10,000+ Restaurants Trust RestoBill AI</h2>
+            <h2 className="text-2xl font-bold text-center mb-8">Why 10,000+ Restaurants Trust BillByteKOT AI</h2>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="text-center space-y-3">
                 <div className="w-16 h-16 mx-auto bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -287,7 +287,7 @@ const SubscriptionPage = ({ user }) => {
             <span className="font-bold">30-Day Money Back Guarantee</span>
           </div>
           <p className="text-gray-600 max-w-xl mx-auto">
-            Not satisfied? Get a full refund within 30 days, no questions asked. We're confident you'll love RestoBill AI.
+            Not satisfied? Get a full refund within 30 days, no questions asked. We're confident you'll love BillByteKOT AI.
           </p>
         </div>
 

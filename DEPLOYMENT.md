@@ -1,6 +1,6 @@
-# 🚀 RestoBill AI - Deployment Guide
+# 🚀 BillByteKOT AI - Deployment Guide
 
-Complete guide for deploying RestoBill AI restaurant management system to production.
+Complete guide for deploying BillByteKOT AI restaurant management system to production.
 
 ## 📋 Table of Contents
 
@@ -15,7 +15,7 @@ Complete guide for deploying RestoBill AI restaurant management system to produc
 
 ## 🚀 Quick Start
 
-The fastest way to get RestoBill AI running:
+The fastest way to get BillByteKOT AI running:
 
 ```bash
 # Clone the repository
@@ -114,7 +114,7 @@ curl https://cli-assets.heroku.com/install.sh | sh
 
 # Login and create app
 heroku login
-heroku create your-restobill-app
+heroku create your-BillByteKOT-app
 
 # Add MongoDB addon
 heroku addons:create mongolab:sandbox
@@ -132,7 +132,7 @@ git push heroku main
 
 ```yaml
 # .do/app.yaml
-name: restobill-ai
+name: BillByteKOT-ai
 services:
 - name: backend
   source_dir: backend
@@ -158,7 +158,7 @@ services:
   instance_count: 1
   instance_size_slug: basic-xxs
 databases:
-- name: restobill-db
+- name: BillByteKOT-db
   engine: MONGODB
   version: "5"
 ```
@@ -235,7 +235,7 @@ sudo systemctl enable mongod
 mongosh
 use restrobill
 db.createUser({
-  user: "restobill",
+  user: "BillByteKOT",
   pwd: "secure_password_here",
   roles: [{ role: "readWrite", db: "restrobill" }]
 })
@@ -298,7 +298,7 @@ cd restro-ai
 
 # 6. Setup reverse proxy (Nginx)
 sudo apt install nginx
-sudo nano /etc/nginx/sites-available/restobill
+sudo nano /etc/nginx/sites-available/BillByteKOT
 
 # Nginx configuration
 server {
@@ -319,7 +319,7 @@ server {
 }
 
 # Enable site
-sudo ln -s /etc/nginx/sites-available/restobill /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/BillByteKOT /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -589,6 +589,6 @@ server {
 
 ---
 
-**🍽️ RestoBill AI** - Smart Restaurant Management Made Simple
+**🍽️ BillByteKOT AI** - Smart Restaurant Management Made Simple
 
 For updates and support, visit: [https://github.com/your-username/restro-ai](https://github.com/your-username/restro-ai)

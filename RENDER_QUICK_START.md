@@ -1,10 +1,10 @@
-# 🚀 RestoBill AI - Render Quick Start Guide
+# 🚀 BillByteKOT AI - Render Quick Start Guide
 
-Deploy RestoBill AI to Render.com in 5 minutes! This guide focuses on the fastest path to get your restaurant management system live.
+Deploy BillByteKOT AI to Render.com in 5 minutes! This guide focuses on the fastest path to get your restaurant management system live.
 
 ## 📋 Prerequisites
 
-1. **GitHub Account** with your RestoBill AI repository
+1. **GitHub Account** with your BillByteKOT AI repository
 2. **Render Account** - Sign up at [render.com](https://render.com)
 3. **MongoDB Atlas Account** - Free tier at [mongodb.com/atlas](https://cloud.mongodb.com)
 
@@ -212,6 +212,6 @@ CORS_ORIGINS=https://your-exact-frontend-url.onrender.com
 
 ---
 
-**🍽️ Your RestoBill AI is now live!**
+**🍽️ Your BillByteKOT AI is now live!**
 
 Start managing your restaurant with modern technology. Add your first menu items, create tables, and start taking orders!

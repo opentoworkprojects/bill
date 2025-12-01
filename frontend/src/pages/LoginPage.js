@@ -56,7 +56,7 @@ const LoginPage = ({ setUser }) => {
             </div>
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>RestoBill AI</CardTitle>
+            <CardTitle className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>BillByteKOT AI</CardTitle>
             <CardDescription className="text-base mt-2">Smart Restaurant Billing System</CardDescription>
           </div>
         </CardHeader>

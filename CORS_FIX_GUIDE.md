@@ -1,4 +1,4 @@
-# RestoBill AI - CORS Fix Guide for Vercel Deployment
+# BillByteKOT AI - CORS Fix Guide for Vercel Deployment
 
 ## 🚨 Issue Identified
 

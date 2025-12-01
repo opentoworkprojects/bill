@@ -18,7 +18,7 @@ export const useElectron = () => {
     if (isElectron && window.electronAPI?.onCheckUpdates) {
       window.electronAPI.onCheckUpdates(() => {
         // Show update notification or modal
-        alert('You are running the latest version of RestoBill!');
+        alert('You are running the latest version of BillByteKOT!');
       });
     }
   }, [isElectron]);

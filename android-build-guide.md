@@ -1,6 +1,6 @@
-# Android Build Guide for RestoBill AI
+# Android Build Guide for BillByteKOT AI
 
-This guide explains how to prepare and publish RestoBill AI to Google Play Store.
+This guide explains how to prepare and publish BillByteKOT AI to Google Play Store.
 
 ## Method 1: Progressive Web App (PWA) with Trusted Web Activity (TWA)
 
@@ -49,7 +49,7 @@ Create `.well-known/assetlinks.json` on your domain:
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "com.restobill.ai",
+    "package_name": "com.BillByteKOT.ai",
     "sha256_cert_fingerprints": ["YOUR_SHA256_FINGERPRINT"]
   }
 }]
@@ -64,7 +64,7 @@ keytool -list -v -keystore your-key.keystore
 1. Go to [Google Play Console](https://play.google.com/console)
 2. Create new app
 3. Fill app details:
-   - App name: RestoBill AI
+   - App name: BillByteKOT AI
    - Category: Business
    - Content rating: Everyone
 4. Upload APK/AAB
@@ -79,12 +79,12 @@ If you need native features not available in PWA:
 
 ### Step 1: Create React Native project
 ```bash
-npx react-native init RestoBillNative
+npx react-native init BillByteKOTNative
 ```
 
 ### Step 2: Install dependencies
 ```bash
-cd RestoBillNative
+cd BillByteKOTNative
 npm install @react-navigation/native @react-navigation/stack
 npm install axios react-native-vector-icons
 npm install @react-native-async-storage/async-storage
@@ -108,7 +108,7 @@ Output: `android/app/build/outputs/apk/release/app-release.apk`
 
 ## Current PWA Features
 
-RestoBill AI is already PWA-ready with:
+BillByteKOT AI is already PWA-ready with:
 - ✅ Web App Manifest (`manifest.json`)
 - ✅ Responsive design
 - ✅ Offline-ready architecture
@@ -133,7 +133,7 @@ lighthouse https://yourdomain.com --view
 ## Play Store Requirements
 
 ### App Information
-- **App Name**: RestoBill AI - Restaurant Billing
+- **App Name**: BillByteKOT AI - Restaurant Billing
 - **Short Description**: AI-powered restaurant billing with thermal printing
 - **Full Description**: Include all features
 - **Category**: Business → Point of Sale
@@ -155,14 +155,14 @@ lighthouse https://yourdomain.com --view
 ## Store Listing Content
 
 ### Title
-RestoBill AI - Restaurant Billing System
+BillByteKOT AI - Restaurant Billing System
 
 ### Short Description
 Smart restaurant billing app with AI, thermal printing, inventory, and payment integration
 
 ### Full Description
 ```
-RestoBill AI - Complete Restaurant Management Solution
+BillByteKOT AI - Complete Restaurant Management Solution
 
 Transform your restaurant with AI-powered billing system!
 
@@ -223,8 +223,8 @@ restaurant billing, pos system, restaurant management, ai billing, thermal print
 ## Support & Updates
 
 For updates and support:
-- Email: support@restobill.ai
-- Documentation: https://restobill.ai/docs
+- Email: support@BillByteKOT.ai
+- Documentation: https://BillByteKOT.ai/docs
 - Updates: Monthly feature releases
 
 ---

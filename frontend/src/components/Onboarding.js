@@ -98,7 +98,7 @@ const Onboarding = ({ onComplete, onSkip }) => {
               <div className="w-20 h-20 bg-gradient-to-br from-violet-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold mb-2">Welcome to RestoBill! 🎉</h2>
+              <h2 className="text-3xl font-bold mb-2">Welcome to BillByteKOT! 🎉</h2>
               <p className="text-gray-600">Let's take a quick tour of your new restaurant management system</p>
             </div>
           )}
@@ -162,7 +162,7 @@ const Onboarding = ({ onComplete, onSkip }) => {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => window.open('https://calendly.com/finverge/restobill-demo', '_blank')}
+              onClick={() => window.open('https://calendly.com/finverge/BillByteKOT-demo', '_blank')}
               className="text-blue-600 border-blue-200 hover:bg-blue-50"
             >
               <Calendar className="w-4 h-4 mr-2" />

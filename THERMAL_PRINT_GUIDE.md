@@ -1,7 +1,7 @@
 # Thermal Print & Business Settings Guide
 
 ## Overview
-The RestoBill AI system now includes comprehensive thermal printing capabilities with multiple print formats, editable business details, and professional invoice generation.
+The BillByteKOT AI system now includes comprehensive thermal printing capabilities with multiple print formats, editable business details, and professional invoice generation.
 
 ## Features Implemented
 

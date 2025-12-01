@@ -3,6 +3,7 @@ import '@/App.css';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import LoginPage from './pages/LoginPage';
+import LoginPageNew from './pages/LoginPageNew';
 import Dashboard from './pages/Dashboard';
 import MenuPage from './pages/MenuPage';
 import OrdersPage from './pages/OrdersPage';
@@ -95,7 +96,8 @@ function App() {
         <ElectronNavigator />
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage setUser={setUser} />} />
+          <Route path="/login" element={<LoginPageNew setUser={setUser} />} />
+          <Route path="/login-old" element={<LoginPage setUser={setUser} />} />
           <Route
             path="/setup"
             element={

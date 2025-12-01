@@ -2,7 +2,7 @@
 
 ## Issue Summary
 
-The RestoBill AI application was failing to deploy on Render due to two critical MongoDB connection issues:
+The BillByteKOT AI application was failing to deploy on Render due to two critical MongoDB connection issues:
 
 1. **SSL/TLS Configuration Error**: Using invalid/conflicting SSL options (`ssl_cert_reqs`, `tlsInsecure` + `tlsAllowInvalidCertificates`)
 2. **UnboundLocalError**: Variable `e` referenced outside exception scope in startup validation
@@ -167,7 +167,7 @@ After deploying to Render, check the logs for:
 ✅ **Success Indicators**:
 ```
 ✅ Database connected: restrobill
-🍽️  RestoBill AI Server Starting...
+🍽️  BillByteKOT AI Server Starting...
 🚀 Server starting on port 10000
 INFO:     Uvicorn running on http://0.0.0.0:10000
 ```

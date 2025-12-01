@@ -1,6 +1,6 @@
-# RestoBill Desktop App (Electron)
+# BillByteKOT Desktop App (Electron)
 
-Desktop application for RestoBill - Restaurant Billing & Management System by FinVerge Tech.
+Desktop application for BillByteKOT - Restaurant Billing & Management System by FinVerge Tech.
 
 ## Configuration
 
@@ -60,9 +60,9 @@ npm run electron:build:linux
 
 Built applications will be in `frontend/dist-electron/`:
 
-- **Windows**: `RestoBill-1.0.0-win-x64.exe` (installer) and portable version
-- **macOS**: `RestoBill-1.0.0-mac.dmg`
-- **Linux**: `RestoBill-1.0.0-linux.AppImage`
+- **Windows**: `BillByteKOT-1.0.0-win-x64.exe` (installer) and portable version
+- **macOS**: `BillByteKOT-1.0.0-mac.dmg`
+- **Linux**: `BillByteKOT-1.0.0-linux.AppImage`
 
 ## Configuration Files
 

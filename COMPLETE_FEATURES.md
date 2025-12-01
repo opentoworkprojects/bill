@@ -1,4 +1,4 @@
-# RestoBill AI - Complete Feature List
+# BillByteKOT AI - Complete Feature List
 
 ## ✅ ALL FEATURES IMPLEMENTED
 

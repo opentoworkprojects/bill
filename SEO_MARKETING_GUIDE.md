@@ -1,4 +1,4 @@
-# SEO & Marketing Guide - RestoBill AI
+# SEO & Marketing Guide - BillByteKOT AI
 
 ## Complete Guide for Product Launch & Market Success
 
@@ -9,7 +9,7 @@
 ### ✅ On-Page SEO Complete
 
 1. **Meta Tags** (in `/app/frontend/public/index.html`):
-   - Title: "RestoBill AI - Smart Restaurant Billing System with AI | POS Software"
+   - Title: "BillByteKOT AI - Smart Restaurant Billing System with AI | POS Software"
    - Description: 160 characters with keywords
    - Keywords: restaurant billing, POS, AI, thermal printer, etc.
    - Open Graph tags for social media
@@ -83,8 +83,8 @@
 
 **Month 3: Case Studies & Comparisons**
 - "Case Study: How [Restaurant] Increased Sales by 30%"
-- "RestoBill AI vs Traditional POS Systems"
-- "ROI Calculator: How Much Can You Save with RestoBill AI?"
+- "BillByteKOT AI vs Traditional POS Systems"
+- "ROI Calculator: How Much Can You Save with BillByteKOT AI?"
 - "Success Stories: Restaurants Using AI Billing"
 - "Before & After: Restaurant Digital Transformation"
 
@@ -283,7 +283,7 @@ Create free tools to attract traffic:
 ### Welcome Series (5 emails):
 1. **Day 0**: Welcome + Quick Start Guide
 2. **Day 2**: Feature Highlight - AI Recommendations
-3. **Day 5**: How Others Use RestoBill (Case Study)
+3. **Day 5**: How Others Use BillByteKOT (Case Study)
 4. **Day 7**: Tips & Tricks for Maximum ROI
 5. **Day 10**: Upgrade to Premium Offer
 
@@ -353,20 +353,20 @@ Create free tools to attract traffic:
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://restobill.ai/</loc>
+    <loc>https://BillByteKOT.ai/</loc>
     <lastmod>2024-11-24</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://restobill.ai/features</loc>
+    <loc>https://BillByteKOT.ai/features</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://restobill.ai/pricing</loc>
+    <loc>https://BillByteKOT.ai/pricing</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://restobill.ai/blog</loc>
+    <loc>https://BillByteKOT.ai/blog</loc>
     <priority>0.7</priority>
   </url>
 </urlset>
@@ -376,7 +376,7 @@ Create free tools to attract traffic:
 ```
 User-agent: *
 Allow: /
-Sitemap: https://restobill.ai/sitemap.xml
+Sitemap: https://BillByteKOT.ai/sitemap.xml
 ```
 
 3. **Performance Optimization**:
@@ -399,9 +399,9 @@ Sitemap: https://restobill.ai/sitemap.xml
 
 **Campaign 1: Branded**
 Keywords:
-- RestoBill
-- RestoBill AI
-- RestoBill software
+- BillByteKOT
+- BillByteKOT AI
+- BillByteKOT software
 
 **Campaign 2: Product**
 Keywords:
@@ -435,7 +435,7 @@ Keywords:
 For Google Play Store:
 
 ### Title:
-"RestoBill AI - Restaurant Billing & POS System"
+"BillByteKOT AI - Restaurant Billing & POS System"
 
 ### Short Description:
 "AI-powered restaurant billing with thermal printing & multi-currency support. Free for 50 bills!"
@@ -575,7 +575,7 @@ Include:
 ## 📞 Support & Contact
 
 ### Customer Support Strategy:
-1. **Email**: support@restobill.ai
+1. **Email**: support@BillByteKOT.ai
 2. **WhatsApp**: For premium users
 3. **Live Chat**: On website
 4. **FAQ/Help Center**: Self-service

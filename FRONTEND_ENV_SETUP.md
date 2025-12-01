@@ -1,8 +1,8 @@
-# RestoBill AI Frontend - Environment Setup Guide
+# BillByteKOT AI Frontend - Environment Setup Guide
 
 ## Overview
 
-This guide covers the complete setup of environment variables for the RestoBill AI frontend React application. The frontend uses various external services and APIs that require proper configuration through environment variables.
+This guide covers the complete setup of environment variables for the BillByteKOT AI frontend React application. The frontend uses various external services and APIs that require proper configuration through environment variables.
 
 ## Environment Files Structure
 
@@ -270,9 +270,9 @@ REACT_APP_JWT_EXPIRY=24h
 REACT_APP_REMEMBER_ME_EXPIRY=30d
 
 # Storage keys (should be unique per environment)
-REACT_APP_SESSION_STORAGE_KEY=restobill_session
-REACT_APP_USER_STORAGE_KEY=restobill_user
-REACT_APP_TOKEN_STORAGE_KEY=restobill_token
+REACT_APP_SESSION_STORAGE_KEY=BillByteKOT_session
+REACT_APP_USER_STORAGE_KEY=BillByteKOT_user
+REACT_APP_TOKEN_STORAGE_KEY=BillByteKOT_token
 
 # CORS settings
 REACT_APP_CORS_ENABLED=true

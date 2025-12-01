@@ -99,7 +99,7 @@ const Dashboard = ({ user }) => {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-gray-700">
-              Your 7-day free trial has ended. Subscribe now for just ₹499/year to continue using RestoBill AI.
+              Your 7-day free trial has ended. Subscribe now for just ₹499/year to continue using BillByteKOT AI.
             </p>
             <div className="bg-violet-50 p-4 rounded-lg">
               <p className="font-medium text-violet-900">Get unlimited bills and premium features!</p>
@@ -150,7 +150,7 @@ const Dashboard = ({ user }) => {
                 <AlertTriangle className="w-6 h-6 text-red-600" />
                 <div>
                   <p className="font-bold text-red-900">Trial Expired - Subscription Required</p>
-                  <p className="text-sm text-red-700">Your 7-day trial has ended. Subscribe to continue using RestoBill AI.</p>
+                  <p className="text-sm text-red-700">Your 7-day trial has ended. Subscribe to continue using BillByteKOT AI.</p>
                 </div>
               </div>
               <Button onClick={() => navigate('/subscription')} className="bg-gradient-to-r from-violet-600 to-purple-600">

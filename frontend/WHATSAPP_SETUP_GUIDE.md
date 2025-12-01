@@ -2,22 +2,22 @@
 
 ## ⚠️ IMPORTANT: Install Latest Version
 
-You need **RestoBill v1.1.0** to access WhatsApp Pro features.
+You need **BillByteKOT v1.1.0** to access WhatsApp Pro features.
 
 ### Step 1: Uninstall Old Version
-1. Close RestoBill app completely
+1. Close BillByteKOT app completely
 2. Go to Windows Settings → Apps
-3. Find "RestoBill" and click Uninstall
+3. Find "BillByteKOT" and click Uninstall
 4. Wait for uninstall to complete
 
 ### Step 2: Install New Version
-1. Locate `RestoBill-Setup-1.1.0-win.exe` in `frontend/dist-electron/`
+1. Locate `BillByteKOT-Setup-1.1.0-win.exe` in `frontend/dist-electron/`
 2. Double-click to install
 3. Follow installation wizard
-4. Launch RestoBill
+4. Launch BillByteKOT
 
 ### Step 3: Access WhatsApp Pro
-1. Login to RestoBill
+1. Login to BillByteKOT
 2. Go to **Settings** (left sidebar)
 3. Look for tabs at the top:
    - Business Details

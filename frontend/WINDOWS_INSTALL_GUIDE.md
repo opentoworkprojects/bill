@@ -2,7 +2,7 @@
 
 ## ⚠️ Windows SmartScreen Warning
 
-When you try to install RestoBill, Windows may show:
+When you try to install BillByteKOT, Windows may show:
 ```
 "Windows protected your PC"
 "Microsoft Defender SmartScreen prevented an unrecognized app from starting"
@@ -14,7 +14,7 @@ When you try to install RestoBill, Windows may show:
 
 ### Method 1: Click "More Info" → "Run Anyway"
 
-1. Double-click `RestoBill-Setup-1.2.0-win.exe`
+1. Double-click `BillByteKOT-Setup-1.2.0-win.exe`
 2. Windows shows: **"Windows protected your PC"**
 3. Click **"More info"** (small text link)
 4. Click **"Run anyway"** button
@@ -23,7 +23,7 @@ When you try to install RestoBill, Windows may show:
 
 ### Method 2: Right-Click → Properties → Unblock
 
-1. Right-click `RestoBill-Setup-1.2.0-win.exe`
+1. Right-click `BillByteKOT-Setup-1.2.0-win.exe`
 2. Select **Properties**
 3. At the bottom, check **"Unblock"** checkbox
 4. Click **Apply** → **OK**
@@ -35,7 +35,7 @@ When you try to install RestoBill, Windows may show:
 2. Go to **Privacy & Security** → **Windows Security**
 3. Click **App & browser control**
 4. Under **Check apps and files**, select **Off** or **Warn**
-5. Install RestoBill
+5. Install BillByteKOT
 6. Turn SmartScreen back **On** after installation
 
 ## 🔒 Is It Safe?
@@ -49,14 +49,14 @@ When you try to install RestoBill, Windows may show:
 
 ## 📦 What Gets Installed:
 
-- **Location:** `C:\Users\[YourName]\AppData\Local\Programs\restobill\`
+- **Location:** `C:\Users\[YourName]\AppData\Local\Programs\BillByteKOT\`
 - **Size:** ~200 MB
 - **Shortcuts:** Desktop + Start Menu
-- **Uninstall:** Windows Settings → Apps → RestoBill
+- **Uninstall:** Windows Settings → Apps → BillByteKOT
 
 ## 🚀 After Installation:
 
-1. Launch RestoBill
+1. Launch BillByteKOT
 2. Login with your credentials
 3. Go to **Settings**
 4. Look for **"WhatsApp Pro"** tab (6th tab)
@@ -101,5 +101,5 @@ Some antivirus software may also flag the app:
 ---
 
 **Current Version:** v1.2.0  
-**File:** RestoBill-Setup-1.2.0-win.exe  
+**File:** BillByteKOT-Setup-1.2.0-win.exe  
 **Location:** `frontend/dist-electron/`

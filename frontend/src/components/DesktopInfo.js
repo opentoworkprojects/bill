@@ -17,7 +17,7 @@ const DesktopInfo = () => {
   
   return (
     <div className="fixed bottom-4 right-4 text-xs text-gray-400 bg-white/80 backdrop-blur px-2 py-1 rounded shadow-sm">
-      RestoBill Desktop v{getVersion()} • {platformNames[platform] || platform}
+      BillByteKOT Desktop v{getVersion()} • {platformNames[platform] || platform}
     </div>
   );
 };

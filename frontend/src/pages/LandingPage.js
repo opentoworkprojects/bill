@@ -59,16 +59,16 @@ const DesktopDownloadSection = () => {
   
   // Download URLs - GitHub Releases
   const downloadUrls = {
-    windows: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/RestoBill-Setup-1.0.0-win.exe",
-    mac: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/RestoBill-1.0.0-mac.dmg",
-    linux: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/RestoBill-1.0.0-linux.AppImage",
+    windows: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/BillByteKOT-Setup-1.0.0-win.exe",
+    mac: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/BillByteKOT-1.0.0-mac.dmg",
+    linux: "https://github.com/shivshankar9/restro-ai/releases/download/v1-desktop-win-exe/BillByteKOT-1.0.0-linux.AppImage",
   };
   
   const handleDownload = (platform) => {
     const url = downloadUrls[platform];
     if (url) {
       window.open(url, "_blank");
-      toast.success(`Downloading RestoBill for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
+      toast.success(`Downloading BillByteKOT for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
     } else {
       toast.error("Download not available yet. Please try again later.");
     }
@@ -79,7 +79,7 @@ const DesktopDownloadSection = () => {
     if (phoneNumber) {
       // Generate WhatsApp link with download info
       const message = encodeURIComponent(
-        `🖥️ Download RestoBill Desktop App:\n\n` +
+        `🖥️ Download BillByteKOT Desktop App:\n\n` +
         `Windows: ${downloadUrls.windows}\n\n` +
         `Mac: ${downloadUrls.mac}\n\n` +
         `Or visit: https://finverge.tech/download`
@@ -102,7 +102,7 @@ const DesktopDownloadSection = () => {
             </div>
             
             <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              Get RestoBill for
+              Get BillByteKOT for
               <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"> Desktop</span>
             </h2>
             
@@ -370,7 +370,7 @@ const LandingPage = () => {
       role: "Owner, Spice Garden",
       image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Rajesh",
       rating: 5,
-      text: "RestoBill AI transformed our restaurant! The AI recommendations increased our sales by 30%. Best investment ever!",
+      text: "BillByteKOT AI transformed our restaurant! The AI recommendations increased our sales by 30%. Best investment ever!",
     },
     {
       name: "Priya Sharma",
@@ -449,7 +449,7 @@ const LandingPage = () => {
                 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent"
                 style={{ fontFamily: "Space Grotesk, sans-serif" }}
               >
-                RestoBill AI
+                BillByteKOT AI
               </span>
             </div>
 
@@ -724,7 +724,7 @@ const LandingPage = () => {
               <span className="text-sm font-medium text-yellow-400">See It In Action</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              How RestoBill Works
+              How BillByteKOT Works
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
               Simple, powerful, and designed for busy restaurants. Get started in minutes.
@@ -831,7 +831,7 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Why RestoBill AI?
+              Why BillByteKOT AI?
             </h2>
             <p className="text-xl text-gray-600">
               The complete solution for modern restaurants
@@ -1052,7 +1052,7 @@ const LandingPage = () => {
                 a: "Absolutely! We use bank-grade encryption, secure MongoDB storage, and HTTPS. Your data is completely safe with 99.9% uptime guarantee.",
               },
               {
-                q: "Can I use RestoBill AI on mobile?",
+                q: "Can I use BillByteKOT AI on mobile?",
                 a: "Yes! It works on any device. Join our early access program to get the Android app from Google Play Store when it launches!",
               },
               {
@@ -1091,7 +1091,7 @@ const LandingPage = () => {
                 </h2>
                 
                 <p className="text-xl text-gray-600">
-                  Be among the first to experience RestoBill AI on your Android device. 
+                  Be among the first to experience BillByteKOT AI on your Android device. 
                   Join our early access program and get exclusive benefits!
                 </p>
 
@@ -1184,7 +1184,7 @@ const LandingPage = () => {
                               <ChefHat className="w-7 h-7 text-white" />
                             </div>
                             <div>
-                              <h3 className="text-white font-bold text-lg">RestoBill AI</h3>
+                              <h3 className="text-white font-bold text-lg">BillByteKOT AI</h3>
                               <p className="text-white/70 text-xs">Smart Restaurant Billing</p>
                             </div>
                           </div>
@@ -1281,7 +1281,7 @@ const LandingPage = () => {
             Ready to Transform Your Restaurant?
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join 10,000+ restaurants using RestoBill AI. Start your 7-day free trial today!
+            Join 10,000+ restaurants using BillByteKOT AI. Start your 7-day free trial today!
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -1334,7 +1334,7 @@ const LandingPage = () => {
                 <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <ChefHat className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-xl font-bold">RestoBill AI</span>
+                <span className="text-xl font-bold">BillByteKOT AI</span>
               </div>
               <p className="text-gray-400 text-sm">
                 AI-powered restaurant billing system trusted by 10,000+
@@ -1423,7 +1423,7 @@ const LandingPage = () => {
 
           <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
             <p>
-              © 2024 RestoBill AI. All rights reserved. Made with ❤️ in India
+              © 2024 BillByteKOT AI. All rights reserved. Made with ❤️ in India
             </p>
           </div>
         </div>

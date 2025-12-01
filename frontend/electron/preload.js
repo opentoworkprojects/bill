@@ -57,14 +57,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 
 // Log that preload script loaded
-console.log(`[RestoBill Desktop] v${CONFIG.APP_VERSION} - Preload script loaded`);
-console.log(`[RestoBill Desktop] Platform: ${process.platform}`);
-console.log(`[RestoBill Desktop] electronAPI exposed:`, typeof window !== 'undefined' ? 'YES' : 'NO');
+console.log(`[BillByteKOT Desktop] v${CONFIG.APP_VERSION} - Preload script loaded`);
+console.log(`[BillByteKOT Desktop] Platform: ${process.platform}`);
+console.log(`[BillByteKOT Desktop] electronAPI exposed:`, typeof window !== 'undefined' ? 'YES' : 'NO');
 
 // Verify electronAPI is available after page load
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
-    console.log('[RestoBill Desktop] electronAPI available:', !!window.electronAPI);
-    console.log('[RestoBill Desktop] openWhatsAppWeb available:', !!window.electronAPI?.openWhatsAppWeb);
+    console.log('[BillByteKOT Desktop] electronAPI available:', !!window.electronAPI);
+    console.log('[BillByteKOT Desktop] openWhatsAppWeb available:', !!window.electronAPI?.openWhatsAppWeb);
   });
 }
