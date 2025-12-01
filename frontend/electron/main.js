@@ -54,9 +54,8 @@ function createWindow() {
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
+    // Always open DevTools for debugging (remove this line in final production)
+    mainWindow.webContents.openDevTools();
   });
 
   // Handle external links
@@ -102,6 +101,7 @@ function createMenu() {
       submenu: [
         { role: 'reload' },
         { role: 'forceReload' },
+        { role: 'toggleDevTools', label: 'Developer Tools', accelerator: 'F12' },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
