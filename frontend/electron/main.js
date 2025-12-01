@@ -35,21 +35,104 @@ function createWindow() {
   
   mainWindow.loadURL(startUrl);
   
-  // Inject electronAPI verification into the page after it loads
+  // Inject electronAPI bridge into the page after it loads
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[RestoBill Desktop] Page loaded, verifying electronAPI');
+    console.log('[RestoBill Desktop] Page loaded, injecting Electron bridge');
+    
+    // Inject a bridge that uses postMessage for communication
     mainWindow.webContents.executeJavaScript(`
       window.__ELECTRON__ = true;
       window.__ELECTRON_VERSION__ = '${CONFIG.APP_VERSION}';
-      console.log('[RestoBill Desktop] Electron flag injected');
-      console.log('[RestoBill Desktop] electronAPI available:', typeof window.electronAPI !== 'undefined');
-      if (window.electronAPI) {
-        console.log('[RestoBill Desktop] electronAPI functions:', Object.keys(window.electronAPI));
-      } else {
-        console.error('[RestoBill Desktop] electronAPI NOT AVAILABLE - preload failed!');
+      
+      // Create message queue for Electron communication
+      window.__electronMessages = window.__electronMessages || [];
+      
+      // Create electronAPI bridge using message queue
+      if (!window.electronAPI) {
+        window.electronAPI = {
+          isElectron: true,
+          openWhatsAppWeb: () => {
+            window.__electronMessages.push({ type: 'ELECTRON_OPEN_WHATSAPP' });
+            console.log('[electronAPI] Queued: OPEN_WHATSAPP');
+          },
+          closeWhatsAppWeb: () => {
+            window.__electronMessages.push({ type: 'ELECTRON_CLOSE_WHATSAPP' });
+            console.log('[electronAPI] Queued: CLOSE_WHATSAPP');
+          },
+          getWhatsAppStatus: () => {
+            return new Promise((resolve) => {
+              const handler = (event) => {
+                if (event.data && event.data.type === 'ELECTRON_WHATSAPP_STATUS_RESPONSE') {
+                  window.removeEventListener('message', handler);
+                  resolve(event.data.status);
+                }
+              };
+              window.addEventListener('message', handler);
+              window.__electronMessages.push({ type: 'ELECTRON_GET_WHATSAPP_STATUS' });
+            });
+          },
+          sendWhatsAppDirect: (phone, message) => {
+            return new Promise((resolve) => {
+              const handler = (event) => {
+                if (event.data && event.data.type === 'ELECTRON_SEND_WHATSAPP_RESPONSE') {
+                  window.removeEventListener('message', handler);
+                  resolve(event.data.result);
+                }
+              };
+              window.addEventListener('message', handler);
+              window.__electronMessages.push({ type: 'ELECTRON_SEND_WHATSAPP', phone, message });
+            });
+          },
+          onWhatsAppStatus: (callback) => {
+            window.addEventListener('message', (event) => {
+              if (event.data.type === 'ELECTRON_WHATSAPP_STATUS_UPDATE') {
+                callback(event.data.status);
+              }
+            });
+          }
+        };
+        console.log('[RestoBill Desktop] electronAPI bridge created');
       }
     `);
   });
+  
+  // Listen for postMessage events from the web page via executeJavaScript polling
+  setInterval(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.executeJavaScript(`
+        if (window.__electronMessages && window.__electronMessages.length > 0) {
+          const messages = window.__electronMessages;
+          window.__electronMessages = [];
+          messages;
+        }
+      `).then(messages => {
+        if (messages && messages.length > 0) {
+          messages.forEach(msg => {
+            handleElectronMessage(msg);
+          });
+        }
+      }).catch(() => {});
+    }
+  }, 100);
+  
+  function handleElectronMessage(msg) {
+    console.log('[RestoBill Desktop] Received message:', msg.type);
+    
+    if (msg.type === 'ELECTRON_OPEN_WHATSAPP') {
+      createWhatsAppView();
+      showWhatsAppView();
+    } else if (msg.type === 'ELECTRON_CLOSE_WHATSAPP') {
+      hideWhatsAppView();
+    } else if (msg.type === 'ELECTRON_GET_WHATSAPP_STATUS') {
+      const status = {
+        connected: whatsappConnected,
+        viewVisible: whatsappViewVisible
+      };
+      mainWindow.webContents.executeJavaScript(`
+        window.postMessage({ type: 'ELECTRON_WHATSAPP_STATUS_RESPONSE', status: ${JSON.stringify(status)} }, '*');
+      `);
+    }
+  }
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
