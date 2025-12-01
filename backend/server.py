@@ -896,50 +896,72 @@ class OTPVerify(BaseModel):
 @api_router.post("/auth/send-otp")
 async def send_otp(request: OTPRequest):
     """Send OTP to phone number"""
+    from sms_service import send_otp_sms
+    
     phone = request.phone.strip()
     
-    # Generate 6-digit OTP
-    otp = ''.join(random.choices(string.digits, k=6))
+    # For Twilio Verify, we don't generate OTP - Twilio does it
+    sms_provider = os.environ.get("SMS_PROVIDER", "twilio")
     
-    # Store OTP with 5-minute expiry
-    otp_storage[phone] = {
-        "otp": otp,
-        "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
+    if sms_provider == "twilio":
+        # Twilio Verify handles OTP generation and storage
+        sms_result = await send_otp_sms(phone, "")
+    else:
+        # For other providers, generate OTP
+        otp = ''.join(random.choices(string.digits, k=6))
+        
+        # Store OTP with 5-minute expiry
+        otp_storage[phone] = {
+            "otp": otp,
+            "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
+        }
+        
+        # Send OTP via SMS gateway
+        sms_result = await send_otp_sms(phone, otp)
+    
+    return {
+        "message": "OTP sent successfully", 
+        "otp": sms_result.get("otp") if os.environ.get("DEBUG_MODE") == "true" else None,
+        "provider": sms_provider
     }
-    
-    # In production, send OTP via SMS gateway (Twilio, MSG91, etc.)
-    # For now, just log it (in dev, you can see it in console)
-    print(f"[OTP] Phone: {phone}, OTP: {otp}")
-    
-    # TODO: Integrate SMS gateway
-    # await send_sms(phone, f"Your RestoBill OTP is: {otp}")
-    
-    return {"message": "OTP sent successfully", "otp": otp if os.environ.get("ENV") == "development" else None}
 
 
 @api_router.post("/auth/verify-otp")
 async def verify_otp(request: OTPVerify):
     """Verify OTP and login/register user"""
+    from sms_service import verify_twilio_otp
+    
     phone = request.phone.strip()
     otp = request.otp.strip()
     
-    # Check if OTP exists
-    if phone not in otp_storage:
-        raise HTTPException(status_code=400, detail="OTP not found. Please request a new one.")
+    sms_provider = os.environ.get("SMS_PROVIDER", "twilio")
     
-    stored_data = otp_storage[phone]
-    
-    # Check if OTP expired
-    if datetime.now(timezone.utc) > stored_data["expires"]:
+    if sms_provider == "twilio":
+        # Use Twilio Verify API for verification
+        try:
+            verification = await verify_twilio_otp(phone, otp)
+            if not verification.get("success"):
+                raise HTTPException(status_code=401, detail="Invalid or expired OTP")
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"OTP verification failed: {str(e)}")
+    else:
+        # Manual verification for other providers
+        if phone not in otp_storage:
+            raise HTTPException(status_code=400, detail="OTP not found. Please request a new one.")
+        
+        stored_data = otp_storage[phone]
+        
+        # Check if OTP expired
+        if datetime.now(timezone.utc) > stored_data["expires"]:
+            del otp_storage[phone]
+            raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
+        
+        # Verify OTP
+        if stored_data["otp"] != otp:
+            raise HTTPException(status_code=401, detail="Invalid OTP")
+        
+        # OTP verified, remove from storage
         del otp_storage[phone]
-        raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
-    
-    # Verify OTP
-    if stored_data["otp"] != otp:
-        raise HTTPException(status_code=401, detail="Invalid OTP")
-    
-    # OTP verified, remove from storage
-    del otp_storage[phone]
     
     # Check if user exists
     user = await db.users.find_one({"phone": phone}, {"_id": 0})

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { ChefHat, Phone, Lock, Sparkles } from 'lucide-react';
 import OTPLogin from '../components/OTPLogin';
-import Onboarding from '../components/Onboarding';
+import GuidedDemo from '../components/GuidedDemo';
 
 const LoginPage = ({ setUser }) => {
   const [loginMethod, setLoginMethod] = useState('otp'); // otp or password
@@ -64,7 +64,7 @@ const LoginPage = ({ setUser }) => {
 
   if (showOnboarding) {
     return (
-      <Onboarding 
+      <GuidedDemo 
         onComplete={handleOnboardingComplete}
         onSkip={handleOnboardingSkip}
       />
