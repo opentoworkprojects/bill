@@ -863,11 +863,132 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
 
-# WhatsApp OTP Login
+@api_router.put("/users/me/onboarding")
+async def complete_onboarding(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark onboarding as completed"""
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"onboarding_completed": data.get("onboarding_completed", True)}}
+    )
+    return {"message": "Onboarding status updated"}
+
+
+# ============ OTP-BASED LOGIN ============
 import random
 import string
 
 # In-memory OTP storage (use Redis in production)
+otp_storage = {}  # {phone: {"otp": "123456", "expires": timestamp}}
+
+
+class OTPRequest(BaseModel):
+    phone: str
+
+
+class OTPVerify(BaseModel):
+    phone: str
+    otp: str
+
+
+@api_router.post("/auth/send-otp")
+async def send_otp(request: OTPRequest):
+    """Send OTP to phone number"""
+    phone = request.phone.strip()
+    
+    # Generate 6-digit OTP
+    otp = ''.join(random.choices(string.digits, k=6))
+    
+    # Store OTP with 5-minute expiry
+    otp_storage[phone] = {
+        "otp": otp,
+        "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
+    }
+    
+    # In production, send OTP via SMS gateway (Twilio, MSG91, etc.)
+    # For now, just log it (in dev, you can see it in console)
+    print(f"[OTP] Phone: {phone}, OTP: {otp}")
+    
+    # TODO: Integrate SMS gateway
+    # await send_sms(phone, f"Your RestoBill OTP is: {otp}")
+    
+    return {"message": "OTP sent successfully", "otp": otp if os.environ.get("ENV") == "development" else None}
+
+
+@api_router.post("/auth/verify-otp")
+async def verify_otp(request: OTPVerify):
+    """Verify OTP and login/register user"""
+    phone = request.phone.strip()
+    otp = request.otp.strip()
+    
+    # Check if OTP exists
+    if phone not in otp_storage:
+        raise HTTPException(status_code=400, detail="OTP not found. Please request a new one.")
+    
+    stored_data = otp_storage[phone]
+    
+    # Check if OTP expired
+    if datetime.now(timezone.utc) > stored_data["expires"]:
+        del otp_storage[phone]
+        raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
+    
+    # Verify OTP
+    if stored_data["otp"] != otp:
+        raise HTTPException(status_code=401, detail="Invalid OTP")
+    
+    # OTP verified, remove from storage
+    del otp_storage[phone]
+    
+    # Check if user exists
+    user = await db.users.find_one({"phone": phone}, {"_id": 0})
+    
+    if not user:
+        # Auto-register new user
+        user_id = str(uuid.uuid4())
+        username = f"user_{phone[-4:]}"  # Use last 4 digits
+        
+        new_user = {
+            "id": user_id,
+            "username": username,
+            "phone": phone,
+            "email": f"{username}@restobill.app",
+            "role": "admin",
+            "login_method": "otp",
+            "password": "",  # No password for OTP users
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "subscription_active": False,
+            "bill_count": 0,
+            "setup_completed": False,
+            "onboarding_completed": False,  # Track onboarding
+            "business_settings": None,
+        }
+        
+        await db.users.insert_one(new_user)
+        user = new_user
+    
+    # Generate token
+    token = create_access_token({"user_id": user["id"], "role": user["role"]})
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "role": user["role"],
+            "phone": user.get("phone"),
+            "email": user.get("email"),
+            "login_method": user.get("login_method", "otp"),
+            "subscription_active": user.get("subscription_active", False),
+            "onboarding_completed": user.get("onboarding_completed", False),
+            "setup_completed": user.get("setup_completed", False),
+        },
+    }
+
+
+# WhatsApp OTP Login (legacy)
 otp_storage: Dict[str, Dict[str, Any]] = {}
 
 

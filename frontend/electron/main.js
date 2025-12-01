@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, Menu, shell, ipcMain, Notification, session } = require('electron');
+const { app, BrowserWindow, BrowserView, Menu, shell, ipcMain, Notification, session, globalShortcut } = require('electron');
 const path = require('path');
 const CONFIG = require('./config');
 
@@ -137,8 +137,10 @@ function createWindow() {
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // Always open DevTools for debugging (remove this line in final production)
-    mainWindow.webContents.openDevTools();
+    // DevTools can be opened with F12 or Ctrl+Shift+I
+    if (isDev) {
+      mainWindow.webContents.openDevTools();
+    }
   });
 
   // Handle external links
@@ -544,11 +546,35 @@ function checkForUpdates() {
 // App lifecycle
 app.whenReady().then(() => {
   createWindow();
+  
+  // Register global shortcuts for DevTools
+  const toggleDevTools = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools();
+      }
+    }
+  };
+  
+  // F12 - Toggle DevTools
+  globalShortcut.register('F12', toggleDevTools);
+  
+  // Ctrl+Shift+I - Toggle DevTools
+  globalShortcut.register('CommandOrControl+Shift+I', toggleDevTools);
+  
+  // Ctrl+Shift+O - Toggle DevTools (custom shortcut)
+  globalShortcut.register('CommandOrControl+Shift+O', toggleDevTools);
+  
   // Initialize WhatsApp in background to check login status
   setTimeout(initWhatsApp, 2000);
 });
 
 app.on('window-all-closed', () => {
+  // Unregister all shortcuts
+  globalShortcut.unregisterAll();
+  
   if (process.platform !== 'darwin') {
     app.quit();
   }
