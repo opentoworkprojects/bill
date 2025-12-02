@@ -885,91 +885,71 @@ otp_storage = {}  # {phone: {"otp": "123456", "expires": timestamp}}
 
 
 class OTPRequest(BaseModel):
-    phone: str
+    email: str
 
 
 class OTPVerify(BaseModel):
-    phone: str
+    email: str
     otp: str
 
 
 @api_router.post("/auth/send-otp")
 async def send_otp(request: OTPRequest):
-    """Send OTP to phone number"""
-    from sms_service import send_otp_sms
+    """Send OTP to email address"""
+    from email_service import send_otp_email
     
-    phone = request.phone.strip()
+    email = request.email.strip().lower()
     
-    # For Twilio Verify, we don't generate OTP - Twilio does it
-    sms_provider = os.environ.get("SMS_PROVIDER", "twilio")
+    # Generate 6-digit OTP
+    otp = ''.join(random.choices(string.digits, k=6))
     
-    if sms_provider == "twilio":
-        # Twilio Verify handles OTP generation and storage
-        sms_result = await send_otp_sms(phone, "")
-    else:
-        # For other providers, generate OTP
-        otp = ''.join(random.choices(string.digits, k=6))
-        
-        # Store OTP with 5-minute expiry
-        otp_storage[phone] = {
-            "otp": otp,
-            "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
-        }
-        
-        # Send OTP via SMS gateway
-        sms_result = await send_otp_sms(phone, otp)
+    # Store OTP with 5-minute expiry
+    otp_storage[email] = {
+        "otp": otp,
+        "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
+    }
+    
+    # Send OTP via email
+    email_result = await send_otp_email(email, otp)
     
     return {
-        "message": "OTP sent successfully", 
-        "otp": sms_result.get("otp") if os.environ.get("DEBUG_MODE") == "true" else None,
-        "provider": sms_provider
+        "message": "OTP sent to your email", 
+        "otp": email_result.get("otp") if os.environ.get("DEBUG_MODE") == "true" else None,
+        "provider": os.environ.get("EMAIL_PROVIDER", "console")
     }
 
 
 @api_router.post("/auth/verify-otp")
 async def verify_otp(request: OTPVerify):
     """Verify OTP and login/register user"""
-    from sms_service import verify_twilio_otp
-    
-    phone = request.phone.strip()
+    email = request.email.strip().lower()
     otp = request.otp.strip()
     
-    sms_provider = os.environ.get("SMS_PROVIDER", "twilio")
+    # Check if OTP exists
+    if email not in otp_storage:
+        raise HTTPException(status_code=400, detail="OTP not found. Please request a new one.")
     
-    if sms_provider == "twilio":
-        # Use Twilio Verify API for verification
-        try:
-            verification = await verify_twilio_otp(phone, otp)
-            if not verification.get("success"):
-                raise HTTPException(status_code=401, detail="Invalid or expired OTP")
-        except Exception as e:
-            raise HTTPException(status_code=401, detail=f"OTP verification failed: {str(e)}")
-    else:
-        # Manual verification for other providers
-        if phone not in otp_storage:
-            raise HTTPException(status_code=400, detail="OTP not found. Please request a new one.")
-        
-        stored_data = otp_storage[phone]
-        
-        # Check if OTP expired
-        if datetime.now(timezone.utc) > stored_data["expires"]:
-            del otp_storage[phone]
-            raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
-        
-        # Verify OTP
-        if stored_data["otp"] != otp:
-            raise HTTPException(status_code=401, detail="Invalid OTP")
-        
-        # OTP verified, remove from storage
-        del otp_storage[phone]
+    stored_data = otp_storage[email]
+    
+    # Check if OTP expired
+    if datetime.now(timezone.utc) > stored_data["expires"]:
+        del otp_storage[email]
+        raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
+    
+    # Verify OTP
+    if stored_data["otp"] != otp:
+        raise HTTPException(status_code=401, detail="Invalid OTP")
+    
+    # OTP verified, remove from storage
+    del otp_storage[email]
     
     # Check if user exists
-    user = await db.users.find_one({"phone": phone}, {"_id": 0})
+    user = await db.users.find_one({"email": email}, {"_id": 0})
     
     if not user:
         # Auto-register new user
         user_id = str(uuid.uuid4())
-        username = f"user_{phone[-4:]}"  # Use last 4 digits
+        username = email.split('@')[0]  # Use email prefix as username
         
         new_user = {
             "id": user_id,
