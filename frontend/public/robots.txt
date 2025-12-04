@@ -1,23 +1,23 @@
-# Robots.txt for RestoBill AI
-# Allow all search engines to crawl the site
+# BillByteKOT - Restaurant Billing & KOT System
+# Allow all search engines to crawl
 
 User-agent: *
 Allow: /
+Allow: /blog/
+Allow: /features
+Allow: /pricing
+Allow: /download
+Allow: /demo
+
+# Disallow admin and private pages
 Disallow: /dashboard
+Disallow: /login
 Disallow: /setup
-Disallow: /menu
-Disallow: /orders
-Disallow: /billing
-Disallow: /tables
-Disallow: /kitchen
-Disallow: /inventory
-Disallow: /reports
-Disallow: /staff
-Disallow: /settings
-Disallow: /subscription
+Disallow: /admin
 
 # Sitemap location
-Sitemap: https://restobill.ai/sitemap.xml
+Sitemap: https://finverge.tech/sitemap.xml
+Sitemap: https://restro-ai-u9kz.vercel.app/sitemap.xml
 
-# Crawl-delay (optional, adjust as needed)
+# Crawl-delay for respectful crawling
 Crawl-delay: 1

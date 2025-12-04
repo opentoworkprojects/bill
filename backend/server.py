@@ -2172,6 +2172,70 @@ async def get_low_stock(current_user: dict = Depends(get_current_user)):
     return low_stock
 
 
+class InventoryDeduction(BaseModel):
+    menu_item_id: str
+    quantity: int
+
+
+@api_router.post("/inventory/deduct")
+async def deduct_inventory(
+    deduction: InventoryDeduction,
+    current_user: dict = Depends(get_current_user)
+):
+    """Deduct inventory when items are sold"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    # Find menu item to get ingredients
+    menu_item = await db.menu_items.find_one(
+        {"id": deduction.menu_item_id, "organization_id": user_org_id},
+        {"_id": 0}
+    )
+    
+    if not menu_item:
+        return {"success": False, "message": "Menu item not found"}
+    
+    # Deduct ingredients from inventory
+    ingredients = menu_item.get("ingredients", [])
+    deducted_items = []
+    
+    for ingredient_name in ingredients:
+        # Find inventory item by name (case-insensitive)
+        inventory_item = await db.inventory.find_one(
+            {
+                "name": {"$regex": f"^{ingredient_name}$", "$options": "i"},
+                "organization_id": user_org_id
+            },
+            {"_id": 0}
+        )
+        
+        if inventory_item:
+            # Deduct quantity (1 unit per item sold)
+            new_quantity = max(0, inventory_item["quantity"] - (1 * deduction.quantity))
+            
+            await db.inventory.update_one(
+                {"id": inventory_item["id"]},
+                {
+                    "$set": {
+                        "quantity": new_quantity,
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }
+                }
+            )
+            
+            deducted_items.append({
+                "name": ingredient_name,
+                "old_quantity": inventory_item["quantity"],
+                "new_quantity": new_quantity,
+                "low_stock": new_quantity <= inventory_item["min_quantity"]
+            })
+    
+    return {
+        "success": True,
+        "deducted_items": deducted_items,
+        "message": f"Inventory updated for {len(deducted_items)} ingredients"
+    }
+
+
 # AI routes
 @api_router.post("/ai/chat")
 async def ai_chat(message: ChatMessage):

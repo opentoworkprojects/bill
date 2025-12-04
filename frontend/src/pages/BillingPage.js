@@ -45,6 +45,44 @@ const BillingPage = ({ user }) => {
     }
   };
 
+  const releaseTable = async () => {
+    if (!order?.table_id) return;
+    
+    try {
+      // Update table status to available
+      await axios.put(`${API}/tables/${order.table_id}`, {
+        table_number: order.table_number,
+        capacity: 4, // Default capacity
+        status: 'available',
+        current_order_id: null
+      });
+      toast.success(`Table ${order.table_number} is now available`);
+    } catch (error) {
+      console.error('Failed to release table', error);
+      // Don't show error to user, it's not critical
+    }
+  };
+
+  const deductInventory = async () => {
+    if (!order?.items) return;
+    
+    try {
+      // Deduct inventory for each item
+      for (const item of order.items) {
+        try {
+          await axios.post(`${API}/inventory/deduct`, {
+            menu_item_id: item.menu_item_id,
+            quantity: item.quantity
+          });
+        } catch (error) {
+          console.error(`Failed to deduct inventory for ${item.name}`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to deduct inventory', error);
+    }
+  };
+
   const handlePayment = async () => {
     if (!order) return;
     setLoading(true);
@@ -72,6 +110,16 @@ const BillingPage = ({ user }) => {
               });
               toast.success('Payment successful!');
               setPaymentCompleted(true);
+              
+              // Update order status to completed
+              await axios.put(`${API}/orders/${orderId}`, { status: 'completed' });
+              
+              // Release table automatically
+              await releaseTable();
+              
+              // Deduct inventory if enabled
+              await deductInventory();
+              
               await printThermalBill();
             } catch (error) {
               toast.error('Payment verification failed');
@@ -96,6 +144,16 @@ const BillingPage = ({ user }) => {
         });
         toast.success('Payment completed!');
         setPaymentCompleted(true);
+        
+        // Update order status to completed
+        await axios.put(`${API}/orders/${orderId}`, { status: 'completed' });
+        
+        // Release table automatically
+        await releaseTable();
+        
+        // Deduct inventory if enabled
+        await deductInventory();
+        
         await printThermalBill();
       }
     } catch (error) {

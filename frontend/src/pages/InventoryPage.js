@@ -91,6 +91,33 @@ const InventoryPage = ({ user }) => {
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="inventory-page">
+        {/* Low Stock Alert Banner */}
+        {lowStock.length > 0 && (
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 p-4 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900">Low Stock Alert!</h3>
+                <p className="text-sm text-orange-800 mt-1">
+                  {lowStock.length} item{lowStock.length > 1 ? 's' : ''} running low on stock. Restock soon to avoid shortages.
+                </p>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {lowStock.slice(0, 3).map(item => (
+                    <span key={item.id} className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                      {item.name}: {item.quantity} {item.unit}
+                    </span>
+                  ))}
+                  {lowStock.length > 3 && (
+                    <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                      +{lowStock.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Inventory Management</h1>

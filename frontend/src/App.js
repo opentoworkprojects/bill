@@ -19,6 +19,7 @@ import LandingPage from './pages/LandingPage';
 import TrackOrderPage from './pages/TrackOrderPage';
 import CustomerOrderPage from './pages/CustomerOrderPage';
 import DownloadPage from './pages/DownloadPage';
+import BlogPage from './pages/BlogPage';
 import DesktopInfo from './components/DesktopInfo';
 import { Toaster } from './components/ui/sonner';
 
@@ -196,6 +197,8 @@ function App() {
           <Route path="/track/:trackingToken" element={<TrackOrderPage />} />
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/download" element={<DownloadPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPage />} />
         </Routes>
         <DesktopInfo />
       </BrowserRouter>
