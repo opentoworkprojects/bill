@@ -19,8 +19,8 @@
     "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\and\\android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1.5.0",
-  "appVersionCode": 20,
+  "appVersionName": "17",
+  "appVersionCode": 21,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://restro-ai-u9kz.vercel.app/manifest.json",
@@ -46,5 +46,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1.5.0"
+  "appVersion": "17"
 }

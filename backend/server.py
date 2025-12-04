@@ -3001,6 +3001,104 @@ async def get_table_qr_data(org_id: str, table_number: int):
     }
 
 
+# Support Ticket System
+class SupportTicket(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    subject: str
+    message: str
+    priority: str = "medium"
+    contactMethod: Optional[str] = "email"
+
+
+@api_router.post("/support/ticket")
+async def create_support_ticket(ticket: SupportTicket):
+    """Create a support ticket"""
+    ticket_id = str(uuid.uuid4())[:12]
+    
+    ticket_doc = {
+        "id": ticket_id,
+        "name": ticket.name,
+        "email": ticket.email,
+        "phone": ticket.phone,
+        "subject": ticket.subject,
+        "message": ticket.message,
+        "priority": ticket.priority,
+        "contact_method": ticket.contactMethod,
+        "status": "open",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.support_tickets.insert_one(ticket_doc)
+    
+    # Log for admin notification (you can add email/SMS notification here)
+    print(f"📧 New support ticket #{ticket_id}: {ticket.subject} from {ticket.name} ({ticket.email})")
+    
+    return {
+        "success": True,
+        "ticket_id": ticket_id,
+        "message": "Support ticket created successfully. We'll contact you within 24 hours."
+    }
+
+
+class AIChatRequest(BaseModel):
+    message: str
+    history: Optional[List[Dict[str, str]]] = []
+
+
+@api_router.post("/ai/support-chat")
+async def ai_support_chat(chat_request: AIChatRequest):
+    """AI-powered support chat"""
+    
+    # Predefined responses for common questions
+    common_responses = {
+        "pricing": "BillByteKOT offers a 7-day free trial with all features. After that, it's just ₹499/year (50% off from ₹999). You get unlimited bills, thermal printing, AI analytics, and priority support!",
+        "thermal": "To setup thermal printer: 1) Connect your ESC/POS compatible printer (58mm or 80mm), 2) Go to Settings > Printer, 3) Select your printer and choose from 6 beautiful themes. Need help? Contact us!",
+        "kot": "KOT (Kitchen Order Ticket) system sends orders directly to the kitchen. When you create an order, it automatically prints in the kitchen with item details, table number, and timing. This reduces errors and speeds up service!",
+        "payment": "We support multiple payment methods: Cash, Card, UPI, and Razorpay integration. You can configure your own Razorpay account in Settings to receive payments directly.",
+        "whatsapp": "WhatsApp integration lets you send bills, order updates, and promotional messages to customers. Setup: Go to Settings > WhatsApp, enable it, and add your business number. You can auto-notify customers on order status changes!",
+        "mobile": "Yes! BillByteKOT works on any device - desktop, tablet, or mobile. We also have a native Android app coming soon. Join our early access program to be notified!",
+        "desktop": "Download our desktop app for Windows, Mac, or Linux from the Download page. It offers offline support, direct thermal printing, and faster performance!",
+        "support": "We offer 24/7 support! Email us at support@finverge.tech, call +91-98765-43210 (Mon-Sat, 9 AM-6 PM IST), or use this chat. Premium users get priority support with faster response times.",
+        "trial": "Start your 7-day free trial now! No credit card required. You get full access to all premium features including AI analytics, thermal printing, and unlimited bills. After trial, upgrade for just ₹499/year!",
+        "features": "Key features: AI-powered billing, KOT system, thermal printing (6 themes), multi-currency support, inventory management, staff management, real-time analytics, WhatsApp integration, table management, and more!",
+        "inventory": "Inventory management helps track stock levels, get low-stock alerts, manage suppliers, and auto-deduct items when sold. Go to Inventory page to add items and set minimum quantities.",
+        "staff": "Add unlimited staff with roles: Admin (full access), Cashier (billing only), Waiter (orders & tables), Kitchen (KOT view). Each role has specific permissions. Go to Staff Management to add team members.",
+        "reports": "Access detailed reports: daily/monthly sales, top-selling items, revenue trends, tax summaries, and more. Export to CSV/PDF. Go to Reports page for analytics dashboard.",
+        "currency": "We support 10+ currencies: INR, USD, EUR, GBP, AED, SGD, MYR, and more. Change currency in Settings > Business Settings. All prices and reports will update automatically!",
+        "table": "Table management lets you track occupancy, assign orders to tables, and manage seating. Tables auto-release after payment. Add tables in Tables page with capacity and status.",
+        "offline": "Desktop app works offline! Your data syncs when internet is back. Web version requires internet connection. Download desktop app for offline billing capability.",
+        "security": "Your data is 100% secure with bank-grade encryption, HTTPS, secure MongoDB storage, and 99.9% uptime. We never share your data with third parties.",
+        "setup": "Quick setup: 1) Sign up (30 seconds), 2) Add your restaurant details, 3) Create menu items, 4) Add tables, 5) Start billing! Takes less than 5 minutes total.",
+        "demo": "Try our interactive demo! Login and you'll see a guided walkthrough showing how to create orders, assign tables, and process payments. It's hands-on and takes just 2 minutes!",
+        "contact": "Contact us: Email: support@finverge.tech | Phone: +91-98765-43210 (Mon-Sat, 9-6 PM IST) | Office: FinVerge Technologies, Bangalore, India. Or submit a ticket using the contact form!"
+    }
+    
+    # Simple keyword matching for responses
+    message_lower = chat_request.message.lower()
+    response = None
+    
+    for keyword, answer in common_responses.items():
+        if keyword in message_lower:
+            response = answer
+            break
+    
+    # Default response if no match
+    if not response:
+        if "?" in chat_request.message:
+            response = "Great question! I can help you with: pricing, thermal printer setup, KOT system, payments, WhatsApp integration, mobile/desktop apps, support options, free trial, features, inventory, staff management, reports, currency, tables, offline mode, security, setup guide, demo, or contact info. What would you like to know?"
+        else:
+            response = "Thanks for reaching out! I'm here to help with BillByteKOT. You can ask me about features, pricing, setup, technical support, or anything else. Or submit a support ticket for personalized assistance!"
+    
+    return {
+        "success": True,
+        "response": response,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():

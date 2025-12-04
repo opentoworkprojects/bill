@@ -20,7 +20,11 @@ import TrackOrderPage from './pages/TrackOrderPage';
 import CustomerOrderPage from './pages/CustomerOrderPage';
 import DownloadPage from './pages/DownloadPage';
 import BlogPage from './pages/BlogPage';
+import BlogPostPage from './pages/BlogPostPage';
+import ContactPage from './pages/ContactPage';
+import OrderDisplayPage from './pages/OrderDisplayPage';
 import DesktopInfo from './components/DesktopInfo';
+import ContactWidget from './components/ContactWidget';
 import { Toaster } from './components/ui/sonner';
 
 // Electron navigation handler component
@@ -130,6 +134,14 @@ function App() {
             }
           />
           <Route
+            path="/orders/display"
+            element={
+              <PrivateRoute>
+                <OrderDisplayPage user={user} />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/billing/:orderId"
             element={
               <PrivateRoute>
@@ -198,9 +210,12 @@ function App() {
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:slug" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/contact" element={<ContactPage />} />
         </Routes>
         <DesktopInfo />
+        {/* Contact Widget - Always visible */}
+        <ContactWidget />
       </BrowserRouter>
       <Toaster position="top-center" richColors />
     </div>

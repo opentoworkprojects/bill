@@ -230,6 +230,7 @@ const BlogPage = () => {
               <h4 className="font-semibold mb-4">Resources</h4>
               <ul className="space-y-2 text-gray-400">
                 <li><Link to="/blog" className="hover:text-white">Blog</Link></li>
+                <li><Link to="/contact" className="hover:text-white">Contact Us</Link></li>
                 <li><Link to="/docs" className="hover:text-white">Documentation</Link></li>
                 <li><Link to="/support" className="hover:text-white">Support</Link></li>
               </ul>

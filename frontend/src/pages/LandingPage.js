@@ -489,6 +489,12 @@ const LandingPage = () => {
               >
                 Reviews
               </a>
+              <a
+                href="/contact"
+                className="text-gray-600 hover:text-violet-600 transition-colors"
+              >
+                Contact
+              </a>
               <Button variant="outline" onClick={() => navigate("/login")}>
                 Login
               </Button>
@@ -549,6 +555,12 @@ const LandingPage = () => {
               >
                 Reviews
               </a>
+              <a
+                href="/contact"
+                className="block text-gray-600 hover:text-violet-600"
+              >
+                Contact
+              </a>
               <Button
                 variant="outline"
                 className="w-full"
@@ -603,6 +615,15 @@ const LandingPage = () => {
               >
                 Start Free Trial
                 <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-14 px-8 text-lg"
+                onClick={() => navigate("/contact")}
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Book a Demo
               </Button>
               <Button
                 size="lg"
@@ -1304,7 +1325,7 @@ const LandingPage = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <a href="/blog" className="hover:text-white">
                     Blog
                   </a>
                 </li>
@@ -1314,7 +1335,7 @@ const LandingPage = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <a href="/contact" className="hover:text-white">
                     Contact
                   </a>
                 </li>
