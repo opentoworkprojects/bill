@@ -1898,6 +1898,9 @@ async def get_orders(
     if status:
         query["status"] = status
 
+    # Security log
+    print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching orders with query: {query}")
+
     orders = await db.orders.find(query, {"_id": 0}).to_list(1000)
     for order in orders:
         if isinstance(order["created_at"], str):
@@ -3009,12 +3012,14 @@ class SupportTicket(BaseModel):
     subject: str
     message: str
     priority: str = "medium"
-    contactMethod: Optional[str] = "email"
+    requestType: Optional[str] = "support"  # support, demo, inquiry
+    preferredDate: Optional[str] = None
+    preferredTime: Optional[str] = None
 
 
 @api_router.post("/support/ticket")
 async def create_support_ticket(ticket: SupportTicket):
-    """Create a support ticket"""
+    """Create a support ticket or demo booking"""
     ticket_id = str(uuid.uuid4())[:12]
     
     ticket_doc = {
@@ -3025,7 +3030,9 @@ async def create_support_ticket(ticket: SupportTicket):
         "subject": ticket.subject,
         "message": ticket.message,
         "priority": ticket.priority,
-        "contact_method": ticket.contactMethod,
+        "request_type": ticket.requestType,
+        "preferred_date": ticket.preferredDate,
+        "preferred_time": ticket.preferredTime,
         "status": "open",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -3033,19 +3040,85 @@ async def create_support_ticket(ticket: SupportTicket):
     
     await db.support_tickets.insert_one(ticket_doc)
     
-    # Log for admin notification (you can add email/SMS notification here)
-    print(f"📧 New support ticket #{ticket_id}: {ticket.subject} from {ticket.name} ({ticket.email})")
+    # Log for admin notification
+    if ticket.requestType == "demo":
+        print(f"📅 New demo booking #{ticket_id}: {ticket.name} ({ticket.email}) - {ticket.preferredDate} at {ticket.preferredTime}")
+    else:
+        print(f"📧 New support ticket #{ticket_id}: {ticket.subject} from {ticket.name} ({ticket.email})")
+    
+    response_message = "Support ticket created successfully. We'll contact you within 24 hours."
+    if ticket.requestType == "demo":
+        response_message = f"Demo booking confirmed for {ticket.preferredDate} at {ticket.preferredTime}. We'll send you a confirmation email shortly!"
     
     return {
         "success": True,
         "ticket_id": ticket_id,
-        "message": "Support ticket created successfully. We'll contact you within 24 hours."
+        "message": response_message
     }
 
 
 class AIChatRequest(BaseModel):
     message: str
     history: Optional[List[Dict[str, str]]] = []
+
+
+@api_router.get("/support/tickets")
+async def get_support_tickets(
+    status: Optional[str] = None,
+    request_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all support tickets (admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can view tickets")
+    
+    # Build query
+    query = {}
+    if status:
+        query["status"] = status
+    if request_type:
+        query["request_type"] = request_type
+    
+    # Fetch tickets
+    tickets = await db.support_tickets.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    
+    return {
+        "success": True,
+        "count": len(tickets),
+        "tickets": tickets
+    }
+
+
+@api_router.put("/support/ticket/{ticket_id}/status")
+async def update_ticket_status(
+    ticket_id: str,
+    status: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update ticket status (admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can update tickets")
+    
+    result = await db.support_tickets.update_one(
+        {"id": ticket_id},
+        {
+            "$set": {
+                "status": status,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    return {
+        "success": True,
+        "message": f"Ticket status updated to {status}"
+    }
 
 
 @api_router.post("/ai/support-chat")

@@ -25,7 +25,9 @@ const ContactPage = () => {
     subject: '',
     message: '',
     priority: 'medium',
-    contactMethod: 'email'
+    requestType: 'support', // support or demo
+    preferredDate: '',
+    preferredTime: ''
   });
 
   const handleSubmit = async (e) => {
@@ -87,59 +89,36 @@ const ContactPage = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-12">
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
-          {/* Contact Info Cards */}
-          <Card className="text-center hover:shadow-xl transition-shadow">
+        <div className="grid md:grid-cols-2 gap-8 mb-12">
+          {/* Submit Ticket Card */}
+          <Card className="text-center hover:shadow-xl transition-shadow bg-gradient-to-br from-violet-50 to-purple-50">
             <CardContent className="pt-8 pb-6">
-              <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-violet-600" />
+              <div className="w-16 h-16 bg-violet-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-white" />
               </div>
-              <h3 className="font-bold text-lg mb-2">Email Us</h3>
+              <h3 className="font-bold text-xl mb-2">Submit a Ticket</h3>
               <p className="text-gray-600 text-sm mb-3">
-                Get a response within 24 hours
+                Fill out the form below and we'll get back to you within 24 hours
               </p>
-              <a 
-                href="mailto:support@finverge.tech" 
-                className="text-violet-600 hover:text-violet-700 font-semibold"
-              >
-                support@finverge.tech
-              </a>
+              <div className="text-violet-600 font-semibold">
+                All tickets are saved in our database
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="text-center hover:shadow-xl transition-shadow">
+          {/* Book Demo Card */}
+          <Card className="text-center hover:shadow-xl transition-shadow bg-gradient-to-br from-purple-50 to-pink-50">
             <CardContent className="pt-8 pb-6">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Phone className="w-8 h-8 text-purple-600" />
+              <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-white" />
               </div>
-              <h3 className="font-bold text-lg mb-2">Call Us</h3>
+              <h3 className="font-bold text-xl mb-2">Book a Demo</h3>
               <p className="text-gray-600 text-sm mb-3">
-                Mon-Sat, 9 AM - 6 PM IST
+                Schedule a personalized demo at your preferred time
               </p>
-              <a 
-                href="tel:+919876543210" 
-                className="text-purple-600 hover:text-purple-700 font-semibold"
-              >
-                +91-98765-43210
-              </a>
-            </CardContent>
-          </Card>
-
-          <Card className="text-center hover:shadow-xl transition-shadow">
-            <CardContent className="pt-8 pb-6">
-              <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="w-8 h-8 text-pink-600" />
+              <div className="text-purple-600 font-semibold">
+                Select your preferred date & time below
               </div>
-              <h3 className="font-bold text-lg mb-2">Live Chat</h3>
-              <p className="text-gray-600 text-sm mb-3">
-                Instant AI-powered support
-              </p>
-              <button 
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="text-pink-600 hover:text-pink-700 font-semibold"
-              >
-                Open Chat Widget →
-              </button>
             </CardContent>
           </Card>
         </div>
@@ -180,7 +159,7 @@ const ContactPage = () => {
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Phone</Label>
+                    <Label>Phone (Optional)</Label>
                     <Input
                       type="tel"
                       value={form.phone}
@@ -189,19 +168,59 @@ const ContactPage = () => {
                     />
                   </div>
                   <div>
-                    <Label>Preferred Contact Method *</Label>
+                    <Label>Request Type *</Label>
                     <select
-                      value={form.contactMethod}
-                      onChange={(e) => setForm({ ...form, contactMethod: e.target.value })}
+                      value={form.requestType}
+                      onChange={(e) => setForm({ ...form, requestType: e.target.value })}
                       className="w-full h-10 px-3 border rounded-md"
                       required
                     >
-                      <option value="email">Email</option>
-                      <option value="phone">Phone Call</option>
-                      <option value="whatsapp">WhatsApp</option>
+                      <option value="support">Support Ticket</option>
+                      <option value="demo">Book a Demo</option>
+                      <option value="inquiry">General Inquiry</option>
                     </select>
                   </div>
                 </div>
+
+                {/* Show booking fields if demo is selected */}
+                {form.requestType === 'demo' && (
+                  <div className="grid md:grid-cols-2 gap-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <div>
+                      <Label>Preferred Date *</Label>
+                      <Input
+                        type="date"
+                        value={form.preferredDate}
+                        onChange={(e) => setForm({ ...form, preferredDate: e.target.value })}
+                        min={new Date().toISOString().split('T')[0]}
+                        required={form.requestType === 'demo'}
+                      />
+                    </div>
+                    <div>
+                      <Label>Preferred Time *</Label>
+                      <select
+                        value={form.preferredTime}
+                        onChange={(e) => setForm({ ...form, preferredTime: e.target.value })}
+                        className="w-full h-10 px-3 border rounded-md"
+                        required={form.requestType === 'demo'}
+                      >
+                        <option value="">Select time</option>
+                        <option value="09:00">09:00 AM</option>
+                        <option value="10:00">10:00 AM</option>
+                        <option value="11:00">11:00 AM</option>
+                        <option value="12:00">12:00 PM</option>
+                        <option value="14:00">02:00 PM</option>
+                        <option value="15:00">03:00 PM</option>
+                        <option value="16:00">04:00 PM</option>
+                        <option value="17:00">05:00 PM</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-sm text-purple-700">
+                        📅 We'll confirm your demo booking via email within 2 hours
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <Label>Subject *</Label>
@@ -295,19 +314,18 @@ const ContactPage = () => {
               </CardContent>
             </Card>
 
-            {/* Office Location */}
-            <Card>
+            {/* Database Storage Info */}
+            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-6 h-6 text-gray-600" />
+                  <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg mb-2">Our Office</h3>
+                    <h3 className="font-bold text-lg mb-2">Secure Storage</h3>
                     <p className="text-gray-700 text-sm leading-relaxed">
-                      FinVerge Technologies<br />
-                      Bangalore, Karnataka<br />
-                      India - 560001
+                      All submissions are securely stored in our database. 
+                      We review every ticket and respond within 24 hours.
                     </p>
                   </div>
                 </div>

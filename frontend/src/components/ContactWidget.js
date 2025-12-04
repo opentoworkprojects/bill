@@ -21,7 +21,10 @@ const ContactWidget = () => {
     phone: '',
     subject: '',
     message: '',
-    priority: 'medium'
+    priority: 'medium',
+    requestType: 'support',
+    preferredDate: '',
+    preferredTime: ''
   });
 
   // AI Chat
@@ -43,7 +46,10 @@ const ContactWidget = () => {
         phone: '',
         subject: '',
         message: '',
-        priority: 'medium'
+        priority: 'medium',
+        requestType: 'support',
+        preferredDate: '',
+        preferredTime: ''
       });
       setIsOpen(false);
     } catch (error) {
@@ -168,7 +174,7 @@ const ContactWidget = () => {
               </div>
 
               <div>
-                <Label className="text-sm">Phone</Label>
+                <Label className="text-sm">Phone (Optional)</Label>
                 <Input
                   type="tel"
                   value={contactForm.phone}
@@ -177,6 +183,55 @@ const ContactWidget = () => {
                   className="h-9"
                 />
               </div>
+
+              <div>
+                <Label className="text-sm">Request Type *</Label>
+                <select
+                  value={contactForm.requestType}
+                  onChange={(e) => setContactForm({ ...contactForm, requestType: e.target.value })}
+                  className="w-full h-9 px-3 border rounded-md text-sm"
+                  required
+                >
+                  <option value="support">Support Ticket</option>
+                  <option value="demo">Book a Demo</option>
+                  <option value="inquiry">General Inquiry</option>
+                </select>
+              </div>
+
+              {contactForm.requestType === 'demo' && (
+                <>
+                  <div>
+                    <Label className="text-sm">Preferred Date *</Label>
+                    <Input
+                      type="date"
+                      value={contactForm.preferredDate}
+                      onChange={(e) => setContactForm({ ...contactForm, preferredDate: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                      required
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Preferred Time *</Label>
+                    <select
+                      value={contactForm.preferredTime}
+                      onChange={(e) => setContactForm({ ...contactForm, preferredTime: e.target.value })}
+                      className="w-full h-9 px-3 border rounded-md text-sm"
+                      required
+                    >
+                      <option value="">Select time</option>
+                      <option value="09:00">09:00 AM</option>
+                      <option value="10:00">10:00 AM</option>
+                      <option value="11:00">11:00 AM</option>
+                      <option value="12:00">12:00 PM</option>
+                      <option value="14:00">02:00 PM</option>
+                      <option value="15:00">03:00 PM</option>
+                      <option value="16:00">04:00 PM</option>
+                      <option value="17:00">05:00 PM</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div>
                 <Label className="text-sm">Subject *</Label>
@@ -228,9 +283,8 @@ const ContactWidget = () => {
 
               <div className="text-center text-xs text-gray-500 pt-2">
                 <p>We typically respond within 24 hours</p>
-                <p className="mt-1">
-                  <Phone className="w-3 h-3 inline mr-1" />
-                  Emergency: +91-XXXXXXXXXX
+                <p className="mt-1 text-violet-600 font-medium">
+                  Your ticket will be saved and we'll get back to you soon!
                 </p>
               </div>
             </form>
