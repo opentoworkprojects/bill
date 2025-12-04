@@ -853,6 +853,7 @@ async def login(credentials: UserLogin):
             "subscription_active": user.get("subscription_active", False),
             "bill_count": user.get("bill_count", 0),
             "setup_completed": user.get("setup_completed", False),
+            "onboarding_completed": user.get("onboarding_completed", False),
             "business_settings": user.get("business_settings"),
         },
     }

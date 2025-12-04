@@ -34,14 +34,15 @@ const LoginPage = ({ setUser }) => {
           password: formData.password
         });
         
-        const { access_token, user } = response.data;
-        setAuthToken(access_token);
+        const { token, access_token, user } = response.data;
+        const authToken = token || access_token;
+        setAuthToken(authToken);
         localStorage.setItem('user', JSON.stringify(user));
         
         setTempUser(user);
         
-        // Show onboarding for new users
-        if (!user.onboarding_completed) {
+        // Show onboarding ONLY for first-time users
+        if (user.onboarding_completed === false) {
           setShowOnboarding(true);
         } else {
           completeLogin(user);
@@ -54,12 +55,14 @@ const LoginPage = ({ setUser }) => {
           password: formData.password
         });
         
-        const { access_token, user } = response.data;
-        setAuthToken(access_token);
+        const { token, access_token, user } = response.data;
+        const authToken = token || access_token;
+        setAuthToken(authToken);
         localStorage.setItem('user', JSON.stringify(user));
         
         setTempUser(user);
-        setShowOnboarding(true); // Always show onboarding for new registrations
+        // Show onboarding for new registrations (first time only)
+        setShowOnboarding(true);
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'An error occurred');
