@@ -165,12 +165,81 @@ ${order.items.map(item => `${item.quantity}x ${item.name}${item.notes ? `\n   No
 Status: ${order.status.toUpperCase()}
 =================================
       `;
-      await axios.post(`${API}/print`, {
-        content: kotContent,
-        type: 'kot'
-      });
-      window.print();
-      toast.success('KOT sent to printer');
+      
+      // Open thermal receipt window
+      const printWindow = window.open('', '', 'width=400,height=600');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>KOT - Table ${order.table_number}</title>
+            <style>
+              @media print {
+                @page {
+                  size: 80mm auto;
+                  margin: 0;
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                }
+                .no-print {
+                  display: none !important;
+                }
+              }
+              body {
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                line-height: 1.4;
+                padding: 10mm;
+                margin: 0;
+                width: 80mm;
+                background: white;
+              }
+              pre {
+                margin: 0;
+                padding: 0;
+                font-family: 'Courier New', monospace;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+              }
+              .print-btn {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 24px;
+                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+              }
+              .print-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
+              }
+              @media print {
+                .print-btn {
+                  display: none;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <button onclick="window.print()" class="print-btn no-print">🖨️ Print KOT</button>
+            <pre>${kotContent}</pre>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      
+      // Auto-trigger print after short delay
+      setTimeout(() => {
+        printWindow.focus();
+      }, 250);
+      
+      toast.success('KOT ready to print');
     } catch (error) {
       toast.error('Failed to print KOT');
     }

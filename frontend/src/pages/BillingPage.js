@@ -34,6 +34,9 @@ const BillingPage = ({ user }) => {
   const [showSplitBill, setShowSplitBill] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [showTip, setShowTip] = useState(false);
+  const [orderNotes, setOrderNotes] = useState('');
+  const [customerRating, setCustomerRating] = useState(0);
+  const [paymentHistory, setPaymentHistory] = useState([]);
 
   useEffect(() => {
     fetchOrder();
