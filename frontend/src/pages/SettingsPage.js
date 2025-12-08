@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
+import TrialBanner from '../components/TrialBanner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -190,6 +191,7 @@ const SettingsPage = ({ user }) => {
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="settings-page">
+        <TrialBanner user={user} />
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Settings</h1>

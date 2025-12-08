@@ -80,6 +80,41 @@ function App() {
       setAuthToken(token);
       fetchUser();
     }
+
+    // Setup axios interceptor for trial expiration
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 402) {
+          // Trial expired or subscription required
+          const message = error.response.data?.detail || 'Your trial has expired. Please subscribe to continue.';
+          
+          // Show error toast
+          import('./components/ui/sonner').then(({ toast }) => {
+            toast.error(message, {
+              duration: 5000,
+              action: {
+                label: 'Subscribe',
+                onClick: () => window.location.href = '/subscription'
+              }
+            });
+          });
+
+          // Redirect to subscription page after delay
+          setTimeout(() => {
+            if (window.location.pathname !== '/subscription') {
+              window.location.href = '/subscription';
+            }
+          }, 3000);
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Cleanup interceptor on unmount
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
   }, []);
 
   const fetchUser = async () => {

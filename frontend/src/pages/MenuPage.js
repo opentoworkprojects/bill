@@ -10,6 +10,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Search, Upload, X } from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
+import TrialBanner from '../components/TrialBanner';
 
 const MenuPage = ({ user }) => {
   const [menuItems, setMenuItems] = useState([]);
@@ -151,6 +152,7 @@ const MenuPage = ({ user }) => {
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="menu-page">
+        <TrialBanner user={user} />
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Menu Management</h1>

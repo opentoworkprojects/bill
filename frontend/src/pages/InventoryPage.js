@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
+import TrialBanner from '../components/TrialBanner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
@@ -92,6 +93,7 @@ const InventoryPage = ({ user }) => {
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="inventory-page">
+        <TrialBanner user={user} />
         {/* Low Stock Alert Banner */}
         {lowStock.length > 0 && (
           <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 p-4 rounded-lg">

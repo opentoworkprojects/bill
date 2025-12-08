@@ -506,7 +506,36 @@ async def get_current_user(
 
 
 async def check_subscription(user: dict):
-    # Check if user is in trial period (7 days from account creation)
+    """
+    Strict 7-day trial enforcement
+    - Trial: 7 days from account creation
+    - After trial: Must have active paid subscription
+    - No bill count limit during trial
+    """
+    
+    # Check if user has active paid subscription
+    if user.get("subscription_active"):
+        # Check if subscription has expired
+        expires_at = user.get("subscription_expires_at")
+        if expires_at:
+            if isinstance(expires_at, str):
+                try:
+                    expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                except:
+                    expires_at = None
+            
+            if expires_at and expires_at < datetime.now(timezone.utc):
+                # Subscription expired - deactivate it
+                await db.users.update_one(
+                    {"id": user["id"]}, 
+                    {"$set": {"subscription_active": False}}
+                )
+                # Fall through to check trial
+            else:
+                # Active subscription - allow access
+                return True
+    
+    # No active subscription - check trial period
     created_at = user.get("created_at")
     if isinstance(created_at, str):
         try:
@@ -516,22 +545,17 @@ async def check_subscription(user: dict):
     
     if created_at:
         trial_end = created_at + timedelta(days=7)
-        if datetime.now(timezone.utc) < trial_end:
-            return True  # Still in trial period
-    
-    # Check subscription status
-    if user["bill_count"] >= 50 and not user["subscription_active"]:
-        return False
-    if user["subscription_active"] and user.get("subscription_expires_at"):
-        expires = user["subscription_expires_at"]
-        if isinstance(expires, str):
-            expires = datetime.fromisoformat(expires.replace("Z", "+00:00"))
-        if expires < datetime.now(timezone.utc):
-            await db.users.update_one(
-                {"id": user["id"]}, {"$set": {"subscription_active": False}}
-            )
+        now = datetime.now(timezone.utc)
+        
+        if now < trial_end:
+            # Still in trial period - allow access
+            return True
+        else:
+            # Trial expired and no active subscription - block access
             return False
-    return True
+    
+    # No created_at date (shouldn't happen) - block access for safety
+    return False
 
 
 def get_paper_width_chars(paper_width: str, custom_width: Optional[int] = None) -> int:
@@ -876,9 +900,41 @@ async def login(credentials: UserLogin):
     }
 
 
-@api_router.get("/auth/me", response_model=User)
+@api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
-    return current_user
+    """Get current user with trial/subscription status"""
+    
+    # Calculate trial info
+    created_at = current_user.get("created_at")
+    trial_info = {
+        "is_trial": False,
+        "trial_days_left": 0,
+        "trial_expired": False,
+        "trial_end_date": None
+    }
+    
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except:
+            created_at = None
+    
+    if created_at:
+        trial_end = created_at + timedelta(days=7)
+        now = datetime.now(timezone.utc)
+        days_left = (trial_end - now).days
+        
+        trial_info = {
+            "is_trial": not current_user.get("subscription_active", False),
+            "trial_days_left": max(0, days_left),
+            "trial_expired": days_left < 0 and not current_user.get("subscription_active", False),
+            "trial_end_date": trial_end.isoformat()
+        }
+    
+    # Add trial info to response
+    user_data = {**current_user, "trial_info": trial_info}
+    
+    return user_data
 
 
 @api_router.put("/users/me/onboarding")
@@ -1904,9 +1960,23 @@ async def create_order(
     order_data: OrderCreate, current_user: dict = Depends(get_current_user)
 ):
     if not await check_subscription(current_user):
+        # Check if trial expired or subscription expired
+        created_at = current_user.get("created_at")
+        if isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                trial_end = created_at + timedelta(days=7)
+                if datetime.now(timezone.utc) > trial_end:
+                    raise HTTPException(
+                        status_code=402,
+                        detail="Your 7-day free trial has expired. Please subscribe to continue using BillByteKOT. Only ₹499/year for unlimited bills!",
+                    )
+            except:
+                pass
+        
         raise HTTPException(
             status_code=402,
-            detail="Subscription required. You have reached 50 bills. Please subscribe to continue.",
+            detail="Subscription required. Please subscribe to continue using BillByteKOT.",
         )
 
     # Get user's organization_id
@@ -3910,6 +3980,292 @@ async def download_inventory_template():
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=inventory_template.csv"}
     )
+
+
+# ============ EXPORT & CUSTOMER MANAGEMENT ============
+
+@api_router.get("/orders/export/excel")
+async def export_orders_to_excel(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Export all orders to Excel file"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    # Build query
+    query = {"organization_id": user_org_id}
+    
+    # Add date filters if provided
+    if start_date or end_date:
+        query["created_at"] = {}
+        if start_date:
+            query["created_at"]["$gte"] = start_date
+        if end_date:
+            query["created_at"]["$lte"] = end_date
+    
+    # Fetch orders
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(length=10000)
+    
+    if not orders:
+        raise HTTPException(status_code=404, detail="No orders found")
+    
+    # Create CSV content
+    csv_content = "Order ID,Date,Time,Table,Customer Name,Customer Phone,Waiter,Items,Subtotal,Tax,Discount,Total,Payment Method,Status\n"
+    
+    for order in orders:
+        order_id = order.get("id", "")[:8]
+        created_at = order.get("created_at", "")
+        
+        # Parse date and time
+        try:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            date_str = dt.strftime("%Y-%m-%d")
+            time_str = dt.strftime("%H:%M:%S")
+        except:
+            date_str = created_at
+            time_str = ""
+        
+        table_number = order.get("table_number", "")
+        customer_name = order.get("customer_name", "")
+        customer_phone = order.get("customer_phone", "")
+        waiter_name = order.get("waiter_name", "")
+        
+        # Format items
+        items = order.get("items", [])
+        items_str = "; ".join([f"{item['quantity']}x {item['name']}" for item in items])
+        
+        subtotal = order.get("subtotal", 0)
+        tax = order.get("tax", 0)
+        discount = order.get("discount", 0)
+        total = order.get("total", 0)
+        payment_method = order.get("payment_method", "")
+        status = order.get("status", "")
+        
+        # Escape commas in text fields
+        items_str = items_str.replace(",", ";")
+        customer_name = customer_name.replace(",", " ")
+        
+        csv_content += f'"{order_id}","{date_str}","{time_str}","{table_number}","{customer_name}","{customer_phone}","{waiter_name}","{items_str}",{subtotal},{tax},{discount},{total},"{payment_method}","{status}"\n'
+    
+    # Return as downloadable file
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+    )
+
+
+# Customer Management Models
+class Customer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    phone: str
+    email: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    total_orders: int = 0
+    total_spent: float = 0.0
+    last_visit: Optional[str] = None
+    organization_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CustomerCreate(BaseModel):
+    name: str
+    phone: str
+    email: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@api_router.post("/customers")
+async def create_customer(
+    customer_data: CustomerCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create or update customer record"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    # Check if customer already exists by phone
+    existing = await db.customers.find_one({
+        "phone": customer_data.phone,
+        "organization_id": user_org_id
+    })
+    
+    if existing:
+        # Update existing customer
+        await db.customers.update_one(
+            {"id": existing["id"]},
+            {
+                "$set": {
+                    "name": customer_data.name,
+                    "email": customer_data.email,
+                    "address": customer_data.address,
+                    "notes": customer_data.notes,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        return {"message": "Customer updated", "customer_id": existing["id"]}
+    
+    # Create new customer
+    customer = Customer(
+        name=customer_data.name,
+        phone=customer_data.phone,
+        email=customer_data.email,
+        address=customer_data.address,
+        notes=customer_data.notes,
+        organization_id=user_org_id
+    )
+    
+    doc = customer.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    
+    await db.customers.insert_one(doc)
+    
+    return {"message": "Customer created", "customer_id": customer.id}
+
+
+@api_router.get("/customers")
+async def get_customers(
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all customers"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    query = {"organization_id": user_org_id}
+    
+    # Add search filter
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"phone": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}}
+        ]
+    
+    customers = await db.customers.find(query, {"_id": 0}).sort("created_at", -1).to_list(length=1000)
+    
+    return customers
+
+
+@api_router.get("/customers/{customer_id}")
+async def get_customer(
+    customer_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get customer details with order history"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    customer = await db.customers.find_one({
+        "id": customer_id,
+        "organization_id": user_org_id
+    }, {"_id": 0})
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Get customer's orders
+    orders = await db.orders.find({
+        "customer_phone": customer["phone"],
+        "organization_id": user_org_id
+    }, {"_id": 0}).sort("created_at", -1).to_list(length=100)
+    
+    # Calculate stats
+    total_orders = len(orders)
+    total_spent = sum(order.get("total", 0) for order in orders)
+    last_visit = orders[0].get("created_at") if orders else None
+    
+    # Update customer stats
+    await db.customers.update_one(
+        {"id": customer_id},
+        {
+            "$set": {
+                "total_orders": total_orders,
+                "total_spent": total_spent,
+                "last_visit": last_visit
+            }
+        }
+    )
+    
+    customer["total_orders"] = total_orders
+    customer["total_spent"] = total_spent
+    customer["last_visit"] = last_visit
+    customer["orders"] = orders
+    
+    return customer
+
+
+@api_router.get("/customers/phone/{phone}")
+async def get_customer_by_phone(
+    phone: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get customer by phone number"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    customer = await db.customers.find_one({
+        "phone": phone,
+        "organization_id": user_org_id
+    }, {"_id": 0})
+    
+    if not customer:
+        return {"found": False}
+    
+    return {"found": True, "customer": customer}
+
+
+@api_router.put("/customers/{customer_id}")
+async def update_customer(
+    customer_id: str,
+    customer_data: CustomerCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update customer details"""
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    result = await db.customers.update_one(
+        {"id": customer_id, "organization_id": user_org_id},
+        {
+            "$set": {
+                "name": customer_data.name,
+                "phone": customer_data.phone,
+                "email": customer_data.email,
+                "address": customer_data.address,
+                "notes": customer_data.notes,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    return {"message": "Customer updated"}
+
+
+@api_router.delete("/customers/{customer_id}")
+async def delete_customer(
+    customer_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete customer"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can delete customers")
+    
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    result = await db.customers.delete_one({
+        "id": customer_id,
+        "organization_id": user_org_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    return {"message": "Customer deleted"}
 
 
 app.include_router(api_router)

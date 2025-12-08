@@ -10,6 +10,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { Plus, Eye, Printer, CreditCard, MessageCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import TrialBanner from '../components/TrialBanner';
 
 const OrdersPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
@@ -280,6 +281,7 @@ Status: ${order.status.toUpperCase()}
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="orders-page">
+        <TrialBanner user={user} />
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Orders</h1>

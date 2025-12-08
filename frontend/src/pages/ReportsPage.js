@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { API } from "../App";
 import Layout from "../components/Layout";
+import TrialBanner from "../components/TrialBanner";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -188,6 +189,7 @@ const ReportsPage = ({ user }) => {
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="reports-page">
+        <TrialBanner user={user} />
         <div>
           <h1
             className="text-4xl font-bold"
