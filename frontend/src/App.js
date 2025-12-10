@@ -23,6 +23,7 @@ import BlogPage from './pages/BlogPage';
 import BlogPostPage from './pages/BlogPostPage';
 import ContactPage from './pages/ContactPage';
 import OrderDisplayPage from './pages/OrderDisplayPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import DesktopInfo from './components/DesktopInfo';
 import ContactWidget from './components/ContactWidget';
 import { Toaster } from './components/ui/sonner';
@@ -247,6 +248,7 @@ function App() {
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
         </Routes>
         <DesktopInfo />
         {/* Contact Widget - Always visible */}

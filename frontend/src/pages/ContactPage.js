@@ -100,10 +100,7 @@ const ContactPage = () => {
                 contact@billbytekot.in
               </a>
             </div>
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-lg">
-              <Phone className="w-5 h-5" />
-              <span className="font-medium">+91-98765-43210</span>
-            </div>
+           
           </div>
         </div>
       </div>

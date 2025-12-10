@@ -41,8 +41,7 @@ import {
 
 // Desktop App Download Section Component
 const DesktopDownloadSection = () => {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const navigate = useNavigate();
   
   // Detect user's operating system
   const getOS = () => {
@@ -58,43 +57,25 @@ const DesktopDownloadSection = () => {
   const os = getOS();
   const isMobile = os === "android" || os === "ios";
   
-  // Download URLs - Direct from billbytekot.in
-  const downloadUrls = {
-    windows: "https://billbytekot.in/downloads/BillByteKOT-Setup-1.0.0-win.exe",
-    mac: "https://billbytekot.in/downloads/BillByteKOT-1.0.0-mac.dmg",
-    linux: "https://billbytekot.in/downloads/BillByteKOT-1.0.0-linux.AppImage",
+  // Windows desktop app download URL
+  // TODO: Replace with your actual download URL after building the app
+  // See BUILD_WINDOWS_APP.md for instructions
+  const windowsAppUrl = "https://github.com/YOUR_USERNAME/billbytekot/releases/download/v1.0.0/BillByteKOT-Setup-1.0.0.exe";
+  
+  const handleGetStarted = () => {
+    navigate("/login");
+    toast.success("Get started with BillByteKOT!");
   };
   
-  const handleDownload = (platform) => {
-    const url = downloadUrls[platform];
-    if (url) {
-      // Create a temporary link and trigger download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = url.split('/').pop();
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`Downloading BillByteKOT for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
+  const handleDownloadWindows = () => {
+    if (windowsAppUrl.includes("YOUR_USERNAME")) {
+      // App not built yet, redirect to web app
+      toast.info("Windows app coming soon! Use the web app for now.");
+      navigate("/login");
     } else {
-      toast.error("Download not available yet. Please try again later.");
-    }
-  };
-  
-  const handleSendLink = (e) => {
-    e.preventDefault();
-    if (phoneNumber) {
-      // Generate WhatsApp link with download info
-      const message = encodeURIComponent(
-        `🖥️ Download BillByteKOT Desktop App:\n\n` +
-        `Windows: ${downloadUrls.windows}\n\n` +
-        `Mac: ${downloadUrls.mac}\n\n` +
-        `Or visit: https://billbytekot.in/download`
-      );
-      window.open(`https://wa.me/${phoneNumber.replace(/\D/g, "")}?text=${message}`, "_blank");
-      toast.success("Opening WhatsApp to send download link!");
-      setPhoneNumber("");
-      setShowPhoneInput(false);
+      // Download the Windows app
+      window.open(windowsAppUrl, '_blank');
+      toast.success("Downloading BillByteKOT for Windows...");
     }
   };
   
@@ -141,87 +122,89 @@ const DesktopDownloadSection = () => {
                         </h3>
                       </div>
                     </div>
-                    <Button 
-                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-lg"
-                      onClick={() => handleDownload(os)}
-                    >
-                      <Download className="w-5 h-5 mr-2" />
-                      Download for {os === "windows" ? "Windows" : os === "mac" ? "macOS" : "Linux"}
-                    </Button>
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      {os === "windows" && "Windows 10/11 • 64-bit • ~80MB"}
-                      {os === "mac" && "macOS 10.15+ • Intel & Apple Silicon • ~90MB"}
-                      {os === "linux" && "Ubuntu 20.04+ • AppImage • ~85MB"}
-                    </p>
+                    {os === "windows" ? (
+                      <>
+                        <Button 
+                          className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-lg mb-2"
+                          onClick={handleDownloadWindows}
+                        >
+                          <Download className="w-5 h-5 mr-2" />
+                          Download for Windows
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="w-full h-10"
+                          onClick={handleGetStarted}
+                        >
+                          <Globe className="w-4 h-4 mr-2" />
+                          Or use Web App
+                        </Button>
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                          Desktop app: ~80MB • Web app: No download needed
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Button 
+                          className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-lg"
+                          onClick={handleGetStarted}
+                        >
+                          <Rocket className="w-5 h-5 mr-2" />
+                          Get Started on {os === "mac" ? "macOS" : "Linux"}
+                        </Button>
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                          Works in any browser • No download required • Instant access
+                        </p>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )}
               
-              {/* Other platforms */}
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={() => handleDownload("windows")}
-                  className={`p-4 rounded-xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${os === "windows" && !isMobile ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}
-                >
-                  <Monitor className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                  <p className="text-sm font-medium">Windows</p>
-                  <p className="text-xs text-gray-500">.exe</p>
-                </button>
-                
-                <button
-                  onClick={() => handleDownload("mac")}
-                  className={`p-4 rounded-xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${os === "mac" && !isMobile ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}
-                >
-                  <Apple className="w-8 h-8 mx-auto mb-2 text-gray-700" />
-                  <p className="text-sm font-medium">macOS</p>
-                  <p className="text-xs text-gray-500">.dmg</p>
-                </button>
-                
-                <button
-                  onClick={() => handleDownload("linux")}
-                  className={`p-4 rounded-xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${os === "linux" && !isMobile ? "border-blue-200 bg-blue-50/30" : "border-gray-200"}`}
-                >
-                  <Monitor className="w-8 h-8 mx-auto mb-2 text-orange-600" />
-                  <p className="text-sm font-medium">Linux</p>
-                  <p className="text-xs text-gray-500">.AppImage</p>
-                </button>
+              {/* Platform Support */}
+              <div className="bg-white rounded-xl p-4 border border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-3 text-center">Available on:</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={handleDownloadWindows}
+                    className="text-center p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <Monitor className="w-8 h-8 mx-auto mb-1 text-blue-600" />
+                    <p className="text-xs font-medium">Windows</p>
+                    <p className="text-xs text-blue-600">Download</p>
+                  </button>
+                  <button
+                    onClick={handleGetStarted}
+                    className="text-center p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Apple className="w-8 h-8 mx-auto mb-1 text-gray-700" />
+                    <p className="text-xs font-medium">macOS</p>
+                    <p className="text-xs text-gray-600">Web App</p>
+                  </button>
+                  <button
+                    onClick={handleGetStarted}
+                    className="text-center p-2 rounded-lg hover:bg-orange-50 transition-colors"
+                  >
+                    <Monitor className="w-8 h-8 mx-auto mb-1 text-orange-600" />
+                    <p className="text-xs font-medium">Linux</p>
+                    <p className="text-xs text-gray-600">Web App</p>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 text-center mt-3">Windows: Desktop app available • Others: Use web app</p>
               </div>
               
-              {/* Send link via WhatsApp */}
-              <div className="bg-white rounded-xl p-4 border border-gray-200">
-                {!showPhoneInput ? (
-                  <button
-                    onClick={() => setShowPhoneInput(true)}
-                    className="w-full flex items-center justify-center gap-2 text-green-600 hover:text-green-700 font-medium"
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                    Send download link via WhatsApp
-                  </button>
-                ) : (
-                  <form onSubmit={handleSendLink} className="space-y-3">
-                    <p className="text-sm text-gray-600 mb-2">Enter phone number to receive download link:</p>
-                    <div className="flex gap-2">
-                      <Input
-                        type="tel"
-                        placeholder="+91 9876543210"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="h-10"
-                        required
-                      />
-                      <Button type="submit" className="bg-green-600 hover:bg-green-700 h-10 px-4">
-                        <MessageCircle className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPhoneInput(false)}
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                )}
+              {/* Quick Start Button */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white text-center">
+                <h3 className="text-xl font-bold mb-2">Ready to Get Started?</h3>
+                <p className="text-blue-100 mb-4">Use BillByteKOT web app on any device - no download needed!</p>
+                <Button 
+                  onClick={handleGetStarted}
+                  className="w-full bg-white text-blue-600 hover:bg-blue-50 font-semibold h-12"
+                >
+                  <Rocket className="w-5 h-5 mr-2" />
+                  Start Free Trial Now
+                </Button>
+                <p className="text-xs text-blue-200 mt-3">7-day free trial • No credit card required</p>
               </div>
             </div>
             
@@ -1548,7 +1531,7 @@ const LandingPage = () => {
               <h4 className="font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>
-                  <a href="./PrivacyPolicy" className="hover:text-white">
+                  <a href="/privacy" className="hover:text-white">
                     Privacy Policy
                   </a>
                 </li>
@@ -1564,7 +1547,7 @@ const LandingPage = () => {
                 </li>
                 <li>
                   <a href="#" className="hover:text-white">
-                    GDPR
+                    Refund Policy
                   </a>
                 </li>
               </ul>

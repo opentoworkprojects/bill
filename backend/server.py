@@ -28,19 +28,7 @@ try:
 except Exception:
     _LLM_AVAILABLE = False
 
-# Import WhatsApp Cloud API
-try:
-    from whatsapp_cloud_api import (
-        whatsapp_api,
-        send_whatsapp_receipt,
-        send_whatsapp_status,
-        send_whatsapp_otp,
-        test_whatsapp_connection
-    )
-    _WHATSAPP_CLOUD_AVAILABLE = True
-except Exception as e:
-    print(f"WhatsApp Cloud API not available: {e}")
-    _WHATSAPP_CLOUD_AVAILABLE = False
+# Automation features - no external dependencies needed
 
     class LlmChat:
         def __init__(self, *args, **kwargs):
@@ -4266,6 +4254,215 @@ async def delete_customer(
         raise HTTPException(status_code=404, detail="Customer not found")
     
     return {"message": "Customer deleted"}
+
+
+# ============================================================================
+# Twilio WhatsApp Integration (Easy Setup)
+# ============================================================================
+
+@api_router.post("/twilio/whatsapp/send")
+async def twilio_send_whatsapp(
+    to_number: str,
+    message: str,
+    user: dict = Depends(get_current_user)
+):
+    """Send WhatsApp message via Twilio"""
+    if not _TWILIO_WHATSAPP_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Twilio WhatsApp not configured. Please add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN to .env"
+        )
+    
+    result = twilio_whatsapp.send_message(to_number, message)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    return result
+
+@api_router.post("/twilio/whatsapp/send-receipt")
+async def twilio_send_receipt(
+    to_number: str,
+    order_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Send order receipt via Twilio WhatsApp"""
+    if not _TWILIO_WHATSAPP_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Twilio WhatsApp not configured")
+    
+    # Get order details
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Format order data
+    order_data = {
+        "order_id": order.get("id"),
+        "restaurant_name": user.get("username", "BillByteKOT"),
+        "date": order.get("created_at", datetime.now()).strftime("%Y-%m-%d %H:%M"),
+        "items": order.get("items", []),
+        "subtotal": order.get("subtotal", 0),
+        "tax": order.get("tax", 0),
+        "total": order.get("total", 0),
+        "payment_method": order.get("payment_method", "Cash"),
+        "status": order.get("status", "completed")
+    }
+    
+    result = twilio_whatsapp.send_receipt(to_number, order_data)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    return result
+
+@api_router.post("/twilio/whatsapp/send-confirmation")
+async def twilio_send_confirmation(
+    to_number: str,
+    order_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Send order confirmation via Twilio WhatsApp"""
+    if not _TWILIO_WHATSAPP_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Twilio WhatsApp not configured")
+    
+    # Get order details
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order_data = {
+        "order_id": order.get("id"),
+        "restaurant_name": user.get("username", "BillByteKOT"),
+        "total": order.get("total", 0),
+        "tracking_url": f"https://billbytekot.in/track/{order.get('tracking_token', '')}"
+    }
+    
+    result = twilio_whatsapp.send_order_confirmation(to_number, order_data)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    return result
+
+@api_router.get("/twilio/whatsapp/status")
+async def twilio_whatsapp_status(user: dict = Depends(get_current_user)):
+    """Check Twilio WhatsApp configuration status"""
+    if not _TWILIO_WHATSAPP_AVAILABLE:
+        return {
+            "configured": False,
+            "message": "Twilio WhatsApp not available. Install twilio package: pip install twilio"
+        }
+    
+    if not twilio_whatsapp.is_configured():
+        return {
+            "configured": False,
+            "message": "Twilio credentials not set. Add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN to .env"
+        }
+    
+    account_info = twilio_whatsapp.get_account_info()
+    
+    return {
+        "configured": True,
+        "account_info": account_info,
+        "from_number": twilio_whatsapp.from_number
+    }
+
+
+# ============================================================================
+# Simple WhatsApp Integration (Free, No API Keys Required)
+# ============================================================================
+
+@api_router.post("/whatsapp/create-receipt-link")
+async def create_whatsapp_receipt_link(
+    phone_number: str,
+    order_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Create WhatsApp link to send receipt
+    Opens WhatsApp with pre-filled receipt message
+    No API keys needed!
+    """
+    # Get order details
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Format order data
+    order_data = {
+        "order_id": order.get("id"),
+        "restaurant_name": user.get("username", "BillByteKOT"),
+        "date": order.get("created_at", datetime.now()).strftime("%Y-%m-%d %H:%M"),
+        "items": order.get("items", []),
+        "subtotal": order.get("subtotal", 0),
+        "tax": order.get("tax", 0),
+        "total": order.get("total", 0),
+        "payment_method": order.get("payment_method", "Cash"),
+        "status": order.get("status", "completed")
+    }
+    
+    # Create WhatsApp link
+    link = simple_whatsapp.create_receipt_link(phone_number, order_data)
+    
+    return {
+        "success": True,
+        "whatsapp_link": link,
+        "phone_number": phone_number,
+        "message": "Click the link to open WhatsApp and send receipt"
+    }
+
+@api_router.post("/whatsapp/create-confirmation-link")
+async def create_whatsapp_confirmation_link(
+    phone_number: str,
+    order_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Create WhatsApp link to send order confirmation"""
+    # Get order details
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order_data = {
+        "order_id": order.get("id"),
+        "restaurant_name": user.get("username", "BillByteKOT"),
+        "total": order.get("total", 0),
+        "tracking_url": f"https://billbytekot.in/track/{order.get('tracking_token', '')}"
+    }
+    
+    link = simple_whatsapp.create_confirmation_link(phone_number, order_data)
+    
+    return {
+        "success": True,
+        "whatsapp_link": link,
+        "phone_number": phone_number
+    }
+
+@api_router.post("/whatsapp/create-message-link")
+async def create_whatsapp_message_link(
+    phone_number: str,
+    message: str,
+    user: dict = Depends(get_current_user)
+):
+    """Create WhatsApp link with custom message"""
+    link = simple_whatsapp.create_message_link(phone_number, message)
+    
+    return {
+        "success": True,
+        "whatsapp_link": link,
+        "phone_number": phone_number
+    }
+
+@api_router.get("/whatsapp/business-link")
+async def get_business_whatsapp_link(user: dict = Depends(get_current_user)):
+    """Get business WhatsApp chat link"""
+    link = simple_whatsapp.get_business_chat_link()
+    
+    return {
+        "success": True,
+        "whatsapp_link": link,
+        "business_number": simple_whatsapp.business_number or "Not configured"
+    }
 
 
 app.include_router(api_router)

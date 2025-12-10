@@ -33,26 +33,26 @@ const DownloadPage = () => {
   const os = getOS();
   const isMobile = os === "android" || os === "ios";
 
-  // Download URLs - Direct from billbytekot.in
+  // Download instructions - Use web app instead
   const downloadUrls = {
-    windows: "https://billbytekot.in/downloads/BillByteKOT-Setup-1.0.0-win.exe",
-    mac: "https://billbytekot.in/downloads/BillByteKOT-1.0.0-mac.dmg",
-    linux: "https://billbytekot.in/downloads/BillByteKOT-1.0.0-linux.AppImage",
+    windows: "web",
+    mac: "web",
+    linux: "web",
+    android: "https://play.google.com/store/apps/details?id=com.billbytekot.app",
   };
 
   const handleDownload = (platform) => {
-    const url = downloadUrls[platform];
-    if (url) {
-      // Create a temporary link and trigger download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = url.split('/').pop();
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`Downloading BillByteKOT for ${platform.charAt(0).toUpperCase() + platform.slice(1)}...`);
+    if (platform === "android") {
+      window.open(downloadUrls.android, '_blank');
+      toast.success("Opening Google Play Store...");
     } else {
-      toast.error("Download not available yet. Please try again later.");
+      // For desktop, show instructions to use web app
+      toast.info("Use the web app for best experience! Click 'Get Started' to begin.", {
+        duration: 5000
+      });
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
     }
   };
 
@@ -100,11 +100,11 @@ const DownloadPage = () => {
               <span className="text-sm font-medium text-blue-600">Download Center</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              Download BillByteKOT
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"> Desktop</span>
+              Get Started with
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"> BillByteKOT</span>
             </h1>
             <p className="text-xl text-gray-600">
-              Get the native desktop app for the best restaurant billing experience
+              Use our powerful web app on any device - no download required!
             </p>
           </div>
 
@@ -125,10 +125,10 @@ const DownloadPage = () => {
                   className="w-full bg-blue-600 hover:bg-blue-700"
                   onClick={() => handleDownload("windows")}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download .exe
+                  <Globe className="w-4 h-4 mr-2" />
+                  Use Web App
                 </Button>
-                <p className="text-xs text-gray-400 mt-2">~80 MB</p>
+                <p className="text-xs text-gray-400 mt-2">Works in any browser</p>
               </CardContent>
             </Card>
 
@@ -147,10 +147,10 @@ const DownloadPage = () => {
                   className="w-full bg-gray-800 hover:bg-gray-900"
                   onClick={() => handleDownload("mac")}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download .dmg
+                  <Globe className="w-4 h-4 mr-2" />
+                  Use Web App
                 </Button>
-                <p className="text-xs text-gray-400 mt-2">~90 MB</p>
+                <p className="text-xs text-gray-400 mt-2">Works in any browser</p>
               </CardContent>
             </Card>
 
@@ -169,10 +169,10 @@ const DownloadPage = () => {
                   className="w-full bg-orange-600 hover:bg-orange-700"
                   onClick={() => handleDownload("linux")}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download .AppImage
+                  <Globe className="w-4 h-4 mr-2" />
+                  Use Web App
                 </Button>
-                <p className="text-xs text-gray-400 mt-2">~85 MB</p>
+                <p className="text-xs text-gray-400 mt-2">Works in any browser</p>
               </CardContent>
             </Card>
           </div>
