@@ -625,12 +625,7 @@ const LandingPage = () => {
               </Button>
             </div>
 
-            {/* Product Hunt Badge */}
-            <div className="flex justify-center mb-8">
-              <a href="https://www.producthunt.com/products/restro-ai?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-restro-ai" target="_blank" rel="noopener noreferrer">
-                <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1043247&theme=light&t=1764436989519" alt="RESTRO AI - RESTAURANT KOT | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
-              </a>
-            </div>
+
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto">
