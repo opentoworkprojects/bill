@@ -955,6 +955,15 @@ class OTPVerify(BaseModel):
     otp: str
 
 
+class LeadCapture(BaseModel):
+    name: str
+    phone: str
+    email: str
+    businessName: Optional[str] = None
+    source: str = "landing_page"
+    timestamp: str
+
+
 @api_router.post("/auth/send-otp")
 async def send_otp(request: OTPRequest):
     """Send OTP to email address"""
@@ -1185,6 +1194,32 @@ async def verify_whatsapp_otp(request: WhatsAppOTPVerify):
             "business_settings": user.get("business_settings"),
         }
     }
+
+
+# Lead Capture (Public endpoint - no auth required)
+@api_router.post("/leads")
+async def capture_lead(lead: LeadCapture):
+    """Capture lead from landing page popup"""
+    try:
+        # Store lead in database
+        lead_data = lead.dict()
+        lead_data["created_at"] = datetime.now(timezone.utc).isoformat()
+        lead_data["status"] = "new"
+        lead_data["contacted"] = False
+        
+        result = await db.leads.insert_one(lead_data)
+        
+        # TODO: Send notification to admin (email/SMS)
+        # TODO: Add to CRM system if integrated
+        
+        return {
+            "success": True,
+            "message": "Lead captured successfully",
+            "lead_id": str(result.inserted_id)
+        }
+    except Exception as e:
+        logging.error(f"Error capturing lead: {e}")
+        raise HTTPException(status_code=500, detail="Failed to capture lead")
 
 
 # Staff Management

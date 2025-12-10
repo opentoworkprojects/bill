@@ -9,6 +9,7 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
+import LeadCapturePopup from "../components/LeadCapturePopup";
 import {
   ChefHat,
   Sparkles,
@@ -419,6 +420,9 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white" data-testid="landing-page">
+      {/* Lead Capture Popup */}
+      <LeadCapturePopup />
+      
       {/* Header/Navbar */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200">
         <nav className="container mx-auto px-4 py-4">
