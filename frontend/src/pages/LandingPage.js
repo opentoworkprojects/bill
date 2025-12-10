@@ -66,15 +66,9 @@ const DesktopDownloadSection = () => {
   };
   
   const handleDownloadWindows = () => {
-    if (windowsAppUrl.includes("YOUR_USERNAME")) {
-      // App not built yet, redirect to web app
-      toast.info("Windows app coming soon! Use the web app for now.");
-      navigate("/login");
-    } else {
-      // Download the Windows app
-      window.open(windowsAppUrl, '_blank');
-      toast.success("Downloading BillByteKOT for Windows...");
-    }
+    // Download the Windows app
+    window.open(windowsAppUrl, '_blank');
+    toast.success("Downloading BillByteKOT for Windows...");
   };
   
   return (
