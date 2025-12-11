@@ -1,98 +1,323 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ===================================
+# BillByteKOT - Complete .gitignore
+# ===================================
 
-# IDE and editors
-.idea/
+# ============ GENERAL ============
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE & Editors
 .vscode/
-.md
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============ NODE.JS ============
 # Dependencies
 node_modules/
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# Testing
-/coverage
-
-# Next.js
-/.next/
-/out/
-next-env.d.ts
-*.tsbuildinfo
-
-# Production builds
-/build
-dist/
-dist
-
-# Environment files (comprehensive coverage)
-
-*token.json*
-*credentials.json*
-
-# Logs and debug files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 .pnpm-debug.log*
-dump.rdb
 
-# System files
-.DS_Store
-*.pem
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
-# Python
+# ============ PYTHON ============
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*pyc*
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
 venv/
+env/
+ENV/
 .venv/
+.env/
 
-# Development tools
-chainlit.md
-.chainlit
-.ipynb_checkpoints/
-.ac
+# Python distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Deployment
-.vercel
+# PyInstaller
+*.manifest
+*.spec
 
-# Data and databases
-agenthub/agents/youtube/db
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
 
-# Archive files and large assets
-**/*.zip
-**/*.tar.gz
-**/*.tar
-**/*.tgz
-*.pack
-*.deb
-*.dylib
-
-# Build caches
-.cache/
-
-# Mobile development
-android-sdk/
-
-# Environment files
+# ============ ENVIRONMENT ============
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 *.env
-*.env.*
+.env.*
 
-# Electron builds (large binary files)
-dist-electron/
+# Secrets
+secrets.json
+config/secrets.js
+*.key
+*.pem
+*.p12
+*.pfx
+
+# ============ FRONTEND (React) ============
+# Build output
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+
+# Testing
+frontend/coverage/
+frontend/.nyc_output/
+
+# Misc
+frontend/.DS_Store
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# ============ ELECTRON ============
+# Electron build output
 frontend/dist-electron/
+frontend/release/
+frontend/out/
+
+# Electron installers
 *.exe
 *.dmg
 *.AppImage
+*.deb
+*.rpm
+*.snap
+*.msi
+*.pkg
 
-# Android build files
-frontend/and/app/build/
-frontend/and/.gradle/
-frontend/and/store_icon.png
-*.aab
+# Electron cache
+frontend/.electron/
+frontend/.cache/
+
+# ============ ANDROID ============
+# Android build output
+frontend/billbytekot/build/
+frontend/billbytekot/app/build/
+frontend/billbytekot/.gradle/
+frontend/billbytekot/local.properties
+
+# Android APK/AAB files
 *.apk
+*.aab
+*.ap_
+*.idsig
+
+# Android keystore (IMPORTANT: Keep secure!)
+# Uncomment if you want to exclude keystore
+# *.keystore
+# *.jks
+
+# Android Studio
+frontend/billbytekot/.idea/
+frontend/billbytekot/*.iml
+frontend/billbytekot/.externalNativeBuild/
+frontend/billbytekot/.cxx/
+
+# ============ BACKEND (Python/Flask) ============
+# Backend build
+backend/build/
+backend/dist/
+backend/*.egg-info/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+backend/logs/
+backend/*.log
+
+# ============ DOCUMENTATION ============
+# Temporary documentation files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Documentation MD files (auto-generated guides)
+*_COMPLETE.md
+*_READY.md
+*_GUIDE.md
+*_SUMMARY.md
+*_INSTRUCTIONS.md
+*_STATUS.md
+BUILD_*.md
+DEPLOY_*.md
+AUTOMATION_*.md
+WINDOWS_*.md
+ANDROID_*.md
+MAC_*.md
+DESKTOP_*.md
+UPLOAD_*.md
+
+# Keep important docs
+!README.md
+!CONTRIBUTING.md
+!LICENSE.md
+!CHANGELOG.md
+
+# ============ BUILD ARTIFACTS ============
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# ============ LOGS ============
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ============ TEMPORARY FILES ============
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# ============ TESTING ============
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# ============ DEPLOYMENT ============
+# Deployment configs (if they contain secrets)
+# Uncomment if needed
+# deploy.sh
+# .deployment
+
+# ============ MISC ============
+# Lock files (optional - uncomment if you want to exclude)
+# package-lock.json
+# yarn.lock
+
+# Cache directories
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vuepress/dist/
+
+# Serverless
+.serverless/
+
+# FuseBox
+.fusebox/
+
+# DynamoDB Local
+.dynamodb/
+
+# TernJS
+.tern-port
+
+# Stores VSCode versions used for testing
+.vscode-test
+
+# ============ PROJECT SPECIFIC ============
+# Documentation that's too large or auto-generated
+# (Uncomment if needed)
+# WINDOWS_DESKTOP_BUILD_COMPLETE.md
+# BUILD_ANDROID_APK.md
+
+# Test files
+test_*.py
+*_test.py
+
+# Backup files
+*.backup
+*.old
+
+# ============ SECURITY ============
+# Never commit these!
+.env
+.env.*
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+config/production.json
+config/secrets.json
+
+# API Keys (just in case)
+*api_key*
+*apikey*
+*secret*
+*password*
+
+# ============ END ============
