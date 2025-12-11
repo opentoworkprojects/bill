@@ -307,7 +307,7 @@ prepare-render.sh
 # Deployment configs
 render.yaml
 render-button.json
-vercel.json
+
 DEPLOYMENT_INSTRUCTIONS.txt
 
 # ============ MISC ============
