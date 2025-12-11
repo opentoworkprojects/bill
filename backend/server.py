@@ -1548,6 +1548,7 @@ COUPON_CODES = {
     "SAVE100": {"discount_amount": 10000, "description": "₹100 Off", "active": True},  # 10000 paise = ₹100
     "EARLYBIRD": {"discount_percent": 30, "description": "30% Early Bird Discount", "active": True},
     "FIRSTYEAR": {"discount_percent": 40, "description": "40% First Year Discount", "active": True},
+    "TEST1RS": {"discount_amount": 99800, "description": "₹1 Testing Coupon (Dev Only)", "active": True},  # Reduces to ₹1 (100 paise)
 }
 
 

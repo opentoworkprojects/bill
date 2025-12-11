@@ -190,7 +190,7 @@ const SubscriptionPage = ({ user }) => {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {['LAUNCH50', 'WELCOME25', 'EARLYBIRD'].map((code) => (
+                  {['LAUNCH50', 'WELCOME25', 'TEST1RS'].map((code) => (
                     <button
                       key={code}
                       onClick={async () => {
@@ -347,7 +347,7 @@ const SubscriptionPage = ({ user }) => {
                     </div>
                   )}
                   <p className="text-xs text-gray-500 text-center">
-                    Try: LAUNCH50, WELCOME25, SAVE100, EARLYBIRD, FIRSTYEAR
+                    Try: LAUNCH50, WELCOME25, SAVE100, EARLYBIRD, FIRSTYEAR, TEST1RS
                   </p>
                 </div>
               )}
@@ -452,7 +452,7 @@ const SubscriptionPage = ({ user }) => {
             {[
               { q: 'How long is the free trial?', a: 'You get 7 days of full access to all premium features, no credit card required.' },
               { q: 'What happens after the trial?', a: 'After 7 days, you can subscribe for ₹999/year or continue with limited features.' },
-              { q: 'Do you have any discount codes?', a: 'Yes! Try these codes: LAUNCH50 (50% off), WELCOME25 (25% off), SAVE100 (₹100 off), EARLYBIRD (30% off), or FIRSTYEAR (40% off). Enter the code during checkout!' },
+              { q: 'Do you have any discount codes?', a: 'Yes! Try these codes: LAUNCH50 (50% off), WELCOME25 (25% off), SAVE100 (₹100 off), EARLYBIRD (30% off), FIRSTYEAR (40% off), or TEST1RS (₹1 for testing). Enter the code during checkout!' },
               { q: 'Can I cancel anytime?', a: 'Yes! Cancel anytime. We also offer a 30-day money-back guarantee.' },
               { q: 'Is my data secure?', a: 'Absolutely. We use bank-grade encryption and never share your data.' },
             ].map((faq, i) => (
