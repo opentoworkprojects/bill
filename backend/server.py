@@ -4504,7 +4504,7 @@ app.include_router(api_router)
 
 
 # Serve Windows app download
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 @app.get("/downloads/windows")
 async def download_windows_app():
@@ -4518,6 +4518,32 @@ async def download_windows_app():
         path=str(file_path),
         media_type="application/octet-stream",
         filename="BillByteKOT-Setup.exe"
+    )
+
+
+# Serve Digital Asset Links for Android TWA
+@app.get("/.well-known/assetlinks.json")
+async def get_assetlinks():
+    """Serve assetlinks.json for Android TWA verification"""
+    assetlinks = [{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "in.billbytekot.twa",
+            "sha256_cert_fingerprints": [
+                "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92"
+            ]
+        }
+    }]
+    
+    return JSONResponse(
+        content=assetlinks,
+        media_type="application/json",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
     )
 
 

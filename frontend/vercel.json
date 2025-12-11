@@ -1,30 +1,8 @@
 {
-  "headers": [
+  "rewrites": [
     {
       "source": "/.well-known/assetlinks.json",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/json"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
-    }
-  ],
-  "routes": [
-    {
-      "src": "/.well-known/assetlinks.json",
-      "dest": "/.well-known/assetlinks.json",
-      "headers": {
-        "Content-Type": "application/json"
-      }
+      "destination": "https://restro-ai.onrender.com/.well-known/assetlinks.json"
     }
   ]
 }
