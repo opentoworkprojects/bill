@@ -250,23 +250,24 @@ const BillingPage = ({ user }) => {
                 }
               }
               body {
-                font-family: 'Courier New', 'Consolas', monospace;
+                font-family: 'Courier New', 'Courier', 'Consolas', 'Monaco', monospace;
                 font-size: ${fontSize};
-                line-height: 1.3;
-                padding: 5mm;
+                line-height: 1.4;
+                padding: 8mm 5mm;
                 margin: 0;
                 width: ${paperWidth};
                 background: white;
-                color: black;
+                color: #000;
               }
               pre {
                 margin: 0;
                 padding: 0;
-                font-family: 'Courier New', 'Consolas', monospace;
+                font-family: 'Courier New', 'Courier', 'Consolas', 'Monaco', monospace;
                 font-size: ${fontSize};
-                white-space: pre-wrap;
-                word-wrap: break-word;
-                line-height: 1.3;
+                white-space: pre;
+                word-wrap: normal;
+                line-height: 1.5;
+                letter-spacing: 0.5px;
               }
               .no-print {
                 display: flex;
@@ -364,11 +365,19 @@ const BillingPage = ({ user }) => {
                 background: #f8f9fa;
               }
               .receipt-paper {
-                background: white;
-                padding: 20px;
+                background: #ffffff;
+                padding: 24px 20px;
                 border-radius: 8px;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
                 border: 1px solid #e5e7eb;
+                max-width: 100%;
+                overflow-x: auto;
+              }
+              .receipt-paper pre {
+                background: #fafafa;
+                padding: 16px;
+                border-radius: 6px;
+                border: 1px dashed #d1d5db;
               }
               .action-buttons {
                 padding: 20px;

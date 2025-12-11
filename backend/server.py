@@ -680,72 +680,103 @@ def get_receipt_template(
 
     templates = {
         "classic": f"""
+
 {sep_eq}
 {rest_name_48}
 {sep_eq}
 {address_48}
 Phone: {phone}
 {f"Email: {email}" if email else ""}
-GSTIN: {gstin}
+{f"GSTIN: {gstin}" if gstin != "N/A" else ""}
 {f"FSSAI: {fssai}" if fssai else ""}
+{sep_eq}
+
+BILL #{order["id"][:8]}
 {sep_dash}
-Bill #: {order["id"][:8]}
-Table: {order["table_number"]}
-Waiter: {order["waiter_name"]}
+Table: {order["table_number"]:<20} Waiter: {order["waiter_name"]}
 Customer: {order.get("customer_name", "Guest")}
 Date: {now_str}
 {sep_dash}
-ITEMS:
+
+ITEMS
+{sep_dash}
+{"Item":<25} {"Qty":>3} {"Amount":>12}
+{sep_dash}
 {items_text}{sep_dash}
-Subtotal:         {currency_symbol}{order["subtotal"]:.2f}
-Tax ({tax_rate}%):          {currency_symbol}{order["tax"]:.2f}
-{sep_dash}
-TOTAL:            {currency_symbol}{order["total"]:.2f}
-{sep_dash}
-{footer_msg}
-{f"Visit: {website}" if website else "Visit again soon!"}
+
+Subtotal:                 {currency_symbol}{order["subtotal"]:>10.2f}
+Tax ({tax_rate}%):                   {currency_symbol}{order["tax"]:>10.2f}
 {sep_eq}
+TOTAL:                    {currency_symbol}{order["total"]:>10.2f}
+{sep_eq}
+
+{footer_msg.center(48)}
+{f"{website.center(48)}" if website else ""}
+
+{sep_dash}
+Thank you! Visit again!
+{sep_eq}
+
 """,
         "modern": f"""
-┌{sep_light}┐
+
+┌{"─" * 46}┐
 │ {rest_name_44} │
 {f"│ {tagline.center(44)} │" if tagline else ""}
-├{sep_light}┤
+├{"─" * 46}┤
 │ {address_44} │
-│ ☎ {phone:<42} │
-{f"│ 🌐 {website:<42} │" if website else ""}
-└{sep_light}┘
+│ ☎  {phone:<43} │
+{f"│ 🌐 {website:<43} │" if website else ""}
+└{"─" * 46}┘
 
-🧾 Bill #{order["id"][:8]}
-🍽️  Table {order["table_number"]} | 👤 {order["waiter_name"]}
+🧾 BILL #{order["id"][:8]}
+{"─" * 48}
+🍽️  Table {order["table_number"]}  |  👤 {order["waiter_name"]}
 👥 {order.get("customer_name", "Guest")}
 📅 {now_str}
+{"─" * 48}
 
-{sep_light}
-{items_modern}{sep_light}
-Subtotal                      {currency_symbol}{order["subtotal"]:.2f}
-Tax ({tax_rate}%)                        {currency_symbol}{order["tax"]:.2f}
-{sep_heavy}
-💰 TOTAL                      {currency_symbol}{order["total"]:.2f}
-{sep_heavy}
+ORDER ITEMS
+{"─" * 48}
+{items_modern}{"─" * 48}
 
-✨ {footer_msg} ✨
+Subtotal                  {currency_symbol}{order["subtotal"]:>10.2f}
+Tax ({tax_rate}%)                    {currency_symbol}{order["tax"]:>10.2f}
+{"═" * 48}
+💰 TOTAL                  {currency_symbol}{order["total"]:>10.2f}
+{"═" * 48}
+
+✨ {footer_msg.center(44)} ✨
 {f"GSTIN: {gstin}" if gstin != "N/A" else ""}
+
+{"─" * 48}
+Thank you for dining with us!
+{"─" * 48}
+
 """,
         "minimal": f"""
-{rest_name}
-{address}
-{phone}
 
-Bill: {order["id"][:8]} | Table: {order["table_number"]}
+{rest_name.center(48)}
+{address.center(48)}
+{phone.center(48)}
+{"─" * 48}
+
+Bill: {order["id"][:8]}
+Table: {order["table_number"]} | {order["waiter_name"]}
+Customer: {order.get("customer_name", "Guest")}
 {now_str}
+{"─" * 48}
 
 {items_minimal}
-Subtotal: {currency_symbol}{order["subtotal"]:.2f}
-Tax ({tax_rate}%): {currency_symbol}{order["tax"]:.2f}
-Total: {currency_symbol}{order["total"]:.2f}
+{"─" * 48}
+Subtotal:             {currency_symbol}{order["subtotal"]:>10.2f}
+Tax ({tax_rate}%):               {currency_symbol}{order["tax"]:>10.2f}
+{"─" * 48}
+TOTAL:                {currency_symbol}{order["total"]:>10.2f}
+{"─" * 48}
 
-{footer_msg}
+{footer_msg.center(48)}
+
 """,
         "elegant": f"""
 ╔{sep_heavy}╗
