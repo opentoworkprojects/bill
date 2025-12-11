@@ -19,8 +19,8 @@
     "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\billbytekot\\android.keystore",
     "alias": "android"
   },
-  "appVersionName": "7",
-  "appVersionCode": 7,
+  "appVersionName": "8",
+  "appVersionCode": 8,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://billbytekot.in/manifest.json",
@@ -41,6 +41,9 @@
     },
     {
       "value": "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92"
+    },
+    {
+      "value": "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92"
     }
   ],
   "additionalTrustedOrigins": [],
@@ -49,5 +52,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "7"
+  "appVersion": "8"
 }

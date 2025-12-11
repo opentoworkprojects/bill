@@ -4503,6 +4503,24 @@ async def get_business_whatsapp_link(user: dict = Depends(get_current_user)):
 app.include_router(api_router)
 
 
+# Serve Windows app download
+from fastapi.responses import FileResponse
+
+@app.get("/downloads/windows")
+async def download_windows_app():
+    """Serve Windows desktop app for download"""
+    file_path = ROOT_DIR / "downloads" / "BillByteKOT-Setup.exe"
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Windows app not found")
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/octet-stream",
+        filename="BillByteKOT-Setup.exe"
+    )
+
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )

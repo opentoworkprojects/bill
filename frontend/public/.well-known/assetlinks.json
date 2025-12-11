@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "in.billbytekot.twa",
-        "sha256_cert_fingerprints": ["85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92"]
+        "sha256_cert_fingerprints": ["85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92", "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92", "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92"]
       }
     }]
