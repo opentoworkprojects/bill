@@ -2657,22 +2657,36 @@ async def ai_chat(message: ChatMessage):
 
 
 @api_router.post("/ai/recommendations")
-async def get_recommendations():
+async def get_recommendations(current_user: dict = Depends(get_current_user)):
     try:
-        orders = (
-            await db.orders.find({"status": "completed"}, {"_id": 0})
-            .limit(50)
-            .to_list(50)
-        )
-        menu_items = await db.menu_items.find({}, {"_id": 0}).to_list(1000)
+        user_org_id = current_user.get("organization_id") or current_user["id"]
+        
+        orders = await db.orders.find({
+            "status": "completed",
+            "organization_id": user_org_id
+        }, {"_id": 0}).limit(50).to_list(50)
+        
+        menu_items = await db.menu_items.find({
+            "organization_id": user_org_id
+        }, {"_id": 0}).to_list(1000)
+
+        if not orders or not menu_items:
+            return {
+                "recommendations": "Not enough data yet. Start taking orders to get AI recommendations!"
+            }
 
         order_items = []
         for order in orders:
             order_items.extend([item["name"] for item in order["items"]])
 
         from collections import Counter
-
         popular_items = Counter(order_items).most_common(5)
+
+        if not _LLM_AVAILABLE:
+            # Fallback without AI
+            return {
+                "recommendations": f"Top selling items: {', '.join([item[0] for item in popular_items])}. Consider promoting these items!"
+            }
 
         chat = LlmChat(
             api_key=os.environ.get("LLM_API_KEY"),
@@ -2686,16 +2700,45 @@ async def get_recommendations():
 
         return {"recommendations": response}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"AI recommendations error: {str(e)}")
+        return {
+            "recommendations": "AI recommendations temporarily unavailable. Please try again later."
+        }
 
 
 @api_router.post("/ai/sales-forecast")
-async def sales_forecast():
+async def sales_forecast(current_user: dict = Depends(get_current_user)):
     try:
-        orders = await db.orders.find({"status": "completed"}, {"_id": 0}).to_list(1000)
+        user_org_id = current_user.get("organization_id") or current_user["id"]
+        
+        orders = await db.orders.find({
+            "status": "completed",
+            "organization_id": user_org_id
+        }, {"_id": 0}).to_list(1000)
+
+        if not orders:
+            return {
+                "forecast": "Not enough data yet. Complete some orders to get sales forecasts!",
+                "current_stats": {
+                    "total_orders": 0,
+                    "total_sales": 0,
+                    "avg_order": 0,
+                },
+            }
 
         total_sales = sum(order["total"] for order in orders)
         avg_order_value = total_sales / len(orders) if orders else 0
+
+        if not _LLM_AVAILABLE:
+            # Fallback without AI
+            return {
+                "forecast": f"Based on {len(orders)} orders with ₹{total_sales:.2f} total sales, your average order value is ₹{avg_order_value:.2f}. Keep up the good work!",
+                "current_stats": {
+                    "total_orders": len(orders),
+                    "total_sales": total_sales,
+                    "avg_order": avg_order_value,
+                },
+            }
 
         chat = LlmChat(
             api_key=os.environ.get("LLM_API_KEY"),
@@ -2716,7 +2759,15 @@ async def sales_forecast():
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"AI forecast error: {str(e)}")
+        return {
+            "forecast": "AI forecast temporarily unavailable. Please try again later.",
+            "current_stats": {
+                "total_orders": 0,
+                "total_sales": 0,
+                "avg_order": 0,
+            },
+        }
 
 
 # Reports
@@ -2850,22 +2901,39 @@ async def best_selling_report(current_user: dict = Depends(get_current_user)):
     }, {"_id": 0}).to_list(1000)
     
     from collections import defaultdict
-    item_stats = defaultdict(lambda: {"total_sold": 0, "total_revenue": 0, "name": "", "category": ""})
+    item_stats = defaultdict(lambda: {
+        "total_quantity": 0, 
+        "total_revenue": 0, 
+        "name": "", 
+        "category": "Uncategorized",
+        "price": 0
+    })
     
     for order in orders:
         for item in order["items"]:
             item_id = item.get("menu_item_id", item["name"])
             item_stats[item_id]["name"] = item["name"]
-            item_stats[item_id]["total_sold"] += item["quantity"]
+            item_stats[item_id]["total_quantity"] += item["quantity"]
             item_stats[item_id]["total_revenue"] += item["price"] * item["quantity"]
+            item_stats[item_id]["price"] = item["price"]  # Store price
     
     # Get category info from menu
     for item_id, stats in item_stats.items():
-        menu_item = await db.menu_items.find_one({"name": stats["name"], "organization_id": user_org_id}, {"_id": 0})
+        menu_item = await db.menu_items.find_one({
+            "name": stats["name"], 
+            "organization_id": user_org_id
+        }, {"_id": 0})
         if menu_item:
             stats["category"] = menu_item.get("category", "Uncategorized")
+            if not stats["price"]:
+                stats["price"] = menu_item.get("price", 0)
     
-    sorted_items = sorted(item_stats.values(), key=lambda x: x["total_sold"], reverse=True)[:10]
+    sorted_items = sorted(
+        item_stats.values(), 
+        key=lambda x: x["total_quantity"], 
+        reverse=True
+    )[:10]
+    
     return sorted_items
 
 

@@ -753,18 +753,18 @@ const ReportsPage = ({ user }) => {
                             #{index + 1}
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">{item.name}</p>
+                            <p className="font-semibold text-gray-900">{item.name || 'Unknown'}</p>
                             <p className="text-sm text-gray-500">
-                              {item.category} • ₹{item.price.toFixed(2)}
+                              {item.category || 'N/A'} • ₹{(item.price || 0).toFixed(2)}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-violet-600">
-                            {item.total_quantity}
+                            {item.total_quantity || 0}
                           </p>
                           <p className="text-sm text-gray-500">
-                            ₹{item.total_revenue.toFixed(2)} revenue
+                            ₹{(item.total_revenue || 0).toFixed(2)} revenue
                           </p>
                         </div>
                       </div>
