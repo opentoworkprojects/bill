@@ -134,6 +134,7 @@ const ReportsPage = ({ user }) => {
       setPeakHours(response.data || []);
     } catch (error) {
       console.error("Failed to fetch peak hours", error);
+      setPeakHours([]);
     }
   };
 
@@ -784,7 +785,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-4xl font-bold text-green-600">
-                      ₹{dailyReport.total_sales.toFixed(2)}
+                      ₹{(dailyReport?.total_sales || 0).toFixed(2)}
                     </p>
                   </CardContent>
                 </Card>
@@ -801,9 +802,9 @@ const ReportsPage = ({ user }) => {
                   <CardContent>
                     <p className="text-4xl font-bold text-blue-600">
                       ₹
-                      {dailyReport.total_orders > 0
+                      {(dailyReport?.total_orders || 0) > 0
                         ? (
-                            dailyReport.total_sales / dailyReport.total_orders
+                            (dailyReport?.total_sales || 0) / (dailyReport?.total_orders || 1)
                           ).toFixed(2)
                         : "0.00"}
                     </p>
@@ -832,13 +833,13 @@ const ReportsPage = ({ user }) => {
                       <div>
                         <p className="text-sm text-gray-600">Total Sales</p>
                         <p className="text-2xl font-bold text-green-600">
-                          ₹{forecast.current_stats.total_sales.toFixed(2)}
+                          ₹{(forecast?.current_stats?.total_sales || 0).toFixed(2)}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Avg Order</p>
                         <p className="text-2xl font-bold text-blue-600">
-                          ₹{forecast.current_stats.avg_order.toFixed(2)}
+                          ₹{(forecast?.current_stats?.avg_order || 0).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -929,7 +930,7 @@ const ReportsPage = ({ user }) => {
                           </p>
                         </div>
                         <p className="font-bold text-violet-600">
-                          ₹{order.total.toFixed(2)}
+                          ₹{(order?.total || 0).toFixed(2)}
                         </p>
                       </div>
                     ))}
@@ -952,7 +953,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-3xl font-bold text-violet-600">
-                      ₹{dailyReport.total_sales.toFixed(2)}
+                      ₹{(dailyReport?.total_sales || 0).toFixed(2)}
                     </p>
                     <p className="text-sm text-gray-500 mt-1">
                       {dailyReport.total_orders} orders
@@ -971,7 +972,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-3xl font-bold text-green-600">
-                      ₹{weeklyReport.total_sales.toFixed(2)}
+                      ₹{(weeklyReport?.total_sales || 0).toFixed(2)}
                     </p>
                     <p className="text-sm text-gray-500 mt-1">
                       {weeklyReport.total_orders} orders
@@ -990,7 +991,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-3xl font-bold text-blue-600">
-                      ₹{monthlyReport.total_sales.toFixed(2)}
+                      ₹{(monthlyReport?.total_sales || 0).toFixed(2)}
                     </p>
                     <p className="text-sm text-gray-500 mt-1">
                       {monthlyReport.total_orders} orders
@@ -1015,13 +1016,13 @@ const ReportsPage = ({ user }) => {
                       <div>
                         <p className="text-sm text-gray-600">Weekly Average</p>
                         <p className="text-2xl font-bold text-violet-600">
-                          ₹{(weeklyReport.total_sales / 7).toFixed(2)}/day
+                          ₹{((weeklyReport?.total_sales || 0) / 7).toFixed(2)}/day
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600">Monthly Average</p>
                         <p className="text-2xl font-bold text-blue-600">
-                          ₹{(monthlyReport.total_sales / 30).toFixed(2)}/day
+                          ₹{((monthlyReport?.total_sales || 0) / 30).toFixed(2)}/day
                         </p>
                       </div>
                     </div>
@@ -1094,7 +1095,7 @@ const ReportsPage = ({ user }) => {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-gray-900">{cat.category}</span>
                           <span className="text-sm text-gray-600">
-                            {cat.total_quantity} items • ₹{cat.total_revenue.toFixed(2)}
+                            {cat.total_quantity || 0} items • ₹{(cat.total_revenue || 0).toFixed(2)}
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -1143,10 +1144,10 @@ const ReportsPage = ({ user }) => {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-green-600">
-                            ₹{staff.total_sales.toFixed(2)}
+                            ₹{(staff.total_sales || 0).toFixed(2)}
                           </p>
                           <p className="text-sm text-gray-500">
-                            Avg: ₹{staff.avg_order_value.toFixed(2)}
+                            Avg: ₹{(staff.avg_order_value || 0).toFixed(2)}
                           </p>
                         </div>
                       </div>
@@ -1184,7 +1185,7 @@ const ReportsPage = ({ user }) => {
                               {hour.hour}:00 - {hour.hour}:59
                             </span>
                             <span className="text-sm text-gray-600">
-                              {hour.order_count} orders • ₹{hour.total_sales.toFixed(2)}
+                              {hour.order_count || 0} orders • ₹{(hour.total_sales || 0).toFixed(2)}
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-3">
@@ -1234,7 +1235,7 @@ const ReportsPage = ({ user }) => {
                               {peakHour.hour}:00 - {peakHour.hour}:59
                             </p>
                             <p className="text-sm text-gray-500">
-                              {peakHour.order_count} orders • ₹{peakHour.total_sales.toFixed(2)}
+                              {peakHour.order_count || 0} orders • ₹{(peakHour.total_sales || 0).toFixed(2)}
                             </p>
                           </div>
                           <div className="p-3 bg-white rounded-lg">
@@ -1243,7 +1244,7 @@ const ReportsPage = ({ user }) => {
                               {slowHour.hour}:00 - {slowHour.hour}:59
                             </p>
                             <p className="text-sm text-gray-500">
-                              {slowHour.order_count} orders • ₹{slowHour.total_sales.toFixed(2)}
+                              {slowHour.order_count || 0} orders • ₹{(slowHour.total_sales || 0).toFixed(2)}
                             </p>
                           </div>
                         </>
