@@ -236,96 +236,53 @@ const BillingPage = ({ user }) => {
           <head>
             <title>Thermal Receipt - Order #${order.id.slice(0, 8)}</title>
             <style>
-              @media print {
-                @page {
-                  size: ${paperWidth} auto;
-                  margin: 0;
-                }
-                body {
-                  margin: 0;
-                  padding: 0;
-                }
-                .no-print {
-                  display: none !important;
-                }
-              }
-              body {
-                font-family: 'Courier New', 'Courier', 'Consolas', 'Monaco', monospace;
-                font-size: ${fontSize};
-                line-height: 1.4;
-                padding: 8mm 5mm;
-                margin: 0;
-                width: ${paperWidth};
-                background: white;
-                color: #000;
-              }
-              pre {
+              * {
                 margin: 0;
                 padding: 0;
-                font-family: 'Courier New', 'Courier', 'Consolas', 'Monaco', monospace;
-                font-size: ${fontSize};
-                white-space: pre;
-                word-wrap: normal;
-                line-height: 1.5;
-                letter-spacing: 0.5px;
-              }
-              .no-print {
-                display: flex;
-                gap: 10px;
-                justify-content: center;
-                margin: 20px 0;
-                padding: 20px;
-                background: #f3f4f6;
-                border-radius: 8px;
-              }
-              .btn {
-                padding: 12px 24px;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 600;
-                transition: all 0.2s;
-              }
-              .btn-print {
-                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
-                color: white;
-              }
-              .btn-print:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
-              }
-              .btn-close {
-                background: #6b7280;
-                color: white;
-              }
-              .btn-close:hover {
-                background: #4b5563;
-              }
-              .preview-container {
-                max-width: 400px;
-                margin: 20px auto;
-                background: #ffffff;
-                border-radius: 16px;
-                overflow: hidden;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
+                box-sizing: border-box;
               }
               html, body {
                 height: 100%;
+                width: 100%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                overflow: hidden;
+              }
+              body {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                padding: 20px;
+              }
+              .preview-wrapper {
+                width: 100%;
+                max-width: 420px;
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+              }
+              .preview-container {
+                background: #ffffff;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.4s ease-out;
+              }
+              @keyframes slideUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(30px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
               }
               .preview-header {
                 text-align: center;
-                padding: 24px 20px;
+                padding: 28px 24px;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                font-family: 'Segoe UI', Arial, sans-serif;
                 position: relative;
                 overflow: hidden;
               }
@@ -336,120 +293,175 @@ const BillingPage = ({ user }) => {
                 right: -50%;
                 width: 200%;
                 height: 200%;
-                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-                animation: shimmer 3s infinite;
+                background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+                animation: shimmer 4s ease-in-out infinite;
               }
               @keyframes shimmer {
-                0%, 100% { transform: translate(0, 0); }
-                50% { transform: translate(-20px, -20px); }
+                0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                50% { transform: translate(-30px, -30px) rotate(5deg); }
               }
               .preview-header h2 {
-                margin: 0;
-                font-size: 24px;
+                margin: 0 0 8px 0;
+                font-size: 26px;
                 font-weight: 700;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 10px;
+                gap: 12px;
                 position: relative;
                 z-index: 1;
+                letter-spacing: -0.5px;
               }
               .preview-header p {
-                margin: 8px 0 0 0;
-                font-size: 13px;
+                margin: 0;
+                font-size: 14px;
                 opacity: 0.95;
                 position: relative;
                 z-index: 1;
+                font-weight: 500;
               }
               .preview-badge {
                 display: inline-block;
-                background: rgba(255, 255, 255, 0.2);
-                padding: 4px 12px;
+                background: rgba(255, 255, 255, 0.25);
+                padding: 6px 14px;
                 border-radius: 20px;
-                font-size: 11px;
-                margin-top: 8px;
+                font-size: 12px;
+                margin-top: 10px;
                 backdrop-filter: blur(10px);
+                font-weight: 600;
+                letter-spacing: 0.5px;
               }
               .receipt-content {
-                padding: 20px;
-                background: #f8f9fa;
+                padding: 24px;
+                background: #f9fafb;
+                max-height: 60vh;
+                overflow-y: auto;
+              }
+              .receipt-content::-webkit-scrollbar {
+                width: 8px;
+              }
+              .receipt-content::-webkit-scrollbar-track {
+                background: #e5e7eb;
+                border-radius: 10px;
+              }
+              .receipt-content::-webkit-scrollbar-thumb {
+                background: #9ca3af;
+                border-radius: 10px;
+              }
+              .receipt-content::-webkit-scrollbar-thumb:hover {
+                background: #6b7280;
               }
               .receipt-paper {
                 background: #ffffff;
-                padding: 24px 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-                border: 1px solid #e5e7eb;
-                max-width: 100%;
-                overflow-x: auto;
+                padding: 28px 24px;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+                border: 2px solid #e5e7eb;
               }
               .receipt-paper pre {
                 background: #fafafa;
-                padding: 16px;
-                border-radius: 6px;
-                border: 1px dashed #d1d5db;
+                padding: 20px;
+                border-radius: 8px;
+                border: 2px dashed #d1d5db;
+                font-family: 'Courier New', 'Courier', 'Consolas', 'Monaco', monospace;
+                font-size: ${fontSize};
+                line-height: 1.6;
+                letter-spacing: 0.3px;
+                white-space: pre;
+                overflow-x: auto;
               }
               .action-buttons {
-                padding: 20px;
+                padding: 24px;
                 display: flex;
-                gap: 12px;
+                gap: 14px;
                 background: white;
-                border-top: 1px solid #e5e7eb;
+                border-top: 2px solid #f3f4f6;
               }
               .btn {
                 flex: 1;
-                padding: 14px 24px;
+                padding: 16px 28px;
                 border: none;
-                border-radius: 10px;
-                font-size: 15px;
-                font-weight: 600;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 700;
                 cursor: pointer;
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 8px;
+                gap: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+              }
+              .btn svg {
+                width: 20px;
+                height: 20px;
               }
               .btn-print {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                 color: white;
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
               }
               .btn-print:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+                transform: translateY(-3px);
+                box-shadow: 0 10px 30px rgba(16, 185, 129, 0.45);
               }
               .btn-print:active {
-                transform: translateY(0);
+                transform: translateY(-1px);
               }
               .btn-close {
                 background: #f3f4f6;
                 color: #374151;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
               }
               .btn-close:hover {
                 background: #e5e7eb;
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+              }
+              .btn-close:active {
+                transform: translateY(0);
               }
               @media print {
+                html, body {
+                  background: white !important;
+                }
                 .preview-header,
-                .action-buttons,
+                .action-buttons {
+                  display: none !important;
+                }
                 .receipt-content {
-                  display: none;
+                  padding: 0 !important;
+                  background: white !important;
+                  max-height: none !important;
                 }
                 .receipt-paper {
-                  box-shadow: none;
-                  border: none;
-                  padding: 0;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                  border-radius: 0 !important;
+                }
+                .receipt-paper pre {
+                  border: none !important;
+                  background: white !important;
+                  padding: 0 !important;
                 }
                 .preview-container {
-                  box-shadow: none;
-                  max-width: none;
+                  box-shadow: none !important;
+                  max-width: none !important;
+                  border-radius: 0 !important;
+                }
+                @page {
+                  size: ${paperWidth} auto;
+                  margin: 0;
                 }
               }
             </style>
           </head>
           <body>
-            <div class="preview-container">
-              <div class="preview-header no-print">
+            <div class="preview-wrapper">
+              <div class="preview-container">
+                <div class="preview-header no-print">
                 <h2>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -492,6 +504,7 @@ const BillingPage = ({ user }) => {
                   </svg>
                   Close
                 </button>
+              </div>
               </div>
             </div>
           </body>
