@@ -550,48 +550,54 @@ const BillingPage = ({ user }) => {
             <div class="preview-wrapper">
               <div class="preview-container">
                 <div class="preview-header no-print">
-                <h2>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                  Thermal Receipt Preview
-                </h2>
-                <p>Ready to print on ${paperWidth} thermal paper</p>
-                <div class="preview-badge">
-                  ${businessSettings?.receipt_theme || 'classic'} theme
+                  <div class="header-content">
+                    <h2>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                      </svg>
+                      Receipt Preview
+                    </h2>
+                    <p>Order #${order.id.slice(0, 8)} • ${paperWidth} Thermal Paper</p>
+                    <div class="preview-badge">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="10"></circle>
+                      </svg>
+                      ${businessSettings?.receipt_theme || 'classic'} theme
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div class="receipt-content no-print">
-                <div class="receipt-paper">
+                
+                <div class="receipt-content no-print">
+                  <div class="thermal-paper-wrapper">
+                    <div class="receipt-paper">
+                      <pre>${response.data.content}</pre>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="receipt-paper" style="display: none;">
                   <pre>${response.data.content}</pre>
                 </div>
-              </div>
-              
-              <div class="receipt-paper" style="display: none;">
-                <pre>${response.data.content}</pre>
-              </div>
-              
-              <div class="action-buttons no-print">
-                <button onclick="window.print()" class="btn btn-print">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                    <rect x="6" y="14" width="12" height="8"></rect>
-                  </svg>
-                  Print Receipt
-                </button>
-                <button onclick="window.close()" class="btn btn-close">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                  Close
-                </button>
+                
+                <div class="action-buttons no-print">
+                  <button onclick="window.print()" class="btn btn-print">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                      <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                    <span>Print</span>
+                  </button>
+                  <button onclick="window.close()" class="btn btn-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Close</span>
+                  </button>
               </div>
               </div>
             </div>
