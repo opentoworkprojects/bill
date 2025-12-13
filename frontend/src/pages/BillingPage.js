@@ -37,6 +37,8 @@ const BillingPage = ({ user }) => {
   const [orderNotes, setOrderNotes] = useState('');
   const [customerRating, setCustomerRating] = useState(0);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [receiptContent, setReceiptContent] = useState('');
 
   useEffect(() => {
     fetchOrder();
@@ -224,18 +226,49 @@ const BillingPage = ({ user }) => {
         params: { theme: businessSettings?.receipt_theme || 'classic' }
       });
       
-      // Determine paper width based on theme
-      const isCompact = businessSettings?.receipt_theme === 'compact';
-      const paperWidth = isCompact ? '58mm' : '80mm';
-      const fontSize = isCompact ? '10px' : '12px';
+      // Store receipt content and show inline preview
+      setReceiptContent(response.data.content);
+      setShowPrintPreview(true);
       
-      // Create a printable window with thermal receipt styling
-      const printWindow = window.open('', '', 'width=400,height=700');
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Thermal Receipt - Order #${order.id.slice(0, 8)}</title>
-            <style>
+      toast.success('Receipt ready for printing!');
+    } catch (error) {
+      console.error('Failed to print bill', error);
+      toast.error('Failed to generate receipt');
+    }
+  };
+
+  const handleActualPrint = () => {
+    window.print();
+  };
+
+  const closePrintPreview = () => {
+    setShowPrintPreview(false);
+  };
+
+  // Old popup code completely removed - now using inline modal
+
+  const downloadBillPDF = async () => {
+    if (!order) return;
+    try {
+      // Generate PDF using jsPDF
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      // Restaurant details
+      const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
+      const address = businessSettings?.address || '';
+      const phone = businessSettings?.phone || '';
+      const gst = businessSettings?.gst_number || '';
+      
+      // Header
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text(restaurantName, 105, 20, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      
+      // Continue with PDF generation
               * {
                 margin: 0;
                 padding: 0;
@@ -254,6 +287,9 @@ const BillingPage = ({ user }) => {
                 padding: 20px;
                 position: relative;
                 overflow: auto;
+              }
+              .print-only {
+                display: none !important;
               }
               body::before {
                 content: '';
@@ -511,37 +547,101 @@ const BillingPage = ({ user }) => {
                 transform: translateY(0);
               }
               @media print {
-                html, body {
-                  background: white !important;
-                }
-                .preview-header,
-                .action-buttons {
-                  display: none !important;
-                }
-                .receipt-content {
-                  padding: 0 !important;
-                  background: white !important;
-                  max-height: none !important;
-                }
-                .receipt-paper {
-                  box-shadow: none !important;
-                  border: none !important;
-                  padding: 0 !important;
-                  border-radius: 0 !important;
-                }
-                .receipt-paper pre {
-                  border: none !important;
-                  background: white !important;
-                  padding: 0 !important;
-                }
-                .preview-container {
-                  box-shadow: none !important;
-                  max-width: none !important;
-                  border-radius: 0 !important;
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
                 }
                 @page {
                   size: ${paperWidth} auto;
                   margin: 0;
+                  padding: 0;
+                }
+                html {
+                  margin: 0;
+                  padding: 0;
+                  width: ${paperWidth};
+                  height: auto;
+                }
+                body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: white !important;
+                  width: ${paperWidth} !important;
+                  min-height: auto !important;
+                  height: auto !important;
+                  display: block !important;
+                  overflow: visible !important;
+                }
+                body::before {
+                  display: none !important;
+                }
+                .no-print,
+                .preview-header,
+                .action-buttons,
+                .thermal-paper-wrapper {
+                  display: none !important;
+                }
+                .print-only {
+                  display: block !important;
+                }
+                .preview-wrapper {
+                  width: ${paperWidth} !important;
+                  max-width: ${paperWidth} !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  animation: none !important;
+                }
+                .preview-container {
+                  background: white !important;
+                  box-shadow: none !important;
+                  border-radius: 0 !important;
+                  overflow: visible !important;
+                  width: ${paperWidth} !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                }
+                .receipt-content {
+                  padding: 0 !important;
+                  background: white !important;
+                  display: block !important;
+                  width: ${paperWidth} !important;
+                  margin: 0 !important;
+                }
+                .receipt-paper {
+                  background: white !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  border-radius: 0 !important;
+                  width: ${paperWidth} !important;
+                  max-width: ${paperWidth} !important;
+                  overflow: visible !important;
+                }
+                .receipt-paper::before,
+                .receipt-paper::after {
+                  display: none !important;
+                }
+                .receipt-paper pre {
+                  background: white !important;
+                  border: none !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  border-radius: 0 !important;
+                  font-family: 'Courier New', 'Courier', monospace !important;
+                  font-size: ${fontSize} !important;
+                  line-height: 1.3 !important;
+                  letter-spacing: 0 !important;
+                  white-space: pre !important;
+                  word-wrap: normal !important;
+                  word-break: normal !important;
+                  overflow: visible !important;
+                  color: #000 !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  box-sizing: border-box !important;
+                  display: block !important;
                 }
               }
             </style>
@@ -578,8 +678,11 @@ const BillingPage = ({ user }) => {
                   </div>
                 </div>
                 
-                <div class="receipt-paper" style="display: none;">
-                  <pre>${response.data.content}</pre>
+                <!-- Print-only content with exact formatting -->
+                <div class="receipt-content print-only" style="display: none;">
+                  <div class="receipt-paper">
+                    <pre>${response.data.content}</pre>
+                  </div>
                 </div>
                 
                 <div class="action-buttons no-print">
@@ -603,41 +706,7 @@ const BillingPage = ({ user }) => {
             </div>
           </body>
         </html>
-      `);
-      printWindow.document.close();
-      
-      // Auto-trigger print dialog after a short delay
-      setTimeout(() => {
-        printWindow.focus();
-      }, 250);
-      
-      toast.success('Receipt ready for printing!');
-    } catch (error) {
-      console.error('Failed to print bill', error);
-      toast.error('Failed to generate receipt');
-    }
-  };
 
-  const downloadBill = async () => {
-    if (!order) return;
-    try {
-      // Generate PDF using jsPDF
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      
-      // Restaurant details
-      const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
-      const address = businessSettings?.address || '';
-      const phone = businessSettings?.phone || '';
-      const gst = businessSettings?.gst_number || '';
-      
-      // Header
-      doc.setFontSize(20);
-      doc.setFont(undefined, 'bold');
-      doc.text(restaurantName, 105, 20, { align: 'center' });
-      
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
       if (address) doc.text(address, 105, 28, { align: 'center' });
       if (phone) doc.text(`Phone: ${phone}`, 105, 34, { align: 'center' });
       if (gst) doc.text(`GSTIN: ${gst}`, 105, 40, { align: 'center' });
@@ -1259,6 +1328,67 @@ const BillingPage = ({ user }) => {
           </div>
         )}
       </div>
+
+      {/* Inline Print Preview Modal */}
+      {showPrintPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-auto bg-slate-800 rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="sticky top-0 z-10 px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Receipt className="w-6 h-6 text-white" />
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Receipt Preview</h3>
+                    <p className="text-sm text-indigo-100">Order #{order?.id?.slice(0, 8)}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={closePrintPreview}
+                  className="p-2 text-white transition-colors rounded-lg hover:bg-white/20"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Receipt Content */}
+            <div className="p-6">
+              <div className="relative p-5 bg-gradient-to-b from-slate-700 to-slate-800 rounded-2xl">
+                <div className="bg-white rounded-xl shadow-xl overflow-hidden">
+                  <pre className="p-6 font-mono text-sm leading-relaxed text-gray-900 whitespace-pre-wrap">
+                    {receiptContent}
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="sticky bottom-0 flex gap-3 px-6 py-5 bg-slate-800 border-t border-slate-700">
+              <button
+                onClick={handleActualPrint}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 text-white font-semibold bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                <Printer className="w-5 h-5" />
+                Print Receipt
+              </button>
+              <button
+                onClick={closePrintPreview}
+                className="px-6 py-3 text-slate-300 font-semibold bg-slate-700 rounded-xl hover:bg-slate-600 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {/* Print-only content */}
+          <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[9999]">
+            <pre className="font-mono text-sm leading-snug whitespace-pre">
+              {receiptContent}
+            </pre>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
