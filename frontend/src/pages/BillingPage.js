@@ -39,6 +39,7 @@ const BillingPage = ({ user }) => {
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [receiptContent, setReceiptContent] = useState('');
+  const [thermalPaperSize, setThermalPaperSize] = useState('80mm'); // 58mm or 80mm
 
   useEffect(() => {
     fetchOrder();
@@ -910,13 +911,52 @@ const BillingPage = ({ user }) => {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              
+              {/* Paper Size Selector */}
+              <div className="mt-4 flex items-center gap-3">
+                <span className="text-sm text-indigo-100 font-medium">Paper Size:</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setThermalPaperSize('58mm')}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      thermalPaperSize === '58mm'
+                        ? 'bg-white text-indigo-600 shadow-lg'
+                        : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                  >
+                    58mm
+                  </button>
+                  <button
+                    onClick={() => setThermalPaperSize('80mm')}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      thermalPaperSize === '80mm'
+                        ? 'bg-white text-indigo-600 shadow-lg'
+                        : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                  >
+                    80mm
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Receipt Content */}
             <div className="p-6">
               <div className="relative p-5 bg-gradient-to-b from-slate-700 to-slate-800 rounded-2xl">
-                <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-                  <pre className="p-6 font-mono text-sm leading-relaxed text-gray-900 whitespace-pre-wrap">
+                <div 
+                  className="bg-white rounded-xl shadow-xl overflow-hidden mx-auto"
+                  style={{ 
+                    maxWidth: thermalPaperSize === '58mm' ? '220px' : '302px',
+                    width: '100%'
+                  }}
+                >
+                  <pre 
+                    className="p-4 font-mono leading-relaxed text-gray-900 whitespace-pre-wrap"
+                    style={{ 
+                      fontSize: thermalPaperSize === '58mm' ? '10px' : '12px',
+                      lineHeight: '1.3'
+                    }}
+                  >
                     {receiptContent}
                   </pre>
                 </div>
@@ -941,11 +981,63 @@ const BillingPage = ({ user }) => {
             </div>
           </div>
 
-          {/* Print-only content */}
+          {/* Print-only content with thermal printer styles */}
           <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[9999]">
-            <pre className="font-mono text-sm leading-snug whitespace-pre">
-              {receiptContent}
-            </pre>
+            <style>{`
+              @page {
+                size: ${thermalPaperSize} auto;
+                margin: 0;
+              }
+              
+              @media print {
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+                
+                html, body {
+                  width: ${thermalPaperSize} !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: white !important;
+                  overflow: visible !important;
+                }
+                
+                .thermal-receipt-container {
+                  width: ${thermalPaperSize} !important;
+                  max-width: ${thermalPaperSize} !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: white !important;
+                  box-sizing: border-box !important;
+                }
+                
+                .thermal-receipt-content {
+                  font-family: 'Courier New', 'Courier', 'Consolas', monospace !important;
+                  font-size: ${thermalPaperSize === '58mm' ? '9px' : '11px'} !important;
+                  line-height: 1.2 !important;
+                  color: #000 !important;
+                  white-space: pre !important;
+                  word-wrap: normal !important;
+                  margin: 0 !important;
+                  padding: 2mm !important;
+                  background: white !important;
+                  width: 100% !important;
+                  box-sizing: border-box !important;
+                }
+                
+                /* Hide everything except thermal receipt */
+                body > *:not(.thermal-receipt-container) {
+                  display: none !important;
+                }
+              }
+            `}</style>
+            <div className="thermal-receipt-container">
+              <pre className="thermal-receipt-content">
+                {receiptContent}
+              </pre>
+            </div>
           </div>
         </div>
       )}
