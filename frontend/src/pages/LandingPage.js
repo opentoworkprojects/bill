@@ -437,7 +437,7 @@ const LandingPage = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <ChefHat className="w-6 h-6 text-white" />
+                <ChefHat className="w-6 h-6 text-white" aria-hidden="true" />
               </div>
               <span
                 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent"
@@ -579,7 +579,7 @@ const LandingPage = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-violet-100 rounded-full mb-6">
-              <Sparkles className="w-4 h-4 text-violet-600" />
+              <Sparkles className="w-4 h-4 text-violet-600" aria-hidden="true" />
               <span className="text-sm font-medium text-violet-600">
                 AI-Powered Restaurant Management
               </span>
@@ -589,8 +589,18 @@ const LandingPage = () => {
               className="text-4xl md:text-6xl font-bold mb-6 leading-tight"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              BillByteKOT – Restaurant Billing & KOT Software in India
+              Restaurant Billing Software India – BillByteKOT KOT System
             </h1>
+            
+            {/* Hero Image for SEO */}
+            <div className="mb-8 max-w-3xl mx-auto">
+              <img 
+                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E%3Crect fill='%23f3f4f6' width='1200' height='600'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='48' fill='%237c3aed'%3EBillByteKOT Restaurant Billing Software%3C/text%3E%3C/svg%3E"
+                alt="BillByteKOT Restaurant Billing Software India - KOT System, Thermal Printing, GST Billing"
+                className="w-full h-auto rounded-2xl shadow-2xl"
+                loading="eager"
+              />
+            </div>
 
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Transform your restaurant with AI-powered billing, multi-currency
@@ -646,6 +656,43 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Quick Links Section for Internal Linking */}
+      <section className="py-12 bg-gray-50 border-y border-gray-200">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-2xl font-bold text-center mb-8 text-gray-900">
+              Explore BillByteKOT Restaurant Solutions
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <a href="/blog" className="flex flex-col items-center p-4 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <Package className="w-8 h-8 text-violet-600 mb-2" />
+                <span className="text-sm font-medium text-gray-900 text-center">Restaurant Blog</span>
+              </a>
+              <a href="/download" className="flex flex-col items-center p-4 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <Download className="w-8 h-8 text-blue-600 mb-2" />
+                <span className="text-sm font-medium text-gray-900 text-center">Download App</span>
+              </a>
+              <a href="/contact" className="flex flex-col items-center p-4 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <MessageCircle className="w-8 h-8 text-green-600 mb-2" />
+                <span className="text-sm font-medium text-gray-900 text-center">Contact Sales</span>
+              </a>
+              <a href="/login" className="flex flex-col items-center p-4 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <Users className="w-8 h-8 text-orange-600 mb-2" />
+                <span className="text-sm font-medium text-gray-900 text-center">Login / Signup</span>
+              </a>
+              <a href="/privacy" className="flex flex-col items-center p-4 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <Shield className="w-8 h-8 text-purple-600 mb-2" />
+                <span className="text-sm font-medium text-gray-900 text-center">Privacy Policy</span>
+              </a>
+              <a href="#pricing" className="flex flex-col items-center p-4 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <DollarSign className="w-8 h-8 text-pink-600 mb-2" />
+                <span className="text-sm font-medium text-gray-900 text-center">View Pricing</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* SEO Content Section - Main Homepage Content */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
@@ -654,12 +701,12 @@ const LandingPage = () => {
               BillByteKOT is India's most trusted <strong>restaurant billing software</strong> designed specifically for Indian restaurants, cafes, and food businesses. Our comprehensive <strong>KOT (Kitchen Order Ticket) system</strong> streamlines your entire restaurant operations from order taking to billing, making it the perfect solution for restaurants of all sizes across India.
             </p>
 
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Complete Restaurant Management Solution</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Complete Restaurant Billing Software with KOT System</h2>
             <p className="text-lg text-gray-700 leading-relaxed mb-6">
               Whether you run a small cafe, quick service restaurant, or fine dining establishment, BillByteKOT provides everything you need in one powerful platform. Our <strong>restaurant billing software</strong> includes advanced features like <strong>GST billing</strong>, inventory management, thermal printing, table management, and real-time analytics. With support for multiple payment methods including cash, card, UPI, and online payments through Razorpay integration, you can accept payments seamlessly from your customers.
             </p>
 
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Why Choose BillByteKOT for Your Restaurant?</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Best Restaurant Billing Software Features in India</h2>
             <p className="text-lg text-gray-700 leading-relaxed mb-4">
               Our <strong>KOT system</strong> is specifically designed for Indian restaurants with features that matter most to your business. Generate professional bills with <strong>GST compliance</strong>, manage your inventory with low-stock alerts, track sales with detailed reports, and print receipts on thermal printers with 6 beautiful themes. BillByteKOT supports multi-currency operations, making it perfect for restaurants serving international customers or operating in tourist areas.
             </p>
@@ -675,12 +722,12 @@ const LandingPage = () => {
               <li><strong>Staff Management:</strong> Role-based access for admin, cashiers, waiters, and kitchen staff</li>
             </ul>
 
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Free Trial – Try Before You Buy</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Free Restaurant Billing Software Trial – No Credit Card</h2>
             <p className="text-lg text-gray-700 leading-relaxed mb-6">
               Start with our <strong>7-day free trial</strong> and experience all premium features without any credit card requirement. Process unlimited bills during your trial period and see how BillByteKOT can transform your restaurant operations. After the trial, continue with our affordable pricing at just <strong>₹499 per year</strong> with unlimited bills and all features included. No hidden fees, no per-transaction charges – just straightforward pricing that works for your business.
             </p>
 
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Trusted Across India – Mumbai to Bangalore</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4 mt-8">Trusted Restaurant POS Software Across India</h2>
             <p className="text-lg text-gray-700 leading-relaxed mb-6">
               BillByteKOT is the preferred <strong>restaurant billing software</strong> for businesses across major Indian cities including Mumbai, Delhi, Bangalore, Hyderabad, Chennai, Kolkata, Pune, Ahmedabad, Jaipur, and Surat. Whether you operate a small cafe in Bangalore, a fine dining restaurant in Mumbai, or a quick service restaurant in Delhi, our software adapts to your specific needs. With cloud-based access, manage your restaurant from anywhere in India with just an internet connection.
             </p>
@@ -692,6 +739,40 @@ const LandingPage = () => {
               <p className="text-gray-700">
                 Trusted by restaurants across India for reliable billing, efficient KOT management, and comprehensive business insights. Get started today and take your restaurant to the next level!
               </p>
+            </div>
+
+            <div className="my-8 p-6 bg-gray-50 rounded-lg">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Related Resources</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <a href="/blog" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                  <Package className="w-6 h-6 text-violet-600 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Restaurant Management Blog</div>
+                    <div className="text-sm text-gray-600">Tips & guides for restaurants</div>
+                  </div>
+                </a>
+                <a href="/download" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                  <Download className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Download Desktop App</div>
+                    <div className="text-sm text-gray-600">Windows, Mac & Linux</div>
+                  </div>
+                </a>
+                <a href="/contact" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                  <MessageCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Contact Support</div>
+                    <div className="text-sm text-gray-600">Get help from our team</div>
+                  </div>
+                </a>
+                <a href="/privacy" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                  <Shield className="w-6 h-6 text-purple-600 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Privacy & Security</div>
+                    <div className="text-sm text-gray-600">Your data is safe with us</div>
+                  </div>
+                </a>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-4 mt-8 justify-center">
@@ -788,33 +869,39 @@ const LandingPage = () => {
           <div className="mt-16 max-w-5xl mx-auto">
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all">
-                <div className="aspect-video bg-gradient-to-br from-violet-600/30 to-purple-600/30 rounded-lg mb-4 flex items-center justify-center">
-                  <div className="text-center">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-violet-300" />
-                    <span className="text-sm text-violet-200">Dashboard</span>
-                  </div>
+                <div className="aspect-video bg-gradient-to-br from-violet-600/30 to-purple-600/30 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 225'%3E%3Crect fill='%237c3aed' width='400' height='225'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='white'%3EDashboard%3C/text%3E%3C/svg%3E"
+                    alt="Restaurant billing software dashboard with real-time sales analytics and order tracking"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
                 <h4 className="font-semibold mb-1">Real-time Dashboard</h4>
                 <p className="text-sm text-gray-400">Track sales, orders, and revenue at a glance</p>
               </div>
               
               <div className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all">
-                <div className="aspect-video bg-gradient-to-br from-green-600/30 to-emerald-600/30 rounded-lg mb-4 flex items-center justify-center">
-                  <div className="text-center">
-                    <Package className="w-12 h-12 mx-auto mb-2 text-green-300" />
-                    <span className="text-sm text-green-200">Menu</span>
-                  </div>
+                <div className="aspect-video bg-gradient-to-br from-green-600/30 to-emerald-600/30 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 225'%3E%3Crect fill='%2310b981' width='400' height='225'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='white'%3EMenu%3C/text%3E%3C/svg%3E"
+                    alt="Restaurant menu management system with categories and pricing for Indian restaurants"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
                 <h4 className="font-semibold mb-1">Menu Management</h4>
                 <p className="text-sm text-gray-400">Organize items by category with images</p>
               </div>
               
               <div className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all">
-                <div className="aspect-video bg-gradient-to-br from-orange-600/30 to-amber-600/30 rounded-lg mb-4 flex items-center justify-center">
-                  <div className="text-center">
-                    <Printer className="w-12 h-12 mx-auto mb-2 text-orange-300" />
-                    <span className="text-sm text-orange-200">Billing</span>
-                  </div>
+                <div className="aspect-video bg-gradient-to-br from-orange-600/30 to-amber-600/30 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 225'%3E%3Crect fill='%23f97316' width='400' height='225'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='white'%3EThermal Print%3C/text%3E%3C/svg%3E"
+                    alt="Thermal printer receipt templates for restaurant billing with GST compliance"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
                 <h4 className="font-semibold mb-1">Thermal Printing</h4>
                 <p className="text-sm text-gray-400">6 professional receipt themes</p>
@@ -841,7 +928,7 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Why BillByteKOT AI?
+              Why Choose BillByteKOT Restaurant POS System?
             </h2>
             <p className="text-xl text-gray-600">
               The complete solution for modern restaurants
@@ -974,7 +1061,7 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Powerful Features
+              Restaurant Billing Software Features
             </h2>
             <p className="text-xl text-gray-600">
               Everything you need to run your restaurant efficiently
@@ -1012,7 +1099,7 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Loved by Restaurants
+              Restaurant Billing Software Reviews & Testimonials
             </h2>
             <p className="text-xl text-gray-600">
               Join thousands of happy restaurant owners
@@ -1065,7 +1152,7 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Simple Pricing
+              Restaurant POS Software Pricing India
             </h2>
             <p className="text-xl text-gray-600">
               Start free, upgrade when you grow
@@ -1129,7 +1216,7 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl font-bold mb-4"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Frequently Asked Questions
+              Restaurant Billing Software FAQ
             </h2>
           </div>
 
