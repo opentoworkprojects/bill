@@ -469,6 +469,168 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+async def send_password_reset_email(email: str, reset_link: str, username: str = "User"):
+    """Send password reset email with reset link"""
+    import os
+    
+    # Get email configuration
+    EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "console")
+    
+    subject = "Reset Your BillByteKOT Password"
+    
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #f5f5f5;
+                margin: 0;
+                padding: 0;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 40px auto;
+                background-color: #ffffff;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }}
+            .header {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 40px 20px;
+                text-align: center;
+            }}
+            .header h1 {{
+                color: #ffffff;
+                margin: 0;
+                font-size: 28px;
+            }}
+            .content {{
+                padding: 40px 30px;
+            }}
+            .button {{
+                display: inline-block;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: #ffffff;
+                padding: 15px 40px;
+                text-decoration: none;
+                border-radius: 8px;
+                margin: 20px 0;
+                font-weight: bold;
+            }}
+            .info {{
+                background-color: #f8f9fa;
+                border-left: 4px solid #667eea;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }}
+            .footer {{
+                background-color: #f8f9fa;
+                padding: 20px;
+                text-align: center;
+                color: #6c757d;
+                font-size: 14px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🍽️ BillByteKOT</h1>
+                <p style="color: #ffffff; margin: 10px 0 0 0;">Restaurant Management System</p>
+            </div>
+            
+            <div class="content">
+                <h2 style="color: #333;">Hello {username}! 👋</h2>
+                <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                    We received a request to reset your password for your BillByteKOT account.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_link}" class="button">Reset Password</a>
+                </div>
+                
+                <div class="info">
+                    <p style="margin: 0; color: #666;">
+                        <strong>⏰ Valid for 1 hour</strong><br>
+                        This reset link will expire in 1 hour for security reasons.
+                    </p>
+                </div>
+                
+                <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                    If you didn't request a password reset, please ignore this email or contact support if you have concerns.
+                </p>
+                
+                <p style="color: #999; font-size: 12px; margin-top: 20px;">
+                    If the button doesn't work, copy and paste this link into your browser:<br>
+                    <a href="{reset_link}" style="color: #667eea;">{reset_link}</a>
+                </p>
+            </div>
+            
+            <div class="footer">
+                <p style="margin: 0;">
+                    <strong>BillByteKOT</strong> - Smart Restaurant Management<br>
+                    © 2025 FinVerge Technologies. All rights reserved.
+                </p>
+                <p style="margin: 10px 0 0 0; font-size: 12px;">
+                    This is an automated email. Please do not reply.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    text_body = f"""
+    Hello {username}!
+    
+    We received a request to reset your password for your BillByteKOT account.
+    
+    Click the link below to reset your password:
+    {reset_link}
+    
+    This link is valid for 1 hour.
+    
+    If you didn't request a password reset, please ignore this email.
+    
+    ---
+    BillByteKOT - Smart Restaurant Management
+    © 2025 FinVerge Technologies
+    """
+    
+    # Console mode for development
+    if EMAIL_PROVIDER == "console" or EMAIL_PROVIDER == "":
+        print(f"\n{'='*60}")
+        print(f"📧 PASSWORD RESET EMAIL (Console Mode)")
+        print(f"{'='*60}")
+        print(f"To: {email}")
+        print(f"Subject: {subject}")
+        print(f"Reset Link: {reset_link}")
+        print(f"{'='*60}\n")
+        return {"success": True, "message": "Email logged to console (dev mode)"}
+    
+    # Try to use email_service if configured
+    try:
+        from email_service import send_via_smtp, send_via_sendgrid, send_via_mailgun, send_via_ses
+        
+        if EMAIL_PROVIDER == "smtp":
+            return await send_via_smtp(email, subject, html_body, text_body)
+        elif EMAIL_PROVIDER == "sendgrid":
+            return await send_via_sendgrid(email, subject, html_body, text_body)
+        elif EMAIL_PROVIDER == "mailgun":
+            return await send_via_mailgun(email, subject, html_body, text_body)
+        elif EMAIL_PROVIDER == "ses":
+            return await send_via_ses(email, subject, html_body, text_body)
+    except Exception as e:
+        print(f"Email service error: {e}")
+        # Fallback to console
+        print(f"\n[EMAIL FALLBACK] To: {email}, Link: {reset_link}")
+        return {"success": False, "message": str(e)}
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -1011,133 +1173,11 @@ async def forgot_password(request: ForgotPasswordRequest):
     
     # Send email with reset link
     try:
-        from email_service import send_otp_email
-        
-        # Create reset link (frontend will handle this)
+        # Create reset link
         reset_link = f"https://billbytekot.in/reset-password?token={reset_token}"
         
-        # For now, we'll use the OTP email function but customize the message
-        # In production, create a dedicated password reset email template
-        subject = "Reset Your BillByteKOT Password"
-        
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background-color: #f5f5f5;
-                    margin: 0;
-                    padding: 0;
-                }}
-                .container {{
-                    max-width: 600px;
-                    margin: 40px auto;
-                    background-color: #ffffff;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                }}
-                .header {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    padding: 40px 20px;
-                    text-align: center;
-                }}
-                .header h1 {{
-                    color: #ffffff;
-                    margin: 0;
-                    font-size: 28px;
-                }}
-                .content {{
-                    padding: 40px 30px;
-                }}
-                .button {{
-                    display: inline-block;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: #ffffff;
-                    padding: 15px 40px;
-                    text-decoration: none;
-                    border-radius: 8px;
-                    margin: 20px 0;
-                    font-weight: bold;
-                }}
-                .info {{
-                    background-color: #f8f9fa;
-                    border-left: 4px solid #667eea;
-                    padding: 15px;
-                    margin: 20px 0;
-                    border-radius: 4px;
-                }}
-                .footer {{
-                    background-color: #f8f9fa;
-                    padding: 20px;
-                    text-align: center;
-                    color: #6c757d;
-                    font-size: 14px;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🍽️ BillByteKOT</h1>
-                    <p style="color: #ffffff; margin: 10px 0 0 0;">Restaurant Management System</p>
-                </div>
-                
-                <div class="content">
-                    <h2 style="color: #333;">Password Reset Request</h2>
-                    <p style="color: #666; font-size: 16px; line-height: 1.6;">
-                        We received a request to reset your password for your BillByteKOT account.
-                    </p>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{reset_link}" class="button">Reset Password</a>
-                    </div>
-                    
-                    <div class="info">
-                        <p style="margin: 0; color: #666;">
-                            <strong>⏰ Valid for 1 hour</strong><br>
-                            This reset link will expire in 1 hour for security reasons.
-                        </p>
-                    </div>
-                    
-                    <p style="color: #666; font-size: 14px; margin-top: 30px;">
-                        If you didn't request a password reset, please ignore this email or contact support if you have concerns.
-                    </p>
-                    
-                    <p style="color: #999; font-size: 12px; margin-top: 20px;">
-                        If the button doesn't work, copy and paste this link into your browser:<br>
-                        <a href="{reset_link}" style="color: #667eea;">{reset_link}</a>
-                    </p>
-                </div>
-                
-                <div class="footer">
-                    <p style="margin: 0;">
-                        <strong>BillByteKOT</strong> - Smart Restaurant Management<br>
-                        © 2025 FinVerge Technologies. All rights reserved.
-                    </p>
-                    <p style="margin: 10px 0 0 0; font-size: 12px;">
-                        This is an automated email. Please do not reply.
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        # Send email (simplified version - in production use proper email service)
-        print(f"\n{'='*60}")
-        print(f"📧 PASSWORD RESET EMAIL")
-        print(f"{'='*60}")
-        print(f"To: {request.email}")
-        print(f"Reset Link: {reset_link}")
-        print(f"Token: {reset_token}")
-        print(f"Expires: {expires_at}")
-        print(f"{'='*60}\n")
-        
-        # TODO: Integrate with email_service.py for production
-        # For now, just log to console
+        # Send password reset email
+        await send_password_reset_email(request.email, reset_link, user.get("username", "User"))
         
     except Exception as e:
         print(f"Failed to send reset email: {e}")
