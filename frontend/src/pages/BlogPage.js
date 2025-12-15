@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp } from 'lucide-react';
+import blogPostsData from '../data/blogPosts';
 
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const blogPosts = [
+  const blogPosts = blogPostsData.concat([
     {
       id: 1,
       title: 'Complete Guide to Restaurant Billing Software in India 2024',
@@ -153,7 +154,7 @@ const BlogPage = () => {
       slug: 'payment-integration-razorpay',
       featured: false
     }
-  ];
+  ]);
 
   const filteredPosts = blogPosts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

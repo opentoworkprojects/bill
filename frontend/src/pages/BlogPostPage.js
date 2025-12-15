@@ -3,10 +3,94 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { ChefHat, Calendar, User, Clock, ArrowLeft, Share2, BookmarkPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import blogPostsData from '../data/blogPosts';
 
 const BlogPostPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+
+  // Check if post exists in new blog posts data
+  const newBlogPost = blogPostsData.find(post => post.slug === slug);
+  
+  if (newBlogPost) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        {/* Header */}
+        <header className="bg-white border-b sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Link to="/" className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <ChefHat className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                  BillByteKOT
+                </span>
+              </Link>
+              <Button variant="outline" onClick={() => navigate('/blog')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Blog
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Article */}
+        <article className="container mx-auto px-4 py-12 max-w-4xl">
+          {/* Hero Image */}
+          <img 
+            src={newBlogPost.image} 
+            alt={newBlogPost.title}
+            className="w-full h-96 object-cover rounded-2xl shadow-2xl mb-8"
+          />
+
+          {/* Meta Info */}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              {new Date(newBlogPost.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+            <span className="flex items-center gap-1">
+              <User className="w-4 h-4" />
+              {newBlogPost.author}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              {newBlogPost.readTime}
+            </span>
+            <span className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
+              {newBlogPost.category}
+            </span>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+            {newBlogPost.title}
+          </h1>
+
+          {/* Content */}
+          <div className="prose prose-lg max-w-none">
+            <div dangerouslySetInnerHTML={{ __html: newBlogPost.content.replace(/\n/g, '<br/>').replace(/###/g, '<h3>').replace(/##/g, '<h2>').replace(/\*\*/g, '<strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>') }} />
+          </div>
+
+          {/* CTA */}
+          <div className="mt-12 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
+            <h3 className="text-2xl font-bold mb-4">Ready to Get Started?</h3>
+            <p className="text-lg mb-6 opacity-90">
+              Start your 7-day free trial today. No credit card required.
+            </p>
+            <Button 
+              size="lg"
+              className="bg-white text-violet-600 hover:bg-gray-100 h-12 px-8"
+              onClick={() => navigate('/login')}
+            >
+              Start Free Trial
+            </Button>
+          </div>
+        </article>
+      </div>
+    );
+  }
 
   const blogContent = {
     'restaurant-billing-software-guide-2025': {

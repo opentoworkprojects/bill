@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Search, Upload, X } from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
 import TrialBanner from '../components/TrialBanner';
+import ValidationAlert from '../components/ValidationAlert';
 
 const MenuPage = ({ user }) => {
   const [menuItems, setMenuItems] = useState([]);
@@ -21,6 +22,7 @@ const MenuPage = ({ user }) => {
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef(null);
+  const [validationErrors, setValidationErrors] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -88,6 +90,25 @@ const MenuPage = ({ user }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    const errors = [];
+    if (!formData.name || formData.name.trim() === '') {
+      errors.push('Item Name is required');
+    }
+    if (!formData.category || formData.category.trim() === '') {
+      errors.push('Category is required');
+    }
+    if (!formData.price || formData.price <= 0) {
+      errors.push('Price must be greater than 0');
+    }
+    
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setTimeout(() => setValidationErrors([]), 5000);
+      return;
+    }
+    
     try {
       if (editingItem) {
         await axios.put(`${API}/menu/${editingItem.id}`, formData);
@@ -151,6 +172,7 @@ const MenuPage = ({ user }) => {
 
   return (
     <Layout user={user}>
+      <ValidationAlert errors={validationErrors} onClose={() => setValidationErrors([])} />
       <div className="space-y-6" data-testid="menu-page">
         <TrialBanner user={user} />
         <div className="flex justify-between items-center flex-wrap gap-4">

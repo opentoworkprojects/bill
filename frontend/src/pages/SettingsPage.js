@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Settings as SettingsIcon, CreditCard, Shield, Info, Printer, Building2, MessageCircle } from 'lucide-react';
 import PrintCustomization from '../components/PrintCustomization';
 import WhatsAppDesktop from '../components/WhatsAppDesktop';
+import ValidationAlert from '../components/ValidationAlert';
 
 const SettingsPage = ({ user }) => {
   const [activeTab, setActiveTab] = useState('business');
@@ -31,7 +32,9 @@ const SettingsPage = ({ user }) => {
     logo_url: '',
     website: '',
     tagline: '',
-    footer_message: 'Thank you for dining with us!'
+    footer_message: 'Thank you for dining with us!',
+    kot_mode_enabled: true, // KOT mode for restaurants with tables
+    business_type: 'restaurant' // restaurant, stall, food-truck, takeaway-only
   });
   const [whatsappSettings, setWhatsappSettings] = useState({
     whatsapp_enabled: false,
@@ -50,6 +53,7 @@ const SettingsPage = ({ user }) => {
   const [businessLoading, setBusinessLoading] = useState(false);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [razorpayConfigured, setRazorpayConfigured] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   useEffect(() => {
     fetchRazorpaySettings();
@@ -138,8 +142,18 @@ const SettingsPage = ({ user }) => {
   };
 
   const handleSaveBusinessSettings = async () => {
-    if (!businessSettings.restaurant_name || !businessSettings.phone) {
-      toast.error('Restaurant name and phone are required');
+    const errors = [];
+    
+    if (!businessSettings.restaurant_name) {
+      errors.push('Restaurant Name is required');
+    }
+    if (!businessSettings.phone) {
+      errors.push('Phone Number is required');
+    }
+    
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setTimeout(() => setValidationErrors([]), 5000);
       return;
     }
     
@@ -190,6 +204,7 @@ const SettingsPage = ({ user }) => {
 
   return (
     <Layout user={user}>
+      <ValidationAlert errors={validationErrors} onClose={() => setValidationErrors([])} />
       <div className="space-y-6" data-testid="settings-page">
         <TrialBanner user={user} />
         <div className="flex items-center justify-between">
@@ -544,7 +559,103 @@ const SettingsPage = ({ user }) => {
               Update your restaurant information and receipt settings
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Business Type & KOT Mode Toggle */}
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Business Type & KOT Mode</h3>
+                  <p className="text-sm text-gray-600">
+                    Configure how your business operates. KOT mode is for restaurants with table service.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Business Type Selection */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Business Type</Label>
+                  <select
+                    value={businessSettings.business_type || 'restaurant'}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      setBusinessSettings({ 
+                        ...businessSettings, 
+                        business_type: newType,
+                        // Auto-disable KOT for non-restaurant types
+                        kot_mode_enabled: newType === 'restaurant' ? businessSettings.kot_mode_enabled : false
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="restaurant">🍽️ Restaurant (Dine-in with tables)</option>
+                    <option value="stall">🏪 Food Stall (Counter service)</option>
+                    <option value="food-truck">🚚 Food Truck (Mobile service)</option>
+                    <option value="takeaway-only">📦 Takeaway Only (No dine-in)</option>
+                    <option value="cafe">☕ Cafe (Mixed service)</option>
+                    <option value="cloud-kitchen">🏠 Cloud Kitchen (Delivery only)</option>
+                  </select>
+                </div>
+
+                {/* KOT Mode Toggle */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">KOT Mode</Label>
+                  <div className="flex items-center gap-3 p-3 bg-white rounded-md border border-gray-200">
+                    <button
+                      onClick={() => setBusinessSettings({ ...businessSettings, kot_mode_enabled: !businessSettings.kot_mode_enabled })}
+                      disabled={businessSettings.business_type !== 'restaurant' && businessSettings.business_type !== 'cafe'}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        businessSettings.kot_mode_enabled 
+                          ? 'bg-blue-600' 
+                          : 'bg-gray-300'
+                      } ${
+                        (businessSettings.business_type !== 'restaurant' && businessSettings.business_type !== 'cafe')
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          businessSettings.kot_mode_enabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {businessSettings.kot_mode_enabled ? 'Enabled' : 'Disabled'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {businessSettings.kot_mode_enabled 
+                          ? 'Table & KOT management active'
+                          : 'Simple billing only'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Message */}
+              <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-100">
+                <div className="flex gap-2">
+                  <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-800">
+                    {businessSettings.kot_mode_enabled ? (
+                      <>
+                        <strong>KOT Mode Enabled:</strong> Customers must select a table when ordering. 
+                        Orders are sent to kitchen displays. Best for dine-in restaurants.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Simple Billing Mode:</strong> No table selection required. 
+                        Direct billing without KOT. Perfect for stalls, food trucks, and takeaway-only businesses.
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Restaurant Name *</Label>

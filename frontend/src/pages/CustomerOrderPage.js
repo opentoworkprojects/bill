@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast, Toaster } from 'sonner';
 import { ShoppingCart, Plus, Minus, X, CreditCard, Banknote, Smartphone, ChefHat, Search } from 'lucide-react';
+import ValidationAlert from '../components/ValidationAlert';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -35,6 +36,7 @@ const CustomerOrderPage = () => {
   const [showCustomerInfoPopup, setShowCustomerInfoPopup] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [step, setStep] = useState(1); // 1: Menu, 2: Cart, 3: Payment
+  const [validationErrors, setValidationErrors] = useState([]);
 
   useEffect(() => {
     fetchMenu();
@@ -45,6 +47,14 @@ const CustomerOrderPage = () => {
     try {
       const response = await axios.get(`${BACKEND_URL}/api/public/menu/${orgId}`);
       setMenu(response.data);
+      
+      // Check if KOT mode is enabled for this restaurant
+      const kotEnabled = response.data.business_settings?.kot_mode_enabled !== false;
+      
+      // If KOT mode is disabled, set order type to takeaway by default
+      if (!kotEnabled) {
+        setCustomerInfo(prev => ({ ...prev, orderType: 'takeaway' }));
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load menu');
     } finally {
@@ -107,20 +117,37 @@ const CustomerOrderPage = () => {
   };
 
   const validateAndShowPopup = () => {
+    const errors = [];
+    
+    // Check cart
     if (cart.length === 0) {
-      toast.error('Your cart is empty');
+      errors.push('Your cart is empty. Please add items before placing order.');
+      setValidationErrors(errors);
+      setTimeout(() => setValidationErrors([]), 5000);
       return;
     }
     
-    // Check if customer info is missing
-    if (!customerInfo.name || !customerInfo.phone) {
-      setShowCustomerInfoPopup(true);
-      return;
+    // Check customer info
+    if (!customerInfo.name) {
+      errors.push('Customer Name is required');
+    }
+    if (!customerInfo.phone) {
+      errors.push('Phone Number is required');
     }
     
-    // For dine-in, table is required
-    if (customerInfo.orderType === 'dine-in' && !customerInfo.selectedTable) {
+    // Check if KOT mode is enabled
+    const kotEnabled = menu?.business_settings?.kot_mode_enabled !== false;
+    
+    // For dine-in with KOT mode enabled, table is required
+    if (kotEnabled && customerInfo.orderType === 'dine-in' && !customerInfo.selectedTable) {
+      errors.push('Table selection is required for dine-in orders');
+    }
+    
+    // If there are errors, show popup and validation alert
+    if (errors.length > 0) {
+      setValidationErrors(errors);
       setShowCustomerInfoPopup(true);
+      setTimeout(() => setValidationErrors([]), 5000);
       return;
     }
     
@@ -129,16 +156,25 @@ const CustomerOrderPage = () => {
   };
 
   const handleSubmitOrder = async () => {
-    // Final validation
-    if (!customerInfo.name || !customerInfo.phone) {
-      toast.error('Please enter your name and phone number');
-      setShowCustomerInfoPopup(true);
-      return;
+    // Final validation with detailed errors
+    const errors = [];
+    
+    if (!customerInfo.name) {
+      errors.push('Customer Name is required');
     }
-
-    if (customerInfo.orderType === 'dine-in' && !customerInfo.selectedTable) {
-      toast.error('Please select a table for dine-in');
+    if (!customerInfo.phone) {
+      errors.push('Phone Number is required');
+    }
+    
+    const kotEnabled = menu?.business_settings?.kot_mode_enabled !== false;
+    if (kotEnabled && customerInfo.orderType === 'dine-in' && !customerInfo.selectedTable) {
+      errors.push('Table selection is required for dine-in orders');
+    }
+    
+    if (errors.length > 0) {
+      setValidationErrors(errors);
       setShowCustomerInfoPopup(true);
+      setTimeout(() => setValidationErrors([]), 5000);
       return;
     }
 
@@ -252,6 +288,7 @@ const CustomerOrderPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-100 pb-24">
       <Toaster position="top-center" richColors />
+      <ValidationAlert errors={validationErrors} onClose={() => setValidationErrors([])} />
       
       {/* Header */}
       <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white p-4 sticky top-0 z-40 shadow-lg">
@@ -606,39 +643,61 @@ const CustomerOrderPage = () => {
 
               <div className="space-y-4">
                 {/* Order Type Selection */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Order Type *
-                  </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setCustomerInfo({ ...customerInfo, orderType: 'dine-in' })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        customerInfo.orderType === 'dine-in'
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <ChefHat className={`w-6 h-6 mx-auto mb-2 ${
-                        customerInfo.orderType === 'dine-in' ? 'text-orange-600' : 'text-gray-400'
-                      }`} />
-                      <div className="text-sm font-medium">Dine In</div>
-                    </button>
-                    <button
-                      onClick={() => setCustomerInfo({ ...customerInfo, orderType: 'takeaway' })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        customerInfo.orderType === 'takeaway'
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <ShoppingCart className={`w-6 h-6 mx-auto mb-2 ${
-                        customerInfo.orderType === 'takeaway' ? 'text-orange-600' : 'text-gray-400'
-                      }`} />
-                      <div className="text-sm font-medium">Takeaway</div>
-                    </button>
-                  </div>
-                </div>
+                {(() => {
+                  const kotEnabled = menu?.business_settings?.kot_mode_enabled !== false;
+                  
+                  // If KOT mode is disabled, show only takeaway option
+                  if (!kotEnabled) {
+                    return (
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-3">
+                          <ShoppingCart className="w-6 h-6 text-blue-600" />
+                          <div>
+                            <div className="font-medium text-gray-900">Takeaway Order</div>
+                            <div className="text-sm text-gray-600">Counter service - No table required</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // If KOT mode is enabled, show both options
+                  return (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                        Order Type *
+                      </Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setCustomerInfo({ ...customerInfo, orderType: 'dine-in' })}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            customerInfo.orderType === 'dine-in'
+                              ? 'border-orange-500 bg-orange-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <ChefHat className={`w-6 h-6 mx-auto mb-2 ${
+                            customerInfo.orderType === 'dine-in' ? 'text-orange-600' : 'text-gray-400'
+                          }`} />
+                          <div className="text-sm font-medium">Dine In</div>
+                        </button>
+                        <button
+                          onClick={() => setCustomerInfo({ ...customerInfo, orderType: 'takeaway' })}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            customerInfo.orderType === 'takeaway'
+                              ? 'border-orange-500 bg-orange-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <ShoppingCart className={`w-6 h-6 mx-auto mb-2 ${
+                            customerInfo.orderType === 'takeaway' ? 'text-orange-600' : 'text-gray-400'
+                          }`} />
+                          <div className="text-sm font-medium">Takeaway</div>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Name Input */}
                 <div>
@@ -669,27 +728,34 @@ const CustomerOrderPage = () => {
                   />
                 </div>
 
-                {/* Table Selection (only for dine-in) */}
-                {customerInfo.orderType === 'dine-in' && (
-                  <div>
-                    <Label htmlFor="popup-table" className="text-sm font-medium text-gray-700">
-                      Select Table *
-                    </Label>
-                    <select
-                      id="popup-table"
-                      value={customerInfo.selectedTable}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, selectedTable: e.target.value })}
-                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    >
-                      <option value="">Choose a table</option>
-                      {tables.map(table => (
-                        <option key={table.id} value={table.table_number}>
-                          Table {table.table_number} ({table.capacity} seats)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Table Selection (only for dine-in with KOT mode) */}
+                {(() => {
+                  const kotEnabled = menu?.business_settings?.kot_mode_enabled !== false;
+                  
+                  if (kotEnabled && customerInfo.orderType === 'dine-in') {
+                    return (
+                      <div>
+                        <Label htmlFor="popup-table" className="text-sm font-medium text-gray-700">
+                          Select Table *
+                        </Label>
+                        <select
+                          id="popup-table"
+                          value={customerInfo.selectedTable}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, selectedTable: e.target.value })}
+                          className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                          <option value="">Choose a table</option>
+                          {tables.map(table => (
+                            <option key={table.id} value={table.table_number}>
+                              Table {table.table_number} ({table.capacity} seats)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Special Instructions */}
                 <div>
