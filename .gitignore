@@ -366,6 +366,11 @@ config/secrets.json
 *api_key*
 *apikey*
 *secret*
-*password*
+# Note: Don't use *password* as it blocks legitimate files like ForgotPasswordPage.js
+# Instead, be specific about what to ignore:
+password.txt
+passwords.txt
+.password
+.passwords
 
 # ============ END ============
