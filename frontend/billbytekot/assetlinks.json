@@ -1,8 +1,12 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "in.billbytekot.twa",
-        "sha256_cert_fingerprints": ["85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92", "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92", "85:7C:B2:AA:70:1E:2E:1F:BC:13:F0:42:BB:73:CC:9A:56:AC:A3:06:24:7A:B2:DD:C4:C8:25:56:6F:7E:3F:92"]
-      }
-    }]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.billbytekot.twa",
+      "sha256_cert_fingerprints": [
+        "3A:B4:A6:42:B5:C0:7E:C8:1C:7F:E4:6A:19:2D:AF:D4:3A:4C:1C:12:52:54:F5:89:DB:C6:09:4E:66:40:34:97"
+      ]
+    }
+  }
+]
