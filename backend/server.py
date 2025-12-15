@@ -1216,6 +1216,15 @@ async def register(user_data: UserCreate):
     doc["created_at"] = doc["created_at"].isoformat()
 
     await db.users.insert_one(doc)
+    
+    # Send welcome email asynchronously
+    try:
+        from email_automation import send_welcome_email
+        asyncio.create_task(send_welcome_email(user_data.email, user_data.username))
+    except Exception as e:
+        print(f"Failed to send welcome email: {e}")
+        # Don't fail registration if email fails
+    
     return user_obj
 
 
