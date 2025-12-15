@@ -109,7 +109,15 @@ security = HTTPBearer()
 JWT_SECRET = os.getenv("JWT_SECRET", "default-jwt-secret-please-change-in-production")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
-app = FastAPI()
+app = FastAPI(
+    title="BillByteKOT API",
+    description="Restaurant Billing & KOT Management System",
+    version="1.3.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    # Performance optimizations
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},  # Collapse models by default
+)
 api_router = APIRouter(prefix="/api")
 
 

@@ -576,16 +576,156 @@ const CustomerOrderPage = () => {
                     Back
                   </Button>
                   <Button
-                    onClick={handleSubmitOrder}
-                    disabled={submitting || !customerInfo.name || !customerInfo.phone || !customerInfo.selectedTable}
+                    onClick={validateAndShowPopup}
+                    disabled={submitting}
                     className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 h-12 text-lg"
                   >
-                    {submitting ? 'Placing...' : `Pay ${currency}${totals.total.toFixed(0)}`}
+                    {submitting ? 'Placing...' : `Place Order ${currency}${totals.total.toFixed(0)}`}
                   </Button>
                 </div>
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Customer Info Popup */}
+      {showCustomerInfoPopup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Complete Your Order</h3>
+                <button
+                  onClick={() => setShowCustomerInfoPopup(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Order Type Selection */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Order Type *
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setCustomerInfo({ ...customerInfo, orderType: 'dine-in' })}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        customerInfo.orderType === 'dine-in'
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <ChefHat className={`w-6 h-6 mx-auto mb-2 ${
+                        customerInfo.orderType === 'dine-in' ? 'text-orange-600' : 'text-gray-400'
+                      }`} />
+                      <div className="text-sm font-medium">Dine In</div>
+                    </button>
+                    <button
+                      onClick={() => setCustomerInfo({ ...customerInfo, orderType: 'takeaway' })}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        customerInfo.orderType === 'takeaway'
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <ShoppingCart className={`w-6 h-6 mx-auto mb-2 ${
+                        customerInfo.orderType === 'takeaway' ? 'text-orange-600' : 'text-gray-400'
+                      }`} />
+                      <div className="text-sm font-medium">Takeaway</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Name Input */}
+                <div>
+                  <Label htmlFor="popup-name" className="text-sm font-medium text-gray-700">
+                    Your Name *
+                  </Label>
+                  <Input
+                    id="popup-name"
+                    value={customerInfo.name}
+                    onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                    placeholder="Enter your name"
+                    className="mt-1"
+                  />
+                </div>
+
+                {/* Phone Input */}
+                <div>
+                  <Label htmlFor="popup-phone" className="text-sm font-medium text-gray-700">
+                    Phone Number *
+                  </Label>
+                  <Input
+                    id="popup-phone"
+                    type="tel"
+                    value={customerInfo.phone}
+                    onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                    placeholder="Enter your phone number"
+                    className="mt-1"
+                  />
+                </div>
+
+                {/* Table Selection (only for dine-in) */}
+                {customerInfo.orderType === 'dine-in' && (
+                  <div>
+                    <Label htmlFor="popup-table" className="text-sm font-medium text-gray-700">
+                      Select Table *
+                    </Label>
+                    <select
+                      id="popup-table"
+                      value={customerInfo.selectedTable}
+                      onChange={(e) => setCustomerInfo({ ...customerInfo, selectedTable: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="">Choose a table</option>
+                      {tables.map(table => (
+                        <option key={table.id} value={table.table_number}>
+                          Table {table.table_number} ({table.capacity} seats)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Special Instructions */}
+                <div>
+                  <Label htmlFor="popup-instructions" className="text-sm font-medium text-gray-700">
+                    Special Instructions (Optional)
+                  </Label>
+                  <textarea
+                    id="popup-instructions"
+                    value={customerInfo.specialInstructions}
+                    onChange={(e) => setCustomerInfo({ ...customerInfo, specialInstructions: e.target.value })}
+                    placeholder="Any special requests?"
+                    rows={3}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  onClick={handleSubmitOrder}
+                  disabled={
+                    submitting ||
+                    !customerInfo.name ||
+                    !customerInfo.phone ||
+                    (customerInfo.orderType === 'dine-in' && !customerInfo.selectedTable)
+                  }
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 h-12 text-lg"
+                >
+                  {submitting ? 'Placing Order...' : 'Confirm & Place Order'}
+                </Button>
+
+                <p className="text-xs text-gray-500 text-center">
+                  * Required fields
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

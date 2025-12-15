@@ -1,0 +1,25 @@
+name: Keep Server Awake
+
+on:
+  schedule:
+    # Run every 14 minutes
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Server
+        run: |
+          echo "🔔 Pinging server to keep it awake..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://restro-ai.onrender.com/health)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Server is awake! Status: $response"
+          else
+            echo "⚠️  Server responded with status: $response"
+          fi
+          
+          echo "⏰ Next ping in 14 minutes"
