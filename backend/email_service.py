@@ -4,6 +4,7 @@ Supports multiple email providers: SMTP, SendGrid, Mailgun, AWS SES
 """
 
 import os
+import ssl
 import smtplib
 import httpx
 from email.mime.text import MIMEText
@@ -199,7 +200,7 @@ async def send_otp_email(email: str, otp: str, username: str = "User") -> dict:
 
 
 async def send_via_smtp(email: str, subject: str, html_body: str, text_body: str) -> dict:
-    """Send email via SMTP (Gmail, Outlook, etc.)"""
+    """Send email via SMTP with multiple port fallback"""
     if not all([SMTP_USER, SMTP_PASSWORD]):
         raise ValueError("SMTP credentials not configured")
     
@@ -215,17 +216,59 @@ async def send_via_smtp(email: str, subject: str, html_body: str, text_body: str
     msg.attach(part1)
     msg.attach(part2)
     
-    # Send email
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
+    # Try multiple SMTP configurations
+    smtp_configs = [
+        # Try port 465 with SSL (most likely to work on Render)
+        {'port': 465, 'use_ssl': True, 'use_tls': False},
+        # Try port 587 with STARTTLS (original)
+        {'port': 587, 'use_ssl': False, 'use_tls': True},
+        # Try port 25 (fallback)
+        {'port': 25, 'use_ssl': False, 'use_tls': True},
+    ]
     
-    return {
-        "success": True,
-        "message": "OTP sent via SMTP",
-        "provider": "smtp"
-    }
+    last_error = None
+    
+    for config in smtp_configs:
+        try:
+            port = config['port']
+            
+            if config['use_ssl']:
+                # Use SMTP_SSL for port 465
+                import ssl
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(SMTP_HOST, port, context=context, timeout=10) as server:
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                    server.send_message(msg)
+                    print(f"✅ Email sent successfully via SMTP SSL (port {port})")
+                    return {
+                        "success": True,
+                        "message": f"OTP sent via SMTP SSL (port {port})",
+                        "provider": "smtp",
+                        "port": port
+                    }
+            else:
+                # Use regular SMTP with optional STARTTLS
+                with smtplib.SMTP(SMTP_HOST, port, timeout=10) as server:
+                    server.ehlo()
+                    if config['use_tls']:
+                        server.starttls()
+                        server.ehlo()
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                    server.send_message(msg)
+                    print(f"✅ Email sent successfully via SMTP (port {port})")
+                    return {
+                        "success": True,
+                        "message": f"OTP sent via SMTP (port {port})",
+                        "provider": "smtp",
+                        "port": port
+                    }
+        except Exception as e:
+            last_error = e
+            print(f"❌ SMTP port {config['port']} failed: {str(e)}")
+            continue
+    
+    # All ports failed
+    raise Exception(f"All SMTP ports failed. Last error: {str(last_error)}")
 
 
 async def send_via_sendgrid(email: str, subject: str, html_body: str, text_body: str) -> dict:
