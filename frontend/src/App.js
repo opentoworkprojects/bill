@@ -50,6 +50,51 @@ const ElectronNavigator = () => {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://restro-ai.onrender.com';
 export const API = `${BACKEND_URL}/api`;
 
+// Configure axios with performance optimizations
+axios.defaults.timeout = 30000; // 30 second timeout
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
+// Add request interceptor for retry logic
+axios.interceptors.request.use(
+  (config) => {
+    // Add timestamp to prevent caching issues
+    if (config.method === 'get') {
+      config.params = { ...config.params, _t: Date.now() };
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Add response interceptor for automatic retry on failure
+axios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    
+    // Retry logic for network errors or 5xx errors
+    if (!config || !config.retry) {
+      config.retry = 0;
+    }
+    
+    const shouldRetry = 
+      config.retry < 2 && // Max 2 retries
+      (!error.response || error.response.status >= 500 || error.code === 'ECONNABORTED');
+    
+    if (shouldRetry) {
+      config.retry += 1;
+      console.log(`Retrying request (${config.retry}/2)...`);
+      
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * config.retry));
+      
+      return axios(config);
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 export const setAuthToken = (token) => {
   if (token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;

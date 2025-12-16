@@ -71,31 +71,48 @@ if "mongodb+srv://" in mongo_url:
 
     mongo_url = f"{base_url}?{'&'.join(params)}"
 
-# Configure MongoDB client with SSL settings for Atlas compatibility
+# Configure MongoDB client with OPTIMIZED settings for speed
 try:
     if (
         "mongodb+srv://" in mongo_url
         or "ssl=true" in mongo_url
         or "tls=true" in mongo_url
     ):
-        # For MongoDB Atlas, use TLS with proper certificate handling
+        # OPTIMIZED MongoDB Atlas connection with connection pooling
         client = AsyncIOMotorClient(
             mongo_url,
             tls=True,
-            tlsInsecure=True,  # Allow invalid certificates for Render compatibility
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000,
+            tlsInsecure=True,
+            # Performance optimizations
+            maxPoolSize=50,  # Increased connection pool
+            minPoolSize=10,  # Keep connections warm
+            maxIdleTimeMS=45000,  # Keep connections alive
+            serverSelectionTimeoutMS=3000,  # Faster timeout
+            connectTimeoutMS=5000,  # Faster connection
+            socketTimeoutMS=20000,  # Socket timeout
+            retryWrites=True,  # Auto-retry failed writes
+            retryReads=True,  # Auto-retry failed reads
+            # Compression for faster data transfer
+            compressors="snappy,zlib",
         )
     else:
         # For local or non-SSL connections
-        client = AsyncIOMotorClient(mongo_url)
+        client = AsyncIOMotorClient(
+            mongo_url,
+            maxPoolSize=50,
+            minPoolSize=10,
+            maxIdleTimeMS=45000,
+        )
 except Exception as e:
     print(f"MongoDB client creation failed: {e}")
     # Fallback to basic client with minimal TLS settings
     try:
         client = AsyncIOMotorClient(
-            mongo_url, tls=True, tlsInsecure=True, serverSelectionTimeoutMS=5000
+            mongo_url, 
+            tls=True, 
+            tlsInsecure=True, 
+            serverSelectionTimeoutMS=3000,
+            maxPoolSize=50
         )
     except Exception as e2:
         print(f"Fallback client creation failed: {e2}")
@@ -116,9 +133,41 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     # Performance optimizations
-    swagger_ui_parameters={"defaultModelsExpandDepth": -1},  # Collapse models by default
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+    # Response optimization
+    default_response_class=None,  # Use default JSON response (fastest)
 )
 api_router = APIRouter(prefix="/api")
+
+# In-memory cache for frequently accessed data
+from functools import lru_cache
+from time import time
+
+# Simple cache decorator
+_cache = {}
+_cache_ttl = {}
+
+def cache_response(ttl_seconds=60):
+    """Cache decorator for API responses"""
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            # Create cache key from function name and args
+            cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            current_time = time()
+            
+            # Check if cached and not expired
+            if cache_key in _cache and cache_key in _cache_ttl:
+                if current_time < _cache_ttl[cache_key]:
+                    return _cache[cache_key]
+            
+            # Execute function and cache result
+            result = await func(*args, **kwargs)
+            _cache[cache_key] = result
+            _cache_ttl[cache_key] = current_time + ttl_seconds
+            
+            return result
+        return wrapper
+    return decorator
 
 
 # Dynamic CORS origin checker
@@ -4387,6 +4436,7 @@ async def startup_validation():
                 tlsAllowInvalidCertificates=True,
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=8000,
+                maxPoolSize=50,
             )
             alt_db = alt_client[os.getenv("DB_NAME", "restrobill")]
             await alt_db.command("ping")
@@ -4399,6 +4449,45 @@ async def startup_validation():
 
         except Exception as e2:
             last_error = e2
+    
+    # Create database indexes for faster queries (PERFORMANCE BOOST)
+    if connection_successful:
+        try:
+            print("⚡ Creating database indexes for performance...")
+            
+            # Users collection indexes
+            await db.users.create_index("id", unique=True)
+            await db.users.create_index("username")
+            await db.users.create_index("email")
+            await db.users.create_index("organization_id")
+            
+            # Menu items indexes
+            await db.menu_items.create_index("organization_id")
+            await db.menu_items.create_index([("organization_id", 1), ("category", 1)])
+            await db.menu_items.create_index([("organization_id", 1), ("available", 1)])
+            
+            # Orders indexes
+            await db.orders.create_index("organization_id")
+            await db.orders.create_index([("organization_id", 1), ("status", 1)])
+            await db.orders.create_index([("organization_id", 1), ("created_at", -1)])
+            await db.orders.create_index("table_id")
+            
+            # Tables indexes
+            await db.tables.create_index("organization_id")
+            await db.tables.create_index([("organization_id", 1), ("status", 1)])
+            
+            # Payments indexes
+            await db.payments.create_index("organization_id")
+            await db.payments.create_index([("organization_id", 1), ("created_at", -1)])
+            await db.payments.create_index("order_id")
+            
+            # Inventory indexes
+            await db.inventory.create_index("organization_id")
+            await db.inventory.create_index([("organization_id", 1), ("quantity", 1)])
+            
+            print("✅ Database indexes created successfully")
+        except Exception as e:
+            print(f"⚠️  Index creation warning: {e}")
             print(f"❌ Alternative connection failed: {e2}")
 
             # Strategy 3: Try with pymongo legacy SSL options
