@@ -5734,23 +5734,16 @@ async def download_windows_app():
 # Serve Digital Asset Links for Android TWA
 @app.get("/.well-known/assetlinks.json")
 async def get_assetlinks():
-    """Serve assetlinks.json for Android TWA verification"""
-    assetlinks = [{
-        "relation": ["delegate_permission/common.handle_all_urls"],
-        "target": {
-            "namespace": "android_app",
-            "package_name": "in.billbytekot.twa",
-            "sha256_cert_fingerprints": [
-                "4F:84:00:E3:DE:51:70:1A:88:78:82:B9:3F:1E:48:91:18:73:1E:E5:22:6F:D4:92:06:A1:8C:99:7A:CD:7C:6D"
-            ]
-        }
-    }]
+    """Serve assetlinks.json - DISABLED to prevent auto-redirect to app"""
+    # Return empty array to disable automatic app opening
+    # Website and app are now completely separate
+    assetlinks = []
     
     return JSONResponse(
         content=assetlinks,
         media_type="application/json",
         headers={
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": "no-cache, no-store, must-revalidate",  # Don't cache
             "Access-Control-Allow-Origin": "*"
         }
     )

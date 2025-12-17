@@ -50,6 +50,10 @@ const BillingPage = ({ user }) => {
     try {
       const response = await axios.get(`${API}/orders/${orderId}`);
       setOrder(response.data);
+      // Auto-fill customer phone if available
+      if (response.data.customer_phone) {
+        setWhatsappPhone(response.data.customer_phone);
+      }
     } catch (error) {
       toast.error('Failed to fetch order');
     }

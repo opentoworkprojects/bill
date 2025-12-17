@@ -91,10 +91,11 @@ const SettingsPage = ({ user }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.business_settings) {
-        setBusinessSettings({
-          ...businessSettings,
+        // Merge with defaults to ensure all fields exist
+        setBusinessSettings(prevSettings => ({
+          ...prevSettings,
           ...response.data.business_settings
-        });
+        }));
       }
     } catch (error) {
       console.error('Failed to fetch business settings', error);

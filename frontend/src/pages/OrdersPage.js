@@ -16,6 +16,7 @@ const OrdersPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
+  const [businessSettings, setBusinessSettings] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
   const [formData, setFormData] = useState({
@@ -31,7 +32,17 @@ const OrdersPage = ({ user }) => {
     fetchOrders();
     fetchTables();
     fetchMenuItems();
+    fetchBusinessSettings();
   }, []);
+
+  const fetchBusinessSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/business/settings`);
+      setBusinessSettings(response.data.business_settings);
+    } catch (error) {
+      console.error('Failed to fetch business settings', error);
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -94,11 +105,18 @@ const OrdersPage = ({ user }) => {
       toast.error('Please add at least one item');
       return;
     }
+    
+    // Check if table is required (KOT mode enabled)
+    if (businessSettings?.kot_mode_enabled !== false && !formData.table_id) {
+      toast.error('Please select a table');
+      return;
+    }
+    
     try {
-      const selectedTable = tables.find(t => t.id === formData.table_id);
+      const selectedTable = formData.table_id ? tables.find(t => t.id === formData.table_id) : null;
       const response = await axios.post(`${API}/orders`, {
-        table_id: formData.table_id,
-        table_number: selectedTable.table_number,
+        table_id: formData.table_id || null,
+        table_number: selectedTable?.table_number || 0,
         items: selectedItems,
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone,
@@ -301,21 +319,24 @@ Status: ${order.status.toUpperCase()}
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label>Table</Label>
-                      <select
-                        className="w-full px-3 py-2 border rounded-md"
-                        value={formData.table_id}
-                        onChange={(e) => setFormData({ ...formData, table_id: e.target.value })}
-                        required
-                        data-testid="order-table-select"
-                      >
-                        <option value="">Select table</option>
-                        {tables.filter(t => t.status === 'available').map(table => (
-                          <option key={table.id} value={table.id}>Table {table.table_number} (Cap: {table.capacity})</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Only show table selection if KOT mode is enabled */}
+                    {businessSettings?.kot_mode_enabled !== false && (
+                      <div>
+                        <Label>Table</Label>
+                        <select
+                          className="w-full px-3 py-2 border rounded-md"
+                          value={formData.table_id}
+                          onChange={(e) => setFormData({ ...formData, table_id: e.target.value })}
+                          required
+                          data-testid="order-table-select"
+                        >
+                          <option value="">Select table</option>
+                          {tables.filter(t => t.status === 'available').map(table => (
+                            <option key={table.id} value={table.id}>Table {table.table_number} (Cap: {table.capacity})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <Label>Customer Name</Label>
                       <Input
@@ -324,7 +345,7 @@ Status: ${order.status.toUpperCase()}
                         placeholder="Customer name"
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div className={businessSettings?.kot_mode_enabled !== false ? "md:col-span-2" : "md:col-span-3"}>
                       <Label>Customer Phone (for WhatsApp updates)</Label>
                       <Input
                         value={formData.customer_phone}
