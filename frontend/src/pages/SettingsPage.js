@@ -65,7 +65,10 @@ const SettingsPage = ({ user }) => {
 
   const fetchRazorpaySettings = async () => {
     try {
-      const response = await axios.get(`${API}/settings/razorpay`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/settings/razorpay`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (response.data.razorpay_key_id) {
         setRazorpaySettings({
           razorpay_key_id: response.data.razorpay_key_id,
@@ -75,12 +78,18 @@ const SettingsPage = ({ user }) => {
       setRazorpayConfigured(response.data.razorpay_configured);
     } catch (error) {
       console.error('Failed to fetch settings', error);
+      if (error.response?.status === 403) {
+        toast.error('Access denied. Please login again.');
+      }
     }
   };
 
   const fetchBusinessSettings = async () => {
     try {
-      const response = await axios.get(`${API}/business/settings`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/business/settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (response.data.business_settings) {
         setBusinessSettings({
           ...businessSettings,
@@ -89,6 +98,9 @@ const SettingsPage = ({ user }) => {
       }
     } catch (error) {
       console.error('Failed to fetch business settings', error);
+      if (error.response?.status === 403) {
+        toast.error('Access denied. Please login again.');
+      }
     }
   };
 

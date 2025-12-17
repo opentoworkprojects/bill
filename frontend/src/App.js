@@ -54,9 +54,15 @@ export const API = `${BACKEND_URL}/api`;
 axios.defaults.timeout = 30000; // 30 second timeout
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
-// Add request interceptor for retry logic
+// Add request interceptor for retry logic and auth
 axios.interceptors.request.use(
   (config) => {
+    // Ensure auth token is always included
+    const token = localStorage.getItem('token');
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     // Add timestamp to prevent caching issues
     if (config.method === 'get') {
       config.params = { ...config.params, _t: Date.now() };
@@ -72,6 +78,17 @@ axios.interceptors.response.use(
   async (error) => {
     const config = error.config;
     
+    // Don't retry 401/403 errors (authentication issues)
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      // Clear invalid token and redirect to login
+      if (error.response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+    
     // Retry logic for network errors or 5xx errors
     if (!config || !config.retry) {
       config.retry = 0;
@@ -84,6 +101,12 @@ axios.interceptors.response.use(
     if (shouldRetry) {
       config.retry += 1;
       console.log(`Retrying request (${config.retry}/2)...`);
+      
+      // Ensure auth token is included in retry
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
       
       // Wait before retry (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, 1000 * config.retry));
