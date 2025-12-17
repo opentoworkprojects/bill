@@ -5426,6 +5426,45 @@ async def get_analytics_admin(username: str, password: str, days: int = 30):
         "start_date": start_date
     }
 
+class CreateLeadRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    businessName: Optional[str] = None
+    source: str = "manual"
+    notes: Optional[str] = None
+
+@api_router.post("/super-admin/leads")
+async def create_lead_admin(
+    lead: CreateLeadRequest,
+    username: str,
+    password: str
+):
+    """Manually create a new lead - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    lead_data = {
+        "name": lead.name,
+        "email": lead.email,
+        "phone": lead.phone,
+        "businessName": lead.businessName,
+        "source": lead.source,
+        "notes": lead.notes,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "new",
+        "contacted": False
+    }
+    
+    result = await db.leads.insert_one(lead_data)
+    
+    return {
+        "success": True,
+        "message": "Lead created successfully",
+        "lead_id": str(result.inserted_id)
+    }
+
 @api_router.get("/super-admin/leads")
 async def get_all_leads_admin(
     username: str,
@@ -5508,6 +5547,166 @@ async def delete_lead_admin(lead_id: str, username: str, password: str):
         raise HTTPException(status_code=404, detail="Lead not found")
     
     return {"message": "Lead deleted successfully", "lead_id": lead_id}
+
+
+# ============ TEAM MANAGEMENT (Site Owner Only) ============
+class TeamMember(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: str  # sales, support, admin
+    permissions: List[str]  # leads, tickets, users, analytics
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+
+class TeamMemberUpdate(BaseModel):
+    role: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    active: Optional[bool] = None
+
+@api_router.post("/super-admin/team")
+async def create_team_member(
+    member: TeamMember,
+    username: str,
+    password: str
+):
+    """Create team member (sales/support) - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    # Check if username already exists
+    existing = await db.team_members.find_one({"username": member.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Check if email already exists
+    existing_email = await db.team_members.find_one({"email": member.email})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    team_data = {
+        "id": str(uuid.uuid4()),
+        "username": member.username,
+        "email": member.email,
+        "password": hash_password(member.password),
+        "role": member.role,
+        "permissions": member.permissions,
+        "full_name": member.full_name,
+        "phone": member.phone,
+        "active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": username
+    }
+    
+    result = await db.team_members.insert_one(team_data)
+    
+    return {
+        "success": True,
+        "message": "Team member created successfully",
+        "member_id": team_data["id"]
+    }
+
+@api_router.get("/super-admin/team")
+async def get_team_members(username: str, password: str):
+    """Get all team members - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    members = await db.team_members.find({}, {"_id": 0, "password": 0}).to_list(100)
+    
+    # Count by role
+    sales_count = sum(1 for m in members if m.get("role") == "sales")
+    support_count = sum(1 for m in members if m.get("role") == "support")
+    admin_count = sum(1 for m in members if m.get("role") == "admin")
+    
+    return {
+        "members": members,
+        "total": len(members),
+        "stats": {
+            "sales": sales_count,
+            "support": support_count,
+            "admin": admin_count
+        }
+    }
+
+@api_router.put("/super-admin/team/{member_id}")
+async def update_team_member(
+    member_id: str,
+    member_update: TeamMemberUpdate,
+    username: str,
+    password: str
+):
+    """Update team member - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if member_update.role:
+        update_data["role"] = member_update.role
+    if member_update.permissions:
+        update_data["permissions"] = member_update.permissions
+    if member_update.active is not None:
+        update_data["active"] = member_update.active
+    
+    result = await db.team_members.update_one({"id": member_id}, {"$set": update_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Team member not found")
+    
+    return {"message": "Team member updated successfully", "member_id": member_id}
+
+@api_router.delete("/super-admin/team/{member_id}")
+async def delete_team_member(member_id: str, username: str, password: str):
+    """Delete team member - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    result = await db.team_members.delete_one({"id": member_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Team member not found")
+    
+    return {"message": "Team member deleted successfully", "member_id": member_id}
+
+# Team member login endpoint
+class TeamLogin(BaseModel):
+    username: str
+    password: str
+
+@api_router.post("/team/login")
+async def team_login(credentials: TeamLogin):
+    """Team member login"""
+    member = await db.team_members.find_one({"username": credentials.username})
+    
+    if not member or not verify_password(credentials.password, member["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if not member.get("active", True):
+        raise HTTPException(status_code=403, detail="Account is inactive")
+    
+    # Create token
+    token_data = {
+        "id": member["id"],
+        "username": member["username"],
+        "role": member["role"],
+        "permissions": member.get("permissions", []),
+        "type": "team"
+    }
+    token = create_access_token(token_data)
+    
+    return {
+        "token": token,
+        "user": {
+            "id": member["id"],
+            "username": member["username"],
+            "email": member["email"],
+            "role": member["role"],
+            "permissions": member.get("permissions", []),
+            "full_name": member.get("full_name"),
+            "type": "team"
+        }
+    }
 
 
 # Include all API routes
