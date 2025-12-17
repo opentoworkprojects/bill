@@ -5247,6 +5247,11 @@ SUPER_ADMIN_PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "shiv@123")
 
 def verify_super_admin(username: str, password: str) -> bool:
     """Verify super admin credentials"""
+    print(f"🔐 Super Admin Login Attempt:")
+    print(f"   Received username: '{username}' (expected: '{SUPER_ADMIN_USERNAME}')")
+    print(f"   Received password: '{password}' (expected: '{SUPER_ADMIN_PASSWORD}')")
+    print(f"   Username match: {username == SUPER_ADMIN_USERNAME}")
+    print(f"   Password match: {password == SUPER_ADMIN_PASSWORD}")
     return username == SUPER_ADMIN_USERNAME and password == SUPER_ADMIN_PASSWORD
 
 @api_router.get("/super-admin/dashboard")
