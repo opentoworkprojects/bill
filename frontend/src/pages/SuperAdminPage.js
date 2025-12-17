@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { 
   Users, Ticket, TrendingUp, Database, Shield, 
-  CheckCircle, Clock, XCircle, DollarSign 
+  CheckCircle, Clock, XCircle, DollarSign, UserPlus 
 } from 'lucide-react';
 
 const SuperAdminPage = () => {
@@ -18,6 +18,8 @@ const SuperAdminPage = () => {
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [leadsStats, setLeadsStats] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
 
@@ -52,6 +54,13 @@ const SuperAdminPage = () => {
         params: credentials
       });
       setTickets(ticketsRes.data.tickets);
+
+      // Fetch leads
+      const leadsRes = await axios.get(`${API}/super-admin/leads`, {
+        params: credentials
+      });
+      setLeads(leadsRes.data.leads);
+      setLeadsStats(leadsRes.data.stats);
 
       // Fetch analytics
       const analyticsRes = await axios.get(`${API}/super-admin/analytics`, {
@@ -102,6 +111,34 @@ const SuperAdminPage = () => {
       fetchAllData();
     } catch (error) {
       toast.error('Failed to delete user');
+    }
+  };
+
+  const updateLeadStatus = async (leadId, status) => {
+    try {
+      await axios.put(
+        `${API}/super-admin/leads/${leadId}`,
+        { status, contacted: status !== 'new' },
+        { params: credentials }
+      );
+      toast.success('Lead updated');
+      fetchAllData();
+    } catch (error) {
+      toast.error('Failed to update lead');
+    }
+  };
+
+  const deleteLead = async (leadId) => {
+    if (!window.confirm('Are you sure you want to delete this lead?')) return;
+    
+    try {
+      await axios.delete(`${API}/super-admin/leads/${leadId}`, {
+        params: credentials
+      });
+      toast.success('Lead deleted');
+      fetchAllData();
+    } catch (error) {
+      toast.error('Failed to delete lead');
     }
   };
 
@@ -174,7 +211,7 @@ const SuperAdminPage = () => {
 
         {/* Tabs */}
         <div className="mb-6 flex gap-2 border-b">
-          {['dashboard', 'users', 'tickets', 'analytics'].map(tab => (
+          {['dashboard', 'users', 'leads', 'tickets', 'analytics'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -231,12 +268,14 @@ const SuperAdminPage = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <DollarSign className="w-4 h-4 text-gray-600" />
+                <CardTitle className="text-sm font-medium">Leads</CardTitle>
+                <UserPlus className="w-4 h-4 text-gray-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹{dashboard.overview.total_revenue}</div>
-                <p className="text-xs text-gray-600">All time</p>
+                <div className="text-2xl font-bold">{dashboard.overview.total_leads || 0}</div>
+                <p className="text-xs text-gray-600">
+                  {dashboard.overview.new_leads || 0} new
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -303,6 +342,88 @@ const SuperAdminPage = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Leads Tab */}
+        {activeTab === 'leads' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Lead Management</CardTitle>
+              {leadsStats && (
+                <div className="flex gap-4 mt-2 text-sm">
+                  <span className="text-blue-600">New: {leadsStats.new}</span>
+                  <span className="text-yellow-600">Contacted: {leadsStats.contacted}</span>
+                  <span className="text-green-600">Converted: {leadsStats.converted}</span>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Name</th>
+                      <th className="text-left p-2">Email</th>
+                      <th className="text-left p-2">Phone</th>
+                      <th className="text-left p-2">Business</th>
+                      <th className="text-left p-2">Source</th>
+                      <th className="text-left p-2">Date</th>
+                      <th className="text-left p-2">Status</th>
+                      <th className="text-left p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leads.map(lead => (
+                      <tr key={lead.timestamp} className="border-b hover:bg-gray-50">
+                        <td className="p-2 font-medium">{lead.name}</td>
+                        <td className="p-2">{lead.email}</td>
+                        <td className="p-2">{lead.phone}</td>
+                        <td className="p-2">{lead.businessName || '-'}</td>
+                        <td className="p-2">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
+                            {lead.source}
+                          </span>
+                        </td>
+                        <td className="p-2 text-sm text-gray-600">
+                          {new Date(lead.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-2">
+                          <select
+                            value={lead.status}
+                            onChange={(e) => updateLeadStatus(lead.timestamp, e.target.value)}
+                            className={`px-2 py-1 border rounded text-xs ${
+                              lead.status === 'new' ? 'bg-blue-50 text-blue-800' :
+                              lead.status === 'contacted' ? 'bg-yellow-50 text-yellow-800' :
+                              'bg-green-50 text-green-800'
+                            }`}
+                          >
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="converted">Converted</option>
+                            <option value="not_interested">Not Interested</option>
+                          </select>
+                        </td>
+                        <td className="p-2">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteLead(lead.timestamp)}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {leads.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No leads yet. They will appear here when visitors fill the "Get Started" form.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

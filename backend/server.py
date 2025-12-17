@@ -5278,6 +5278,10 @@ async def get_super_admin_dashboard(username: str, password: str):
     pending_tickets = sum(1 for t in tickets if t.get("status") == "pending")
     resolved_tickets = sum(1 for t in tickets if t.get("status") == "resolved")
     
+    # Lead statistics
+    total_leads = await db.leads.count_documents({})
+    new_leads = await db.leads.count_documents({"status": "new"})
+    
     return {
         "overview": {
             "total_users": total_users,
@@ -5286,7 +5290,9 @@ async def get_super_admin_dashboard(username: str, password: str):
             "total_orders_30d": len(recent_orders),
             "open_tickets": open_tickets,
             "pending_tickets": pending_tickets,
-            "resolved_tickets": resolved_tickets
+            "resolved_tickets": resolved_tickets,
+            "total_leads": total_leads,
+            "new_leads": new_leads
         },
         "users": users,
         "tickets": tickets,
@@ -5419,6 +5425,89 @@ async def get_analytics_admin(username: str, password: str, days: int = 30):
         "new_tickets": new_tickets,
         "start_date": start_date
     }
+
+@api_router.get("/super-admin/leads")
+async def get_all_leads_admin(
+    username: str,
+    password: str,
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None
+):
+    """Get all leads from landing page - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    # Build query
+    query = {}
+    if status:
+        query["status"] = status
+    
+    leads = await db.leads.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.leads.count_documents(query)
+    
+    # Count by status
+    new_count = await db.leads.count_documents({"status": "new"})
+    contacted_count = await db.leads.count_documents({"status": "contacted"})
+    converted_count = await db.leads.count_documents({"status": "converted"})
+    
+    return {
+        "leads": leads,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "stats": {
+            "new": new_count,
+            "contacted": contacted_count,
+            "converted": converted_count
+        }
+    }
+
+class LeadUpdate(BaseModel):
+    status: str
+    notes: Optional[str] = None
+    contacted: Optional[bool] = None
+
+@api_router.put("/super-admin/leads/{lead_id}")
+async def update_lead_admin(
+    lead_id: str,
+    lead_update: LeadUpdate,
+    username: str,
+    password: str
+):
+    """Update lead status - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    update_data = {
+        "status": lead_update.status,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    if lead_update.notes:
+        update_data["notes"] = lead_update.notes
+    if lead_update.contacted is not None:
+        update_data["contacted"] = lead_update.contacted
+    
+    # Find by timestamp (used as ID in leads)
+    result = await db.leads.update_one({"timestamp": lead_id}, {"$set": update_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    return {"message": "Lead updated successfully", "lead_id": lead_id, "status": lead_update.status}
+
+@api_router.delete("/super-admin/leads/{lead_id}")
+async def delete_lead_admin(lead_id: str, username: str, password: str):
+    """Delete lead - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    result = await db.leads.delete_one({"timestamp": lead_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    return {"message": "Lead deleted successfully", "lead_id": lead_id}
 
 
 # Include all API routes
