@@ -351,7 +351,6 @@ Status: ${order.status.toUpperCase()}
                         value={formData.customer_phone}
                         onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
                         placeholder="+91 9876543210"
-                        placeholder="Enter customer name"
                       />
                     </div>
                   </div>
