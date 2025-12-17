@@ -211,14 +211,14 @@ ALLOWED_ORIGINS = [
     "https://restro-ai-u9kz-ed0v8idw3-shivs-projects-db2d52eb.vercel.app",
 ]
 
+# CRITICAL: Add CORS middleware BEFORE any routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    # if you want to allow all your future Vercel previews:
-    allow_origin_regex=r"https://.*\.vercel\.app$",
-    allow_credentials=True,  # keep this if you ever use cookies/auth headers
+    allow_origins=["*"],  # Allow all origins temporarily to fix CORS
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
