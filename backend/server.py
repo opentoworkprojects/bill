@@ -5241,8 +5241,6 @@ async def get_business_whatsapp_link(user: dict = Depends(get_current_user)):
     }
 
 
-app.include_router(api_router)
-
 # ============ SUPER ADMIN PANEL (Site Owner Only) ============
 SUPER_ADMIN_USERNAME = os.getenv("SUPER_ADMIN_USERNAME", "shiv")
 SUPER_ADMIN_PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "shiv@123")
@@ -5415,6 +5413,10 @@ async def get_analytics_admin(username: str, password: str, days: int = 30):
         "new_tickets": new_tickets,
         "start_date": start_date
     }
+
+
+# Include all API routes
+app.include_router(api_router)
 
 
 # Serve Windows app download
