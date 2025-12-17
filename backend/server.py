@@ -134,8 +134,6 @@ app = FastAPI(
     redoc_url="/api/redoc",
     # Performance optimizations
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
-    # Response optimization
-    default_response_class=None,  # Use default JSON response (fastest)
 )
 api_router = APIRouter(prefix="/api")
 
