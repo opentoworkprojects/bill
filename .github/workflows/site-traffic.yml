@@ -1,0 +1,108 @@
+name: Site Traffic Generator
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  generate-traffic:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate Site Traffic
+        run: |
+          echo "🚀 Starting traffic generation for BillByteKOT..."
+          
+          # Main pages to visit
+          PAGES=(
+            "https://billbytekot.in"
+            "https://billbytekot.in/"
+            "https://billbytekot.in/login"
+            "https://billbytekot.in/register"
+            "https://billbytekot.in/contact"
+            "https://billbytekot.in/blog"
+            "https://billbytekot.in/privacy-policy"
+            "https://billbytekot.in/terms"
+            "https://billbytekot.in/help"
+            "https://billbytekot.in/download"
+            "https://billbytekot.in/pricing"
+            "https://billbytekot.in/features"
+            "https://billbytekot.in/about"
+          )
+          
+          # Blog posts
+          BLOG_POSTS=(
+            "https://billbytekot.in/blog/restaurant-billing-software-india"
+            "https://billbytekot.in/blog/kot-system-guide"
+            "https://billbytekot.in/blog/thermal-printer-setup"
+            "https://billbytekot.in/blog/gst-billing-restaurants"
+            "https://billbytekot.in/blog/restaurant-pos-comparison"
+          )
+          
+          # Backend health check
+          BACKEND_URLS=(
+            "https://restro-ai.onrender.com/health"
+            "https://restro-ai.onrender.com/"
+          )
+          
+          # Function to visit URL with random delay
+          visit_url() {
+            local url=$1
+            local delay=$((RANDOM % 5 + 1))
+            sleep $delay
+            
+            response=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$url" --max-time 30)
+            
+            if [ "$response" = "200" ] || [ "$response" = "304" ]; then
+              echo "✅ $url - Status: $response"
+            else
+              echo "⚠️ $url - Status: $response"
+            fi
+          }
+          
+          echo ""
+          echo "📄 Visiting main pages..."
+          for page in "${PAGES[@]}"; do
+            visit_url "$page"
+          done
+          
+          echo ""
+          echo "📝 Visiting blog posts..."
+          for post in "${BLOG_POSTS[@]}"; do
+            visit_url "$post"
+          done
+          
+          echo ""
+          echo "🔧 Checking backend health..."
+          for url in "${BACKEND_URLS[@]}"; do
+            visit_url "$url"
+          done
+          
+          echo ""
+          echo "✨ Traffic generation complete!"
+
+      - name: Ping Search Engines
+        run: |
+          echo "🔍 Pinging search engines..."
+          
+          # Ping Google
+          curl -s "https://www.google.com/ping?sitemap=https://billbytekot.in/sitemap.xml" > /dev/null && echo "✅ Google pinged"
+          
+          # Ping Bing
+          curl -s "https://www.bing.com/ping?sitemap=https://billbytekot.in/sitemap.xml" > /dev/null && echo "✅ Bing pinged"
+          
+          echo "✨ Search engine pings complete!"
+
+      - name: Keep Render Alive
+        run: |
+          echo "💓 Keeping Render backend alive..."
+          
+          # Multiple requests to prevent cold start
+          for i in {1..3}; do
+            curl -s -o /dev/null "https://restro-ai.onrender.com/health"
+            sleep 2
+          done
+          
+          echo "✅ Render keep-alive complete!"
