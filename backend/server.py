@@ -453,8 +453,8 @@ class Order(BaseModel):
 
 
 class OrderCreate(BaseModel):
-    table_id: str
-    table_number: int
+    table_id: Optional[str] = "counter"  # Optional when KOT disabled
+    table_number: Optional[int] = 0  # Optional when KOT disabled
     items: List[OrderItem]
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None  # For WhatsApp notifications
@@ -2630,6 +2630,7 @@ async def create_order(
 
     business = current_user.get("business_settings", {})
     tax_rate = business.get("tax_rate", 5.0) / 100
+    kot_mode_enabled = business.get("kot_mode_enabled", True)
 
     subtotal = sum(item.price * item.quantity for item in order_data.items)
     tax = subtotal * tax_rate
@@ -2637,10 +2638,14 @@ async def create_order(
     
     # Generate tracking token for customer live tracking
     tracking_token = str(uuid.uuid4())[:12]
+    
+    # Use default values for table when KOT is disabled
+    table_id = order_data.table_id or "counter"
+    table_number = order_data.table_number or 0
 
     order_obj = Order(
-        table_id=order_data.table_id,
-        table_number=order_data.table_number,
+        table_id=table_id,
+        table_number=table_number,
         items=[item.model_dump() for item in order_data.items],
         subtotal=subtotal,
         tax=tax,
@@ -2650,7 +2655,7 @@ async def create_order(
         customer_name=order_data.customer_name,
         customer_phone=order_data.customer_phone,
         tracking_token=tracking_token,
-        order_type=order_data.order_type or "dine_in",
+        order_type=order_data.order_type or "takeaway",
         organization_id=user_org_id,
     )
 
@@ -2659,10 +2664,13 @@ async def create_order(
     doc["updated_at"] = doc["updated_at"].isoformat()
 
     await db.orders.insert_one(doc)
-    await db.tables.update_one(
-        {"id": order_data.table_id, "organization_id": user_org_id},
-        {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
-    )
+    
+    # Only update table status if KOT mode is enabled and table exists
+    if kot_mode_enabled and table_id != "counter":
+        await db.tables.update_one(
+            {"id": table_id, "organization_id": user_org_id},
+            {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
+        )
     
     # Generate WhatsApp notification if enabled and phone provided
     whatsapp_link = None

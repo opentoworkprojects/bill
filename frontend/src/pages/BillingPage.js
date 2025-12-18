@@ -69,8 +69,10 @@ const BillingPage = ({ user }) => {
   };
 
   const releaseTable = async () => {
-    if (!order?.table_id) {
-      console.log('No table_id found in order');
+    // Skip table release if KOT mode is disabled or no table assigned
+    const kotEnabled = businessSettings?.kot_mode_enabled !== false;
+    if (!kotEnabled || !order?.table_id || order.table_id === 'counter') {
+      console.log('Skipping table release - KOT disabled or counter order');
       return;
     }
     
