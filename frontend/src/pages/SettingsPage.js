@@ -173,16 +173,25 @@ const SettingsPage = ({ user }) => {
     setBusinessLoading(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`${API}/business/settings`, businessSettings, {
+      console.log('Saving business settings:', {
+        business_type: businessSettings.business_type,
+        kot_mode_enabled: businessSettings.kot_mode_enabled
+      });
+      
+      const response = await axios.put(`${API}/business/settings`, businessSettings, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success('Business settings updated successfully!');
+      
+      console.log('Save response:', response.data);
+      toast.success(`Settings saved! Type: ${businessSettings.business_type}, KOT: ${businessSettings.kot_mode_enabled ? 'ON' : 'OFF'}`);
+      
       // Update local storage user data
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       user.business_settings = businessSettings;
       localStorage.setItem('user', JSON.stringify(user));
       // DON'T refetch - keep the current state to prevent reverting changes
     } catch (error) {
+      console.error('Save error:', error);
       toast.error(error.response?.data?.detail || 'Failed to update settings');
     } finally {
       setBusinessLoading(false);
@@ -598,12 +607,15 @@ const SettingsPage = ({ user }) => {
                     value={businessSettings.business_type || 'restaurant'}
                     onChange={(e) => {
                       const newType = e.target.value;
-                      setBusinessSettings({ 
+                      console.log('Business type changed to:', newType);
+                      const newSettings = { 
                         ...businessSettings, 
                         business_type: newType,
                         // Auto-disable KOT for non-restaurant types
-                        kot_mode_enabled: newType === 'restaurant' ? businessSettings.kot_mode_enabled : false
-                      });
+                        kot_mode_enabled: newType === 'restaurant' || newType === 'cafe' ? businessSettings.kot_mode_enabled : false
+                      };
+                      console.log('New settings:', newSettings);
+                      setBusinessSettings(newSettings);
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
