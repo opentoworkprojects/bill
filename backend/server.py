@@ -1423,13 +1423,31 @@ This is a computer generated receipt
 @api_router.post("/auth/register-request")
 async def register_request(user_data: RegisterOTPRequest):
     """Step 1: Request registration - Send OTP to email"""
-    # Check if username already exists
-    existing_username = await db.users.find_one({"username": user_data.username}, {"_id": 0})
+    # Normalize username and email to lowercase for case-insensitive matching
+    username_lower = user_data.username.lower().strip()
+    email_lower = user_data.email.lower().strip()
+    
+    # Check if username already exists (case-insensitive)
+    existing_username = await db.users.find_one(
+        {"username_lower": username_lower}, {"_id": 0}
+    )
+    # Fallback: also check original username field with regex for older records
+    if not existing_username:
+        existing_username = await db.users.find_one(
+            {"username": {"$regex": f"^{user_data.username}$", "$options": "i"}}, {"_id": 0}
+        )
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # Check if email already exists
-    existing_email = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+    # Check if email already exists (case-insensitive)
+    existing_email = await db.users.find_one(
+        {"email_lower": email_lower}, {"_id": 0}
+    )
+    # Fallback: also check original email field with regex for older records
+    if not existing_email:
+        existing_email = await db.users.find_one(
+            {"email": {"$regex": f"^{user_data.email}$", "$options": "i"}}, {"_id": 0}
+        )
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -1437,20 +1455,22 @@ async def register_request(user_data: RegisterOTPRequest):
     otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     
-    # Store OTP and user data temporarily
-    registration_otp_storage[user_data.email] = {
+    # Store OTP and user data temporarily (store lowercase versions for consistency)
+    registration_otp_storage[email_lower] = {
         "otp": otp,
         "expires": expires_at,
         "user_data": {
-            "username": user_data.username,
-            "email": user_data.email,
+            "username": user_data.username.strip(),  # Keep original case for display
+            "username_lower": username_lower,  # Lowercase for lookups
+            "email": user_data.email.strip(),  # Keep original case for display
+            "email_lower": email_lower,  # Lowercase for lookups
             "password": user_data.password,
             "role": user_data.role
         }
     }
     
     # Send OTP email asynchronously (non-blocking)
-    asyncio.create_task(send_registration_otp_email(user_data.email, otp, user_data.username))
+    asyncio.create_task(send_registration_otp_email(user_data.email.strip(), otp, user_data.username.strip()))
     
     return {
         "message": "OTP sent to your email. Please verify to complete registration.",
@@ -1463,8 +1483,11 @@ async def register_request(user_data: RegisterOTPRequest):
 @api_router.post("/auth/verify-registration", response_model=User)
 async def verify_registration(verify_data: VerifyRegistrationOTP):
     """Step 2: Verify OTP and complete registration"""
-    # Get OTP data
-    otp_data = registration_otp_storage.get(verify_data.email)
+    # Normalize email for lookup
+    email_lower = verify_data.email.lower().strip()
+    
+    # Get OTP data (try lowercase first, then original)
+    otp_data = registration_otp_storage.get(email_lower) or registration_otp_storage.get(verify_data.email)
     if not otp_data:
         raise HTTPException(status_code=400, detail="No registration request found. Please request OTP again.")
     
@@ -1491,18 +1514,22 @@ async def verify_registration(verify_data: VerifyRegistrationOTP):
     if user_data["role"] == "admin":
         user_obj.organization_id = user_obj.id
     
-    # Add email_verified flag
+    # Add email_verified flag and lowercase fields for case-insensitive lookups
     doc = user_obj.model_dump()
     doc["password"] = hash_password(user_data["password"])
     doc["created_at"] = doc["created_at"].isoformat()
     doc["email_verified"] = True
     doc["email_verified_at"] = datetime.now(timezone.utc).isoformat()
+    # Add lowercase fields for case-insensitive lookups
+    doc["username_lower"] = user_data.get("username_lower", user_data["username"].lower().strip())
+    doc["email_lower"] = user_data.get("email_lower", user_data["email"].lower().strip())
     
     # Insert user into database
     await db.users.insert_one(doc)
     
-    # Remove used OTP
-    del registration_otp_storage[verify_data.email]
+    # Remove used OTP (try both keys)
+    registration_otp_storage.pop(email_lower, None)
+    registration_otp_storage.pop(verify_data.email, None)
     
     # Send welcome email asynchronously
     try:
@@ -1526,7 +1553,19 @@ async def register_legacy(user_data: UserCreate):
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"username": credentials.username}, {"_id": 0})
+    # Normalize username for case-insensitive lookup
+    username_lower = credentials.username.lower().strip()
+    
+    # Try to find user by lowercase username first (new records)
+    user = await db.users.find_one({"username_lower": username_lower}, {"_id": 0})
+    
+    # Fallback: try case-insensitive regex for older records without username_lower field
+    if not user:
+        user = await db.users.find_one(
+            {"username": {"$regex": f"^{credentials.username}$", "$options": "i"}}, 
+            {"_id": 0}
+        )
+    
     if not user or not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -4476,6 +4515,18 @@ async def startup_validation():
             await db.users.create_index("username")
             await db.users.create_index("email")
             await db.users.create_index("organization_id")
+            # Case-insensitive lookup indexes
+            await db.users.create_index("username_lower")
+            await db.users.create_index("email_lower")
+            
+            # Migrate existing users to have lowercase fields (one-time migration)
+            await db.users.update_many(
+                {"username_lower": {"$exists": False}},
+                [{"$set": {
+                    "username_lower": {"$toLower": "$username"},
+                    "email_lower": {"$toLower": "$email"}
+                }}]
+            )
             
             # Menu items indexes
             await db.menu_items.create_index("organization_id")
