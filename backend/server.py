@@ -5742,10 +5742,10 @@ async def download_windows_app():
     )
 
 
-# Serve Digital Asset Links for Android TWA
+# Serve Digital Asset Links for Android TWA - Updated 2025-12-18
 @app.get("/.well-known/assetlinks.json")
 async def get_assetlinks():
-    """Serve assetlinks.json for Android TWA verification"""
+    """Serve assetlinks.json for Android TWA verification - Enables app deep linking"""
     assetlinks = [{
         "relation": ["delegate_permission/common.handle_all_urls"],
         "target": {
