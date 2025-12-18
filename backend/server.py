@@ -283,6 +283,9 @@ class BusinessSettings(BaseModel):
     tagline: Optional[str] = None
     footer_message: Optional[str] = "Thank you for dining with us!"
     print_customization: Optional[PrintCustomization] = None
+    # Business Type & KOT Settings
+    business_type: str = "restaurant"  # restaurant, stall, food-truck, takeaway-only, cafe, cloud-kitchen
+    kot_mode_enabled: bool = True  # KOT mode for restaurants with tables
     # WhatsApp Settings
     whatsapp_enabled: bool = False
     whatsapp_business_number: Optional[str] = None
