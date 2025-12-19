@@ -65,7 +65,7 @@ const LeadCapturePopup = () => {
 
     if (isWindows) {
       // Auto-download Windows app from Google Drive
-      const fileId = "1k-3AhQlDhj3c4VtlUbGCAhDW0VY3wOES";
+      const fileId = "1SILwfrO_f73ujof-x-PcTgJaJv2yHW_E";
       
       // Use direct download link that bypasses virus scan for large files
       const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`;

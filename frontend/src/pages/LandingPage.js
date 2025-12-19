@@ -59,7 +59,7 @@ const DesktopDownloadSection = () => {
   const isMobile = os === "android" || os === "ios";
   
   // Windows desktop app download URL (Google Drive direct download)
-  const fileId = "1k-3AhQlDhj3c4VtlUbGCAhDW0VY3wOES";
+  const fileId = "1SILwfrO_f73ujof-x-PcTgJaJv2yHW_E";
   const windowsAppUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`;
   
   const handleGetStarted = () => {

@@ -33,20 +33,31 @@ const DownloadPage = () => {
   const os = getOS();
   const isMobile = os === "android" || os === "ios";
 
-  // Download instructions - Use web app instead
+  // Download URLs
+  const windowsFileId = "1SILwfrO_f73ujof-x-PcTgJaJv2yHW_E";
   const downloadUrls = {
-    windows: "web",
+    windows: `https://drive.usercontent.google.com/download?id=${windowsFileId}&export=download&authuser=0&confirm=t`,
     mac: "web",
     linux: "web",
-    android: "https://play.google.com/store/apps/details?id=com.billbytekot.app",
+    android: "https://play.google.com/store/apps/details?id=in.billbytekot.twa",
   };
 
   const handleDownload = (platform) => {
-    if (platform === "android") {
+    if (platform === "windows") {
+      // Download Windows app from Google Drive
+      const link = document.createElement('a');
+      link.href = downloadUrls.windows;
+      link.download = "BillByteKOT-Setup.exe";
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Downloading BillByteKOT for Windows...");
+    } else if (platform === "android") {
       window.open(downloadUrls.android, '_blank');
       toast.success("Opening Google Play Store...");
     } else {
-      // For desktop, show instructions to use web app
+      // For Mac/Linux, show instructions to use web app
       toast.info("Use the web app for best experience! Click 'Get Started' to begin.", {
         duration: 5000
       });
@@ -125,10 +136,10 @@ const DownloadPage = () => {
                   className="w-full bg-blue-600 hover:bg-blue-700"
                   onClick={() => handleDownload("windows")}
                 >
-                  <Globe className="w-4 h-4 mr-2" />
-                  Use Web App
+                  <Download className="w-4 h-4 mr-2" />
+                  Download for Windows
                 </Button>
-                <p className="text-xs text-gray-400 mt-2">Works in any browser</p>
+                <p className="text-xs text-gray-400 mt-2">~80 MB • Installer</p>
               </CardContent>
             </Card>
 
