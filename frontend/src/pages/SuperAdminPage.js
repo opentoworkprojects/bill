@@ -130,6 +130,25 @@ const SuperAdminPage = () => {
     }
   };
 
+  const extendTrial = async (userId, days) => {
+    if (!days || days <= 0) {
+      toast.error('Please enter valid number of days');
+      return;
+    }
+    
+    try {
+      const response = await axios.put(
+        `${API}/super-admin/users/${userId}/extend-trial`,
+        { days: parseInt(days) },
+        { params: credentials }
+      );
+      toast.success(`Trial extended by ${days} days! Total trial: ${response.data.total_trial_days} days`);
+      fetchAllData();
+    } catch (error) {
+      toast.error('Failed to extend trial');
+    }
+  };
+
   const updateLeadStatus = async (leadId, status) => {
     try {
       await axios.put(
@@ -384,7 +403,8 @@ const SuperAdminPage = () => {
                       <th className="text-left p-2">Username</th>
                       <th className="text-left p-2">Email</th>
                       <th className="text-left p-2">Role</th>
-                      <th className="text-left p-2">Subscription</th>
+                      <th className="text-left p-2">Status</th>
+                      <th className="text-left p-2">Trial Days</th>
                       <th className="text-left p-2">Bills</th>
                       <th className="text-left p-2">Actions</th>
                     </tr>
@@ -393,7 +413,7 @@ const SuperAdminPage = () => {
                     {users.map(user => (
                       <tr key={user.id} className="border-b hover:bg-gray-50">
                         <td className="p-2">{user.username}</td>
-                        <td className="p-2">{user.email}</td>
+                        <td className="p-2 text-sm">{user.email}</td>
                         <td className="p-2">
                           <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                             {user.role}
@@ -402,7 +422,7 @@ const SuperAdminPage = () => {
                         <td className="p-2">
                           {user.subscription_active ? (
                             <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs flex items-center gap-1 w-fit">
-                              <CheckCircle className="w-3 h-3" /> Active
+                              <CheckCircle className="w-3 h-3" /> Subscribed
                             </span>
                           ) : (
                             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs flex items-center gap-1 w-fit">
@@ -410,22 +430,55 @@ const SuperAdminPage = () => {
                             </span>
                           )}
                         </td>
+                        <td className="p-2">
+                          <span className="text-sm font-medium">
+                            {7 + (user.trial_extension_days || 0)} days
+                          </span>
+                          {user.trial_extension_days > 0 && (
+                            <span className="text-xs text-green-600 ml-1">(+{user.trial_extension_days})</span>
+                          )}
+                        </td>
                         <td className="p-2">{user.bill_count || 0}</td>
-                        <td className="p-2 space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateSubscription(user.id, !user.subscription_active)}
-                          >
-                            {user.subscription_active ? 'Deactivate' : 'Activate'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteUser(user.id)}
-                          >
-                            Delete
-                          </Button>
+                        <td className="p-2">
+                          <div className="flex flex-wrap gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateSubscription(user.id, !user.subscription_active)}
+                              className="text-xs"
+                            >
+                              {user.subscription_active ? 'Deactivate' : 'Activate Sub'}
+                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                placeholder="Days"
+                                className="w-16 h-8 text-xs"
+                                min="1"
+                                max="365"
+                                id={`trial-days-${user.id}`}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs bg-blue-50 hover:bg-blue-100"
+                                onClick={() => {
+                                  const input = document.getElementById(`trial-days-${user.id}`);
+                                  extendTrial(user.id, input?.value);
+                                }}
+                              >
+                                +Trial
+                              </Button>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => deleteUser(user.id)}
+                              className="text-xs"
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

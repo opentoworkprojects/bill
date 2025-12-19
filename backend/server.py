@@ -1044,8 +1044,8 @@ async def get_current_user(
 
 async def check_subscription(user: dict):
     """
-    Strict 7-day trial enforcement
-    - Trial: 7 days from account creation
+    Strict trial enforcement with extension support
+    - Trial: 7 days from account creation + any extension days
     - After trial: Must have active paid subscription
     - No bill count limit during trial
     """
@@ -1081,7 +1081,10 @@ async def check_subscription(user: dict):
             created_at = None
     
     if created_at:
-        trial_end = created_at + timedelta(days=7)
+        # Base trial is 7 days + any extension days granted by admin
+        trial_extension_days = user.get("trial_extension_days", 0)
+        total_trial_days = 7 + trial_extension_days
+        trial_end = created_at + timedelta(days=total_trial_days)
         now = datetime.now(timezone.utc)
         
         if now < trial_end:
@@ -5375,6 +5378,51 @@ async def get_all_users_admin(username: str, password: str, skip: int = 0, limit
 class SubscriptionUpdate(BaseModel):
     subscription_active: bool
     subscription_expires_at: Optional[str] = None
+
+class TrialExtension(BaseModel):
+    days: int
+
+@api_router.put("/super-admin/users/{user_id}/extend-trial")
+async def extend_user_trial_admin(
+    user_id: str,
+    trial_extension: TrialExtension,
+    username: str,
+    password: str
+):
+    """Extend user trial by X days - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    # Get current user
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get current created_at date
+    created_at = user.get("created_at")
+    if isinstance(created_at, str):
+        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    
+    if not created_at:
+        created_at = datetime.now(timezone.utc)
+    
+    # Calculate new trial end date by adjusting created_at backwards
+    # This effectively extends the trial by making it seem like they registered later
+    # Or we can store a separate trial_extension_days field
+    current_extension = user.get("trial_extension_days", 0)
+    new_extension = current_extension + trial_extension.days
+    
+    result = await db.users.update_one(
+        {"id": user_id}, 
+        {"$set": {"trial_extension_days": new_extension}}
+    )
+    
+    return {
+        "message": f"Trial extended by {trial_extension.days} days",
+        "user_id": user_id,
+        "total_trial_days": 7 + new_extension,
+        "extension_days": new_extension
+    }
 
 @api_router.put("/super-admin/users/{user_id}/subscription")
 async def update_user_subscription_admin(
