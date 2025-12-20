@@ -1,66 +1,25 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { toast } from 'sonner';
-import { ChefHat, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
-import axios from 'axios';
-import { API } from '../App';
-import ValidationAlert from '../components/ValidationAlert';
+import { ChefHat, ArrowLeft, Mail, Phone, MessageCircle, HelpCircle } from 'lucide-react';
 
 const ForgotPasswordPage = () => {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [validationErrors, setValidationErrors] = useState([]);
+  const supportEmail = "support@billbytekot.in";
+  const supportPhone = "+91 9876543210"; // Update with actual number
+  
+  const handleWhatsApp = () => {
+    const message = encodeURIComponent("Hi, I need help resetting my BillByteKOT password. My registered email is: ");
+    window.open(`https://wa.me/919876543210?text=${message}`, '_blank');
+  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validation
-    const errors = [];
-    if (!email || email.trim() === '') {
-      errors.push('Email address is required');
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.push('Please enter a valid email address');
-    }
-    
-    if (errors.length > 0) {
-      setValidationErrors(errors);
-      setTimeout(() => setValidationErrors([]), 5000);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await axios.post(`${API}/auth/forgot-password`, { email });
-      
-      // Show OTP in console for development
-      if (response.data.otp) {
-        console.log('🔐 Development OTP:', response.data.otp);
-        toast.info(`Dev Mode: OTP is ${response.data.otp}`);
-      }
-      
-      toast.success('OTP sent to your email! Check your inbox.');
-      // Navigate to reset password page with email
-      navigate('/reset-password', { state: { email } });
-    } catch (error) {
-      if (error.response?.status === 404) {
-        toast.error('No account found with this email address');
-      } else {
-        toast.error(error.response?.data?.detail || 'Failed to send reset email');
-      }
-    } finally {
-      setLoading(false);
-    }
+  const handleEmail = () => {
+    const subject = encodeURIComponent("Password Reset Request - BillByteKOT");
+    const body = encodeURIComponent("Hi Support Team,\n\nI need help resetting my password.\n\nMy registered email: \nMy username: \n\nThank you.");
+    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
-      <ValidationAlert errors={validationErrors} onClose={() => setValidationErrors([])} />
-      
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
           <Link to="/" className="flex items-center justify-center gap-2 mb-4">
@@ -73,56 +32,77 @@ const ForgotPasswordPage = () => {
           </Link>
           <CardTitle className="text-2xl">Forgot Password?</CardTitle>
           <CardDescription>
-            Enter your email and we'll send you an OTP to reset your password.
+            Contact our support team to reset your password
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email Address *</Label>
-              <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="pl-10"
-                  disabled={loading}
-                />
+        <CardContent className="space-y-6">
+          {/* Info Box */}
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start gap-3">
+              <HelpCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-blue-800 font-medium">Need to reset your password?</p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Please contact our support team with your registered email address. We'll help you reset your password within 24 hours.
+                </p>
               </div>
             </div>
+          </div>
 
+          {/* Contact Options */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-900">Contact Support:</h3>
+            
+            {/* WhatsApp - Primary */}
             <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-violet-600 to-purple-600 h-11"
-              disabled={loading}
+              onClick={handleWhatsApp}
+              className="w-full h-12 bg-green-600 hover:bg-green-700 text-white"
             >
-              {loading ? 'Sending OTP...' : 'Send OTP'}
+              <MessageCircle className="w-5 h-5 mr-2" />
+              WhatsApp Support (Fastest)
             </Button>
 
-            <div className="text-center">
-              <Link
-                to="/login"
-                className="text-sm text-gray-600 hover:text-violet-600 flex items-center justify-center gap-1"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Login
-              </Link>
-            </div>
-          </form>
+            {/* Email */}
+            <Button
+              onClick={handleEmail}
+              variant="outline"
+              className="w-full h-12"
+            >
+              <Mail className="w-5 h-5 mr-2" />
+              Email: {supportEmail}
+            </Button>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Need Help?</h3>
-            <p className="text-xs text-gray-600 mb-2">
-              If you don't receive the email within 5 minutes:
-            </p>
+            {/* Phone */}
+            <a href={`tel:${supportPhone.replace(/\s/g, '')}`} className="block">
+              <Button
+                variant="outline"
+                className="w-full h-12"
+              >
+                <Phone className="w-5 h-5 mr-2" />
+                Call: {supportPhone}
+              </Button>
+            </a>
+          </div>
+
+          {/* What to Include */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">When contacting support, please provide:</h3>
             <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-              <li>Check your spam/junk folder</li>
-              <li>Verify you entered the correct email</li>
-              <li>Contact support: support@billbytekot.in</li>
+              <li>Your registered email address</li>
+              <li>Your username</li>
+              <li>Restaurant/Business name</li>
             </ul>
+          </div>
+
+          {/* Back to Login */}
+          <div className="text-center pt-2">
+            <Link
+              to="/login"
+              className="text-sm text-gray-600 hover:text-violet-600 flex items-center justify-center gap-1"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Login
+            </Link>
           </div>
         </CardContent>
       </Card>
