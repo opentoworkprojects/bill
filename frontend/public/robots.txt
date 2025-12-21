@@ -1,6 +1,12 @@
 # BillByteKOT - Restaurant Billing & POS Software
 # https://billbytekot.in
 
+# Sitemaps
+Sitemap: https://billbytekot.in/sitemap-index.xml
+Sitemap: https://billbytekot.in/sitemap.xml
+Sitemap: https://billbytekot.in/sitemap-blog.xml
+
+# Crawl rules
 User-agent: *
 Allow: /
 Allow: /$

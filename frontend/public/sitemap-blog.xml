@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+        http://www.google.com/schemas/sitemap-news/0.9
+        http://www.google.com/schemas/sitemap-news/0.9/sitemap-news.xsd">
   
   <!-- High-Volume Keyword Targeted Blog Posts -->
   
@@ -11,13 +16,12 @@
         <news:name>BillByteKOT Blog</news:name>
         <news:language>en</news:language>
       </news:publication>
-      <news:publication_date>2025-12-20</news:publication_date>
+      <news:publication_date>2025-12-20T00:00:00+05:30</news:publication_date>
       <news:title>Best Restaurant Billing Software India 2025 - Complete Guide</news:title>
-      <news:keywords>restaurant billing software, restaurant billing software India, best billing software for restaurant, restaurant POS India</news:keywords>
     </news:news>
     <lastmod>2025-12-20</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.95</priority>
+    <priority>0.85</priority>
   </url>
 
   <url>
