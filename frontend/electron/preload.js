@@ -1,5 +1,20 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const CONFIG = require('./config');
+
+// Handle config loading with proper path resolution for packaged app
+let CONFIG;
+try {
+  CONFIG = require('./config');
+} catch (error) {
+  console.warn('[BillByteKOT Desktop] Could not load config from ./config, using fallback');
+  // Fallback config - hardcoded values to avoid module loading issues
+  CONFIG = {
+    APP_NAME: 'BillByteKOT',
+    APP_VERSION: '1.3.0',
+    COMPANY_NAME: 'BillByte',
+    COMPANY_URL: 'https://billbytekot.in',
+    BACKEND_URL: 'https://restro-ai.onrender.com'
+  };
+}
 
 // Expose protected methods to renderer process
 contextBridge.exposeInMainWorld('electronAPI', {

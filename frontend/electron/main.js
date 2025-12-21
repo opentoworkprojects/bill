@@ -1,6 +1,35 @@
 const { app, BrowserWindow, BrowserView, Menu, shell, ipcMain, Notification, session, globalShortcut } = require('electron');
 const path = require('path');
-const CONFIG = require('./config');
+
+// Handle config loading with proper path resolution for packaged app
+let CONFIG;
+try {
+  CONFIG = require('./config');
+} catch (error) {
+  console.warn('[BillByteKOT Desktop] Could not load config from ./config, trying absolute path');
+  try {
+    CONFIG = require(path.join(__dirname, 'config.js'));
+  } catch (error2) {
+    console.error('[BillByteKOT Desktop] Failed to load config:', error2);
+    // Fallback config
+    CONFIG = {
+      APP_NAME: 'BillByteKOT',
+      APP_VERSION: '1.3.0',
+      COMPANY_NAME: 'BillByte',
+      COMPANY_URL: 'https://billbytekot.in',
+      BACKEND_URL: 'https://restro-ai.onrender.com',
+      PRODUCTION_URL: 'https://billbytekot.in/login',
+      DEV_URL: 'http://localhost:3000',
+      WINDOW: {
+        WIDTH: 1400,
+        HEIGHT: 900,
+        MIN_WIDTH: 1024,
+        MIN_HEIGHT: 700,
+        BACKGROUND_COLOR: '#f5f3ff'
+      }
+    };
+  }
+}
 
 const isDev = process.env.NODE_ENV === 'development';
 
