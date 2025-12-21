@@ -2,6 +2,112 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PWA and Mobile Optimizations */
+html {
+    /* Prevent zoom on mobile */
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    
+    /* Prevent horizontal scroll */
+    overflow-x: hidden;
+    
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    
+    /* PWA optimizations */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    
+    /* Prevent overscroll bounce */
+    overscroll-behavior: none;
+    
+    /* Prevent horizontal scroll */
+    overflow-x: hidden;
+    
+    /* Full height for PWA */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+}
+
+/* Re-enable text selection for inputs and content areas */
+input, textarea, [contenteditable], .selectable {
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
+
+/* Prevent zoom on input focus (iOS Safari) */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+    font-size: 16px !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* PWA safe area handling */
+.safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+}
+
+/* Hide scrollbars in PWA mode */
+@media (display-mode: standalone) {
+    body {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    
+    body::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Prevent text selection on UI elements */
+button, .btn, .button, nav, header, .menu {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Touch optimizations */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+/* Prevent pull-to-refresh */
+body {
+    overscroll-behavior-y: contain;
+}
+
 body {
     margin: 0;
     font-family:
