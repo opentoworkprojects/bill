@@ -8,17 +8,41 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Textarea } from '../components/ui/textarea';
+import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, Package, Printer, QrCode, Download, FileSpreadsheet, Search, Filter } from 'lucide-react';
+import { 
+  Plus, AlertTriangle, Package, Printer, QrCode, Download, FileSpreadsheet, 
+  Search, Filter, TrendingUp, TrendingDown, Calendar, BarChart3, 
+  ShoppingCart, Truck, Clock, DollarSign, Archive, RefreshCw,
+  Eye, Edit, Trash2, History, Bell, Target, Zap, Package2,
+  ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, XCircle,
+  Settings, Users, MapPin, Phone, Mail, Globe
+} from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
 
 const InventoryPage = ({ user }) => {
   const [inventory, setInventory] = useState([]);
   const [lowStock, setLowStock] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [stockMovements, setStockMovements] = useState([]);
+  const [analytics, setAnalytics] = useState({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [movementDialogOpen, setMovementDialogOpen] = useState(false);
+  const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [editingSupplier, setEditingSupplier] = useState(null);
+  const [editingCategory, setEditingCategory] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [viewMode, setViewMode] = useState('grid'); // grid or table
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrData, setQrData] = useState({ upiId: '', amount: '', note: '' });
   const [businessSettings, setBusinessSettings] = useState(null);
@@ -27,13 +51,52 @@ const InventoryPage = ({ user }) => {
     quantity: '',
     unit: '',
     min_quantity: '',
-    price_per_unit: ''
+    max_quantity: '',
+    price_per_unit: '',
+    cost_price: '',
+    category_id: '',
+    supplier_id: '',
+    sku: '',
+    barcode: '',
+    description: '',
+    location: '',
+    expiry_date: '',
+    batch_number: '',
+    reorder_point: '',
+    reorder_quantity: ''
+  });
+  const [supplierFormData, setSupplierFormData] = useState({
+    name: '',
+    contact_person: '',
+    phone: '',
+    email: '',
+    address: '',
+    website: '',
+    payment_terms: '',
+    notes: ''
+  });
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    description: '',
+    color: '#7c3aed'
+  });
+  const [movementFormData, setMovementFormData] = useState({
+    item_id: '',
+    type: 'in', // in, out, adjustment
+    quantity: '',
+    reason: '',
+    reference: '',
+    notes: ''
   });
 
   useEffect(() => {
     fetchInventory();
     fetchLowStock();
     fetchBusinessSettings();
+    fetchSuppliers();
+    fetchCategories();
+    fetchStockMovements();
+    fetchAnalytics();
   }, []);
 
   const fetchBusinessSettings = async () => {
@@ -63,6 +126,46 @@ const InventoryPage = ({ user }) => {
     }
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/suppliers`);
+      setSuppliers(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch suppliers', error);
+      setSuppliers([]);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/categories`);
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
+      setCategories([]);
+    }
+  };
+
+  const fetchStockMovements = async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/movements`);
+      setStockMovements(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch stock movements', error);
+      setStockMovements([]);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/analytics`);
+      setAnalytics(response.data || {});
+    } catch (error) {
+      console.error('Failed to fetch analytics', error);
+      setAnalytics({});
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -76,9 +179,61 @@ const InventoryPage = ({ user }) => {
       setDialogOpen(false);
       fetchInventory();
       fetchLowStock();
+      fetchAnalytics();
       resetForm();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to save inventory item');
+    }
+  };
+
+  const handleSupplierSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingSupplier) {
+        await axios.put(`${API}/inventory/suppliers/${editingSupplier.id}`, supplierFormData);
+        toast.success('Supplier updated!');
+      } else {
+        await axios.post(`${API}/inventory/suppliers`, supplierFormData);
+        toast.success('Supplier created!');
+      }
+      setSupplierDialogOpen(false);
+      fetchSuppliers();
+      resetSupplierForm();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save supplier');
+    }
+  };
+
+  const handleCategorySubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingCategory) {
+        await axios.put(`${API}/inventory/categories/${editingCategory.id}`, categoryFormData);
+        toast.success('Category updated!');
+      } else {
+        await axios.post(`${API}/inventory/categories`, categoryFormData);
+        toast.success('Category created!');
+      }
+      setCategoryDialogOpen(false);
+      fetchCategories();
+      resetCategoryForm();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save category');
+    }
+  };
+
+  const handleMovementSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/inventory/movements`, movementFormData);
+      toast.success('Stock movement recorded!');
+      setMovementDialogOpen(false);
+      fetchInventory();
+      fetchStockMovements();
+      fetchAnalytics();
+      resetMovementForm();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to record movement');
     }
   };
 
@@ -88,9 +243,55 @@ const InventoryPage = ({ user }) => {
       quantity: '',
       unit: '',
       min_quantity: '',
-      price_per_unit: ''
+      max_quantity: '',
+      price_per_unit: '',
+      cost_price: '',
+      category_id: '',
+      supplier_id: '',
+      sku: '',
+      barcode: '',
+      description: '',
+      location: '',
+      expiry_date: '',
+      batch_number: '',
+      reorder_point: '',
+      reorder_quantity: ''
     });
     setEditingItem(null);
+  };
+
+  const resetSupplierForm = () => {
+    setSupplierFormData({
+      name: '',
+      contact_person: '',
+      phone: '',
+      email: '',
+      address: '',
+      website: '',
+      payment_terms: '',
+      notes: ''
+    });
+    setEditingSupplier(null);
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryFormData({
+      name: '',
+      description: '',
+      color: '#7c3aed'
+    });
+    setEditingCategory(null);
+  };
+
+  const resetMovementForm = () => {
+    setMovementFormData({
+      item_id: '',
+      type: 'in',
+      quantity: '',
+      reason: '',
+      reference: '',
+      notes: ''
+    });
   };
 
   const handleEdit = (item) => {
@@ -100,17 +301,92 @@ const InventoryPage = ({ user }) => {
       quantity: item.quantity,
       unit: item.unit,
       min_quantity: item.min_quantity,
-      price_per_unit: item.price_per_unit
+      max_quantity: item.max_quantity || '',
+      price_per_unit: item.price_per_unit,
+      cost_price: item.cost_price || '',
+      category_id: item.category_id || '',
+      supplier_id: item.supplier_id || '',
+      sku: item.sku || '',
+      barcode: item.barcode || '',
+      description: item.description || '',
+      location: item.location || '',
+      expiry_date: item.expiry_date || '',
+      batch_number: item.batch_number || '',
+      reorder_point: item.reorder_point || '',
+      reorder_quantity: item.reorder_quantity || ''
     });
     setDialogOpen(true);
   };
 
-  // Filter inventory based on search and low stock filter
-  const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLowStock = filterLowStock ? item.quantity <= item.min_quantity : true;
-    return matchesSearch && matchesLowStock;
-  });
+  const handleEditSupplier = (supplier) => {
+    setEditingSupplier(supplier);
+    setSupplierFormData({
+      name: supplier.name,
+      contact_person: supplier.contact_person || '',
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      address: supplier.address || '',
+      website: supplier.website || '',
+      payment_terms: supplier.payment_terms || '',
+      notes: supplier.notes || ''
+    });
+    setSupplierDialogOpen(true);
+  };
+
+  const handleEditCategory = (category) => {
+    setEditingCategory(category);
+    setCategoryFormData({
+      name: category.name,
+      description: category.description || '',
+      color: category.color || '#7c3aed'
+    });
+    setCategoryDialogOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      try {
+        await axios.delete(`${API}/inventory/${id}`);
+        toast.success('Item deleted successfully');
+        fetchInventory();
+        fetchLowStock();
+        fetchAnalytics();
+      } catch (error) {
+        toast.error('Failed to delete item');
+      }
+    }
+  };
+
+  // Enhanced filtering and sorting
+  const filteredAndSortedInventory = inventory
+    .filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (item.barcode && item.barcode.includes(searchTerm));
+      const matchesLowStock = filterLowStock ? item.quantity <= item.min_quantity : true;
+      const matchesCategory = filterCategory ? item.category_id === filterCategory : true;
+      return matchesSearch && matchesLowStock && matchesCategory;
+    })
+    .sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+      
+      if (sortBy === 'total_value') {
+        aValue = a.quantity * a.price_per_unit;
+        bValue = b.quantity * b.price_per_unit;
+      }
+      
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
 
   // Print inventory report
   const handlePrintInventory = () => {
@@ -410,12 +686,83 @@ const InventoryPage = ({ user }) => {
           </div>
         )}
 
-        <div className="flex justify-between items-center flex-wrap gap-4">
+        <div className="flex justify-between items-start flex-wrap gap-4">
           <div>
-            <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Inventory Management</h1>
-            <p className="text-gray-600 mt-2">Track stock levels and supplies</p>
+            <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              Inventory Management
+            </h1>
+            <p className="text-gray-600 mt-2">Track stock levels, suppliers, and analytics</p>
+            
+            {/* Quick Stats */}
+            <div className="flex gap-4 mt-4 flex-wrap">
+              <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
+                <Package className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium">{inventory.length} Items</span>
+              </div>
+              <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg">
+                <DollarSign className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-medium">
+                  ₹{inventory.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0).toFixed(0)} Value
+                </span>
+              </div>
+              {lowStock.length > 0 && (
+                <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                  <span className="text-sm font-medium">{lowStock.length} Low Stock</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded-lg">
+                <Users className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium">{suppliers.length} Suppliers</span>
+              </div>
+            </div>
           </div>
+          
           <div className="flex gap-2 flex-wrap">
+            {/* Analytics Button */}
+            <Button 
+              variant="outline" 
+              onClick={() => setAnalyticsDialogOpen(true)}
+              className="border-blue-500 text-blue-600 hover:bg-blue-50"
+              title="View Analytics Dashboard"
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </Button>
+
+            {/* Stock Movement Button */}
+            <Button 
+              variant="outline" 
+              onClick={() => setMovementDialogOpen(true)}
+              className="border-purple-500 text-purple-600 hover:bg-purple-50"
+              title="Record Stock Movement"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Movement
+            </Button>
+
+            {/* Suppliers Button */}
+            <Button 
+              variant="outline" 
+              onClick={() => setSupplierDialogOpen(true)}
+              className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+              title="Manage Suppliers"
+            >
+              <Truck className="w-4 h-4 mr-2" />
+              Suppliers
+            </Button>
+
+            {/* Categories Button */}
+            <Button 
+              variant="outline" 
+              onClick={() => setCategoryDialogOpen(true)}
+              className="border-teal-500 text-teal-600 hover:bg-teal-50"
+              title="Manage Categories"
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Categories
+            </Button>
+
             {/* Print & Export Buttons */}
             <Button variant="outline" onClick={handlePrintInventory} title="Print Inventory Report">
               <Printer className="w-4 h-4 mr-2" />
@@ -434,6 +781,7 @@ const InventoryPage = ({ user }) => {
               <QrCode className="w-4 h-4 mr-2" />
               UPI QR
             </Button>
+            
             {['admin', 'cashier'].includes(user?.role) && (
               <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
                 <DialogTrigger asChild>
@@ -442,69 +790,245 @@ const InventoryPage = ({ user }) => {
                     Add Item
                   </Button>
                 </DialogTrigger>
-                <DialogContent data-testid="inventory-dialog">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="inventory-dialog">
                   <DialogHeader>
-                    <DialogTitle>{editingItem ? 'Edit Inventory Item' : 'Add Inventory Item'}</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Package className="w-5 h-5" />
+                      {editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}
+                    </DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <Label>Item Name</Label>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        required
-                        data-testid="inventory-name-input"
-                      />
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Basic Information */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Package2 className="w-4 h-4" />
+                        Basic Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Item Name *</Label>
+                          <Input
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            required
+                            data-testid="inventory-name-input"
+                            placeholder="e.g., Tomatoes, Chicken Breast"
+                          />
+                        </div>
+                        <div>
+                          <Label>SKU (Stock Keeping Unit)</Label>
+                          <Input
+                            value={formData.sku}
+                            onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                            placeholder="e.g., TOM-001, CHK-BR-001"
+                          />
+                        </div>
+                        <div>
+                          <Label>Category</Label>
+                          <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map(category => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }}></div>
+                                    {category.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Supplier</Label>
+                          <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select supplier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {suppliers.map(supplier => (
+                                <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                                  {supplier.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Quantity</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={formData.quantity}
-                          onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                          required
-                          data-testid="inventory-quantity-input"
-                        />
-                      </div>
-                      <div>
-                        <Label>Unit</Label>
-                        <Input
-                          value={formData.unit}
-                          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                          placeholder="kg, liters, pieces"
-                          required
-                        />
+
+                    {/* Stock Information */}
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
+                        Stock Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label>Current Quantity *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.quantity}
+                            onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                            required
+                            data-testid="inventory-quantity-input"
+                          />
+                        </div>
+                        <div>
+                          <Label>Unit *</Label>
+                          <Input
+                            value={formData.unit}
+                            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                            placeholder="kg, liters, pieces, boxes"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label>Storage Location</Label>
+                          <Input
+                            value={formData.location}
+                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                            placeholder="e.g., Freezer A, Shelf 2"
+                          />
+                        </div>
+                        <div>
+                          <Label>Minimum Quantity *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.min_quantity}
+                            onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label>Maximum Quantity</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.max_quantity}
+                            onChange={(e) => setFormData({ ...formData, max_quantity: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label>Reorder Point</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.reorder_point}
+                            onChange={(e) => setFormData({ ...formData, reorder_point: e.target.value })}
+                            placeholder="Auto-reorder when stock hits this level"
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Min Quantity</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={formData.min_quantity}
-                          onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
-                          required
-                        />
+
+                    {/* Pricing Information */}
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4" />
+                        Pricing Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label>Cost Price (₹) *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.cost_price}
+                            onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                            placeholder="Purchase price per unit"
+                          />
+                        </div>
+                        <div>
+                          <Label>Selling Price (₹) *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.price_per_unit}
+                            onChange={(e) => setFormData({ ...formData, price_per_unit: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label>Reorder Quantity</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.reorder_quantity}
+                            onChange={(e) => setFormData({ ...formData, reorder_quantity: e.target.value })}
+                            placeholder="Quantity to order when restocking"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <Label>Price per Unit (₹)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={formData.price_per_unit}
-                          onChange={(e) => setFormData({ ...formData, price_per_unit: e.target.value })}
-                          required
-                        />
+                      {formData.cost_price && formData.price_per_unit && (
+                        <div className="mt-3 p-3 bg-white rounded border">
+                          <div className="flex justify-between text-sm">
+                            <span>Profit Margin:</span>
+                            <span className="font-semibold text-green-600">
+                              ₹{(parseFloat(formData.price_per_unit) - parseFloat(formData.cost_price)).toFixed(2)} 
+                              ({(((parseFloat(formData.price_per_unit) - parseFloat(formData.cost_price)) / parseFloat(formData.cost_price)) * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Additional Details */}
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Settings className="w-4 h-4" />
+                        Additional Details
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Barcode</Label>
+                          <Input
+                            value={formData.barcode}
+                            onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                            placeholder="Scan or enter barcode"
+                          />
+                        </div>
+                        <div>
+                          <Label>Batch Number</Label>
+                          <Input
+                            value={formData.batch_number}
+                            onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
+                            placeholder="e.g., BATCH-2024-001"
+                          />
+                        </div>
+                        <div>
+                          <Label>Expiry Date</Label>
+                          <Input
+                            type="date"
+                            value={formData.expiry_date}
+                            onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label>Description</Label>
+                          <Textarea
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            placeholder="Additional notes about this item..."
+                            rows={3}
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+
+                    <div className="flex gap-3 pt-4 border-t">
                       <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" data-testid="save-inventory-button">
-                        {editingItem ? 'Update' : 'Create'}
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        {editingItem ? 'Update Item' : 'Create Item'}
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
+                      <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Cancel
+                      </Button>
                     </div>
                   </form>
                 </DialogContent>
@@ -513,30 +1037,141 @@ const InventoryPage = ({ user }) => {
           </div>
         </div>
 
-        {/* Search and Filter Bar */}
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search inventory..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        {/* Enhanced Search and Filter Bar */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="flex gap-4 flex-wrap items-center">
+            {/* Search */}
+            <div className="flex-1 min-w-[200px] relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search by name, SKU, or barcode..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Category Filter */}
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category.id} value={category.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }}></div>
+                      {category.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Sort Options */}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="quantity">Quantity</SelectItem>
+                <SelectItem value="price_per_unit">Price</SelectItem>
+                <SelectItem value="total_value">Total Value</SelectItem>
+                <SelectItem value="updated_at">Last Updated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sort Order */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+            >
+              {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+            </Button>
+
+            {/* View Mode Toggle */}
+            <div className="flex border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-none"
+              >
+                <Package className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="rounded-none"
+              >
+                <BarChart3 className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Low Stock Filter */}
+            <Button
+              variant={filterLowStock ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterLowStock(!filterLowStock)}
+              className={filterLowStock ? "bg-orange-500 hover:bg-orange-600" : ""}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {filterLowStock ? 'Low Stock' : 'All Items'}
+              {lowStock.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {lowStock.length}
+                </Badge>
+              )}
+            </Button>
           </div>
-          <Button
-            variant={filterLowStock ? "default" : "outline"}
-            onClick={() => setFilterLowStock(!filterLowStock)}
-            className={filterLowStock ? "bg-orange-500 hover:bg-orange-600" : ""}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            {filterLowStock ? 'Showing Low Stock' : 'Filter Low Stock'}
-            {lowStock.length > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                {lowStock.length}
-              </span>
-            )}
-          </Button>
+
+          {/* Active Filters Display */}
+          {(searchTerm || filterCategory || filterLowStock) && (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <span className="text-sm text-gray-500">Active filters:</span>
+              {searchTerm && (
+                <Badge variant="outline" className="gap-1">
+                  Search: {searchTerm}
+                  <button onClick={() => setSearchTerm('')} className="ml-1 hover:bg-gray-200 rounded-full p-0.5">
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+              {filterCategory && (
+                <Badge variant="outline" className="gap-1">
+                  Category: {categories.find(c => c.id.toString() === filterCategory)?.name}
+                  <button onClick={() => setFilterCategory('')} className="ml-1 hover:bg-gray-200 rounded-full p-0.5">
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+              {filterLowStock && (
+                <Badge variant="outline" className="gap-1">
+                  Low Stock Only
+                  <button onClick={() => setFilterLowStock(false)} className="ml-1 hover:bg-gray-200 rounded-full p-0.5">
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterCategory('');
+                  setFilterLowStock(false);
+                }}
+                className="text-xs h-6"
+              >
+                Clear All
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Bulk Upload Component */}
@@ -572,77 +1207,187 @@ const InventoryPage = ({ user }) => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInventory.map((item) => {
+          {filteredAndSortedInventory.map((item) => {
             const isLowStock = item.quantity <= item.min_quantity;
+            const category = categories.find(c => c.id === item.category_id);
+            const supplier = suppliers.find(s => s.id === item.supplier_id);
+            const totalValue = item.quantity * item.price_per_unit;
+            const profitMargin = item.cost_price ? ((item.price_per_unit - item.cost_price) / item.cost_price * 100) : 0;
+            
             return (
               <Card
                 key={item.id}
-                className={`card-hover border-0 shadow-lg ${isLowStock ? 'border-l-4 border-l-orange-500' : ''}`}
+                className={`card-hover border-0 shadow-lg transition-all hover:shadow-xl ${
+                  isLowStock ? 'border-l-4 border-l-orange-500' : ''
+                }`}
                 data-testid={`inventory-item-${item.id}`}
               >
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <Package className="w-5 h-5 text-white" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                        <Package className="w-6 h-6 text-white" />
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">{item.name}</CardTitle>
-                        <p className="text-xs text-gray-500">₹{item.price_per_unit}/{item.unit}</p>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg leading-tight">{item.name}</CardTitle>
+                        <div className="flex items-center gap-2 mt-1">
+                          {item.sku && (
+                            <Badge variant="outline" className="text-xs">
+                              {item.sku}
+                            </Badge>
+                          )}
+                          {category && (
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs"
+                              style={{ borderColor: category.color, color: category.color }}
+                            >
+                              {category.name}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
+                    </div>
+                    <div className="flex gap-1">
+                      {isLowStock && (
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" title="Low Stock"></div>
+                      )}
+                      {item.expiry_date && new Date(item.expiry_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && (
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Expiring Soon"></div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Current Stock:</span>
-                      <span className={`font-bold ${isLowStock ? 'text-orange-600' : 'text-green-600'}`}>
+                <CardContent className="space-y-3">
+                  {/* Stock Information */}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-gray-50 p-2 rounded">
+                      <div className="text-gray-600 text-xs">Current Stock</div>
+                      <div className={`font-bold ${isLowStock ? 'text-orange-600' : 'text-green-600'}`}>
                         {item.quantity} {item.unit}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Min Required:</span>
-                      <span className="text-sm">{item.min_quantity} {item.unit}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Total Value:</span>
-                      <span className="text-sm font-medium">₹{(item.quantity * item.price_per_unit).toFixed(2)}</span>
-                    </div>
-                    {['admin', 'cashier'].includes(user?.role) && (
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => handleEdit(item)}
-                          data-testid={`edit-inventory-${item.id}`}
-                        >
-                          Update Stock
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-green-500 text-green-600 hover:bg-green-50"
-                          onClick={() => openQRModal((item.min_quantity - item.quantity) * item.price_per_unit, `Restock: ${item.name}`)}
-                          title="Generate QR for restock payment"
-                        >
-                          <QrCode className="w-4 h-4" />
-                        </Button>
                       </div>
-                    )}
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded">
+                      <div className="text-gray-600 text-xs">Min Required</div>
+                      <div className="font-medium">{item.min_quantity} {item.unit}</div>
+                    </div>
                   </div>
+
+                  {/* Pricing Information */}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-600">Unit Price:</span>
+                      <span className="font-medium ml-1">₹{item.price_per_unit}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total Value:</span>
+                      <span className="font-bold text-green-600 ml-1">₹{totalValue.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Additional Information */}
+                  {(item.location || supplier || item.batch_number) && (
+                    <div className="text-xs text-gray-500 space-y-1">
+                      {item.location && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {item.location}
+                        </div>
+                      )}
+                      {supplier && (
+                        <div className="flex items-center gap-1">
+                          <Truck className="w-3 h-3" />
+                          {supplier.name}
+                        </div>
+                      )}
+                      {item.batch_number && (
+                        <div className="flex items-center gap-1">
+                          <Package2 className="w-3 h-3" />
+                          Batch: {item.batch_number}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Expiry Warning */}
+                  {item.expiry_date && (
+                    <div className={`text-xs p-2 rounded ${
+                      new Date(item.expiry_date) < new Date() 
+                        ? 'bg-red-100 text-red-700' 
+                        : new Date(item.expiry_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Expires: {new Date(item.expiry_date).toLocaleDateString()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  {['admin', 'cashier'].includes(user?.role) && (
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleEdit(item)}
+                        data-testid={`edit-inventory-${item.id}`}
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-green-500 text-green-600 hover:bg-green-50"
+                        onClick={() => openQRModal(
+                          item.reorder_quantity ? (item.reorder_quantity * (item.cost_price || item.price_per_unit)) : 
+                          ((item.min_quantity - item.quantity) * (item.cost_price || item.price_per_unit)), 
+                          `Restock: ${item.name}`
+                        )}
+                        title="Generate QR for restock payment"
+                      >
+                        <QrCode className="w-3 h-3" />
+                      </Button>
+                      {['admin'].includes(user?.role) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-500 text-red-600 hover:bg-red-50"
+                          onClick={() => handleDelete(item.id)}
+                          title="Delete item"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
           })}
 
-          {filteredInventory.length === 0 && (
+          {filteredAndSortedInventory.length === 0 && (
             <div className="col-span-full text-center py-12">
-              <Package className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">
-                {searchTerm || filterLowStock ? 'No items match your search/filter' : 'No inventory items found'}
+              <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No items found</h3>
+              <p className="text-gray-500 mb-4">
+                {searchTerm || filterCategory || filterLowStock 
+                  ? 'Try adjusting your search or filters' 
+                  : 'Start by adding your first inventory item'
+                }
               </p>
+              {!searchTerm && !filterCategory && !filterLowStock && ['admin', 'cashier'].includes(user?.role) && (
+                <Button 
+                  onClick={() => setDialogOpen(true)}
+                  className="bg-gradient-to-r from-violet-600 to-purple-600"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add First Item
+                </Button>
+              )}
             </div>
           )}
         </div>
