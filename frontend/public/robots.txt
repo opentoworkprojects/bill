@@ -1,122 +1,39 @@
-# BillByteKOT - Restaurant Billing & POS Software
-# https://billbytekot.in
-
-# Sitemaps
-Sitemap: https://billbytekot.in/sitemap-index.xml
-Sitemap: https://billbytekot.in/sitemap.xml
-Sitemap: https://billbytekot.in/sitemap-blog.xml
-
-# Crawl rules
 User-agent: *
 Allow: /
-Allow: /$
-Allow: /blog/$
-Allow: /blog/*.html$
-Allow: /download/$
-Allow: /contact/$
-Allow: /login/$
-Allow: /register/$
-Allow: /privacy/$
-Allow: /help/$
-Allow: /terms/$
-Allow: /pricing/$
-Allow: /features/$
-Allow: /about/$
-Allow: /api/health-check/$
 
-# Disallow private/authenticated pages
+# Allow all search engines to crawl the site
+Allow: /blog/
+Allow: /download/
+Allow: /contact/
+Allow: /restaurant-billing-software/
+Allow: /kot-software/
+Allow: /pos-software-for-restaurants/
+
+# Disallow private/admin areas
 Disallow: /dashboard/
-Disallow: /menu/
+Disallow: /admin/
+Disallow: /super-admin-panel-secret/
+Disallow: /login/
+Disallow: /setup/
+Disallow: /settings/
 Disallow: /orders/
+Disallow: /menu/
+Disallow: /kitchen/
+Disallow: /inventory/
+Disallow: /reports/
 Disallow: /billing/
-Disallow: /api/
-Disallow: /*?*
-Disallow: /*?$
-Disallow: /*.json$
-Disallow: /*.js$
-Disallow: /*.css$
-
-# Sitemap location
-Sitemap: https://billbytekot.in/sitemap.xml
-Sitemap: https://billbytekot.in/sitemap-blog.xml
-Disallow: /tables
-Disallow: /kitchen
-Disallow: /inventory
-Disallow: /reports
-Disallow: /settings
-Disallow: /subscription
-Disallow: /staff
-Disallow: /setup
+Disallow: /tables/
+Disallow: /staff/
+Disallow: /subscription/
+Disallow: /help/
 Disallow: /track/
 Disallow: /order/
-Disallow: /super-admin*
-Disallow: /verify-email
-Disallow: /reset-password
 
 # Disallow API endpoints
 Disallow: /api/
 
-# Allow CSS, JS, and images for proper rendering
-Allow: /static/
-Allow: /*.css$
-Allow: /*.js$
-Allow: /*.jpg$
-Allow: /*.jpeg$
-Allow: /*.png$
-Allow: /*.gif$
-Allow: /*.svg$
-Allow: /*.webp$
-Allow: /*.ico$
-
-# Sitemaps
+# Allow sitemap
 Sitemap: https://billbytekot.in/sitemap.xml
-Sitemap: https://billbytekot.in/sitemap-blog.xml
 
-# Google Bot - Priority crawler
-User-agent: Googlebot
-Allow: /
-Crawl-delay: 0
-
-User-agent: Googlebot-Image
-Allow: /
-
-# Bing Bot
-User-agent: Bingbot
-Allow: /
+# Crawl delay (optional)
 Crawl-delay: 1
-
-# Yahoo Bot
-User-agent: Slurp
-Allow: /
-Crawl-delay: 1
-
-# Yandex Bot
-User-agent: Yandex
-Allow: /
-Crawl-delay: 1
-
-# Baidu Bot
-User-agent: Baiduspider
-Allow: /
-Crawl-delay: 2
-
-# DuckDuckGo Bot
-User-agent: DuckDuckBot
-Allow: /
-Crawl-delay: 1
-
-# Facebook Bot
-User-agent: facebookexternalhit
-Allow: /
-
-# Twitter Bot
-User-agent: Twitterbot
-Allow: /
-
-# LinkedIn Bot
-User-agent: LinkedInBot
-Allow: /
-
-# WhatsApp Bot
-User-agent: WhatsApp
-Allow: /

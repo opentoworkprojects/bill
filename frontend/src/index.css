@@ -66,7 +66,6 @@ html {
 @supports (-webkit-touch-callout: none) {
     body {
         -webkit-overflow-scrolling: touch;
-        overflow-scrolling: touch;
     }
 }
 
@@ -214,7 +213,6 @@ code {
 /* Fix for touch scrolling momentum */
 .momentum-scroll {
     -webkit-overflow-scrolling: touch;
-    overflow-scrolling: touch;
 }
 
 /* Prevent horizontal scroll on small screens */

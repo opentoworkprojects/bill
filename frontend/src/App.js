@@ -33,6 +33,7 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import RestaurantBillingSoftwarePage from './pages/RestaurantBillingSoftwarePage';
 import KOTSoftwarePage from './pages/KOTSoftwarePage';
 import POSSoftwarePage from './pages/POSSoftwarePage';
+import NotFound from './pages/NotFound';
 import DesktopInfo from './components/DesktopInfo';
 import { Toaster } from './components/ui/sonner';
 
@@ -362,6 +363,8 @@ function App() {
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/help" element={<PrivateRoute><HelpPage user={user} /></PrivateRoute>} />
           <Route path="/super-admin-panel-secret" element={<SuperAdminPage />} />
+          {/* 404 Not Found Route - Must be last */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <DesktopInfo />
       </BrowserRouter>
