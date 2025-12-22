@@ -70,7 +70,7 @@
   },
   "scripts": {
     "start": "craco start",
-    "build": "craco build",
+    "build": "craco build && node scripts/fix-build.js",
     "postbuild": "node scripts/ensure-public-dir.js && node src/utils/generateSitemap.js",
     "test": "craco test",
     "clean-install": "rm -rf node_modules package-lock.json && npm install",
