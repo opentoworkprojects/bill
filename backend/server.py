@@ -3196,72 +3196,280 @@ async def get_low_stock(current_user: dict = Depends(get_current_user)):
     return low_stock
 
 
+@api_router.delete("/inventory/{item_id}")
+async def delete_inventory_item(
+    item_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user["role"] not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get user's organization_id
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+
+    result = await db.inventory.delete_one(
+        {"id": item_id, "organization_id": user_org_id}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    return {"message": "Item deleted successfully"}
+
+
+# Supplier models and routes
+class SupplierCreate(BaseModel):
+    name: str
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    payment_terms: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class Supplier(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    payment_terms: Optional[str] = None
+    notes: Optional[str] = None
+    organization_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@api_router.get("/inventory/suppliers", response_model=List[Supplier])
+async def get_suppliers(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    suppliers = await db.suppliers.find(
+        {"organization_id": user_org_id}, {"_id": 0}
+    ).to_list(1000)
+    return suppliers
+
+
+@api_router.post("/inventory/suppliers", response_model=Supplier)
+async def create_supplier(
+    supplier: SupplierCreate, current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    supplier_obj = Supplier(**supplier.model_dump(), organization_id=user_org_id)
+    doc = supplier_obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.suppliers.insert_one(doc)
+    return supplier_obj
+
+
+@api_router.put("/inventory/suppliers/{supplier_id}", response_model=Supplier)
+async def update_supplier(
+    supplier_id: str,
+    supplier: SupplierCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    update_data = supplier.model_dump()
+
+    await db.suppliers.update_one(
+        {"id": supplier_id, "organization_id": user_org_id}, {"$set": update_data}
+    )
+    updated = await db.suppliers.find_one(
+        {"id": supplier_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    return updated
+
+
+# Category models and routes
+class CategoryCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    color: str = "#7c3aed"
+
+
+class Category(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    color: str = "#7c3aed"
+    organization_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@api_router.get("/inventory/categories", response_model=List[Category])
+async def get_categories(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    categories = await db.categories.find(
+        {"organization_id": user_org_id}, {"_id": 0}
+    ).to_list(1000)
+    return categories
+
+
+@api_router.post("/inventory/categories", response_model=Category)
+async def create_category(
+    category: CategoryCreate, current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    category_obj = Category(**category.model_dump(), organization_id=user_org_id)
+    doc = category_obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.categories.insert_one(doc)
+    return category_obj
+
+
+@api_router.put("/inventory/categories/{category_id}", response_model=Category)
+async def update_category(
+    category_id: str,
+    category: CategoryCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    update_data = category.model_dump()
+
+    await db.categories.update_one(
+        {"id": category_id, "organization_id": user_org_id}, {"$set": update_data}
+    )
+    updated = await db.categories.find_one(
+        {"id": category_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    return updated
+
+
+# Stock Movement models and routes
+class StockMovementCreate(BaseModel):
+    item_id: str
+    type: str  # in, out, adjustment
+    quantity: float
+    reason: Optional[str] = None
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class StockMovement(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    item_id: str
+    type: str
+    quantity: float
+    reason: Optional[str] = None
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    organization_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@api_router.get("/inventory/movements", response_model=List[StockMovement])
+async def get_stock_movements(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    movements = await db.stock_movements.find(
+        {"organization_id": user_org_id}, {"_id": 0}
+    ).sort("created_at", -1).limit(100).to_list(100)
+    return movements
+
+
+@api_router.post("/inventory/movements", response_model=StockMovement)
+async def create_stock_movement(
+    movement: StockMovementCreate, current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    # Update inventory quantity based on movement
+    inventory_item = await db.inventory.find_one(
+        {"id": movement.item_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    
+    if not inventory_item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    # Calculate new quantity
+    current_qty = inventory_item["quantity"]
+    if movement.type == "in":
+        new_qty = current_qty + movement.quantity
+    elif movement.type == "out":
+        new_qty = max(0, current_qty - movement.quantity)
+    else:  # adjustment
+        new_qty = movement.quantity
+    
+    # Update inventory
+    await db.inventory.update_one(
+        {"id": movement.item_id, "organization_id": user_org_id},
+        {"$set": {"quantity": new_qty, "last_updated": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Record movement
+    movement_obj = StockMovement(**movement.model_dump(), organization_id=user_org_id)
+    doc = movement_obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.stock_movements.insert_one(doc)
+    return movement_obj
+
+
+@api_router.get("/inventory/analytics")
+async def get_inventory_analytics(current_user: dict = Depends(get_current_user)):
+    user_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    # Get all inventory items
+    items = await db.inventory.find(
+        {"organization_id": user_org_id}, {"_id": 0}
+    ).to_list(1000)
+    
+    # Get recent stock movements
+    movements = await db.stock_movements.find(
+        {"organization_id": user_org_id}, {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    # Calculate analytics
+    total_items = len(items)
+    total_value = sum(item["quantity"] * item["price_per_unit"] for item in items)
+    low_stock_count = len([item for item in items if item["quantity"] <= item["min_quantity"]])
+    
+    # Category breakdown
+    categories = {}
+    for item in items:
+        cat_id = item.get("category_id", "uncategorized")
+        if cat_id not in categories:
+            categories[cat_id] = {"count": 0, "value": 0}
+        categories[cat_id]["count"] += 1
+        categories[cat_id]["value"] += item["quantity"] * item["price_per_unit"]
+    
+    # Recent movements summary
+    movement_summary = {"in": 0, "out": 0, "adjustment": 0}
+    for movement in movements:
+        movement_summary[movement["type"]] += 1
+    
+    return {
+        "total_items": total_items,
+        "total_value": total_value,
+        "low_stock_count": low_stock_count,
+        "healthy_stock_count": total_items - low_stock_count,
+        "categories": categories,
+        "recent_movements": movement_summary,
+        "movements": movements[:10]  # Last 10 movements
+    }
+
+
 class InventoryDeduction(BaseModel):
     menu_item_id: str
     quantity: int
 
 
 @api_router.post("/inventory/deduct")
-async def deduct_inventory(
-    deduction: InventoryDeduction,
-    current_user: dict = Depends(get_current_user)
-):
-    """Deduct inventory when items are sold"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
-    
-    # Find menu item to get ingredients
-    menu_item = await db.menu_items.find_one(
-        {"id": deduction.menu_item_id, "organization_id": user_org_id},
-        {"_id": 0}
-    )
-    
-    if not menu_item:
-        return {"success": False, "message": "Menu item not found"}
-    
-    # Deduct ingredients from inventory
-    ingredients = menu_item.get("ingredients", [])
-    deducted_items = []
-    
-    for ingredient_name in ingredients:
-        # Find inventory item by name (case-insensitive)
-        inventory_item = await db.inventory.find_one(
-            {
-                "name": {"$regex": f"^{ingredient_name}$", "$options": "i"},
-                "organization_id": user_org_id
-            },
-            {"_id": 0}
-        )
-        
-        if inventory_item:
-            # Deduct quantity (1 unit per item sold)
-            new_quantity = max(0, inventory_item["quantity"] - (1 * deduction.quantity))
-            
-            await db.inventory.update_one(
-                {"id": inventory_item["id"]},
-                {
-                    "$set": {
-                        "quantity": new_quantity,
-                        "last_updated": datetime.now(timezone.utc).isoformat()
-                    }
-                }
-            )
-            
-            deducted_items.append({
-                "name": ingredient_name,
-                "old_quantity": inventory_item["quantity"],
-                "new_quantity": new_quantity,
-                "low_stock": new_quantity <= inventory_item["min_quantity"]
-            })
-    
-    return {
-        "success": True,
-        "deducted_items": deducted_items,
-        "message": f"Inventory updated for {len(deducted_items)} ingredients"
-    }
-
-
-# AI routes
-@api_router.post("/ai/chat")
 async def ai_chat(message: ChatMessage):
     if not _LLM_AVAILABLE:
         raise HTTPException(status_code=503, detail="LLM integration unavailable")
@@ -6043,3 +6251,7 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

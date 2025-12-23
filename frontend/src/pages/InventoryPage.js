@@ -24,6 +24,8 @@ import BulkUpload from '../components/BulkUpload';
 
 const InventoryPage = ({ user }) => {
   const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [lowStock, setLowStock] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -110,10 +112,22 @@ const InventoryPage = ({ user }) => {
 
   const fetchInventory = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const response = await axios.get(`${API}/inventory`);
       setInventory(response.data);
     } catch (error) {
-      toast.error('Failed to fetch inventory');
+      console.error('Inventory fetch error:', error);
+      setError(error.response?.data?.detail || error.message);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Please login to access inventory');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error - please try again later');
+      } else {
+        toast.error('Failed to fetch inventory: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1206,6 +1220,29 @@ const InventoryPage = ({ user }) => {
           </Card>
         )}
 
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading inventory...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-16 h-16 mx-auto text-red-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load inventory</h3>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <Button onClick={fetchInventory} className="bg-gradient-to-r from-violet-600 to-purple-600">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        {/* Inventory Grid */}
+        {!loading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAndSortedInventory.map((item) => {
             const isLowStock = item.quantity <= item.min_quantity;
@@ -1391,6 +1428,7 @@ const InventoryPage = ({ user }) => {
             </div>
           )}
         </div>
+        )}
 
         {/* UPI QR Code Modal */}
         {qrModalOpen && (
