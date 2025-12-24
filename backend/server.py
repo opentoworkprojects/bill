@@ -3810,22 +3810,6 @@ async def monthly_report(current_user: dict = Depends(get_current_user)):
         "avg_order_value": avg_order_value,
         "period": "last_30_days"
     }
-        order_date = order["created_at"]
-        if isinstance(order_date, str):
-            order_date = datetime.fromisoformat(order_date.replace("Z", "+00:00"))
-        if order_date >= month_ago:
-            monthly_orders.append(order)
-    
-    total_sales = sum(order["total"] for order in monthly_orders)
-    total_orders = len(monthly_orders)
-    avg_order_value = total_sales / total_orders if total_orders > 0 else 0
-    
-    return {
-        "total_orders": total_orders,
-        "total_sales": total_sales,
-        "avg_order_value": avg_order_value,
-        "period": "last_30_days"
-    }
 
 
 @api_router.get("/reports/best-selling")
