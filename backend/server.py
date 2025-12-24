@@ -504,7 +504,19 @@ class InventoryItem(BaseModel):
     quantity: float
     unit: str
     min_quantity: float
+    max_quantity: Optional[float] = None
     price_per_unit: float
+    cost_price: Optional[float] = None
+    category_id: Optional[str] = None
+    supplier_id: Optional[str] = None
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    expiry_date: Optional[str] = None
+    batch_number: Optional[str] = None
+    reorder_point: Optional[float] = None
+    reorder_quantity: Optional[float] = None
     organization_id: Optional[str] = None
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -514,7 +526,19 @@ class InventoryItemCreate(BaseModel):
     quantity: float
     unit: str
     min_quantity: float
+    max_quantity: Optional[float] = None
     price_per_unit: float
+    cost_price: Optional[float] = None
+    category_id: Optional[str] = None
+    supplier_id: Optional[str] = None
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    expiry_date: Optional[str] = None
+    batch_number: Optional[str] = None
+    reorder_point: Optional[float] = None
+    reorder_quantity: Optional[float] = None
 
 
 class ChatMessage(BaseModel):
@@ -3149,9 +3173,12 @@ async def get_inventory(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
     user_org_id = current_user.get("organization_id") or current_user["id"]
 
+    # Optimized query with projection to reduce data transfer
     items = await db.inventory.find(
-        {"organization_id": user_org_id}, {"_id": 0}
-    ).to_list(1000)
+        {"organization_id": user_org_id}, 
+        {"_id": 0}
+    ).sort("name", 1).to_list(1000)  # Sort by name for consistent ordering
+    
     for item in items:
         if isinstance(item["last_updated"], str):
             item["last_updated"] = datetime.fromisoformat(item["last_updated"])
@@ -3189,10 +3216,18 @@ async def get_low_stock(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
     user_org_id = current_user.get("organization_id") or current_user["id"]
 
-    items = await db.inventory.find(
-        {"organization_id": user_org_id}, {"_id": 0}
-    ).to_list(1000)
-    low_stock = [item for item in items if item["quantity"] <= item["min_quantity"]]
+    # Optimized: Use database aggregation to filter low stock items directly
+    pipeline = [
+        {"$match": {"organization_id": user_org_id}},
+        {"$addFields": {
+            "is_low_stock": {"$lte": ["$quantity", "$min_quantity"]}
+        }},
+        {"$match": {"is_low_stock": True}},
+        {"$project": {"_id": 0, "is_low_stock": 0}},
+        {"$sort": {"quantity": 1}}  # Sort by quantity ascending (lowest first)
+    ]
+    
+    low_stock = await db.inventory.aggregate(pipeline).to_list(1000)
     return low_stock
 
 
@@ -3609,21 +3644,41 @@ async def daily_report(current_user: dict = Depends(get_current_user)):
     today = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
-    orders = await db.orders.find({
+    
+    # Optimized: Use database query instead of filtering in Python
+    today_orders = await db.orders.find({
         "status": "completed",
-        "organization_id": user_org_id
-    }, {"_id": 0}).to_list(1000)
+        "organization_id": user_org_id,
+        "created_at": {"$gte": today.isoformat()}
+    }, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
-    today_orders = []
-    for order in orders:
-        order_date = order["created_at"]
-        if isinstance(order_date, str):
-            order_date = datetime.fromisoformat(order_date.replace("Z", "+00:00"))
-        if order_date >= today:
-            today_orders.append(order)
-
-    total_sales = sum(order["total"] for order in today_orders)
-    total_orders = len(today_orders)
+    # Use aggregation for better performance
+    pipeline = [
+        {
+            "$match": {
+                "status": "completed",
+                "organization_id": user_org_id,
+                "created_at": {"$gte": today.isoformat()}
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_orders": {"$sum": 1},
+                "total_sales": {"$sum": "$total"}
+            }
+        }
+    ]
+    
+    aggregation_result = await db.orders.aggregate(pipeline).to_list(1)
+    
+    if aggregation_result:
+        stats = aggregation_result[0]
+        total_orders = stats["total_orders"]
+        total_sales = stats["total_sales"]
+    else:
+        total_orders = 0
+        total_sales = 0
 
     return {
         "date": today.isoformat(),
@@ -3676,22 +3731,35 @@ async def weekly_report(current_user: dict = Depends(get_current_user)):
     user_org_id = current_user.get("organization_id") or current_user["id"]
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     
-    orders = await db.orders.find({
-        "status": "completed", 
-        "organization_id": user_org_id
-    }, {"_id": 0}).to_list(1000)
+    # Optimized: Use database aggregation instead of filtering in Python
+    pipeline = [
+        {
+            "$match": {
+                "status": "completed",
+                "organization_id": user_org_id,
+                "created_at": {"$gte": week_ago.isoformat()}
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_orders": {"$sum": 1},
+                "total_sales": {"$sum": "$total"}
+            }
+        }
+    ]
     
-    weekly_orders = []
-    for order in orders:
-        order_date = order["created_at"]
-        if isinstance(order_date, str):
-            order_date = datetime.fromisoformat(order_date.replace("Z", "+00:00"))
-        if order_date >= week_ago:
-            weekly_orders.append(order)
+    result = await db.orders.aggregate(pipeline).to_list(1)
     
-    total_sales = sum(order["total"] for order in weekly_orders)
-    total_orders = len(weekly_orders)
-    avg_order_value = total_sales / total_orders if total_orders > 0 else 0
+    if result:
+        stats = result[0]
+        total_orders = stats["total_orders"]
+        total_sales = stats["total_sales"]
+        avg_order_value = total_sales / total_orders if total_orders > 0 else 0
+    else:
+        total_orders = 0
+        total_sales = 0
+        avg_order_value = 0
     
     return {
         "total_orders": total_orders,
@@ -3706,13 +3774,42 @@ async def monthly_report(current_user: dict = Depends(get_current_user)):
     user_org_id = current_user.get("organization_id") or current_user["id"]
     month_ago = datetime.now(timezone.utc) - timedelta(days=30)
     
-    orders = await db.orders.find({
-        "status": "completed",
-        "organization_id": user_org_id
-    }, {"_id": 0}).to_list(1000)
+    # Optimized: Use database aggregation instead of filtering in Python
+    pipeline = [
+        {
+            "$match": {
+                "status": "completed",
+                "organization_id": user_org_id,
+                "created_at": {"$gte": month_ago.isoformat()}
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_orders": {"$sum": 1},
+                "total_sales": {"$sum": "$total"}
+            }
+        }
+    ]
     
-    monthly_orders = []
-    for order in orders:
+    result = await db.orders.aggregate(pipeline).to_list(1)
+    
+    if result:
+        stats = result[0]
+        total_orders = stats["total_orders"]
+        total_sales = stats["total_sales"]
+        avg_order_value = total_sales / total_orders if total_orders > 0 else 0
+    else:
+        total_orders = 0
+        total_sales = 0
+        avg_order_value = 0
+    
+    return {
+        "total_orders": total_orders,
+        "total_sales": total_sales,
+        "avg_order_value": avg_order_value,
+        "period": "last_30_days"
+    }
         order_date = order["created_at"]
         if isinstance(order_date, str):
             order_date = datetime.fromisoformat(order_date.replace("Z", "+00:00"))
@@ -4819,11 +4916,17 @@ async def startup_validation():
             await db.menu_items.create_index([("organization_id", 1), ("category", 1)])
             await db.menu_items.create_index([("organization_id", 1), ("available", 1)])
             
-            # Orders indexes
+            # Orders indexes - Enhanced for reports performance
             await db.orders.create_index("organization_id")
             await db.orders.create_index([("organization_id", 1), ("status", 1)])
             await db.orders.create_index([("organization_id", 1), ("created_at", -1)])
+            await db.orders.create_index([("organization_id", 1), ("waiter_name", 1)])
+            await db.orders.create_index([("organization_id", 1), ("created_at", -1), ("status", 1)])
             await db.orders.create_index("table_id")
+            
+            # Compound indexes for reports queries
+            await db.orders.create_index([("organization_id", 1), ("created_at", -1), ("total", 1)])
+            await db.orders.create_index([("organization_id", 1), ("items.name", 1), ("items.quantity", 1)])
             
             # Tables indexes
             await db.tables.create_index("organization_id")
@@ -4834,9 +4937,21 @@ async def startup_validation():
             await db.payments.create_index([("organization_id", 1), ("created_at", -1)])
             await db.payments.create_index("order_id")
             
-            # Inventory indexes
+            # Inventory indexes - Enhanced for better performance
             await db.inventory.create_index("organization_id")
             await db.inventory.create_index([("organization_id", 1), ("quantity", 1)])
+            await db.inventory.create_index([("organization_id", 1), ("name", 1)])
+            await db.inventory.create_index([("organization_id", 1), ("min_quantity", 1)])
+            await db.inventory.create_index([("organization_id", 1), ("category_id", 1)])
+            await db.inventory.create_index([("organization_id", 1), ("supplier_id", 1)])
+            await db.inventory.create_index([("organization_id", 1), ("sku", 1)])
+            await db.inventory.create_index([("organization_id", 1), ("barcode", 1)])
+            
+            # Suppliers and categories indexes
+            await db.suppliers.create_index("organization_id")
+            await db.categories.create_index("organization_id")
+            await db.stock_movements.create_index([("organization_id", 1), ("item_id", 1)])
+            await db.stock_movements.create_index([("organization_id", 1), ("created_at", -1)])
             
             print("✅ Database indexes created successfully")
         except Exception as e:

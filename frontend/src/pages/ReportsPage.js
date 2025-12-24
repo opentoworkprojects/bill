@@ -109,29 +109,41 @@ const ReportsPage = ({ user }) => {
   }, [datePresets]);
 
   useEffect(() => {
-    fetchAllReports();
+    // Prioritized loading: Load critical data first, then supporting data
+    const loadReports = async () => {
+      setInitialLoading(true);
+      
+      try {
+        // Priority 1: Load essential reports first (most important for overview)
+        await Promise.all([
+          fetchDailyReport(),
+          fetchWeeklyReport(),
+          fetchMonthlyReport()
+        ]);
+        
+        // Priority 2: Load analytics data in parallel (less critical)
+        Promise.all([
+          fetchBestSelling(),
+          fetchStaffPerformance(),
+          fetchPeakHours(),
+          fetchCategoryAnalysis()
+        ]);
+        
+        // Priority 3: Load AI forecast last (least critical, can be slow)
+        setTimeout(() => {
+          fetchForecast();
+        }, 500);
+        
+      } catch (error) {
+        console.error("Error loading reports:", error);
+        toast.error("Failed to load some reports");
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    
+    loadReports();
   }, []);
-
-  const fetchAllReports = async () => {
-    setInitialLoading(true);
-    try {
-      await Promise.all([
-        fetchDailyReport(),
-        fetchWeeklyReport(),
-        fetchMonthlyReport(),
-        fetchBestSelling(),
-        fetchStaffPerformance(),
-        fetchPeakHours(),
-        fetchCategoryAnalysis(),
-        fetchForecast(),
-      ]);
-    } catch (error) {
-      console.error("Error fetching reports:", error);
-      toast.error("Failed to load some reports");
-    } finally {
-      setInitialLoading(false);
-    }
-  };
 
   const fetchDailyReport = async () => {
     try {
@@ -163,7 +175,7 @@ const ReportsPage = ({ user }) => {
     }
   };
 
-  const fetchBestSelling = async () => {
+  const fetchBestSelling = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/reports/best-selling`);
       setBestSelling(response.data || []);
@@ -171,9 +183,9 @@ const ReportsPage = ({ user }) => {
       console.error("Failed to fetch best selling items", error);
       setBestSelling([]);
     }
-  };
+  }, []);
 
-  const fetchStaffPerformance = async () => {
+  const fetchStaffPerformance = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/reports/staff-performance`);
       setStaffPerformance(response.data || []);
@@ -181,9 +193,9 @@ const ReportsPage = ({ user }) => {
       console.error("Failed to fetch staff performance", error);
       setStaffPerformance([]);
     }
-  };
+  }, []);
 
-  const fetchPeakHours = async () => {
+  const fetchPeakHours = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/reports/peak-hours`);
       setPeakHours(response.data || []);
@@ -191,9 +203,9 @@ const ReportsPage = ({ user }) => {
       console.error("Failed to fetch peak hours", error);
       setPeakHours([]);
     }
-  };
+  }, []);
 
-  const fetchCategoryAnalysis = async () => {
+  const fetchCategoryAnalysis = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/reports/category-analysis`);
       setCategoryAnalysis(response.data || []);
@@ -201,9 +213,9 @@ const ReportsPage = ({ user }) => {
       console.error("Failed to fetch category analysis", error);
       setCategoryAnalysis([]);
     }
-  };
+  }, []);
 
-  const fetchForecast = async () => {
+  const fetchForecast = useCallback(async () => {
     try {
       const response = await axios.post(`${API}/ai/sales-forecast`);
       setForecast(response.data);
@@ -211,7 +223,7 @@ const ReportsPage = ({ user }) => {
       console.error("Failed to fetch forecast", error);
       setForecast(null);
     }
-  };
+  }, []);
 
   const handleExportCSV = async () => {
     setExportLoading(true);
@@ -1111,10 +1123,40 @@ const ReportsPage = ({ user }) => {
   if (initialLoading) {
     return (
       <Layout user={user}>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-gray-600 font-medium">Loading reports...</p>
+        <div className="space-y-6">
+          <TrialBanner user={user} />
+          
+          {/* Header Skeleton */}
+          <div>
+            <div className="h-10 bg-gray-200 rounded animate-pulse w-80 mb-2"></div>
+            <div className="h-5 bg-gray-200 rounded animate-pulse w-96"></div>
+          </div>
+
+          {/* Tabs Skeleton */}
+          <div className="flex gap-2 mb-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-10 bg-gray-200 rounded animate-pulse w-24"></div>
+            ))}
+          </div>
+
+          {/* Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="border-0 shadow-lg rounded-lg p-6 bg-white">
+                <div className="h-4 bg-gray-200 rounded animate-pulse w-24 mb-4"></div>
+                <div className="h-12 bg-gray-200 rounded animate-pulse w-32"></div>
+              </div>
+            ))}
+          </div>
+
+          {/* Large Card Skeleton */}
+          <div className="border-0 shadow-lg rounded-lg p-6 bg-white">
+            <div className="h-6 bg-gray-200 rounded animate-pulse w-48 mb-4"></div>
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+              <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+            </div>
           </div>
         </div>
       </Layout>
