@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
+import { printKOT as printKOTUtil, printReceipt as printReceiptUtil, getPrintSettings, generateKOTContent, generateReceiptContent } from '../utils/printUtils';
 
 const OrdersPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
@@ -172,97 +173,11 @@ const OrdersPage = ({ user }) => {
 
   const handlePrintKOT = async (order) => {
     try {
-      const kotContent = `
-=================================
-        KITCHEN ORDER TICKET
-=================================
-Table: ${order.table_number}
-Waiter: ${order.waiter_name}
-Customer: ${order.customer_name || 'N/A'}
-Time: ${new Date(order.created_at).toLocaleString()}
----------------------------------
-ITEMS:
-${order.items.map(item => `${item.quantity}x ${item.name}${item.notes ? `\n   Note: ${item.notes}` : ''}`).join('\n')}
----------------------------------
-Status: ${order.status.toUpperCase()}
-=================================
-      `;
-      
-      // Open thermal receipt window
-      const printWindow = window.open('', '', 'width=400,height=600');
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>KOT - Table ${order.table_number}</title>
-            <style>
-              @media print {
-                @page {
-                  size: 80mm auto;
-                  margin: 0;
-                }
-                body {
-                  margin: 0;
-                  padding: 0;
-                }
-                .no-print {
-                  display: none !important;
-                }
-              }
-              body {
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-                line-height: 1.4;
-                padding: 10mm;
-                margin: 0;
-                width: 80mm;
-                background: white;
-              }
-              pre {
-                margin: 0;
-                padding: 0;
-                font-family: 'Courier New', monospace;
-                white-space: pre-wrap;
-                word-wrap: break-word;
-              }
-              .print-btn {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 12px 24px;
-                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-              }
-              .print-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
-              }
-              @media print {
-                .print-btn {
-                  display: none;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            <button onclick="window.print()" class="print-btn no-print">🖨️ Print KOT</button>
-            <pre>${kotContent}</pre>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      
-      // Auto-trigger print after short delay
-      setTimeout(() => {
-        printWindow.focus();
-      }, 250);
-      
+      // Use centralized print utility with global settings
+      printKOTUtil(order, businessSettings);
       toast.success('KOT ready to print');
     } catch (error) {
+      console.error('Failed to print KOT:', error);
       toast.error('Failed to print KOT');
     }
   };
@@ -308,80 +223,12 @@ Status: ${order.status.toUpperCase()}
   const handlePrintReceipt = async (order) => {
     setPrintLoading(true);
     try {
-      const response = await axios.post(`${API}/print/bill/${order.id}`, null, {
-        params: { theme: businessSettings?.receipt_theme || 'classic' }
-      });
-      
-      const content = response.data.content;
-      setReceiptContent(content);
-      
-      // Open print window
-      const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
-      if (!printWindow) {
-        toast.error('Please allow popups for printing');
-        return;
-      }
-      
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Receipt - ${order.id.slice(0, 8)}</title>
-            <style>
-              @page { size: 80mm auto; margin: 0; }
-              @media print { .no-print { display: none !important; } }
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { 
-                font-family: 'Courier New', Courier, monospace; 
-                padding: 10px;
-                max-width: 400px;
-                margin: 0 auto;
-              }
-              pre { 
-                white-space: pre-wrap; 
-                font-size: 12px; 
-                line-height: 1.4;
-                background: #fff;
-                padding: 15px;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-              }
-              .no-print { 
-                text-align: center; 
-                margin: 20px 0; 
-                padding: 15px;
-                background: #f5f5f5;
-                border-radius: 8px;
-              }
-              .btn { 
-                padding: 12px 24px; 
-                border: none; 
-                border-radius: 8px; 
-                cursor: pointer; 
-                font-weight: 600; 
-                margin: 5px;
-                font-size: 14px;
-              }
-              .btn-print { background: linear-gradient(135deg, #10b981, #059669); color: white; }
-              .btn-close { background: #6b7280; color: white; }
-              h3 { text-align: center; margin-bottom: 15px; color: #374151; }
-            </style>
-          </head>
-          <body>
-            <h3>🧾 Receipt - Order #${order.id.slice(0, 8)}</h3>
-            <pre>${content}</pre>
-            <div class="no-print">
-              <button class="btn btn-print" onclick="window.print()">🖨️ Print Receipt</button>
-              <button class="btn btn-close" onclick="window.close()">✕ Close</button>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      toast.success('Receipt opened for printing');
+      // Use centralized print utility with global settings
+      printReceiptUtil(order, businessSettings);
+      toast.success('Receipt ready for printing!');
     } catch (error) {
-      console.error('Failed to print receipt', error);
-      toast.error('Failed to generate receipt');
+      console.error('Failed to print receipt:', error);
+      toast.error('Failed to print receipt');
     } finally {
       setPrintLoading(false);
     }

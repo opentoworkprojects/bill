@@ -26,35 +26,68 @@ import {
 const PrintCustomization = ({ businessSettings, onUpdate }) => {
   // Initialize with proper defaults and existing settings
   const initializeCustomization = useCallback(() => {
-    const ps = businessSettings?.print_customization || {};
-    return {
-      paper_width: ps.paper_width || '80mm',
-      font_size: ps.font_size || 'medium',
-      header_style: ps.header_style || 'centered',
-      show_logo: ps.show_logo ?? true,
-      show_address: ps.show_address ?? true,
-      show_phone: ps.show_phone ?? true,
-      show_email: ps.show_email ?? false,
-      show_website: ps.show_website ?? false,
-      show_gstin: ps.show_gstin ?? true,
-      show_fssai: ps.show_fssai ?? false,
-      show_tagline: ps.show_tagline ?? true,
-      show_customer_name: ps.show_customer_name ?? true,
-      show_waiter_name: ps.show_waiter_name ?? true,
-      show_table_number: ps.show_table_number ?? true,
-      show_order_time: ps.show_order_time ?? true,
-      show_item_notes: ps.show_item_notes ?? true,
-      border_style: ps.border_style || 'single',
-      separator_style: ps.separator_style || 'dashes',
-      footer_style: ps.footer_style || 'simple',
-      qr_code_enabled: ps.qr_code_enabled ?? false,
-      auto_print: ps.auto_print ?? false,
-      print_copies: ps.print_copies || 1,
-      kot_auto_print: ps.kot_auto_print ?? true,
-      kot_font_size: ps.kot_font_size || 'large',
-      kot_show_time: ps.kot_show_time ?? true,
-      kot_highlight_notes: ps.kot_highlight_notes ?? true,
-    };
+    try {
+      const ps = businessSettings?.print_customization || {};
+      return {
+        paper_width: ps.paper_width || '80mm',
+        font_size: ps.font_size || 'medium',
+        header_style: ps.header_style || 'centered',
+        show_logo: ps.show_logo ?? true,
+        show_address: ps.show_address ?? true,
+        show_phone: ps.show_phone ?? true,
+        show_email: ps.show_email ?? false,
+        show_website: ps.show_website ?? false,
+        show_gstin: ps.show_gstin ?? true,
+        show_fssai: ps.show_fssai ?? false,
+        show_tagline: ps.show_tagline ?? true,
+        show_customer_name: ps.show_customer_name ?? true,
+        show_waiter_name: ps.show_waiter_name ?? true,
+        show_table_number: ps.show_table_number ?? true,
+        show_order_time: ps.show_order_time ?? true,
+        show_item_notes: ps.show_item_notes ?? true,
+        border_style: ps.border_style || 'single',
+        separator_style: ps.separator_style || 'dashes',
+        footer_style: ps.footer_style || 'simple',
+        qr_code_enabled: ps.qr_code_enabled ?? false,
+        auto_print: ps.auto_print ?? false,
+        print_copies: Math.max(1, Math.min(5, ps.print_copies || 1)),
+        kot_auto_print: ps.kot_auto_print ?? true,
+        kot_font_size: ps.kot_font_size || 'large',
+        kot_show_time: ps.kot_show_time ?? true,
+        kot_highlight_notes: ps.kot_highlight_notes ?? true,
+      };
+    } catch (error) {
+      console.error('Error initializing customization:', error);
+      // Return safe defaults if there's an error
+      return {
+        paper_width: '80mm',
+        font_size: 'medium',
+        header_style: 'centered',
+        show_logo: true,
+        show_address: true,
+        show_phone: true,
+        show_email: false,
+        show_website: false,
+        show_gstin: true,
+        show_fssai: false,
+        show_tagline: true,
+        show_customer_name: true,
+        show_waiter_name: true,
+        show_table_number: true,
+        show_order_time: true,
+        show_item_notes: true,
+        border_style: 'single',
+        separator_style: 'dashes',
+        footer_style: 'simple',
+        qr_code_enabled: false,
+        auto_print: false,
+        print_copies: 1,
+        kot_auto_print: true,
+        kot_font_size: 'large',
+        kot_show_time: true,
+        kot_highlight_notes: true,
+      };
+    }
   }, [businessSettings]);
 
   const [customization, setCustomization] = useState(initializeCustomization);
@@ -66,49 +99,78 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
 
   // Update customization when businessSettings change
   useEffect(() => {
-    setCustomization(initializeCustomization());
+    try {
+      setCustomization(initializeCustomization());
+    } catch (error) {
+      console.error('Error updating customization from business settings:', error);
+      toast.error('Error loading print settings. Using defaults.');
+    }
   }, [initializeCustomization]);
 
   // Track changes for unsaved indicator
   useEffect(() => {
-    const initialSettings = initializeCustomization();
-    const hasChanges = JSON.stringify(customization) !== JSON.stringify(initialSettings);
-    setHasUnsavedChanges(hasChanges);
+    try {
+      const initialSettings = initializeCustomization();
+      const hasChanges = JSON.stringify(customization) !== JSON.stringify(initialSettings);
+      setHasUnsavedChanges(hasChanges);
+    } catch (error) {
+      console.error('Error tracking changes:', error);
+      setHasUnsavedChanges(false);
+    }
   }, [customization, initializeCustomization]);
 
   useEffect(() => {
-    generatePreview();
-    validateSettings();
+    try {
+      generatePreview();
+      validateSettings();
+    } catch (error) {
+      console.error('Error generating preview or validating:', error);
+      setPreviewContent('Error generating preview');
+      setValidationErrors(['Error validating settings']);
+    }
   }, [customization, activeTab, businessSettings]);
 
   const validateSettings = () => {
-    const errors = [];
-    
-    if (!businessSettings?.restaurant_name) {
-      errors.push('Restaurant name is required for proper receipt printing');
+    try {
+      const errors = [];
+      
+      if (!businessSettings?.restaurant_name) {
+        errors.push('Restaurant name is required for proper receipt printing');
+      }
+      
+      const copies = customization.print_copies;
+      if (!copies || copies < 1 || copies > 5 || isNaN(copies)) {
+        errors.push('Print copies must be between 1 and 5');
+      }
+      
+      if (customization.show_gstin && !businessSettings?.gstin) {
+        errors.push('GSTIN is enabled but not configured in business settings');
+      }
+      
+      if (customization.show_fssai && !businessSettings?.fssai) {
+        errors.push('FSSAI is enabled but not configured in business settings');
+      }
+      
+      setValidationErrors(errors);
+      return errors;
+    } catch (error) {
+      console.error('Error validating settings:', error);
+      const fallbackErrors = ['Error validating settings. Please refresh and try again.'];
+      setValidationErrors(fallbackErrors);
+      return fallbackErrors;
     }
-    
-    if (customization.print_copies < 1 || customization.print_copies > 5) {
-      errors.push('Print copies must be between 1 and 5');
-    }
-    
-    if (customization.show_gstin && !businessSettings?.gstin) {
-      errors.push('GSTIN is enabled but not configured in business settings');
-    }
-    
-    if (customization.show_fssai && !businessSettings?.fssai) {
-      errors.push('FSSAI is enabled but not configured in business settings');
-    }
-    
-    setValidationErrors(errors);
-    return errors;
   };
 
   const generatePreview = () => {
-    if (activeTab === 'receipt') {
-      setPreviewContent(generateReceiptPreview());
-    } else {
-      setPreviewContent(generateKOTPreview());
+    try {
+      if (activeTab === 'receipt') {
+        setPreviewContent(generateReceiptPreview());
+      } else {
+        setPreviewContent(generateKOTPreview());
+      }
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      setPreviewContent('Error generating preview. Please check your settings.');
     }
   };
 
@@ -276,50 +338,92 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       const token = localStorage.getItem('token');
       if (!token) {
         toast.error('Please login again to save settings');
+        setLoading(false);
         return;
       }
 
+      // Ensure we have valid business settings structure
+      const currentSettings = businessSettings || {};
       const updatedSettings = {
-        ...businessSettings,
-        print_customization: customization
+        ...currentSettings,
+        print_customization: {
+          ...customization,
+          // Ensure all required fields are present
+          paper_width: customization.paper_width || '80mm',
+          font_size: customization.font_size || 'medium',
+          print_copies: Math.max(1, Math.min(5, customization.print_copies || 1))
+        }
       };
       
-      console.log('Saving print settings:', customization);
+      console.log('Saving print settings:', updatedSettings.print_customization);
       
       const response = await axios.put(`${API}/business/settings`, updatedSettings, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
       
       console.log('Print settings saved successfully:', response.data);
       toast.success('Print settings saved successfully!');
       
-      // Update parent component
-      if (onUpdate) {
-        onUpdate(updatedSettings);
+      // Safely update parent component
+      try {
+        if (onUpdate && typeof onUpdate === 'function') {
+          onUpdate(updatedSettings);
+        }
+      } catch (updateError) {
+        console.warn('Error updating parent component:', updateError);
+        // Don't fail the save operation if parent update fails
       }
       
-      // Update local storage
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (user.business_settings) {
-        user.business_settings.print_customization = customization;
-        localStorage.setItem('user', JSON.stringify(user));
+      // Safely update local storage
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user && typeof user === 'object') {
+          user.business_settings = {
+            ...(user.business_settings || {}),
+            print_customization: updatedSettings.print_customization
+          };
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      } catch (storageError) {
+        console.warn('Error updating local storage:', storageError);
+        // Don't fail the save operation if localStorage update fails
       }
       
       setHasUnsavedChanges(false);
       
     } catch (error) {
       console.error('Failed to save print settings:', error);
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          'Failed to save print settings';
+      
+      let errorMessage = 'Failed to save print settings';
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please login again.';
+        // Optionally redirect to login
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else if (error.response?.status === 403) {
+        errorMessage = 'You do not have permission to modify print settings.';
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.detail || 'Invalid settings data. Please check your inputs.';
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast.error(errorMessage);
       
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-      }
     } finally {
       setLoading(false);
     }
@@ -360,66 +464,117 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
   };
 
   const handleTestPrint = () => {
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    const content = activeTab === 'receipt' ? generateReceiptPreview() : generateKOTPreview();
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Test Print - ${activeTab === 'receipt' ? 'Receipt' : 'KOT'}</title>
-          <style>
-            body {
-              font-family: 'Courier New', Consolas, monospace;
-              font-size: ${customization.font_size === 'small' ? '10px' : 
-                          customization.font_size === 'large' ? '14px' : '12px'};
-              line-height: 1.4;
-              margin: 20px;
-              background: white;
-            }
-            @media print {
-              body { margin: 0; padding: 10px; }
-              .no-print { display: none; }
-            }
-            .print-content {
-              white-space: pre-wrap;
-              font-family: inherit;
-            }
-            .print-actions {
-              margin-top: 20px;
-              text-align: center;
-            }
-            .print-btn {
-              background: #7c3aed;
-              color: white;
-              border: none;
-              padding: 10px 20px;
-              border-radius: 5px;
-              cursor: pointer;
-              margin: 0 5px;
-              font-size: 14px;
-            }
-            .print-btn:hover {
-              background: #6d28d9;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-content">${content}</div>
-          <div class="print-actions no-print">
-            <button class="print-btn" onclick="window.print()">Print</button>
-            <button class="print-btn" onclick="window.close()">Close</button>
-          </div>
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    toast.success('Test print window opened!');
+    try {
+      const content = activeTab === 'receipt' ? generateReceiptPreview() : generateKOTPreview();
+      
+      if (!content) {
+        toast.error('Unable to generate preview content for printing');
+        return;
+      }
+      
+      const printWindow = window.open('', '_blank', 'width=400,height=600');
+      
+      if (!printWindow) {
+        toast.error('Unable to open print window. Please check your popup blocker settings.');
+        return;
+      }
+      
+      const fontSize = customization.font_size === 'small' ? '10px' : 
+                      customization.font_size === 'large' ? '14px' : '12px';
+      
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Test Print - ${activeTab === 'receipt' ? 'Receipt' : 'KOT'}</title>
+            <style>
+              body {
+                font-family: 'Courier New', Consolas, monospace;
+                font-size: ${fontSize};
+                line-height: 1.4;
+                margin: 20px;
+                background: white;
+              }
+              @media print {
+                body { margin: 0; padding: 10px; }
+                .no-print { display: none; }
+              }
+              .print-content {
+                white-space: pre-wrap;
+                font-family: inherit;
+              }
+              .print-actions {
+                margin-top: 20px;
+                text-align: center;
+              }
+              .print-btn {
+                background: #7c3aed;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin: 0 5px;
+                font-size: 14px;
+              }
+              .print-btn:hover {
+                background: #6d28d9;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="print-content">${content}</div>
+            <div class="print-actions no-print">
+              <button class="print-btn" onclick="window.print()">Print</button>
+              <button class="print-btn" onclick="window.close()">Close</button>
+            </div>
+          </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      toast.success('Test print window opened!');
+      
+    } catch (error) {
+      console.error('Error opening test print:', error);
+      toast.error('Failed to open test print window. Please try again.');
+    }
   };
 
   const updateCustomization = (updates) => {
-    setCustomization(prev => ({ ...prev, ...updates }));
+    try {
+      if (!updates || typeof updates !== 'object') {
+        console.error('Invalid updates object:', updates);
+        return;
+      }
+      
+      setCustomization(prev => {
+        if (!prev || typeof prev !== 'object') {
+          console.error('Invalid previous customization state:', prev);
+          return initializeCustomization();
+        }
+        
+        const newCustomization = { ...prev, ...updates };
+        
+        // Validate critical fields
+        if (newCustomization.print_copies) {
+          newCustomization.print_copies = Math.max(1, Math.min(5, parseInt(newCustomization.print_copies) || 1));
+        }
+        
+        if (newCustomization.paper_width && !['58mm', '80mm'].includes(newCustomization.paper_width)) {
+          newCustomization.paper_width = '80mm';
+        }
+        
+        if (newCustomization.font_size && !['small', 'medium', 'large'].includes(newCustomization.font_size)) {
+          newCustomization.font_size = 'medium';
+        }
+        
+        return newCustomization;
+      });
+    } catch (error) {
+      console.error('Error updating customization:', error);
+      toast.error('Error updating settings. Please try again.');
+    }
   };
 
   const ToggleSwitch = ({ label, checked, onChange, description }) => (
@@ -643,7 +798,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1">
-                  <ToggleSwitch 
+                  <ToggleSwitcheSwitcheSwitch 
                     label="Show Logo" 
                     checked={customization.show_logo}
                     onChange={(v) => updateCustomization({ show_logo: v })}

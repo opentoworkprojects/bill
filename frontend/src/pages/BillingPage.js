@@ -13,6 +13,7 @@ import {
   Calculator, Percent, DollarSign, Gift, Users, Clock, CheckCircle,
   AlertCircle, TrendingUp, Receipt, Zap, Star
 } from 'lucide-react';
+import { printReceipt as printReceiptUtil, getPrintSettings, generateReceiptContent, printDocument } from '../utils/printUtils';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
@@ -178,14 +179,16 @@ const BillingPage = ({ user }) => {
   const printThermalBill = async () => {
     if (!order) return;
     try {
-      // Get thermal receipt from backend
-      const response = await axios.post(`${API}/print/bill/${orderId}`, null, {
-        params: { theme: businessSettings?.receipt_theme || 'classic' }
-      });
+      // Use centralized print utility with global settings
+      const settings = getPrintSettings();
+      const content = generateReceiptContent(order, businessSettings);
       
-      // Store receipt content and show inline preview
-      setReceiptContent(response.data.content);
+      // Store receipt content for preview
+      setReceiptContent(content);
       setShowPrintPreview(true);
+      
+      // Update thermal paper size from settings
+      setThermalPaperSize(settings.paper_width || '80mm');
       
       toast.success('Receipt ready for printing!');
     } catch (error) {
@@ -195,137 +198,15 @@ const BillingPage = ({ user }) => {
   };
 
   const handleActualPrint = () => {
-    // Create a hidden iframe for reliable printing
-    const printFrame = document.createElement('iframe');
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-10000px';
-    printFrame.style.left = '-10000px';
-    printFrame.style.width = thermalPaperSize;
-    printFrame.style.height = '0';
-    document.body.appendChild(printFrame);
-
-    const printDocument = printFrame.contentWindow.document;
-    printDocument.open();
-    printDocument.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt - ${order?.id?.slice(0, 8)}</title>
-          <style>
-            @page {
-              size: ${thermalPaperSize} auto;
-              margin: 0;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              width: ${thermalPaperSize};
-              font-family: 'Courier New', Courier, monospace;
-              font-size: ${thermalPaperSize === '58mm' ? '9px' : '11px'};
-              line-height: 1.3;
-              color: #000;
-              background: #fff;
-              padding: 2mm;
-            }
-            pre {
-              white-space: pre-wrap;
-              word-wrap: break-word;
-              font-family: inherit;
-              font-size: inherit;
-              margin: 0;
-            }
-          </style>
-        </head>
-        <body>
-          <pre>${receiptContent}</pre>
-        </body>
-      </html>
-    `);
-    printDocument.close();
-
-    // Wait for content to load then print
-    printFrame.onload = () => {
-      setTimeout(() => {
-        printFrame.contentWindow.focus();
-        printFrame.contentWindow.print();
-        // Remove iframe after printing
-        setTimeout(() => {
-          document.body.removeChild(printFrame);
-        }, 1000);
-      }, 250);
-    };
+    // Use centralized print utility
+    const settings = getPrintSettings();
+    printDocument(receiptContent, `Receipt - ${order?.id?.slice(0, 8)}`, 'receipt');
   };
 
   const handlePopupPrint = () => {
-    // Fallback: Open in new window for manual printing
-    const printWindow = window.open('', '_blank', `width=400,height=600,scrollbars=yes`);
-    if (!printWindow) {
-      toast.error('Please allow popups for printing');
-      return;
-    }
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt - ${order?.id?.slice(0, 8)}</title>
-          <style>
-            @page { size: ${thermalPaperSize} auto; margin: 0; }
-            @media print { .no-print { display: none !important; } }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              font-family: 'Courier New', Courier, monospace; 
-              padding: 10px;
-              max-width: 400px;
-              margin: 0 auto;
-            }
-            pre { 
-              white-space: pre-wrap; 
-              font-size: ${thermalPaperSize === '58mm' ? '11px' : '13px'}; 
-              line-height: 1.4;
-              background: #fff;
-              padding: 15px;
-              border: 1px solid #ddd;
-              border-radius: 8px;
-            }
-            .no-print { 
-              text-align: center; 
-              margin: 20px 0; 
-              padding: 15px;
-              background: #f5f5f5;
-              border-radius: 8px;
-            }
-            .btn { 
-              padding: 12px 24px; 
-              border: none; 
-              border-radius: 8px; 
-              cursor: pointer; 
-              font-weight: 600; 
-              margin: 5px;
-              font-size: 14px;
-            }
-            .btn-print { background: linear-gradient(135deg, #10b981, #059669); color: white; }
-            .btn-print:hover { background: linear-gradient(135deg, #059669, #047857); }
-            .btn-close { background: #6b7280; color: white; }
-            .btn-close:hover { background: #4b5563; }
-            h3 { text-align: center; margin-bottom: 15px; color: #374151; }
-          </style>
-        </head>
-        <body>
-          <h3>🧾 Receipt Preview</h3>
-          <pre>${receiptContent}</pre>
-          <div class="no-print">
-            <button class="btn btn-print" onclick="window.print()">🖨️ Print Receipt</button>
-            <button class="btn btn-close" onclick="window.close()">✕ Close</button>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    toast.success('Receipt opened in new window');
+    // Use centralized print utility
+    printDocument(receiptContent, `Receipt - ${order?.id?.slice(0, 8)}`, 'receipt');
+    toast.success('Receipt opened for printing');
   };
 
   const closePrintPreview = () => {

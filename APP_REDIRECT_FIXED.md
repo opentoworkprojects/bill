@@ -1,4 +1,4 @@
-# ✅ Auto-Redirect to App DISABLED
+Auto-Redirect to App DISABLED
 
 ## Issue Fixed
 

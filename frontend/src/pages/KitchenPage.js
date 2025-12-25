@@ -10,6 +10,7 @@ import {
   RefreshCw, Volume2, VolumeX, Filter, Flame, Eye, X, Play, Pause,
   Maximize, Minimize, Utensils, Coffee, AlertCircle
 } from 'lucide-react';
+import { printKOT as printKOTUtil, getPrintSettings, generateKOTContent } from '../utils/printUtils';
 
 const KitchenPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
@@ -118,47 +119,14 @@ const KitchenPage = ({ user }) => {
   };
 
   const printKOT = (order) => {
-    const width = 48;
-    const sep = '='.repeat(width);
-    const dash = '-'.repeat(width);
-    
-    let kot = `${sep}\n`;
-    kot += '*** KITCHEN ORDER TICKET ***'.padStart((width + 28) / 2).padEnd(width) + '\n';
-    kot += `${sep}\n\n`;
-    kot += `ORDER #: ${order.id.slice(0, 8).toUpperCase()}\n`;
-    kot += `TABLE: ${order.table_number}\n`;
-    kot += `SERVER: ${order.waiter_name}\n`;
-    kot += `TIME: ${new Date(order.created_at).toLocaleTimeString()}\n`;
-    kot += `\n${dash}\nITEMS TO PREPARE:\n${dash}\n\n`;
-    
-    order.items.forEach(item => {
-      kot += `>>> ${item.quantity}x ${item.name.toUpperCase()} <<<\n`;
-      if (item.notes) kot += `    *** ${item.notes} ***\n`;
-      kot += '\n';
-    });
-    
-    kot += `${dash}\nTOTAL ITEMS: ${order.items.reduce((sum, i) => sum + i.quantity, 0)}\n${sep}`;
-
-    const printWindow = window.open('', '', 'width=400,height=600');
-    printWindow.document.write(`
-      <html><head><title>KOT - Table ${order.table_number}</title>
-      <style>
-        @media print { @page { size: 80mm auto; margin: 0; } body { margin: 0; } .no-print { display: none; } }
-        body { font-family: 'Courier New', monospace; font-size: 14px; padding: 10px; width: 80mm; }
-        pre { margin: 0; white-space: pre-wrap; }
-        .no-print { text-align: center; margin: 20px 0; }
-        .btn { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin: 5px; }
-        .btn-print { background: linear-gradient(135deg, #f97316, #ea580c); color: white; }
-        .btn-close { background: #6b7280; color: white; }
-      </style></head><body>
-      <pre>${kot}</pre>
-      <div class="no-print">
-        <button class="btn btn-print" onclick="window.print()">🖨️ Print KOT</button>
-        <button class="btn btn-close" onclick="window.close()">✕ Close</button>
-      </div></body></html>
-    `);
-    printWindow.document.close();
-    toast.success('KOT ready for printing!');
+    try {
+      // Use centralized print utility with global settings
+      printKOTUtil(order, businessSettings);
+      toast.success('KOT ready for printing!');
+    } catch (error) {
+      console.error('Failed to print KOT:', error);
+      toast.error('Failed to print KOT');
+    }
   };
 
   const filteredOrders = orders.filter(o => filter === 'all' || o.status === filter);
