@@ -849,3 +849,98 @@ code {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Marquee Animation for Campaign Banner */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 20s linear infinite;
+}
+
+/* Campaign Banner Specific Animations */
+@keyframes campaignPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.2);
+  }
+}
+
+.campaign-pulse {
+  animation: campaignPulse 2s ease-in-out infinite;
+}
+
+/* Countdown Timer Animation */
+@keyframes countdownTick {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.countdown-tick {
+  animation: countdownTick 1s ease-in-out infinite;
+}
+
+/* Fire Emoji Animation */
+@keyframes fireFlicker {
+  0%, 100% {
+    transform: scale(1) rotate(-5deg);
+  }
+  25% {
+    transform: scale(1.1) rotate(5deg);
+  }
+  50% {
+    transform: scale(1) rotate(-3deg);
+  }
+  75% {
+    transform: scale(1.05) rotate(3deg);
+  }
+}
+
+.fire-flicker {
+  animation: fireFlicker 0.5s ease-in-out infinite;
+}
+
+/* Price Tag Animation */
+@keyframes priceShine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.price-shine {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background-size: 200% 100%;
+  animation: priceShine 3s linear infinite;
+}
+
+/* Urgency Blink Animation */
+@keyframes urgencyBlink {
+  0%, 50%, 100% {
+    opacity: 1;
+  }
+  25%, 75% {
+    opacity: 0.7;
+  }
+}
+
+.urgency-blink {
+  animation: urgencyBlink 1.5s ease-in-out infinite;
+}

@@ -312,6 +312,112 @@ const DesktopDownloadSection = () => {
   );
 };
 
+// Early Adopter Campaign Banner Component
+const EarlyAdopterBanner = () => {
+  const navigate = useNavigate();
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const endDate = new Date('2025-12-31T23:59:59');
+      const now = new Date();
+      const difference = endDate - now;
+      
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60)
+        });
+      }
+    };
+    
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  return (
+    <div className="relative overflow-hidden bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white py-3 animate-gradient" style={{ backgroundSize: '200% 200%' }}>
+      {/* Animated sparkles */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full animate-float"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              opacity: Math.random() * 0.7 + 0.3
+            }}
+          />
+        ))}
+      </div>
+      
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-center">
+          {/* Fire emoji with animation */}
+          <div className="flex items-center gap-2 animate-bounce">
+            <span className="text-2xl">🔥</span>
+            <span className="font-bold text-lg md:text-xl tracking-wide">EARLY ADOPTER OFFER</span>
+            <span className="text-2xl">🔥</span>
+          </div>
+          
+          {/* Price highlight */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm md:text-base line-through opacity-70">₹999/year</span>
+            <div className="relative">
+              <span className="text-2xl md:text-3xl font-black animate-pulse-glow px-3 py-1 bg-white/20 rounded-lg">
+                ₹9/year
+              </span>
+              <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full animate-bounce">
+                99% OFF
+              </span>
+            </div>
+          </div>
+          
+          {/* Countdown timer */}
+          <div className="flex items-center gap-1 text-sm md:text-base">
+            <span className="opacity-80">Ends in:</span>
+            <div className="flex gap-1">
+              <span className="bg-black/30 px-2 py-1 rounded font-mono font-bold">{String(timeLeft.days).padStart(2, '0')}d</span>
+              <span className="bg-black/30 px-2 py-1 rounded font-mono font-bold">{String(timeLeft.hours).padStart(2, '0')}h</span>
+              <span className="bg-black/30 px-2 py-1 rounded font-mono font-bold">{String(timeLeft.minutes).padStart(2, '0')}m</span>
+              <span className="bg-black/30 px-2 py-1 rounded font-mono font-bold animate-pulse">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+            </div>
+          </div>
+          
+          {/* CTA Button */}
+          <Button
+            size="sm"
+            className="bg-white text-red-600 hover:bg-yellow-100 font-bold px-4 py-2 shadow-lg hover-lift"
+            onClick={() => navigate("/login")}
+          >
+            <Gift className="w-4 h-4 mr-1" />
+            Claim Now
+          </Button>
+        </div>
+        
+        {/* Scrolling text */}
+        <div className="mt-2 overflow-hidden">
+          <div className="animate-marquee whitespace-nowrap text-xs opacity-80">
+            <span className="mx-4">🎉 Limited Time Offer</span>
+            <span className="mx-4">✨ Full Premium Features</span>
+            <span className="mx-4">🚀 Unlimited Bills</span>
+            <span className="mx-4">💳 All Payment Methods</span>
+            <span className="mx-4">🖨️ Thermal Printing</span>
+            <span className="mx-4">📊 Advanced Analytics</span>
+            <span className="mx-4">🎉 Limited Time Offer</span>
+            <span className="mx-4">✨ Full Premium Features</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -462,10 +568,11 @@ const LandingPage = () => {
       popular: false,
     },
     {
-      name: "Premium",
-      price: "₹999",
+      name: "Early Adopter",
+      price: "₹9",
       period: "per year",
-      originalPrice: "",
+      originalPrice: "₹999",
+      badge: "99% OFF - Till Dec 31",
       features: [
         "Unlimited bills forever",
         "All premium features",
@@ -477,8 +584,10 @@ const LandingPage = () => {
         "Export to CSV/PDF",
         "Multi-currency",
         "6 thermal printer themes",
+        "WhatsApp integration",
+        "Lifetime early adopter badge",
       ],
-      cta: "Get Premium - 50% OFF",
+      cta: "🔥 Grab ₹9/Year Deal",
       popular: true,
     },
   ];
@@ -494,6 +603,9 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white" data-testid="landing-page">
+      {/* Early Adopter Campaign Banner */}
+      <EarlyAdopterBanner />
+      
       {/* Lead Capture Popup */}
       <LeadCapturePopup />
       
@@ -667,16 +779,18 @@ const LandingPage = () => {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto font-light animate-fade-in-up delay-200">
-              AI-powered POS system trusted by 500+ restaurants. Start billing in minutes.
+              AI-powered POS system trusted by 500+ restaurants. 
+              <span className="font-semibold text-red-600"> Early Adopter Special: ₹9/year (99% OFF)!</span>
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 animate-fade-in-up delay-400">
               <Button
                 size="lg"
-                className="bg-gradient-to-r from-violet-600 to-purple-600 h-14 px-8 text-lg btn-animate hover-lift"
+                className="bg-gradient-to-r from-red-500 to-orange-500 h-14 px-8 text-lg btn-animate hover-lift animate-pulse-glow"
                 onClick={handleGetStarted}
               >
-                Start Free Trial
+                <Gift className="w-5 h-5 mr-2" />
+                Get ₹9/Year Deal
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               <Button
@@ -751,6 +865,142 @@ const LandingPage = () => {
                 <DollarSign className="w-8 h-8 text-pink-600 mb-2" />
                 <span className="text-sm font-medium text-gray-900 text-center">View Pricing</span>
               </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Early Adopter Special Offer Section */}
+      <section id="early-adopter" className="py-16 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 relative overflow-hidden">
+        {/* Animated background particles */}
+        <div className="absolute inset-0">
+          {[...Array(30)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-white/20 rounded-full animate-float"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 4}s`
+              }}
+            />
+          ))}
+        </div>
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8 items-center">
+              {/* Left Content */}
+              <div className="text-white space-y-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur rounded-full animate-bounce">
+                  <span className="text-2xl">🔥</span>
+                  <span className="font-bold">LIMITED TIME OFFER</span>
+                  <span className="text-2xl">🔥</span>
+                </div>
+                
+                <h2 className="text-4xl md:text-5xl font-black leading-tight" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                  Early Adopter
+                  <span className="block text-yellow-200">Special Deal!</span>
+                </h2>
+                
+                <p className="text-xl text-white/90">
+                  Be among the first 1000 restaurants to join BillByteKOT and get our premium plan at an unbelievable price!
+                </p>
+                
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <div className="text-sm text-white/70 line-through">Regular Price</div>
+                    <div className="text-2xl font-bold text-white/70">₹999/year</div>
+                  </div>
+                  <ArrowRight className="w-8 h-8 text-yellow-200 animate-pulse" />
+                  <div className="text-center bg-white/20 backdrop-blur rounded-xl p-4">
+                    <div className="text-sm text-yellow-200 font-bold">Early Adopter Price</div>
+                    <div className="text-5xl font-black text-white">₹9</div>
+                    <div className="text-sm text-white/80">per year</div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-3">
+                  {["Unlimited Bills", "All Features", "Priority Support", "Lifetime Badge"].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-2 rounded-full">
+                      <CheckCircle className="w-4 h-4 text-yellow-200" />
+                      <span className="text-sm font-medium">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <Button
+                  size="lg"
+                  className="bg-white text-red-600 hover:bg-yellow-100 font-bold h-14 px-8 text-lg shadow-2xl hover-lift"
+                  onClick={() => navigate("/login")}
+                >
+                  <Gift className="w-5 h-5 mr-2" />
+                  Claim ₹9/Year Deal Now
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                
+                <p className="text-sm text-white/70">
+                  ⏰ Offer valid till December 31, 2025 • No hidden charges • Cancel anytime
+                </p>
+              </div>
+              
+              {/* Right Content - Countdown & Benefits */}
+              <div className="space-y-6">
+                {/* Countdown Card */}
+                <Card className="bg-white/10 backdrop-blur border-white/20 text-white overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-center text-xl">⏰ Offer Ends In</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { label: "Days", id: "days" },
+                        { label: "Hours", id: "hours" },
+                        { label: "Minutes", id: "mins" },
+                        { label: "Seconds", id: "secs" }
+                      ].map((item) => (
+                        <div key={item.id} className="bg-black/30 rounded-lg p-3">
+                          <div className="text-3xl md:text-4xl font-mono font-black countdown-tick">
+                            --
+                          </div>
+                          <div className="text-xs text-white/70">{item.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-center text-sm text-white/80 mt-4">
+                      🎯 Only for first 1000 early adopters!
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                {/* What You Get Card */}
+                <Card className="bg-white shadow-2xl">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Gift className="w-5 h-5 text-red-500" />
+                      What You Get for ₹9/Year
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      { icon: "📊", text: "Unlimited Bills & Orders" },
+                      { icon: "🖨️", text: "6 Thermal Printer Themes" },
+                      { icon: "📱", text: "WhatsApp Integration" },
+                      { icon: "🤖", text: "AI-Powered Analytics" },
+                      { icon: "👥", text: "Multi-Staff Management" },
+                      { icon: "🏆", text: "Lifetime Early Adopter Badge" },
+                      { icon: "📞", text: "Priority 24/7 Support" },
+                      { icon: "🔄", text: "Free Updates Forever" }
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                        <span className="text-xl">{item.icon}</span>
+                        <span className="font-medium text-gray-800">{item.text}</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
