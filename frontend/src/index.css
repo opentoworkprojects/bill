@@ -28,6 +28,15 @@ html {
     box-sizing: border-box;
 }
 
+/* Hide scrollbar utility */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
 /* Fix mobile viewport issues */
 #root {
     min-height: 100vh;

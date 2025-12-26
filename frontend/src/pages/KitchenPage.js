@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { 
+import {
   Clock, CheckCircle, Printer, AlertTriangle, ChefHat, Timer, Bell,
-  RefreshCw, Volume2, VolumeX, Filter, Flame, Eye, X, Play, Pause,
-  Maximize, Minimize, Utensils, Coffee, AlertCircle
+  RefreshCw, Volume2, VolumeX, Flame, Eye, X, Play,
+  Maximize, Minimize, Utensils, Coffee, AlertCircle, Grid3X3, List, Zap
 } from 'lucide-react';
-import { printKOT as printKOTUtil, getPrintSettings, generateKOTContent } from '../utils/printUtils';
+import { printKOT as printKOTUtil } from '../utils/printUtils';
 
 const KitchenPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
@@ -23,6 +23,7 @@ const KitchenPage = ({ user }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // grid or list
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -104,11 +105,11 @@ const KitchenPage = ({ user }) => {
     }
   };
 
-  const getTimeSince = (date) => {
-    const minutes = Math.floor((new Date() - new Date(date)) / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
+  // Manual refresh with animation
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchOrders();
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const getUrgencyLevel = (date) => {
@@ -146,29 +147,80 @@ const KitchenPage = ({ user }) => {
 
   const filteredOrders = orders.filter(o => filter === 'all' || o.status === filter);
 
-  // Calculate average wait time
-  const avgWaitTime = orders.length > 0 
-    ? Math.round(orders.reduce((sum, o) => sum + Math.floor((new Date() - new Date(o.created_at)) / 60000), 0) / orders.length)
-    : 0;
+  // Calculate enhanced wait time stats
+  const waitTimeStats = (() => {
+    if (orders.length === 0) return { avg: 0, min: 0, max: 0, oldest: null, status: 'good' };
+    
+    const waitTimes = orders.map(o => Math.floor((new Date() - new Date(o.created_at)) / 60000));
+    const avg = Math.round(waitTimes.reduce((sum, t) => sum + t, 0) / waitTimes.length);
+    const min = Math.min(...waitTimes);
+    const max = Math.max(...waitTimes);
+    const oldestOrder = orders.reduce((oldest, o) => 
+      new Date(o.created_at) < new Date(oldest.created_at) ? o : oldest
+    , orders[0]);
+    
+    // Determine status based on avg wait time
+    let status = 'good'; // green - under 10 min
+    if (avg > 20) status = 'critical'; // red - over 20 min
+    else if (avg > 10) status = 'warning'; // orange - 10-20 min
+    
+    return { avg, min, max, oldest: oldestOrder, status };
+  })();
+
+  // Format time for display
+  const formatTimeDisplay = (minutes) => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
 
   const OrderCard = ({ order }) => {
     const urgency = getUrgencyLevel(order.created_at);
     const waitTime = formatWaitTime(order.created_at);
-    
+    const [touchStart, setTouchStart] = useState(null);
+    const [touchEnd, setTouchEnd] = useState(null);
+    const minSwipeDistance = 50;
+
+    const onTouchStart = (e) => {
+      setTouchEnd(null);
+      setTouchStart(e.targetTouches[0].clientX);
+    };
+
+    const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+
+    const onTouchEnd = () => {
+      if (!touchStart || !touchEnd) return;
+      const distance = touchStart - touchEnd;
+      const isLeftSwipe = distance > minSwipeDistance;
+      const isRightSwipe = distance < -minSwipeDistance;
+      
+      // Swipe left to advance status
+      if (isLeftSwipe) {
+        if (order.status === 'pending') handleStatusChange(order.id, 'preparing');
+        else if (order.status === 'preparing') handleStatusChange(order.id, 'ready');
+        else if (order.status === 'ready') handleStatusChange(order.id, 'completed');
+      }
+      // Swipe right to view details
+      if (isRightSwipe) {
+        setSelectedOrder(order);
+      }
+    };
+
     const urgencyStyles = {
       critical: {
         border: 'border-l-red-500',
         bg: 'bg-gradient-to-br from-red-50 to-red-100',
         pulse: 'animate-pulse',
         badge: 'bg-red-600 text-white',
-        icon: <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+        icon: <AlertCircle className="w-4 h-4 text-red-600" />
       },
       warning: {
         border: 'border-l-orange-500',
         bg: 'bg-gradient-to-br from-orange-50 to-amber-50',
         pulse: '',
         badge: 'bg-orange-500 text-white',
-        icon: <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+        icon: <AlertTriangle className="w-4 h-4 text-orange-500" />
       },
       normal: {
         border: order.status === 'pending' ? 'border-l-yellow-500' : order.status === 'preparing' ? 'border-l-blue-500' : 'border-l-green-500',
@@ -181,16 +233,29 @@ const KitchenPage = ({ user }) => {
 
     const style = urgencyStyles[urgency];
 
+    // Get next action text for swipe hint
+    const getNextAction = () => {
+      if (order.status === 'pending') return 'Start';
+      if (order.status === 'preparing') return 'Ready';
+      if (order.status === 'ready') return 'Served';
+      return '';
+    };
+
     return (
-      <Card className={`border-0 shadow-lg border-l-4 ${style.border} ${style.bg} ${style.pulse} transition-all overflow-hidden w-full max-w-full`}>
-        <CardHeader className="pb-2 px-3 sm:px-4">
+      <Card 
+        className={`border-0 shadow-lg border-l-4 ${style.border} ${style.bg} ${style.pulse} transition-all overflow-hidden w-full max-w-full touch-pan-y`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <CardHeader className="pb-2 px-3 sm:px-4 pt-3">
           <div className="flex justify-between items-start gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
               <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${order.status === 'pending' ? 'bg-yellow-200' : order.status === 'preparing' ? 'bg-blue-200' : 'bg-green-200'}`}>
-                <ChefHat className={`w-5 h-5 sm:w-8 sm:h-8 ${order.status === 'pending' ? 'text-yellow-700' : order.status === 'preparing' ? 'text-blue-700' : 'text-green-700'}`} />
+                <ChefHat className={`w-5 h-5 sm:w-7 sm:h-7 ${order.status === 'pending' ? 'text-yellow-700' : order.status === 'preparing' ? 'text-blue-700' : 'text-green-700'}`} />
               </div>
               <div className="min-w-0 flex-1 overflow-hidden">
-                <CardTitle className="text-lg sm:text-2xl font-black tracking-tight truncate">
+                <CardTitle className="text-base sm:text-xl font-black tracking-tight truncate">
                   Table #{order.table_number}
                 </CardTitle>
                 <p className="text-[10px] sm:text-xs text-gray-500 font-mono truncate">#{order.id.slice(0, 8).toUpperCase()}</p>
@@ -202,14 +267,14 @@ const KitchenPage = ({ user }) => {
               </span>
               <div className={`mt-1 flex items-center gap-1 whitespace-nowrap ${urgency === 'critical' ? 'text-red-600' : urgency === 'warning' ? 'text-orange-600' : 'text-gray-500'}`}>
                 {style.icon}
-                <span className={`text-sm sm:text-lg font-bold ${urgency === 'critical' ? 'animate-pulse' : ''}`}>
+                <span className={`text-sm sm:text-base font-bold ${urgency === 'critical' ? 'animate-pulse' : ''}`}>
                   {waitTime}
                 </span>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2 sm:space-y-3 px-3 sm:px-4 pb-3">
+        <CardContent className="space-y-2 px-3 sm:px-4 pb-3">
           {/* Order Type Badge */}
           {order.order_type && (
             <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${
@@ -223,19 +288,19 @@ const KitchenPage = ({ user }) => {
             </div>
           )}
 
-          {/* Items List */}
-          <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
+          {/* Items List - Compact on mobile */}
+          <div className="space-y-1 max-h-[30vh] overflow-y-auto">
             {order.items.map((item, idx) => (
-              <div key={idx} className={`p-2 rounded-lg ${urgency === 'critical' ? 'bg-red-100 border border-red-200' : 'bg-white/70'} border border-gray-100`}>
+              <div key={idx} className={`p-1.5 sm:p-2 rounded-lg ${urgency === 'critical' ? 'bg-red-100 border border-red-200' : 'bg-white/70'} border border-gray-100`}>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-violet-600 text-white text-xs sm:text-sm font-bold flex-shrink-0">
+                  <span className="inline-flex items-center justify-center w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-violet-600 text-white text-[10px] sm:text-xs font-bold flex-shrink-0">
                     {item.quantity}
                   </span>
-                  <span className="font-bold text-sm sm:text-base text-gray-900 truncate flex-1">{item.name}</span>
+                  <span className="font-semibold text-xs sm:text-sm text-gray-900 truncate flex-1">{item.name}</span>
                 </div>
                 {item.notes && (
-                  <div className="mt-1 flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs sm:text-sm">
-                    <Flame className="w-3 h-3 flex-shrink-0" />
+                  <div className="mt-1 flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] sm:text-xs">
+                    <Flame className="w-2.5 h-2.5 flex-shrink-0" />
                     <span className="font-medium truncate">{item.notes}</span>
                   </div>
                 )}
@@ -244,46 +309,51 @@ const KitchenPage = ({ user }) => {
           </div>
 
           {/* Total Items Count */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-            <span className="text-gray-600 font-medium text-xs sm:text-sm">Total Items:</span>
-            <span className="text-lg sm:text-xl font-black text-violet-600">
+          <div className="flex items-center justify-between pt-1.5 border-t border-gray-200">
+            <span className="text-gray-600 font-medium text-[10px] sm:text-xs">Total Items:</span>
+            <span className="text-base sm:text-lg font-black text-violet-600">
               {order.items.reduce((sum, i) => sum + i.quantity, 0)}
             </span>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-1">
+          {/* Action Buttons - Touch optimized */}
+          <div className="flex gap-1.5 sm:gap-2 pt-1">
             {order.status === 'pending' && (
-              <Button 
-                onClick={() => handleStatusChange(order.id, 'preparing')} 
-                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 h-10 sm:h-12 text-xs sm:text-sm font-bold"
+              <Button
+                onClick={() => handleStatusChange(order.id, 'preparing')}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 h-11 sm:h-12 text-xs sm:text-sm font-bold active:scale-95 transition-transform"
               >
                 <Play className="w-4 h-4 mr-1" /> START
               </Button>
             )}
             {order.status === 'preparing' && (
-              <Button 
-                onClick={() => handleStatusChange(order.id, 'ready')} 
-                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 h-10 sm:h-12 text-xs sm:text-sm font-bold"
+              <Button
+                onClick={() => handleStatusChange(order.id, 'ready')}
+                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 h-11 sm:h-12 text-xs sm:text-sm font-bold active:scale-95 transition-transform"
               >
                 <CheckCircle className="w-4 h-4 mr-1" /> READY
               </Button>
             )}
             {order.status === 'ready' && (
-              <Button 
-                onClick={() => handleStatusChange(order.id, 'completed')} 
-                className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 h-10 sm:h-12 text-xs sm:text-sm font-bold"
+              <Button
+                onClick={() => handleStatusChange(order.id, 'completed')}
+                className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 h-11 sm:h-12 text-xs sm:text-sm font-bold active:scale-95 transition-transform"
               >
                 <CheckCircle className="w-4 h-4 mr-1" /> SERVED
               </Button>
             )}
-            <Button variant="outline" onClick={() => printKOT(order)} className="h-10 sm:h-12 px-2 sm:px-3 border">
+            <Button variant="outline" onClick={() => printKOT(order)} className="h-11 sm:h-12 px-3 border active:scale-95 transition-transform">
               <Printer className="w-4 h-4" />
             </Button>
-            <Button variant="outline" onClick={() => setSelectedOrder(order)} className="h-10 sm:h-12 px-2 sm:px-3 border">
+            <Button variant="outline" onClick={() => setSelectedOrder(order)} className="h-11 sm:h-12 px-3 border active:scale-95 transition-transform">
               <Eye className="w-4 h-4" />
             </Button>
           </div>
+
+          {/* Swipe hint - Mobile only */}
+          <p className="text-[9px] text-gray-400 text-center sm:hidden">
+            ← Swipe left to {getNextAction()} • Swipe right to view →
+          </p>
         </CardContent>
       </Card>
     );
@@ -309,20 +379,36 @@ const KitchenPage = ({ user }) => {
               </div>
             </div>
             {/* Mobile Quick Actions */}
-            <div className="flex items-center gap-2 sm:hidden">
-              <Button 
-                variant={autoRefresh ? "default" : "outline"} 
+            <div className="flex items-center gap-1.5 sm:hidden">
+              <Button
+                variant="ghost"
                 size="sm"
-                onClick={() => setAutoRefresh(!autoRefresh)} 
-                className={autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className={`p-2 ${soundEnabled ? 'text-green-600' : 'text-gray-400'}`}
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                className="p-2"
+              >
+                {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
+              </Button>
+              <Button
+                variant={autoRefresh ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`p-2 ${autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}`}
               >
                 <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={toggleFullscreen}
-                className={`${isFullscreen ? 'border-gray-700 text-white hover:bg-gray-800 bg-violet-600' : 'bg-violet-100 border-violet-300 text-violet-700'}`}
+                className={`p-2 ${isFullscreen ? 'border-gray-700 text-white hover:bg-gray-800 bg-violet-600' : 'bg-violet-100 border-violet-300 text-violet-700'}`}
               >
                 {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </Button>
@@ -378,62 +464,123 @@ const KitchenPage = ({ user }) => {
           </div>
         </div>
 
-        {/* Stats Bar - Mobile Responsive */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-          <Card className={`border-0 shadow-lg bg-gradient-to-br from-yellow-500 to-orange-500 text-white ${stats.pending > 0 ? 'ring-2 sm:ring-4 ring-yellow-300 ring-opacity-50' : ''}`}>
-            <CardContent className="p-3 sm:p-4 flex items-center justify-between">
+        {/* Quick Stats Summary - Mobile Only */}
+        <div className={`flex sm:hidden items-center justify-between px-2 py-2 rounded-lg ${
+          waitTimeStats.status === 'critical' ? 'bg-gradient-to-r from-red-50 to-red-100' :
+          waitTimeStats.status === 'warning' ? 'bg-gradient-to-r from-orange-50 to-amber-50' :
+          'bg-gradient-to-r from-violet-50 to-purple-50'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+              <span className="text-xs font-bold">{stats.pending}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-xs font-bold">{stats.preparing}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-xs font-bold">{stats.ready}</span>
+            </div>
+            <div className="h-4 w-px bg-gray-300 mx-1"></div>
+            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              waitTimeStats.status === 'critical' ? 'bg-red-500 text-white animate-pulse' :
+              waitTimeStats.status === 'warning' ? 'bg-orange-500 text-white' :
+              'bg-violet-500 text-white'
+            }`}>
+              <Clock className="w-3 h-3" />
+              <span>{waitTimeStats.avg}m avg</span>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleManualRefresh}
+            className="p-1.5 h-auto"
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-violet-600' : 'text-gray-500'}`} />
+          </Button>
+        </div>
+
+        {/* Stats Bar - Desktop */}
+        <div className="hidden sm:grid grid-cols-4 gap-4">
+          <Card className={`border-0 shadow-lg bg-gradient-to-br from-yellow-500 to-orange-500 text-white ${stats.pending > 0 ? 'ring-2 ring-yellow-300 ring-opacity-50' : ''}`}>
+            <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-yellow-100 text-xs sm:text-sm font-medium">Pending</p>
-                <p className="text-3xl sm:text-5xl font-black">{stats.pending}</p>
+                <p className="text-yellow-100 text-sm font-medium">Pending</p>
+                <p className="text-5xl font-black">{stats.pending}</p>
               </div>
-              <Bell className={`w-8 h-8 sm:w-14 sm:h-14 opacity-50 ${stats.pending > 0 ? 'animate-bounce' : ''}`} />
+              <Bell className={`w-14 h-14 opacity-50 ${stats.pending > 0 ? 'animate-bounce' : ''}`} />
             </CardContent>
           </Card>
           <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
-            <CardContent className="p-3 sm:p-4 flex items-center justify-between">
+            <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-xs sm:text-sm font-medium">Preparing</p>
-                <p className="text-3xl sm:text-5xl font-black">{stats.preparing}</p>
+                <p className="text-blue-100 text-sm font-medium">Preparing</p>
+                <p className="text-5xl font-black">{stats.preparing}</p>
               </div>
-              <Timer className="w-8 h-8 sm:w-14 sm:h-14 opacity-50" />
+              <Timer className="w-14 h-14 opacity-50" />
             </CardContent>
           </Card>
           <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-emerald-500 text-white">
-            <CardContent className="p-3 sm:p-4 flex items-center justify-between">
+            <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-xs sm:text-sm font-medium">Ready</p>
-                <p className="text-3xl sm:text-5xl font-black">{stats.ready}</p>
+                <p className="text-green-100 text-sm font-medium">Ready</p>
+                <p className="text-5xl font-black">{stats.ready}</p>
               </div>
-              <CheckCircle className="w-8 h-8 sm:w-14 sm:h-14 opacity-50" />
+              <CheckCircle className="w-14 h-14 opacity-50" />
             </CardContent>
           </Card>
-          <Card className={`border-0 shadow-lg ${isFullscreen ? 'bg-gray-800' : 'bg-gradient-to-br from-violet-500 to-purple-500'} text-white`}>
-            <CardContent className="p-3 sm:p-4 flex items-center justify-between">
+          <Card className={`border-0 shadow-lg ${
+            waitTimeStats.status === 'critical' ? 'bg-gradient-to-br from-red-500 to-red-600 ring-2 ring-red-300 animate-pulse' :
+            waitTimeStats.status === 'warning' ? 'bg-gradient-to-br from-orange-500 to-amber-500' :
+            isFullscreen ? 'bg-gray-800' : 'bg-gradient-to-br from-violet-500 to-purple-500'
+          } text-white`}>
+            <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className={`text-xs sm:text-sm font-medium ${isFullscreen ? 'text-gray-400' : 'text-violet-100'}`}>Avg Wait</p>
-                <p className="text-3xl sm:text-5xl font-black">{avgWaitTime}<span className="text-lg sm:text-2xl">m</span></p>
+                <p className={`text-sm font-medium ${
+                  waitTimeStats.status === 'critical' ? 'text-red-100' :
+                  waitTimeStats.status === 'warning' ? 'text-orange-100' :
+                  isFullscreen ? 'text-gray-400' : 'text-violet-100'
+                }`}>
+                  Avg Wait {waitTimeStats.status === 'critical' && '⚠️'}
+                </p>
+                <p className="text-5xl font-black">{waitTimeStats.avg}<span className="text-2xl">m</span></p>
+                <div className="flex gap-2 mt-1 text-xs opacity-80">
+                  <span>Min: {waitTimeStats.min}m</span>
+                  <span>•</span>
+                  <span>Max: {waitTimeStats.max}m</span>
+                </div>
               </div>
-              <Clock className="w-8 h-8 sm:w-14 sm:h-14 opacity-50" />
+              <div className="flex flex-col items-center">
+                <Clock className={`w-10 h-10 opacity-50 ${waitTimeStats.status === 'critical' ? 'animate-bounce' : ''}`} />
+                {waitTimeStats.status === 'good' && <span className="text-xs mt-1 bg-white/20 px-2 py-0.5 rounded-full">On Track</span>}
+                {waitTimeStats.status === 'warning' && <span className="text-xs mt-1 bg-white/20 px-2 py-0.5 rounded-full">Slow</span>}
+                {waitTimeStats.status === 'critical' && <span className="text-xs mt-1 bg-white/20 px-2 py-0.5 rounded-full">Behind</span>}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filter Tabs - Mobile Scrollable */}
-        <div className={`flex gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-lg sm:rounded-xl overflow-x-auto ${isFullscreen ? 'bg-gray-800' : 'bg-gray-100'}`}>
+        {/* Filter Tabs - Mobile Optimized */}
+        <div className={`flex gap-1 p-1 rounded-xl overflow-x-auto scrollbar-hide ${isFullscreen ? 'bg-gray-800' : 'bg-gray-100'}`}>
           {[
-            { id: 'all', label: 'All', count: orders.length, color: 'violet' },
-            { id: 'pending', label: 'Pending', count: stats.pending, color: 'yellow' },
-            { id: 'preparing', label: 'Cooking', count: stats.preparing, color: 'blue' },
-            { id: 'ready', label: 'Ready', count: stats.ready, color: 'green' },
+            { id: 'all', label: 'All', count: orders.length, color: 'violet', icon: <Zap className="w-3.5 h-3.5" /> },
+            { id: 'pending', label: 'Pending', count: stats.pending, color: 'yellow', icon: <Bell className="w-3.5 h-3.5" /> },
+            { id: 'preparing', label: 'Cooking', count: stats.preparing, color: 'blue', icon: <Timer className="w-3.5 h-3.5" /> },
+            { id: 'ready', label: 'Ready', count: stats.ready, color: 'green', icon: <CheckCircle className="w-3.5 h-3.5" /> },
           ].map(tab => (
             <button key={tab.id} onClick={() => setFilter(tab.id)}
-              className={`px-3 sm:px-5 py-2 sm:py-3 rounded-md sm:rounded-lg font-bold transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap text-sm sm:text-base ${
-                filter === tab.id 
-                  ? `bg-${tab.color}-600 text-white shadow-lg` 
+              className={`flex-1 min-w-[70px] px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap text-xs sm:text-sm active:scale-95 ${
+                filter === tab.id
+                  ? `bg-${tab.color}-600 text-white shadow-lg`
                   : isFullscreen ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-white'
               }`}>
+              <span className="hidden sm:inline">{tab.icon}</span>
               {tab.label}
-              <span className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-black ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black ${
                 filter === tab.id ? 'bg-white/20' : isFullscreen ? 'bg-gray-700' : 'bg-gray-200'
               }`}>
                 {tab.count}
