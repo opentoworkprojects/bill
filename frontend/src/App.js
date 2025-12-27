@@ -137,10 +137,14 @@ const PrivateRoute = ({ children, requireSetup = true }) => {
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   
+  // If no token, redirect to login
   if (!token) return <Navigate to="/login" />;
-  if (requireSetup && user.role === 'admin' && !user.setup_completed) {
+  
+  // If user data exists and setup is required but not completed
+  if (requireSetup && user.role === 'admin' && user.setup_completed === false) {
     return <Navigate to="/setup" />;
   }
+  
   return children;
 };
 
@@ -149,26 +153,42 @@ const SetupRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" />;
 };
 
+// Loading component for auth check
+const AuthLoading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
+
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // Initialize user from localStorage immediately to prevent logout flash
+    const cachedUser = localStorage.getItem('user');
+    if (cachedUser) {
+      try {
+        return JSON.parse(cachedUser);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       setAuthToken(token);
       
-      // Immediately load cached user to prevent logout on refresh
-      const cachedUser = localStorage.getItem('user');
-      if (cachedUser) {
-        try {
-          setUser(JSON.parse(cachedUser));
-        } catch {
-          // Invalid cached data
-        }
-      }
-      
-      // Then fetch fresh user data in background
-      fetchUser();
+      // Fetch fresh user data in background
+      fetchUser().finally(() => {
+        setIsAuthChecking(false);
+      });
+    } else {
+      setIsAuthChecking(false);
     }
 
     // Setup axios interceptor for trial expiration
@@ -218,19 +238,9 @@ function App() {
       if (e.response?.status === 401) {
         setAuthToken(null);
         localStorage.removeItem('user');
-      } else {
-        // On network error, use cached user data if available
-        const cachedUser = localStorage.getItem('user');
-        if (cachedUser) {
-          try {
-            setUser(JSON.parse(cachedUser));
-            console.log('Using cached user data');
-          } catch {
-            // Invalid cached data, clear it
-            localStorage.removeItem('user');
-          }
-        }
+        setUser(null);
       }
+      // On network error, keep using cached user data (already set in state initialization)
     }
   };
 

@@ -1169,41 +1169,62 @@ const ReportsPage = ({ user }) => {
         <TrialBanner user={user} />
         <div>
           <h1
-            className="text-4xl font-bold"
+            className="text-2xl sm:text-4xl font-bold"
             style={{ fontFamily: "Space Grotesk, sans-serif" }}
           >
             Reports & Analytics
           </h1>
-          <p className="text-gray-600 mt-2">
-            Comprehensive business insights and analytics
+          <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
+            Comprehensive business insights
           </p>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="sales">Sales Trends</TabsTrigger>
-            <TabsTrigger value="items">Best Sellers</TabsTrigger>
-            <TabsTrigger value="staff">Staff Performance</TabsTrigger>
-            <TabsTrigger value="hours">Peak Hours</TabsTrigger>
-            <TabsTrigger value="export">Export</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+          {/* Mobile-optimized scrollable tabs */}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
+            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-6 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
+              <TabsTrigger value="overview" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Overview</span>
+                <span className="sm:hidden">📊 Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="sales" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Sales Trends</span>
+                <span className="sm:hidden">📈 Sales</span>
+              </TabsTrigger>
+              <TabsTrigger value="items" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Best Sellers</span>
+                <span className="sm:hidden">🏆 Top Items</span>
+              </TabsTrigger>
+              <TabsTrigger value="staff" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Staff Performance</span>
+                <span className="sm:hidden">👥 Staff</span>
+              </TabsTrigger>
+              <TabsTrigger value="hours" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Peak Hours</span>
+                <span className="sm:hidden">⏰ Hours</span>
+              </TabsTrigger>
+              <TabsTrigger value="export" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Export</span>
+                <span className="sm:hidden">📥 Export</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
             {dailyReport && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
                 <Card
                   className="card-hover border-0 shadow-lg"
                   data-testid="daily-orders-card"
                 >
-                  <CardHeader>
-                    <CardTitle className="text-sm text-gray-600">
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="text-xs sm:text-sm text-gray-600">
                       Today's Orders
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-4xl font-bold text-violet-600">
+                  <CardContent className="pt-0">
+                    <p className="text-2xl sm:text-4xl font-bold text-violet-600">
                       {dailyReport.total_orders}
                     </p>
                   </CardContent>
@@ -1213,29 +1234,29 @@ const ReportsPage = ({ user }) => {
                   className="card-hover border-0 shadow-lg"
                   data-testid="daily-sales-card"
                 >
-                  <CardHeader>
-                    <CardTitle className="text-sm text-gray-600">
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="text-xs sm:text-sm text-gray-600">
                       Today's Sales
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-4xl font-bold text-green-600">
+                  <CardContent className="pt-0">
+                    <p className="text-2xl sm:text-4xl font-bold text-green-600 truncate">
                       ₹{(dailyReport?.total_sales || 0).toFixed(2)}
                     </p>
                   </CardContent>
                 </Card>
 
                 <Card
-                  className="card-hover border-0 shadow-lg"
+                  className="card-hover border-0 shadow-lg sm:col-span-1 col-span-1"
                   data-testid="avg-order-card"
                 >
-                  <CardHeader>
-                    <CardTitle className="text-sm text-gray-600">
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="text-xs sm:text-sm text-gray-600">
                       Avg Order Value
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-4xl font-bold text-blue-600">
+                  <CardContent className="pt-0">
+                    <p className="text-2xl sm:text-4xl font-bold text-blue-600 truncate">
                       ₹
                       {(dailyReport?.total_orders || 0) > 0
                         ? (
@@ -1250,36 +1271,36 @@ const ReportsPage = ({ user }) => {
 
             {forecast && (
               <Card className="border-0 shadow-lg" data-testid="forecast-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-violet-600" />
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                     AI Sales Forecast
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4 p-4 bg-violet-50 rounded-lg">
-                      <div>
-                        <p className="text-sm text-gray-600">Total Orders</p>
-                        <p className="text-2xl font-bold text-violet-600">
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 bg-violet-50 rounded-lg">
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs sm:text-sm text-gray-600">Orders</p>
+                        <p className="text-lg sm:text-2xl font-bold text-violet-600">
                           {forecast.current_stats.total_orders}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Total Sales</p>
-                        <p className="text-2xl font-bold text-green-600">
-                          ₹{(forecast?.current_stats?.total_sales || 0).toFixed(2)}
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs sm:text-sm text-gray-600">Sales</p>
+                        <p className="text-lg sm:text-2xl font-bold text-green-600 truncate">
+                          ₹{(forecast?.current_stats?.total_sales || 0).toFixed(0)}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Avg Order</p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          ₹{(forecast?.current_stats?.avg_order || 0).toFixed(2)}
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs sm:text-sm text-gray-600">Avg</p>
+                        <p className="text-lg sm:text-2xl font-bold text-blue-600 truncate">
+                          ₹{(forecast?.current_stats?.avg_order || 0).toFixed(0)}
                         </p>
                       </div>
                     </div>
-                    <div className="p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg border border-violet-200">
-                      <p className="text-sm text-gray-700 whitespace-pre-line">
+                    <div className="p-3 sm:p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-lg border border-violet-200">
+                      <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-line leading-relaxed">
                         {forecast.forecast}
                       </p>
                     </div>
@@ -1289,25 +1310,25 @@ const ReportsPage = ({ user }) => {
             )}
 
             <Card className="border-0 shadow-lg" data-testid="export-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-violet-600" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                   Quick Export
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {/* Quick Presets */}
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Quick Presets - Mobile optimized */}
                   <div className="flex flex-wrap gap-2">
                     {[
                       { key: 'today', label: 'Today' },
-                      { key: 'week', label: 'Last 7 Days' },
-                      { key: 'month', label: 'Last 30 Days' },
+                      { key: 'week', label: '7 Days' },
+                      { key: 'month', label: '30 Days' },
                     ].map(preset => (
                       <button
                         key={preset.key}
                         onClick={() => applyPreset(preset.key)}
-                        className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
+                        className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm font-medium ${
                           activePreset === preset.key
                             ? 'border-violet-500 bg-violet-50 text-violet-700'
                             : 'border-gray-200 hover:border-violet-300'
@@ -1318,8 +1339,8 @@ const ReportsPage = ({ user }) => {
                     ))}
                   </div>
                   
-                  {/* Date Range Display */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Date Range Display - Mobile optimized */}
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     <div>
                       <Label className="text-xs text-gray-500">From</Label>
                       <input
@@ -1329,7 +1350,7 @@ const ReportsPage = ({ user }) => {
                           setActivePreset('custom');
                           setDateRange({ ...dateRange, start_date: e.target.value });
                         }}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-violet-500 outline-none transition-all"
+                        className="w-full px-2 sm:px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:border-violet-500 outline-none transition-all"
                         data-testid="start-date-input"
                       />
                     </div>
@@ -1342,7 +1363,7 @@ const ReportsPage = ({ user }) => {
                           setActivePreset('custom');
                           setDateRange({ ...dateRange, end_date: e.target.value });
                         }}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-violet-500 outline-none transition-all"
+                        className="w-full px-2 sm:px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:border-violet-500 outline-none transition-all"
                         data-testid="end-date-input"
                       />
                     </div>
@@ -1351,7 +1372,7 @@ const ReportsPage = ({ user }) => {
                   <Button
                     onClick={handleExportCSV}
                     disabled={exportLoading}
-                    className="w-full bg-gradient-to-r from-violet-600 to-purple-600"
+                    className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-sm sm:text-base"
                     data-testid="export-button"
                   >
                     <Download className="w-4 h-4 mr-2" />
@@ -1366,27 +1387,26 @@ const ReportsPage = ({ user }) => {
                 className="border-0 shadow-lg"
                 data-testid="today-orders-list"
               >
-                <CardHeader>
-                  <CardTitle>Today's Orders</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">Today's Orders</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <div className="space-y-2 max-h-72 sm:max-h-96 overflow-y-auto">
                     {dailyReport.orders.map((order) => (
                       <div
                         key={order.id}
-                        className="p-3 bg-gray-50 rounded-lg flex justify-between items-center"
+                        className="p-2 sm:p-3 bg-gray-50 rounded-lg flex justify-between items-center"
                       >
-                        <div>
-                          <p className="font-medium">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm sm:text-base truncate">
                             Order #{order.id.slice(0, 8)}
                           </p>
-                          <p className="text-sm text-gray-500">
-                            Table {order.table_number} • {order.items.length}{" "}
-                            items
+                          <p className="text-xs sm:text-sm text-gray-500">
+                            Table {order.table_number} • {order.items.length} items
                           </p>
                         </div>
-                        <p className="font-bold text-violet-600">
-                          ₹{(order?.total || 0).toFixed(2)}
+                        <p className="font-bold text-violet-600 text-sm sm:text-base ml-2 flex-shrink-0">
+                          ₹{(order?.total || 0).toFixed(0)}
                         </p>
                       </div>
                     ))}
@@ -1397,21 +1417,21 @@ const ReportsPage = ({ user }) => {
           </TabsContent>
 
           {/* Sales Trends Tab */}
-          <TabsContent value="sales" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <TabsContent value="sales" className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
               {dailyReport && (
                 <Card className="border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-sm text-gray-600 flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
+                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                       Today
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold text-violet-600">
+                  <CardContent className="pt-0">
+                    <p className="text-xl sm:text-3xl font-bold text-violet-600 truncate">
                       ₹{(dailyReport?.total_sales || 0).toFixed(2)}
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {dailyReport.total_orders} orders
                     </p>
                   </CardContent>
@@ -1420,17 +1440,17 @@ const ReportsPage = ({ user }) => {
 
               {weeklyReport && (
                 <Card className="border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-sm text-gray-600 flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
+                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                       This Week
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold text-green-600">
+                  <CardContent className="pt-0">
+                    <p className="text-xl sm:text-3xl font-bold text-green-600 truncate">
                       ₹{(weeklyReport?.total_sales || 0).toFixed(2)}
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {weeklyReport.total_orders} orders
                     </p>
                   </CardContent>
@@ -1439,17 +1459,17 @@ const ReportsPage = ({ user }) => {
 
               {monthlyReport && (
                 <Card className="border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-sm text-gray-600 flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
+                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                       This Month
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold text-blue-600">
+                  <CardContent className="pt-0">
+                    <p className="text-xl sm:text-3xl font-bold text-blue-600 truncate">
                       ₹{(monthlyReport?.total_sales || 0).toFixed(2)}
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {monthlyReport.total_orders} orders
                     </p>
                   </CardContent>
@@ -1460,24 +1480,24 @@ const ReportsPage = ({ user }) => {
             {/* Sales Comparison */}
             {weeklyReport && monthlyReport && (
               <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-violet-600" />
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                     Sales Comparison
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg">
-                      <div>
-                        <p className="text-sm text-gray-600">Weekly Average</p>
-                        <p className="text-2xl font-bold text-violet-600">
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg gap-3 sm:gap-0">
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs sm:text-sm text-gray-600">Weekly Average</p>
+                        <p className="text-lg sm:text-2xl font-bold text-violet-600">
                           ₹{((weeklyReport?.total_sales || 0) / 7).toFixed(2)}/day
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">Monthly Average</p>
-                        <p className="text-2xl font-bold text-blue-600">
+                      <div className="text-center sm:text-right">
+                        <p className="text-xs sm:text-sm text-gray-600">Monthly Average</p>
+                        <p className="text-lg sm:text-2xl font-bold text-blue-600">
                           ₹{((monthlyReport?.total_sales || 0) / 30).toFixed(2)}/day
                         </p>
                       </div>
@@ -1489,46 +1509,46 @@ const ReportsPage = ({ user }) => {
           </TabsContent>
 
           {/* Best Sellers Tab */}
-          <TabsContent value="items" className="space-y-6">
+          <TabsContent value="items" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-5 h-5 text-violet-600" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Package className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                   Top Selling Items
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {bestSelling && bestSelling.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {bestSelling.map((item, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg hover:shadow-md transition-shadow"
+                        className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg hover:shadow-md transition-shadow"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
                             #{index + 1}
                           </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">{item.name || 'Unknown'}</p>
-                            <p className="text-sm text-gray-500">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">{item.name || 'Unknown'}</p>
+                            <p className="text-xs sm:text-sm text-gray-500 truncate">
                               {item.category || 'N/A'} • ₹{(item.price || 0).toFixed(2)}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-violet-600">
+                        <div className="text-right flex-shrink-0 ml-2">
+                          <p className="text-lg sm:text-2xl font-bold text-violet-600">
                             {item.total_quantity || 0}
                           </p>
-                          <p className="text-sm text-gray-500">
-                            ₹{(item.total_revenue || 0).toFixed(2)} revenue
+                          <p className="text-[10px] sm:text-sm text-gray-500 truncate">
+                            ₹{(item.total_revenue || 0).toFixed(0)}
                           </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-gray-500 py-8">
+                  <p className="text-center text-gray-500 py-6 sm:py-8 text-sm">
                     No sales data available yet
                   </p>
                 )}
@@ -1538,20 +1558,20 @@ const ReportsPage = ({ user }) => {
             {/* Category Analysis */}
             {categoryAnalysis && categoryAnalysis.length > 0 && (
               <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5 text-violet-600" />
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                     Sales by Category
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-3 sm:space-y-4">
                     {categoryAnalysis.map((cat, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-gray-900">{cat.category}</span>
-                          <span className="text-sm text-gray-600">
-                            {cat.total_quantity || 0} items • ₹{(cat.total_revenue || 0).toFixed(2)}
+                      <div key={index} className="space-y-1.5 sm:space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-gray-900 truncate flex-1">{cat.category}</span>
+                          <span className="text-xs sm:text-sm text-gray-600 ml-2 flex-shrink-0">
+                            {cat.total_quantity || 0} • ₹{(cat.total_revenue || 0).toFixed(0)}
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -1571,46 +1591,46 @@ const ReportsPage = ({ user }) => {
           </TabsContent>
 
           {/* Staff Performance Tab */}
-          <TabsContent value="staff" className="space-y-6">
+          <TabsContent value="staff" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-violet-600" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                   Staff Performance
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {staffPerformance && staffPerformance.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {staffPerformance.map((staff, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg hover:shadow-md transition-shadow"
+                        className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg hover:shadow-md transition-shadow"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0">
                             {staff.waiter_name.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">{staff.waiter_name}</p>
-                            <p className="text-sm text-gray-500">
-                              {staff.total_orders} orders served
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">{staff.waiter_name}</p>
+                            <p className="text-xs sm:text-sm text-gray-500">
+                              {staff.total_orders} orders
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">
-                            ₹{(staff.total_sales || 0).toFixed(2)}
+                        <div className="text-right flex-shrink-0 ml-2">
+                          <p className="text-lg sm:text-2xl font-bold text-green-600 truncate">
+                            ₹{(staff.total_sales || 0).toFixed(0)}
                           </p>
-                          <p className="text-sm text-gray-500">
-                            Avg: ₹{(staff.avg_order_value || 0).toFixed(2)}
+                          <p className="text-[10px] sm:text-sm text-gray-500">
+                            Avg: ₹{(staff.avg_order_value || 0).toFixed(0)}
                           </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-gray-500 py-8">
+                  <p className="text-center text-gray-500 py-6 sm:py-8 text-sm">
                     No staff performance data available yet
                   </p>
                 )}
@@ -1619,34 +1639,34 @@ const ReportsPage = ({ user }) => {
           </TabsContent>
 
           {/* Peak Hours Tab */}
-          <TabsContent value="hours" className="space-y-6">
+          <TabsContent value="hours" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-violet-600" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                   Peak Hours Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {peakHours && peakHours.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {peakHours.map((hour, index) => {
                       const maxOrders = Math.max(...peakHours.map(h => h.order_count));
                       const percentage = (hour.order_count / maxOrders) * 100;
                       
                       return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-gray-900">
+                        <div key={index} className="space-y-1.5 sm:space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-gray-900 text-xs sm:text-sm">
                               {hour.hour}:00 - {hour.hour}:59
                             </span>
-                            <span className="text-sm text-gray-600">
-                              {hour.order_count || 0} orders • ₹{(hour.total_sales || 0).toFixed(2)}
+                            <span className="text-[10px] sm:text-sm text-gray-600">
+                              {hour.order_count || 0} • ₹{(hour.total_sales || 0).toFixed(0)}
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
                             <div
-                              className={`h-3 rounded-full ${
+                              className={`h-2 sm:h-3 rounded-full ${
                                 percentage > 80
                                   ? 'bg-gradient-to-r from-red-500 to-orange-600'
                                   : percentage > 50
@@ -1661,7 +1681,7 @@ const ReportsPage = ({ user }) => {
                     })}
                   </div>
                 ) : (
-                  <p className="text-center text-gray-500 py-8">
+                  <p className="text-center text-gray-500 py-6 sm:py-8 text-sm">
                     No peak hours data available yet
                   </p>
                 )}
@@ -1670,14 +1690,14 @@ const ReportsPage = ({ user }) => {
 
             {peakHours && peakHours.length > 0 && (
               <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-blue-600" />
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                     Insights
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     {(() => {
                       const sortedHours = [...peakHours].sort((a, b) => b.order_count - a.order_count);
                       const peakHour = sortedHours[0];
@@ -1685,22 +1705,22 @@ const ReportsPage = ({ user }) => {
                       
                       return (
                         <>
-                          <div className="p-3 bg-white rounded-lg">
-                            <p className="text-sm text-gray-600">Busiest Hour</p>
-                            <p className="text-lg font-bold text-blue-600">
-                              {peakHour.hour}:00 - {peakHour.hour}:59
+                          <div className="p-2 sm:p-3 bg-white rounded-lg">
+                            <p className="text-[10px] sm:text-sm text-gray-600">Busiest</p>
+                            <p className="text-sm sm:text-lg font-bold text-blue-600">
+                              {peakHour.hour}:00
                             </p>
-                            <p className="text-sm text-gray-500">
-                              {peakHour.order_count || 0} orders • ₹{(peakHour.total_sales || 0).toFixed(2)}
+                            <p className="text-[10px] sm:text-sm text-gray-500">
+                              {peakHour.order_count || 0} orders
                             </p>
                           </div>
-                          <div className="p-3 bg-white rounded-lg">
-                            <p className="text-sm text-gray-600">Slowest Hour</p>
-                            <p className="text-lg font-bold text-gray-600">
-                              {slowHour.hour}:00 - {slowHour.hour}:59
+                          <div className="p-2 sm:p-3 bg-white rounded-lg">
+                            <p className="text-[10px] sm:text-sm text-gray-600">Slowest</p>
+                            <p className="text-sm sm:text-lg font-bold text-gray-600">
+                              {slowHour.hour}:00
                             </p>
-                            <p className="text-sm text-gray-500">
-                              {slowHour.order_count || 0} orders • ₹{(slowHour.total_sales || 0).toFixed(2)}
+                            <p className="text-[10px] sm:text-sm text-gray-500">
+                              {slowHour.order_count || 0} orders
                             </p>
                           </div>
                         </>
@@ -1713,53 +1733,53 @@ const ReportsPage = ({ user }) => {
           </TabsContent>
 
           {/* Export Tab */}
-          <TabsContent value="export" className="space-y-6">
+          <TabsContent value="export" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5 text-violet-600" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                   Export Reports
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {/* Quick Date Presets - More Prominent */}
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Quick Date Presets - Mobile optimized grid */}
                   <div>
-                    <Label className="text-base font-semibold mb-3 block">Quick Select Date Range</Label>
-                    <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                    <Label className="text-sm sm:text-base font-semibold mb-2 sm:mb-3 block">Quick Select</Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                       {[
                         { key: 'today', label: 'Today', icon: '📅' },
                         { key: 'yesterday', label: 'Yesterday', icon: '⏪' },
-                        { key: 'week', label: 'Last 7 Days', icon: '📆' },
-                        { key: 'month', label: 'Last 30 Days', icon: '🗓️' },
+                        { key: 'week', label: '7 Days', icon: '📆' },
+                        { key: 'month', label: '30 Days', icon: '🗓️' },
                         { key: 'thisMonth', label: 'This Month', icon: '📊' },
                         { key: 'lastMonth', label: 'Last Month', icon: '📈' },
                       ].map(preset => (
                         <button
                           key={preset.key}
                           onClick={() => applyPreset(preset.key)}
-                          className={`p-3 rounded-xl border-2 transition-all text-center ${
+                          className={`p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all text-center ${
                             activePreset === preset.key
                               ? 'border-violet-500 bg-violet-50 text-violet-700 shadow-md'
                               : 'border-gray-200 hover:border-violet-300 hover:bg-violet-50'
                           }`}
                         >
-                          <span className="text-xl block mb-1">{preset.icon}</span>
-                          <span className="text-xs font-medium">{preset.label}</span>
+                          <span className="text-base sm:text-xl block mb-0.5 sm:mb-1">{preset.icon}</span>
+                          <span className="text-[10px] sm:text-xs font-medium leading-tight block">{preset.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Custom Date Range */}
-                  <div className="p-4 bg-gray-50 rounded-xl">
-                    <Label className="text-sm font-semibold mb-3 block flex items-center gap-2">
-                      <CalendarDays className="w-4 h-4" />
-                      Custom Date Range
+                  {/* Custom Date Range - Mobile optimized */}
+                  <div className="p-3 sm:p-4 bg-gray-50 rounded-lg sm:rounded-xl">
+                    <Label className="text-xs sm:text-sm font-semibold mb-2 sm:mb-3 block flex items-center gap-2">
+                      <CalendarDays className="w-3 h-3 sm:w-4 sm:h-4" />
+                      Custom Range
                     </Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
                       <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">Start Date</Label>
+                        <Label className="text-[10px] sm:text-xs text-gray-500 mb-1 block">Start</Label>
                         <input
                           type="date"
                           value={dateRange.start_date}
@@ -1767,12 +1787,12 @@ const ReportsPage = ({ user }) => {
                             setActivePreset('custom');
                             setDateRange({ ...dateRange, start_date: e.target.value });
                           }}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all text-base"
+                          className="w-full px-2 sm:px-4 py-2 sm:py-3 text-sm border-2 border-gray-200 rounded-lg sm:rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all"
                           data-testid="export-start-date"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">End Date</Label>
+                        <Label className="text-[10px] sm:text-xs text-gray-500 mb-1 block">End</Label>
                         <input
                           type="date"
                           value={dateRange.end_date}
@@ -1780,97 +1800,93 @@ const ReportsPage = ({ user }) => {
                             setActivePreset('custom');
                             setDateRange({ ...dateRange, end_date: e.target.value });
                           }}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all text-base"
+                          className="w-full px-2 sm:px-4 py-2 sm:py-3 text-sm border-2 border-gray-200 rounded-lg sm:rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all"
                           data-testid="export-end-date"
                         />
                       </div>
                     </div>
-                    <div className="mt-3 p-2 bg-violet-100 rounded-lg text-center">
-                      <span className="text-sm text-violet-700 font-medium">
-                        📅 Selected: {new Date(dateRange.start_date).toLocaleDateString()} → {new Date(dateRange.end_date).toLocaleDateString()}
+                    <div className="mt-2 sm:mt-3 p-1.5 sm:p-2 bg-violet-100 rounded-lg text-center">
+                      <span className="text-[10px] sm:text-sm text-violet-700 font-medium">
+                        📅 {new Date(dateRange.start_date).toLocaleDateString()} → {new Date(dateRange.end_date).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
 
-                  {/* Export Buttons */}
+                  {/* Export Buttons - Mobile optimized grid */}
                   <div>
-                    <Label className="text-base font-semibold mb-3 block">Export Format</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <Label className="text-sm sm:text-base font-semibold mb-2 sm:mb-3 block">Export Format</Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
                       <Button
                         onClick={handleExportCSV}
                         disabled={exportLoading}
-                        className="h-16 bg-gradient-to-r from-green-600 to-emerald-600 flex-col gap-1"
+                        className="h-14 sm:h-16 bg-gradient-to-r from-green-600 to-emerald-600 flex-col gap-0.5 sm:gap-1 px-2"
                         data-testid="export-csv-button"
                       >
-                        <FileSpreadsheet className="w-6 h-6" />
-                        <span className="text-sm">{exportLoading ? "..." : "CSV"}</span>
+                        <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[10px] sm:text-sm">{exportLoading ? "..." : "CSV"}</span>
                       </Button>
                       
                       <Button
                         onClick={handleExportExcel}
                         disabled={exportLoading}
-                        className="h-16 bg-gradient-to-r from-blue-600 to-cyan-600 flex-col gap-1"
+                        className="h-14 sm:h-16 bg-gradient-to-r from-blue-600 to-cyan-600 flex-col gap-0.5 sm:gap-1 px-2"
                         data-testid="export-excel-button"
                       >
-                        <FileSpreadsheet className="w-6 h-6" />
-                        <span className="text-sm">{exportLoading ? "..." : "Excel"}</span>
+                        <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[10px] sm:text-sm">{exportLoading ? "..." : "Excel"}</span>
                       </Button>
                       
                       <Button
                         onClick={handleExportPDF}
                         disabled={exportLoading}
-                        className="h-16 bg-gradient-to-r from-red-600 to-pink-600 flex-col gap-1"
+                        className="h-14 sm:h-16 bg-gradient-to-r from-red-600 to-pink-600 flex-col gap-0.5 sm:gap-1 px-2"
                         data-testid="export-pdf-button"
                       >
-                        <FileText className="w-6 h-6" />
-                        <span className="text-sm">{exportLoading ? "..." : "PDF"}</span>
+                        <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[10px] sm:text-sm">{exportLoading ? "..." : "PDF"}</span>
                       </Button>
                       
                       <Button
                         onClick={handleDetailedReport}
                         disabled={exportLoading}
-                        className="h-16 bg-gradient-to-r from-violet-600 to-purple-600 flex-col gap-1"
+                        className="h-14 sm:h-16 bg-gradient-to-r from-violet-600 to-purple-600 flex-col gap-0.5 sm:gap-1 px-2 col-span-2 sm:col-span-1"
                         data-testid="detailed-report-button"
                       >
-                        <Sparkles className="w-6 h-6" />
-                        <span className="text-sm">{exportLoading ? "..." : "Detailed"}</span>
+                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[10px] sm:text-sm">{exportLoading ? "..." : "Detailed"}</span>
                       </Button>
                       
                       <Button
                         onClick={handlePrintReport}
                         disabled={exportLoading}
                         variant="outline"
-                        className="h-16 flex-col gap-1 border-2"
+                        className="h-14 sm:h-16 flex-col gap-0.5 sm:gap-1 border-2 px-2 col-span-1 sm:col-span-1"
                         data-testid="print-report-button"
                       >
-                        <Printer className="w-6 h-6" />
-                        <span className="text-sm">Print</span>
+                        <Printer className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[10px] sm:text-sm">Print</span>
                       </Button>
                     </div>
                   </div>
 
-                  {/* Info Box */}
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
-                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-violet-600" />
-                      Export Options:
+                  {/* Info Box - Mobile optimized */}
+                  <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg sm:rounded-xl border border-blue-200">
+                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2 text-sm sm:text-base">
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-violet-600" />
+                      Export Options
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div className="p-2 bg-white rounded-lg border">
-                        <p className="font-semibold text-green-700">CSV / Excel</p>
-                        <p className="text-xs text-gray-600">Order data for spreadsheets</p>
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+                      <div className="p-1.5 sm:p-2 bg-white rounded-lg border">
+                        <p className="font-semibold text-green-700 text-[10px] sm:text-sm">CSV / Excel</p>
+                        <p className="text-[9px] sm:text-xs text-gray-600">Spreadsheet data</p>
                       </div>
-                      <div className="p-2 bg-white rounded-lg border">
-                        <p className="font-semibold text-red-700">PDF</p>
-                        <p className="text-xs text-gray-600">Basic sales report</p>
+                      <div className="p-1.5 sm:p-2 bg-white rounded-lg border">
+                        <p className="font-semibold text-red-700 text-[10px] sm:text-sm">PDF</p>
+                        <p className="text-[9px] sm:text-xs text-gray-600">Sales report</p>
                       </div>
-                      <div className="p-2 bg-white rounded-lg border border-violet-300 bg-violet-50">
-                        <p className="font-semibold text-violet-700">⭐ Detailed Report</p>
-                        <p className="text-xs text-gray-600">Full analytics: Best sellers, Staff, Peak hours, Categories</p>
-                      </div>
-                      <div className="p-2 bg-white rounded-lg border">
-                        <p className="font-semibold text-gray-700">Print</p>
-                        <p className="text-xs text-gray-600">Quick print view</p>
+                      <div className="p-1.5 sm:p-2 bg-white rounded-lg border border-violet-300 bg-violet-50 col-span-2">
+                        <p className="font-semibold text-violet-700 text-[10px] sm:text-sm">⭐ Detailed Report</p>
+                        <p className="text-[9px] sm:text-xs text-gray-600">Full analytics with charts</p>
                       </div>
                     </div>
                   </div>

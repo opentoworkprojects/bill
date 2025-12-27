@@ -75,6 +75,23 @@ html {
         max-width: 100%;
         overflow: hidden;
     }
+    
+    /* Reports page mobile tabs fix */
+    [role="tablist"] {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    
+    [role="tablist"]::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* Prevent text overflow in cards */
+    .truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
 
 /* Fix for iOS Safari scrolling issues */
