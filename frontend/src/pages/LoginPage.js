@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { 
   ChefHat, Mail, Lock, User, Eye, EyeOff, ArrowRight, Sparkles,
-  Shield, Zap, BarChart3, MessageCircle, Smartphone, Globe,
+  Shield, Zap, BarChart3, MessageCircle,
   CheckCircle, Star, TrendingUp, Users, Clock, CreditCard
 } from 'lucide-react';
 import GuidedDemo from '../components/GuidedDemo';
@@ -37,15 +37,15 @@ const LoginPage = ({ setUser }) => {
 
   const features = [
     { icon: Zap, title: 'Lightning Fast', desc: 'Process orders in seconds', color: 'from-yellow-400 to-orange-500' },
-    { icon: BarChart3, title: 'Smart Analytics', desc: 'AI-powered insights', color: 'from-blue-400 to-cyan-500' },
+    { icon: BarChart3, title: 'Smart Analytics', desc: 'Real-time insights', color: 'from-blue-400 to-cyan-500' },
     { icon: MessageCircle, title: 'WhatsApp Integration', desc: 'Auto customer updates', color: 'from-green-400 to-emerald-500' },
-    { icon: Shield, title: 'Secure & Reliable', desc: '99.9% uptime guarantee', color: 'from-purple-400 to-pink-500' },
+    { icon: Shield, title: 'Secure & Reliable', desc: 'Cloud-based system', color: 'from-purple-400 to-pink-500' },
   ];
 
   const stats = [
-    { value: '50K+', label: 'Orders Daily', icon: TrendingUp },
-    { value: '2000+', label: 'Restaurants', icon: Users },
-    { value: '99.9%', label: 'Uptime', icon: Clock },
+    { value: 'Free', label: '7-Day Trial', icon: TrendingUp },
+    { value: '24/7', label: 'Support', icon: Users },
+    { value: 'Cloud', label: 'Based', icon: Clock },
     { value: '₹0', label: 'Setup Fee', icon: CreditCard },
   ];
 
