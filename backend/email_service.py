@@ -1,6 +1,6 @@
 """
 Email Service for OTP delivery
-Supports multiple email providers: SMTP, SendGrid, Mailgun, AWS SES
+Supports multiple email providers: SMTP, SendGrid, Mailgun, AWS SES, Resend
 """
 
 import os
@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
 # Email Configuration
-EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "smtp")  # smtp, sendgrid, mailgun, ses
+EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "resend")  # smtp, sendgrid, mailgun, ses, resend
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER")
@@ -24,6 +24,7 @@ SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
 MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")
 AWS_SES_REGION = os.getenv("AWS_SES_REGION", "us-east-1")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 
 async def send_otp_email(email: str, otp: str, username: str = "User") -> dict:
@@ -173,7 +174,9 @@ async def send_otp_email(email: str, otp: str, username: str = "User") -> dict:
     """
     
     try:
-        if EMAIL_PROVIDER == "smtp":
+        if EMAIL_PROVIDER == "resend":
+            return await send_via_resend(email, subject, html_body, text_body)
+        elif EMAIL_PROVIDER == "smtp":
             return await send_via_smtp(email, subject, html_body, text_body)
         elif EMAIL_PROVIDER == "sendgrid":
             return await send_via_sendgrid(email, subject, html_body, text_body)
@@ -368,3 +371,47 @@ async def send_via_ses(email: str, subject: str, html_body: str, text_body: str)
         raise ValueError("boto3 not installed. Run: pip install boto3")
     except ClientError as e:
         raise ValueError(f"AWS SES error: {e.response['Error']['Message']}")
+
+
+async def send_via_resend(email: str, subject: str, html_body: str, text_body: str) -> dict:
+    """Send email via Resend API (Free - 100 emails/day)"""
+    if not RESEND_API_KEY:
+        raise ValueError("Resend API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        url = "https://api.resend.com/emails"
+        
+        payload = {
+            "from": f"{SMTP_FROM_NAME} <onboarding@resend.dev>",
+            "to": [email],
+            "subject": subject,
+            "html": html_body,
+            "text": text_body
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = await client.post(url, json=payload, headers=headers, timeout=30)
+            
+            if response.status_code == 200 or response.status_code == 201:
+                result = response.json()
+                print(f"✅ Email sent via Resend: {result}")
+                return {
+                    "success": True,
+                    "message": "Email sent via Resend",
+                    "provider": "resend",
+                    "id": result.get("id")
+                }
+            else:
+                error_msg = response.text
+                print(f"❌ Resend error: {response.status_code} - {error_msg}")
+                raise Exception(f"Resend API error: {error_msg}")
+                
+        except httpx.TimeoutException:
+            raise Exception("Resend API timeout")
+        except Exception as e:
+            raise Exception(f"Resend error: {str(e)}")

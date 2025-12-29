@@ -1,21 +1,58 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { API } from '../App';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { ChefHat, ArrowLeft, Mail, Phone, MessageCircle, HelpCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { ChefHat, ArrowLeft, Mail, Loader2, CheckCircle } from 'lucide-react';
 
 const ForgotPasswordPage = () => {
-  const supportEmail = "support@billbytekot.in";
-  const supportPhone = "+91 8310832669";
-  
-  const handleWhatsApp = () => {
-    const message = encodeURIComponent("Hi, I need help resetting my BillByteKOT password. My registered email is: ");
-    window.open(`https://wa.me/918310832669?text=${message}`, '_blank');
-  };
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const navigate = useNavigate();
 
-  const handleEmail = () => {
-    const subject = encodeURIComponent("Password Reset Request - BillByteKOT");
-    const body = encodeURIComponent("Hi Support Team,\n\nI need help resetting my password.\n\nMy registered email: \nMy username: \n\nThank you.");
-    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!email.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/auth/forgot-password`, { email: email.trim() });
+      
+      if (response.data.success) {
+        setOtpSent(true);
+        
+        // Show OTP in toast if returned (for testing when email not working)
+        if (response.data.otp) {
+          toast.success(`Your OTP is: ${response.data.otp}`, { duration: 10000 });
+        } else {
+          toast.success('OTP sent to your email!');
+        }
+        
+        // Navigate to reset password page with email and OTP
+        setTimeout(() => {
+          navigate('/reset-password', { 
+            state: { 
+              email: email.trim(),
+              otp: response.data.otp // Pass OTP if available
+            } 
+          });
+        }, 2000);
+      }
+    } catch (error) {
+      const message = error.response?.data?.detail || 'Failed to send OTP. Please try again.';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -32,78 +69,66 @@ const ForgotPasswordPage = () => {
           </Link>
           <CardTitle className="text-2xl">Forgot Password?</CardTitle>
           <CardDescription>
-            Contact our support team to reset your password
+            Enter your email address and we'll send you an OTP to reset your password
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Info Box */}
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-start gap-3">
-              <HelpCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-blue-800 font-medium">Need to reset your password?</p>
-                <p className="text-xs text-blue-700 mt-1">
-                  Please contact our support team with your registered email address. We'll help you reset your password within 24 hours.
-                </p>
+        <CardContent>
+          {otpSent ? (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">OTP Sent!</h3>
+              <p className="text-gray-600 mb-4">
+                Check your email <span className="font-medium">{email}</span> for the OTP code.
+              </p>
+              <p className="text-sm text-gray-500">Redirecting to reset password page...</p>
             </div>
-          </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your registered email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 h-12"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
 
-          {/* Contact Options */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-900">Contact Support:</h3>
-            
-            {/* WhatsApp - Primary */}
-            <Button
-              onClick={handleWhatsApp}
-              className="w-full h-12 bg-green-600 hover:bg-green-700 text-white"
-            >
-              <MessageCircle className="w-5 h-5 mr-2" />
-              WhatsApp Support (Fastest)
-            </Button>
-
-            {/* Email */}
-            <Button
-              onClick={handleEmail}
-              variant="outline"
-              className="w-full h-12"
-            >
-              <Mail className="w-5 h-5 mr-2" />
-              Email: {supportEmail}
-            </Button>
-
-            {/* Phone */}
-            <a href={`tel:${supportPhone.replace(/\s/g, '')}`} className="block">
               <Button
-                variant="outline"
-                className="w-full h-12"
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                disabled={loading}
               >
-                <Phone className="w-5 h-5 mr-2" />
-                Call: {supportPhone}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Sending OTP...
+                  </>
+                ) : (
+                  'Send OTP'
+                )}
               </Button>
-            </a>
-          </div>
 
-          {/* What to Include */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">When contacting support, please provide:</h3>
-            <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-              <li>Your registered email address</li>
-              <li>Your username</li>
-              <li>Restaurant/Business name</li>
-            </ul>
-          </div>
-
-          {/* Back to Login */}
-          <div className="text-center pt-2">
-            <Link
-              to="/login"
-              className="text-sm text-gray-600 hover:text-violet-600 flex items-center justify-center gap-1"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Login
-            </Link>
-          </div>
+              <div className="text-center pt-4">
+                <Link
+                  to="/login"
+                  className="text-sm text-gray-600 hover:text-violet-600 flex items-center justify-center gap-1"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Login
+                </Link>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
