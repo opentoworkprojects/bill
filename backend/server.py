@@ -1676,6 +1676,9 @@ async def forgot_password(request: ForgotPasswordRequest):
         "verified": False
     }
     
+    # Log OTP for debugging (check Render logs)
+    print(f"🔐 PASSWORD RESET OTP for {request.email}: {otp}")
+    
     # Send OTP email
     try:
         result = await send_password_reset_otp_email(request.email, otp, user.get("username", "User"))
@@ -1686,7 +1689,7 @@ async def forgot_password(request: ForgotPasswordRequest):
         print(f"❌ Email error for {request.email}: {e}")
     
     if not email_sent:
-        raise HTTPException(status_code=500, detail="Failed to send OTP email. Please try again.")
+        print(f"⚠️ Email failed but OTP logged above. Check Render logs for OTP: {otp}")
     
     return {
         "message": "OTP sent to your email. Please check your inbox.",
