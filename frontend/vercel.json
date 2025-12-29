@@ -8,14 +8,21 @@
     }
   ],
   "rewrites": [
-    { "source": "/.well-known/assetlinks.json", "destination": "https://restro-ai.onrender.com/.well-known/assetlinks.json" },
     { "source": "/api/(.*)", "destination": "https://restro-ai.onrender.com/api/$1" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/sitemap-blog.xml", "destination": "/sitemap-blog.xml" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!.well-known).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    },
     {
       "source": "/static/(.*)",
       "headers": [
