@@ -38,7 +38,7 @@ async def send_via_resend(email: str, subject: str, html_body: str, text_body: s
         url = "https://api.resend.com/emails"
         
         payload = {
-            "from": "BillByteKOT <noreply@billbytekot.in>",
+            "from": "BillByteKOT <shiv@billbytekot.in>",
             "to": [email],
             "subject": subject,
             "html": html_body,
