@@ -686,25 +686,272 @@ const SettingsPage = ({ user }) => {
                           >
                             🖨️ Print QR Code
                           </Button>
-                          
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
-                              const link = document.createElement('a');
-                              link.href = qrUrl;
-                              link.download = 'menu-qr-code.png';
-                              link.click();
-                              toast.success('QR Code downloaded!');
-                            }}
-                            className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                          >
-                            ⬇️ Download QR
-                          </Button>
                         </div>
                         
-                        <p className="text-xs text-orange-600">Print this QR code and display it in your restaurant for customers to scan and view your menu.</p>
+                        {/* Download Options */}
+                        <div className="pt-2 border-t">
+                          <p className="text-xs text-gray-500 mb-2">Download Designs:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {/* Classic Design */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const restaurantName = businessSettings.restaurant_name || 'Restaurant';
+                                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
+                                
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 600;
+                                canvas.height = 750;
+                                const ctx = canvas.getContext('2d');
+                                
+                                // Background
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillRect(0, 0, 600, 750);
+                                
+                                // Orange border
+                                ctx.strokeStyle = '#f97316';
+                                ctx.lineWidth = 8;
+                                ctx.roundRect(20, 20, 560, 710, 20);
+                                ctx.stroke();
+                                
+                                // Header
+                                ctx.fillStyle = '#ea580c';
+                                ctx.font = 'bold 36px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.fillText('🍽️ ' + restaurantName, 300, 80);
+                                
+                                // Load QR and draw
+                                const img = new Image();
+                                img.crossOrigin = 'anonymous';
+                                img.onload = () => {
+                                  ctx.drawImage(img, 100, 120, 400, 400);
+                                  
+                                  // Scan text
+                                  ctx.fillStyle = '#333333';
+                                  ctx.font = 'bold 28px Arial';
+                                  ctx.fillText('📱 Scan to View Menu', 300, 580);
+                                  
+                                  // Footer
+                                  ctx.fillStyle = '#999999';
+                                  ctx.font = '16px Arial';
+                                  ctx.fillText('Powered by BillByteKOT', 300, 700);
+                                  
+                                  // Download
+                                  const link = document.createElement('a');
+                                  link.download = `${restaurantName.replace(/[^a-z0-9]/gi, '_')}_menu_qr_classic.png`;
+                                  link.href = canvas.toDataURL('image/png');
+                                  link.click();
+                                  toast.success('Classic design downloaded!');
+                                };
+                                img.src = qrUrl;
+                              }}
+                              className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                            >
+                              🎨 Classic
+                            </Button>
+                            
+                            {/* Modern Design */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const restaurantName = businessSettings.restaurant_name || 'Restaurant';
+                                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
+                                
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 600;
+                                canvas.height = 800;
+                                const ctx = canvas.getContext('2d');
+                                
+                                // Gradient background
+                                const gradient = ctx.createLinearGradient(0, 0, 600, 800);
+                                gradient.addColorStop(0, '#7c3aed');
+                                gradient.addColorStop(1, '#a855f7');
+                                ctx.fillStyle = gradient;
+                                ctx.fillRect(0, 0, 600, 800);
+                                
+                                // White card
+                                ctx.fillStyle = '#ffffff';
+                                ctx.roundRect(40, 40, 520, 720, 30);
+                                ctx.fill();
+                                
+                                // Restaurant name
+                                ctx.fillStyle = '#7c3aed';
+                                ctx.font = 'bold 32px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.fillText(restaurantName, 300, 100);
+                                
+                                // Tagline
+                                ctx.fillStyle = '#666666';
+                                ctx.font = '18px Arial';
+                                ctx.fillText('Digital Menu', 300, 135);
+                                
+                                // Load QR
+                                const img = new Image();
+                                img.crossOrigin = 'anonymous';
+                                img.onload = () => {
+                                  // QR with rounded corners effect
+                                  ctx.save();
+                                  ctx.roundRect(100, 160, 400, 400, 20);
+                                  ctx.clip();
+                                  ctx.drawImage(img, 100, 160, 400, 400);
+                                  ctx.restore();
+                                  
+                                  // Scan instruction
+                                  ctx.fillStyle = '#333333';
+                                  ctx.font = 'bold 24px Arial';
+                                  ctx.fillText('📱 Scan for Menu', 300, 620);
+                                  
+                                  // Decorative line
+                                  ctx.strokeStyle = '#e5e7eb';
+                                  ctx.lineWidth = 2;
+                                  ctx.beginPath();
+                                  ctx.moveTo(150, 660);
+                                  ctx.lineTo(450, 660);
+                                  ctx.stroke();
+                                  
+                                  // Footer
+                                  ctx.fillStyle = '#9ca3af';
+                                  ctx.font = '14px Arial';
+                                  ctx.fillText('Powered by BillByteKOT', 300, 720);
+                                  
+                                  const link = document.createElement('a');
+                                  link.download = `${restaurantName.replace(/[^a-z0-9]/gi, '_')}_menu_qr_modern.png`;
+                                  link.href = canvas.toDataURL('image/png');
+                                  link.click();
+                                  toast.success('Modern design downloaded!');
+                                };
+                                img.src = qrUrl;
+                              }}
+                              className="text-violet-600 border-violet-300 hover:bg-violet-50"
+                            >
+                              ✨ Modern
+                            </Button>
+                            
+                            {/* Minimal Design */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const restaurantName = businessSettings.restaurant_name || 'Restaurant';
+                                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
+                                
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 500;
+                                canvas.height = 600;
+                                const ctx = canvas.getContext('2d');
+                                
+                                // White background
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillRect(0, 0, 500, 600);
+                                
+                                // Restaurant name
+                                ctx.fillStyle = '#111827';
+                                ctx.font = 'bold 28px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.fillText(restaurantName, 250, 50);
+                                
+                                // Load QR
+                                const img = new Image();
+                                img.crossOrigin = 'anonymous';
+                                img.onload = () => {
+                                  ctx.drawImage(img, 50, 80, 400, 400);
+                                  
+                                  // Simple text
+                                  ctx.fillStyle = '#374151';
+                                  ctx.font = '20px Arial';
+                                  ctx.fillText('Scan for Menu', 250, 530);
+                                  
+                                  ctx.fillStyle = '#9ca3af';
+                                  ctx.font = '12px Arial';
+                                  ctx.fillText('billbytekot.in', 250, 570);
+                                  
+                                  const link = document.createElement('a');
+                                  link.download = `${restaurantName.replace(/[^a-z0-9]/gi, '_')}_menu_qr_minimal.png`;
+                                  link.href = canvas.toDataURL('image/png');
+                                  link.click();
+                                  toast.success('Minimal design downloaded!');
+                                };
+                                img.src = qrUrl;
+                              }}
+                              className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                            >
+                              ⬜ Minimal
+                            </Button>
+                            
+                            {/* Table Tent Design */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const restaurantName = businessSettings.restaurant_name || 'Restaurant';
+                                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
+                                
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 400;
+                                canvas.height = 550;
+                                const ctx = canvas.getContext('2d');
+                                
+                                // Warm gradient
+                                const gradient = ctx.createLinearGradient(0, 0, 0, 550);
+                                gradient.addColorStop(0, '#fef3c7');
+                                gradient.addColorStop(1, '#fde68a');
+                                ctx.fillStyle = gradient;
+                                ctx.fillRect(0, 0, 400, 550);
+                                
+                                // Decorative top
+                                ctx.fillStyle = '#f59e0b';
+                                ctx.fillRect(0, 0, 400, 60);
+                                
+                                // Restaurant name on top
+                                ctx.fillStyle = '#ffffff';
+                                ctx.font = 'bold 22px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.fillText(restaurantName, 200, 40);
+                                
+                                // White QR area
+                                ctx.fillStyle = '#ffffff';
+                                ctx.roundRect(40, 80, 320, 360, 15);
+                                ctx.fill();
+                                
+                                // Load QR
+                                const img = new Image();
+                                img.crossOrigin = 'anonymous';
+                                img.onload = () => {
+                                  ctx.drawImage(img, 50, 90, 300, 300);
+                                  
+                                  // Scan text inside white area
+                                  ctx.fillStyle = '#92400e';
+                                  ctx.font = 'bold 18px Arial';
+                                  ctx.fillText('📱 Scan for Menu', 200, 420);
+                                  
+                                  // Bottom text
+                                  ctx.fillStyle = '#b45309';
+                                  ctx.font = '14px Arial';
+                                  ctx.fillText('View our full menu', 200, 480);
+                                  ctx.fillText('on your phone!', 200, 500);
+                                  
+                                  ctx.fillStyle = '#d97706';
+                                  ctx.font = '11px Arial';
+                                  ctx.fillText('Powered by BillByteKOT', 200, 535);
+                                  
+                                  const link = document.createElement('a');
+                                  link.download = `${restaurantName.replace(/[^a-z0-9]/gi, '_')}_menu_qr_table_tent.png`;
+                                  link.href = canvas.toDataURL('image/png');
+                                  link.click();
+                                  toast.success('Table tent design downloaded!');
+                                };
+                                img.src = qrUrl;
+                              }}
+                              className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                            >
+                              🏷️ Table Tent
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs text-orange-600">Print or download these QR codes and display in your restaurant for customers to scan and view your menu.</p>
                       </div>
                     </div>
                   </div>
