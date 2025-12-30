@@ -612,11 +612,101 @@ const SettingsPage = ({ user }) => {
 
                 {whatsappSettings.menu_display_enabled && !whatsappSettings.customer_self_order_enabled && (
                   <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <p className="text-sm font-medium text-orange-800 mb-2">📱 Menu QR Code Link:</p>
-                    <code className="block p-2 bg-white rounded text-xs break-all border">
-                      {window.location.origin}/menu/{user?.organization_id || user?.id}
-                    </code>
-                    <p className="text-xs text-orange-600 mt-2">Share this link or generate QR code for customers to view your menu</p>
+                    <p className="text-sm font-medium text-orange-800 mb-3">📱 Menu QR Code:</p>
+                    
+                    {/* QR Code Display */}
+                    <div className="flex flex-col md:flex-row gap-4 items-start">
+                      <div className="bg-white p-4 rounded-lg border shadow-sm" id="menu-qr-container">
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`}
+                          alt="Menu QR Code"
+                          className="w-48 h-48"
+                        />
+                        <p className="text-center text-sm font-medium mt-2 text-gray-700">Scan to View Menu</p>
+                      </div>
+                      
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Menu Link:</p>
+                          <code className="block p-2 bg-white rounded text-xs break-all border">
+                            {window.location.origin}/menu/{user?.organization_id || user?.id}
+                          </code>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const link = `${window.location.origin}/menu/${user?.organization_id || user?.id}`;
+                              navigator.clipboard.writeText(link);
+                              toast.success('Link copied to clipboard!');
+                            }}
+                            className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                          >
+                            📋 Copy Link
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const printWindow = window.open('', '_blank');
+                              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
+                              const restaurantName = businessSettings.restaurant_name || 'Restaurant';
+                              printWindow.document.write(`
+                                <html>
+                                <head>
+                                  <title>Menu QR Code - ${restaurantName}</title>
+                                  <style>
+                                    body { font-family: Arial, sans-serif; text-align: center; padding: 40px; }
+                                    .qr-container { display: inline-block; padding: 30px; border: 3px solid #f97316; border-radius: 16px; }
+                                    h1 { color: #ea580c; margin-bottom: 10px; }
+                                    h2 { color: #333; font-size: 24px; margin: 20px 0 10px; }
+                                    p { color: #666; margin: 5px 0; }
+                                    img { margin: 20px 0; }
+                                    .scan-text { font-size: 18px; font-weight: bold; color: #333; margin-top: 15px; }
+                                    @media print { body { padding: 20px; } }
+                                  </style>
+                                </head>
+                                <body>
+                                  <div class="qr-container">
+                                    <h1>🍽️ ${restaurantName}</h1>
+                                    <img src="${qrUrl}" alt="Menu QR Code" />
+                                    <p class="scan-text">📱 Scan to View Our Menu</p>
+                                    <p style="font-size: 12px; color: #999; margin-top: 20px;">Powered by BillByteKOT</p>
+                                  </div>
+                                  <script>setTimeout(() => { window.print(); }, 500);</script>
+                                </body>
+                                </html>
+                              `);
+                              printWindow.document.close();
+                            }}
+                            className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                          >
+                            🖨️ Print QR Code
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(`${window.location.origin}/menu/${user?.organization_id || user?.id}`)}`;
+                              const link = document.createElement('a');
+                              link.href = qrUrl;
+                              link.download = 'menu-qr-code.png';
+                              link.click();
+                              toast.success('QR Code downloaded!');
+                            }}
+                            className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                          >
+                            ⬇️ Download QR
+                          </Button>
+                        </div>
+                        
+                        <p className="text-xs text-orange-600">Print this QR code and display it in your restaurant for customers to scan and view your menu.</p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
