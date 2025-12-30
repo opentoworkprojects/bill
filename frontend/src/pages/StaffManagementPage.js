@@ -8,12 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Users, Shield, UserCheck } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, UserCheck, Mail, CheckCircle } from 'lucide-react';
 
 const StaffManagementPage = ({ user }) => {
   const [staff, setStaff] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [pendingStaffEmail, setPendingStaffEmail] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -64,8 +68,11 @@ const StaffManagementPage = ({ user }) => {
         
         await axios.put(`${API}/staff/${editingStaff.id}`, updateData);
         toast.success('Staff updated successfully!');
+        setDialogOpen(false);
+        fetchStaff();
+        resetForm();
       } else {
-        // Create new staff with all required fields
+        // Step 1: Request OTP for new staff
         const createData = {
           username: formData.username,
           email: formData.email,
@@ -76,17 +83,93 @@ const StaffManagementPage = ({ user }) => {
         if (formData.phone) createData.phone = formData.phone;
         if (formData.salary) createData.salary = parseFloat(formData.salary);
         
-        await axios.post(`${API}/staff/create`, createData);
-        toast.success('Staff member added successfully!');
+        await axios.post(`${API}/staff/create-request`, createData);
+        toast.success('📧 OTP sent to staff email for verification!');
+        setPendingStaffEmail(formData.email);
+        setShowOTPVerification(true);
       }
-      
-      setDialogOpen(false);
-      fetchStaff();
-      resetForm();
     } catch (error) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to save staff';
       toast.error(errorMsg);
       console.error('Staff save error:', error);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+    
+    setOtpLoading(true);
+    try {
+      await axios.post(`${API}/staff/verify-create`, {
+        email: pendingStaffEmail,
+        otp: otp
+      });
+      
+      toast.success('✅ Staff member verified and added successfully!');
+      setShowOTPVerification(false);
+      setDialogOpen(false);
+      setOtp('');
+      setPendingStaffEmail('');
+      fetchStaff();
+      resetForm();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid OTP');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleSkipVerification = async () => {
+    setOtpLoading(true);
+    try {
+      // Create staff directly without verification
+      const createData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role || 'waiter'
+      };
+      
+      if (formData.phone) createData.phone = formData.phone;
+      if (formData.salary) createData.salary = parseFloat(formData.salary);
+      
+      await axios.post(`${API}/staff/create`, createData);
+      toast.success('Staff member added (email not verified)');
+      setShowOTPVerification(false);
+      setDialogOpen(false);
+      setOtp('');
+      setPendingStaffEmail('');
+      fetchStaff();
+      resetForm();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create staff');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setOtpLoading(true);
+    try {
+      const createData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role || 'waiter'
+      };
+      
+      if (formData.phone) createData.phone = formData.phone;
+      if (formData.salary) createData.salary = parseFloat(formData.salary);
+      
+      await axios.post(`${API}/staff/create-request`, createData);
+      toast.success('📧 New OTP sent to staff email!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to resend OTP');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -111,6 +194,9 @@ const StaffManagementPage = ({ user }) => {
       salary: ''
     });
     setEditingStaff(null);
+    setShowOTPVerification(false);
+    setOtp('');
+    setPendingStaffEmail('');
   };
 
   const handleEdit = (member) => {
@@ -171,8 +257,58 @@ const StaffManagementPage = ({ user }) => {
             </DialogTrigger>
             <DialogContent data-testid="staff-dialog">
               <DialogHeader>
-                <DialogTitle>{editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}</DialogTitle>
+                <DialogTitle>{editingStaff ? 'Edit Staff Member' : showOTPVerification ? 'Verify Staff Email' : 'Add Staff Member'}</DialogTitle>
               </DialogHeader>
+              
+              {showOTPVerification ? (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Mail className="w-8 h-8 text-violet-600" />
+                    </div>
+                    <p className="text-gray-600">
+                      OTP sent to <span className="font-medium text-gray-900">{pendingStaffEmail}</span>
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">Ask the staff member to check their email and share the OTP</p>
+                  </div>
+                  
+                  <div>
+                    <Label>Enter 6-digit OTP</Label>
+                    <Input
+                      type="text"
+                      placeholder="Enter OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="text-center text-2xl tracking-widest font-mono mt-2"
+                      maxLength={6}
+                    />
+                  </div>
+                  
+                  <Button
+                    onClick={handleVerifyOTP}
+                    disabled={otpLoading || otp.length !== 6}
+                    className="w-full bg-gradient-to-r from-violet-600 to-purple-600"
+                  >
+                    {otpLoading ? 'Verifying...' : 'Verify & Add Staff'}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={handleResendOTP}
+                    disabled={otpLoading}
+                    className="w-full"
+                  >
+                    Resend OTP
+                  </Button>
+                  
+                  <button
+                    onClick={() => { setShowOTPVerification(false); setOtp(''); }}
+                    className="w-full text-sm text-violet-600 hover:text-violet-700"
+                  >
+                    ← Back to form
+                  </button>
+                </div>
+              ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -271,9 +407,10 @@ const StaffManagementPage = ({ user }) => {
                   <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" data-testid="save-staff-button">
                     {editingStaff ? 'Update Staff' : 'Add Staff'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); setShowOTPVerification(false); setOtp(''); }}>Cancel</Button>
                 </div>
               </form>
+              )}
             </DialogContent>
           </Dialog>
         </div>

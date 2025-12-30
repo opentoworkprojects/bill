@@ -83,7 +83,7 @@ def get_email_template(content: str, title: str = "BillByteKOT") -> str:
                 {content}
             </div>
             <div class="footer">
-                <p style="margin: 0;"><strong>BillByteKOT</strong> - Smart Restaurant Management<br>© 2025 FinVerge Technologies. All rights reserved.</p>
+                <p style="margin: 0;"><strong>BillByteKOT</strong> - Smart Restaurant Management<br>© 2025 BillByte Innovations. All rights reserved.</p>
                 <p style="margin: 10px 0 0 0; font-size: 12px;">This is an automated email. Please do not reply.</p>
             </div>
         </div>

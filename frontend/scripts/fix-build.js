@@ -88,7 +88,7 @@ const chromeFixedContent = `<!doctype html>
     <link rel="canonical" href="https://billbytekot.in/"/>
     
     <!-- Author and Publisher -->
-    <meta name="author" content="BillByteKOT - FinVerge Technologies"/>
+    <meta name="author" content="BillByteKOT - BillByte Innovations"/>
     <link rel="publisher" href="https://billbytekot.in/"/>
     
     <!-- Search Engine Optimization -->

@@ -690,7 +690,7 @@ async def send_registration_otp_email(email: str, otp: str, username: str = "Use
             <div class="footer">
                 <p style="margin: 0;">
                     <strong>BillByteKOT</strong> - Smart Restaurant Management<br>
-                    © 2025 FinVerge Technologies. All rights reserved.
+                    © 2025 BillByte Innovations. All rights reserved.
                 </p>
                 <p style="margin: 10px 0 0 0; font-size: 12px;">
                     This is an automated email. Please do not reply.
@@ -712,7 +712,7 @@ async def send_registration_otp_email(email: str, otp: str, username: str = "Use
     
     ---
     BillByteKOT - Smart Restaurant Management
-    © 2025 FinVerge Technologies
+    © 2025 BillByte Innovations
     """
     
     # Console mode for development
@@ -887,7 +887,7 @@ async def send_password_reset_email(email: str, reset_link: str, username: str =
             <div class="footer">
                 <p style="margin: 0;">
                     <strong>BillByteKOT</strong> - Smart Restaurant Management<br>
-                    © 2025 FinVerge Technologies. All rights reserved.
+                    © 2025 BillByte Innovations. All rights reserved.
                 </p>
                 <p style="margin: 10px 0 0 0; font-size: 12px;">
                     This is an automated email. Please do not reply.
@@ -912,7 +912,7 @@ async def send_password_reset_email(email: str, reset_link: str, username: str =
     
     ---
     BillByteKOT - Smart Restaurant Management
-    © 2025 FinVerge Technologies
+    © 2025 BillByte Innovations
     """
     
     # Console mode for development
@@ -942,6 +942,82 @@ async def send_password_reset_email(email: str, reset_link: str, username: str =
         print(f"Email service error: {e}")
         # Fallback to console
         print(f"\n[EMAIL FALLBACK] To: {email}, Link: {reset_link}")
+        return {"success": False, "message": str(e)}
+
+
+async def send_staff_verification_email(email: str, otp: str, staff_name: str, admin_name: str):
+    """Send OTP email for staff email verification"""
+    from email_service import send_email
+    
+    subject = "Verify Your Email - BillByteKOT Staff Account"
+    
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }}
+            .container {{ max-width: 500px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            .header {{ text-align: center; color: #7c3aed; }}
+            .otp-box {{ background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+            .info {{ background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }}
+            .footer {{ text-align: center; color: #666; font-size: 12px; margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🍽️ BillByteKOT</h1>
+                <p>Staff Account Verification</p>
+            </div>
+            
+            <h2>Hello {staff_name}! 👋</h2>
+            <p><strong>{admin_name}</strong> has invited you to join their restaurant team on BillByteKOT.</p>
+            <p>Please share this OTP with your admin to verify your email and complete your account setup:</p>
+            
+            <div class="otp-box">{otp}</div>
+            
+            <div class="info">
+                <p style="margin: 0;"><strong>⏰ Valid for 10 minutes</strong><br>
+                This OTP will expire in 10 minutes for security reasons.</p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">If you didn't expect this invitation, please ignore this email.</p>
+            
+            <div class="footer">
+                <p><strong>BillByteKOT</strong> - Smart Restaurant Management<br>
+                © 2025 BillByte Innovations. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    text_body = f"""
+    Hello {staff_name}!
+    
+    {admin_name} has invited you to join their restaurant team on BillByteKOT.
+    
+    Your verification OTP is: {otp}
+    
+    Please share this OTP with your admin to complete your account setup.
+    This OTP is valid for 10 minutes.
+    
+    If you didn't expect this invitation, please ignore this email.
+    
+    ---
+    BillByteKOT - Smart Restaurant Management
+    © 2025 BillByte Innovations
+    """
+    
+    # Log OTP for debugging
+    print(f"🔐 STAFF VERIFICATION OTP for {email}: {otp}")
+    
+    try:
+        result = await send_email(email, subject, html_body, text_body)
+        return result
+    except Exception as e:
+        print(f"Email service error: {e}")
         return {"success": False, "message": str(e)}
 
 
@@ -1770,6 +1846,8 @@ import string
 # In-memory storage for registration OTP
 registration_otp_storage = {}  # {email: {"otp": "123456", "expires": timestamp, "user_data": {...}}}
 
+# In-memory storage for staff OTP verification
+staff_otp_storage = {}  # {email: {"otp": "123456", "expires": timestamp, "staff_data": {...}, "admin_id": "..."}}
 
 class LeadCapture(BaseModel):
     name: str
@@ -1807,10 +1885,120 @@ async def capture_lead(lead: LeadCapture):
 
 
 # Staff Management
+@api_router.post("/staff/create-request")
+async def create_staff_request(
+    staff_data: StaffCreate, current_user: dict = Depends(get_current_user)
+):
+    """Step 1: Request staff creation - Send OTP to staff email"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can create staff")
+
+    # Check if username already exists
+    existing = await db.users.find_one({"username": staff_data.username}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Check if email already exists
+    existing_email = await db.users.find_one({"email": staff_data.email}, {"_id": 0})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Generate 6-digit OTP
+    otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    
+    # Get admin's organization_id
+    admin_org_id = current_user.get("organization_id") or current_user["id"]
+    
+    # Store OTP and staff data temporarily
+    email_lower = staff_data.email.lower().strip()
+    staff_otp_storage[email_lower] = {
+        "otp": otp,
+        "expires": expires_at,
+        "staff_data": {
+            "username": staff_data.username,
+            "email": staff_data.email,
+            "password": staff_data.password,
+            "role": staff_data.role,
+            "phone": staff_data.phone,
+            "salary": staff_data.salary
+        },
+        "admin_id": current_user["id"],
+        "organization_id": admin_org_id
+    }
+    
+    # Send OTP email
+    asyncio.create_task(send_staff_verification_email(staff_data.email, otp, staff_data.username, current_user.get("username", "Admin")))
+    
+    # Log OTP for debugging
+    print(f"🔐 STAFF VERIFICATION OTP for {staff_data.email}: {otp}")
+    
+    return {
+        "message": "OTP sent to staff email for verification",
+        "email": staff_data.email,
+        "success": True
+    }
+
+
+@api_router.post("/staff/verify-create")
+async def verify_staff_creation(
+    email: str = Body(...),
+    otp: str = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Step 2: Verify OTP and create staff"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can create staff")
+    
+    email_lower = email.lower().strip()
+    
+    # Get OTP data
+    otp_data = staff_otp_storage.get(email_lower)
+    if not otp_data:
+        raise HTTPException(status_code=400, detail="No verification request found. Please request OTP again.")
+    
+    # Check if OTP expired
+    if datetime.now(timezone.utc) > otp_data["expires"]:
+        del staff_otp_storage[email_lower]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    
+    # Verify OTP
+    if otp_data["otp"] != otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP. Please check and try again.")
+    
+    # Get staff data
+    staff_data = otp_data["staff_data"]
+    admin_org_id = otp_data["organization_id"]
+    
+    # Create user object
+    user_obj = User(
+        username=staff_data["username"],
+        email=staff_data["email"],
+        role=staff_data["role"],
+        organization_id=admin_org_id,
+    )
+
+    doc = user_obj.model_dump()
+    doc["password"] = hash_password(staff_data["password"])
+    doc["phone"] = staff_data["phone"]
+    doc["salary"] = staff_data["salary"]
+    doc["created_at"] = doc["created_at"].isoformat()
+    doc["email_verified"] = True
+    doc["email_verified_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.users.insert_one(doc)
+    
+    # Remove used OTP
+    del staff_otp_storage[email_lower]
+    
+    return {"message": "Staff member created successfully", "id": user_obj.id}
+
+
 @api_router.post("/staff/create")
 async def create_staff(
     staff_data: StaffCreate, current_user: dict = Depends(get_current_user)
 ):
+    """Direct staff creation without OTP (for skip verification)"""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admin can create staff")
 
@@ -1833,6 +2021,7 @@ async def create_staff(
     doc["phone"] = staff_data.phone
     doc["salary"] = staff_data.salary
     doc["created_at"] = doc["created_at"].isoformat()
+    doc["email_verified"] = False
 
     await db.users.insert_one(doc)
     return {"message": "Staff member created", "id": user_obj.id}
@@ -4756,7 +4945,7 @@ async def ai_support_chat(chat_request: AIChatRequest):
         "security": "Your data is 100% secure with bank-grade encryption, HTTPS, secure MongoDB storage, and 99.9% uptime. We never share your data with third parties.",
         "setup": "Quick setup: 1) Sign up (30 seconds), 2) Add your restaurant details, 3) Create menu items, 4) Add tables, 5) Start billing! Takes less than 5 minutes total.",
         "demo": "Try our interactive demo! Login and you'll see a guided walkthrough showing how to create orders, assign tables, and process payments. It's hands-on and takes just 2 minutes!",
-        "contact": "Contact us: Email: support@billbytekot.in or contact@billbytekot.in | Phone: +91-8310832669 (Mon-Sat, 9-6 PM IST) | Office: FinVerge Technologies, Bangalore, India. Or submit a ticket using the contact form!"
+        "contact": "Contact us: Email: support@billbytekot.in or contact@billbytekot.in | Phone: +91-8310832669 (Mon-Sat, 9-6 PM IST) | Office: BillByte Innovations, Bangalore, India. Or submit a ticket using the contact form!"
     }
     
     # Simple keyword matching for responses

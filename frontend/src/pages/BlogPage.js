@@ -460,7 +460,7 @@ const BlogPage = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>© 2025 BillByteKOT by FinVerge Technologies. All rights reserved.</p>
+            <p>© 2025 BillByteKOT by BillByte Innovations. All rights reserved.</p>
           </div>
         </div>
       </footer>

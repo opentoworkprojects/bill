@@ -990,7 +990,7 @@ BillByteKOT offers a complete KOT solution for just ₹999/year:
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12 mt-20">
         <div className="container mx-auto px-4 text-center">
-          <p className="text-gray-400">© 2025 BillByteKOT by FinVerge Technologies. All rights reserved.</p>
+          <p className="text-gray-400">© 2025 BillByteKOT by BillByte Innovations. All rights reserved.</p>
         </div>
       </footer>
     </div>

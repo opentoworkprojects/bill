@@ -58,7 +58,7 @@ export const OrganizationSchema = () => {
     "@type": "Organization",
     "@id": "https://billbytekot.in/#organization",
     "name": "BillByteKOT",
-    "legalName": "FinVerge Technologies",
+    "legalName": "BillByte Innovations",
     "url": "https://billbytekot.in/",
     "logo": {
       "@type": "ImageObject",

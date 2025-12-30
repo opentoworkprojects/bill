@@ -162,7 +162,7 @@ const Onboarding = ({ onComplete, onSkip }) => {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => window.open('https://calendly.com/finverge/BillByteKOT-demo', '_blank')}
+              onClick={() => window.open('https://calendly.com/billbytekot/demo', '_blank')}
               className="text-blue-600 border-blue-200 hover:bg-blue-50"
             >
               <Calendar className="w-4 h-4 mr-2" />
