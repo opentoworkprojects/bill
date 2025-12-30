@@ -4676,6 +4676,50 @@ async def get_public_menu(org_id: str):
     }
 
 
+@app.get("/api/public/view-menu/{org_id}")
+async def get_view_only_menu(org_id: str):
+    """Public endpoint for customers to VIEW menu only (no ordering) - QR code menu display"""
+    admin = await db.users.find_one({"id": org_id}, {"_id": 0})
+    if not admin:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    business = admin.get("business_settings", {})
+    
+    # Check if menu display is enabled (either self-order OR view-only menu)
+    if not business.get("customer_self_order_enabled") and not business.get("menu_display_enabled"):
+        raise HTTPException(status_code=403, detail="Menu display not enabled for this restaurant")
+    
+    # Get available menu items
+    items = await db.menu_items.find(
+        {"organization_id": org_id, "available": True},
+        {"_id": 0, "organization_id": 0}
+    ).to_list(1000)
+    
+    # Group by category
+    categories = {}
+    for item in items:
+        cat = item.get("category", "Other")
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(item)
+    
+    # Get currency symbol
+    currency_symbols = {"INR": "₹", "USD": "$", "EUR": "€", "GBP": "£", "AED": "د.إ", "PKR": "₨"}
+    currency_code = business.get("currency", "INR")
+    currency_symbol = currency_symbols.get(currency_code, "₹")
+    
+    return {
+        "restaurant_name": business.get("restaurant_name", "Restaurant"),
+        "tagline": business.get("tagline", ""),
+        "logo_url": business.get("logo_url", ""),
+        "currency": currency_code,
+        "currency_symbol": currency_symbol,
+        "categories": categories,
+        "items": items,
+        "allow_ordering": business.get("customer_self_order_enabled", False)
+    }
+
+
 @app.get("/api/public/tables/{org_id}")
 async def get_public_tables(org_id: str):
     """Public endpoint to get available tables for self-ordering"""

@@ -45,7 +45,8 @@ const SettingsPage = ({ user }) => {
     whatsapp_notify_on_preparing: true,
     whatsapp_notify_on_ready: true,
     whatsapp_notify_on_completed: true,
-    customer_self_order_enabled: false
+    customer_self_order_enabled: false,
+    menu_display_enabled: false
   });
   const [themes, setThemes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -159,7 +160,8 @@ const SettingsPage = ({ user }) => {
         whatsapp_notify_on_preparing: response.data.whatsapp_notify_on_preparing !== false,
         whatsapp_notify_on_ready: response.data.whatsapp_notify_on_ready !== false,
         whatsapp_notify_on_completed: response.data.whatsapp_notify_on_completed !== false,
-        customer_self_order_enabled: response.data.customer_self_order_enabled || false
+        customer_self_order_enabled: response.data.customer_self_order_enabled || false,
+        menu_display_enabled: response.data.menu_display_enabled || false
       });
     } catch (error) {
       console.error('Failed to fetch WhatsApp settings', error);
@@ -433,24 +435,6 @@ const SettingsPage = ({ user }) => {
             <MessageCircle className="w-4 h-4" />
             WhatsApp
           </button>
-          <button
-            onClick={() => setActiveTab('payment')}
-            className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'payment' ? 'bg-white shadow text-violet-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            Payment
-          </button>
-          <button
-            onClick={() => setActiveTab('campaigns')}
-            className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'campaigns' ? 'bg-white shadow text-orange-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Megaphone className="w-4 h-4" />
-            Campaigns
-          </button>
 
           {/* WhatsApp Pro tab - Only show in desktop app */}
           {(window.__ELECTRON__ || window.electronAPI) && (
@@ -609,6 +593,34 @@ const SettingsPage = ({ user }) => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Menu Display Only Option */}
+                <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div>
+                    <p className="font-medium text-orange-800">Enable QR Menu Display</p>
+                    <p className="text-sm text-orange-600">Customers can scan QR code to view menu only (no ordering)</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappSettings.menu_display_enabled}
+                      onChange={(e) => setWhatsappSettings({ ...whatsappSettings, menu_display_enabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                  </label>
+                </div>
+
+                {whatsappSettings.menu_display_enabled && !whatsappSettings.customer_self_order_enabled && (
+                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <p className="text-sm font-medium text-orange-800 mb-2">📱 Menu QR Code Link:</p>
+                    <code className="block p-2 bg-white rounded text-xs break-all border">
+                      {window.location.origin}/menu/{user?.organization_id || user?.id}
+                    </code>
+                    <p className="text-xs text-orange-600 mt-2">Share this link or generate QR code for customers to view your menu</p>
+                  </div>
+                )}
+
+                {/* Self-Ordering Option */}
                 <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div>
                     <p className="font-medium text-blue-800">Enable Customer Self-Ordering</p>
@@ -667,388 +679,6 @@ const SettingsPage = ({ user }) => {
             >
               {whatsappLoading ? 'Saving...' : 'Save All WhatsApp Settings'}
             </Button>
-          </div>
-        )}
-
-        {/* Payment Tab */}
-        {activeTab === 'payment' && (
-        <Card className="border-0 shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-violet-600" />
-              Razorpay Integration
-            </CardTitle>
-            <CardDescription>
-              Configure your own Razorpay account for accepting payments
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
-              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-900">
-                <p className="font-medium mb-1">How to get Razorpay Keys:</p>
-                <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>Sign up at <a href="https://dashboard.razorpay.com/signup" target="_blank" rel="noopener noreferrer" className="underline font-medium">dashboard.razorpay.com</a></li>
-                  <li>Complete KYC verification</li>
-                  <li>Go to Settings → API Keys</li>
-                  <li>Generate Test/Live keys and paste below</li>
-                </ol>
-              </div>
-            </div>
-
-            {razorpayConfigured && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                Razorpay is configured and active
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <Label>Razorpay Key ID</Label>
-                <Input
-                  placeholder="rzp_test_xxxxxxxxxxxxx"
-                  value={razorpaySettings.razorpay_key_id}
-                  onChange={(e) => setRazorpaySettings({ ...razorpaySettings, razorpay_key_id: e.target.value })}
-                  data-testid="razorpay-key-id-input"
-                />
-              </div>
-
-              <div>
-                <Label>Razorpay Key Secret</Label>
-                <Input
-                  type="password"
-                  placeholder="Enter secret key"
-                  value={razorpaySettings.razorpay_key_secret}
-                  onChange={(e) => setRazorpaySettings({ ...razorpaySettings, razorpay_key_secret: e.target.value })}
-                  data-testid="razorpay-key-secret-input"
-                />
-                <p className="text-xs text-gray-500 mt-1">Your secret key is encrypted and stored securely</p>
-              </div>
-
-              <Button
-                onClick={handleSaveRazorpay}
-                disabled={loading}
-                className="bg-gradient-to-r from-violet-600 to-purple-600"
-                data-testid="save-razorpay-button"
-              >
-                {loading ? 'Saving...' : 'Save Razorpay Settings'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        )}
-
-        {/* Campaigns Tab */}
-        {activeTab === 'campaigns' && (
-          <div className="space-y-6">
-            {/* Campaign Header */}
-            <Card className="border-0 shadow-xl bg-gradient-to-r from-orange-500 to-red-500 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/20 rounded-xl">
-                      <Megaphone className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold">Campaign Management</h2>
-                      <p className="text-orange-100">Create offers, discounts & promotional campaigns</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => setShowCampaignForm(true)}
-                    className="bg-white text-orange-600 hover:bg-orange-50"
-                  >
-                    <Plus className="w-4 h-4 mr-2" /> New Campaign
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Campaign Form */}
-            {showCampaignForm && (
-              <Card className="border-0 shadow-xl border-l-4 border-l-orange-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-orange-500" />
-                    {editingCampaign ? 'Edit Campaign' : 'Create New Campaign'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Campaign Title *</Label>
-                      <Input
-                        placeholder="e.g., New Year Special"
-                        value={campaignForm.title}
-                        onChange={(e) => setCampaignForm({ ...campaignForm, title: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Coupon Code *</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="e.g., NEWYEAR25"
-                          value={campaignForm.coupon_code}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, coupon_code: e.target.value.toUpperCase() })}
-                          className="uppercase"
-                        />
-                        <Button variant="outline" onClick={generateCouponCode} type="button">
-                          Generate
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>Description</Label>
-                      <Input
-                        placeholder="Brief description of the offer"
-                        value={campaignForm.description}
-                        onChange={(e) => setCampaignForm({ ...campaignForm, description: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Discount Settings */}
-                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <h4 className="font-semibold text-orange-800 mb-3">Discount Settings</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label>Discount Type</Label>
-                        <select
-                          value={campaignForm.discount_type}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, discount_type: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        >
-                          <option value="percentage">Percentage (%)</option>
-                          <option value="fixed">Fixed Amount (₹)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Discount Value</Label>
-                        <Input
-                          type="number"
-                          placeholder={campaignForm.discount_type === 'percentage' ? '10' : '100'}
-                          value={campaignForm.discount_value}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, discount_value: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Min Order Amount (₹)</Label>
-                        <Input
-                          type="number"
-                          placeholder="0 = No minimum"
-                          value={campaignForm.min_order_amount}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, min_order_amount: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Max Discount (₹)</Label>
-                        <Input
-                          type="number"
-                          placeholder="0 = No limit"
-                          value={campaignForm.max_discount}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, max_discount: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Date & Usage Settings */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Start Date</Label>
-                      <Input
-                        type="date"
-                        value={campaignForm.start_date}
-                        onChange={(e) => setCampaignForm({ ...campaignForm, start_date: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>End Date</Label>
-                      <Input
-                        type="date"
-                        value={campaignForm.end_date}
-                        onChange={(e) => setCampaignForm({ ...campaignForm, end_date: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Usage Limit</Label>
-                      <Input
-                        type="number"
-                        placeholder="0 = Unlimited"
-                        value={campaignForm.usage_limit}
-                        onChange={(e) => setCampaignForm({ ...campaignForm, usage_limit: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Banner Settings */}
-                  <div className="p-4 bg-violet-50 rounded-lg border border-violet-200">
-                    <h4 className="font-semibold text-violet-800 mb-3">Landing Page Banner</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Banner Text</Label>
-                        <Input
-                          placeholder="🎉 Use code NEWYEAR25 for 25% OFF!"
-                          value={campaignForm.banner_text}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, banner_text: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Banner Color</Label>
-                        <select
-                          value={campaignForm.banner_color}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, banner_color: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        >
-                          <option value="violet">Purple</option>
-                          <option value="orange">Orange</option>
-                          <option value="green">Green</option>
-                          <option value="blue">Blue</option>
-                          <option value="red">Red</option>
-                          <option value="pink">Pink</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={campaignForm.show_on_landing}
-                          onChange={(e) => setCampaignForm({ ...campaignForm, show_on_landing: e.target.checked })}
-                          className="w-4 h-4 text-violet-600 rounded"
-                        />
-                        <span className="text-sm">Show banner on landing page</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Preview */}
-                  {campaignForm.banner_text && campaignForm.show_on_landing && (
-                    <div className={`p-3 rounded-lg text-white text-center font-medium bg-gradient-to-r ${
-                      campaignForm.banner_color === 'violet' ? 'from-violet-600 to-purple-600' :
-                      campaignForm.banner_color === 'orange' ? 'from-orange-500 to-red-500' :
-                      campaignForm.banner_color === 'green' ? 'from-green-500 to-emerald-500' :
-                      campaignForm.banner_color === 'blue' ? 'from-blue-500 to-cyan-500' :
-                      campaignForm.banner_color === 'red' ? 'from-red-500 to-rose-500' :
-                      'from-pink-500 to-rose-500'
-                    }`}>
-                      {campaignForm.banner_text}
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleSaveCampaign}
-                      disabled={campaignLoading}
-                      className="bg-gradient-to-r from-orange-500 to-red-500"
-                    >
-                      {campaignLoading ? 'Saving...' : editingCampaign ? 'Update Campaign' : 'Create Campaign'}
-                    </Button>
-                    <Button variant="outline" onClick={resetCampaignForm}>
-                      Cancel
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Campaigns List */}
-            <Card className="border-0 shadow-xl">
-              <CardHeader>
-                <CardTitle>Active & Past Campaigns</CardTitle>
-                <CardDescription>Manage your promotional campaigns</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {campaigns.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Megaphone className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500 text-lg">No campaigns yet</p>
-                    <p className="text-gray-400 text-sm">Create your first campaign to attract more customers!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {campaigns.map((campaign) => (
-                      <div
-                        key={campaign.id}
-                        className={`p-4 rounded-lg border-2 transition-all ${
-                          campaign.is_active
-                            ? 'border-green-200 bg-green-50'
-                            : 'border-gray-200 bg-gray-50 opacity-60'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-bold text-lg">{campaign.title}</h4>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                campaign.is_active ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'
-                              }`}>
-                                {campaign.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            </div>
-                            <p className="text-gray-600 text-sm mb-2">{campaign.description}</p>
-                            <div className="flex flex-wrap gap-3 text-sm">
-                              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded font-mono font-bold">
-                                {campaign.coupon_code}
-                              </span>
-                              <span className="px-2 py-1 bg-violet-100 text-violet-700 rounded">
-                                {campaign.discount_type === 'percentage'
-                                  ? `${campaign.discount_value}% OFF`
-                                  : `₹${campaign.discount_value} OFF`}
-                              </span>
-                              {campaign.min_order_amount > 0 && (
-                                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                                  Min: ₹{campaign.min_order_amount}
-                                </span>
-                              )}
-                              {campaign.usage_limit > 0 && (
-                                <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded">
-                                  Used: {campaign.used_count || 0}/{campaign.usage_limit}
-                                </span>
-                              )}
-                            </div>
-                            {(campaign.start_date || campaign.end_date) && (
-                              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                                <Calendar className="w-3 h-3" />
-                                {campaign.start_date && <span>From: {new Date(campaign.start_date).toLocaleDateString()}</span>}
-                                {campaign.end_date && <span>To: {new Date(campaign.end_date).toLocaleDateString()}</span>}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleCampaign(campaign)}
-                              className={campaign.is_active ? 'text-orange-600' : 'text-green-600'}
-                            >
-                              {campaign.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => editCampaign(campaign)}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCampaign(campaign.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         )}
 

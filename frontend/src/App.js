@@ -33,6 +33,7 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import RestaurantBillingSoftwarePage from './pages/RestaurantBillingSoftwarePage';
 import KOTSoftwarePage from './pages/KOTSoftwarePage';
 import POSSoftwarePage from './pages/POSSoftwarePage';
+import PublicMenuPage from './pages/PublicMenuPage';
 import NotFound from './pages/NotFound';
 import DesktopInfo from './components/DesktopInfo';
 import { Toaster } from './components/ui/sonner';
@@ -713,6 +714,7 @@ function App() {
           <Route path="/pos-software-for-restaurants" element={<POSSoftwarePage />} />
           <Route path="/track/:trackingToken" element={<TrackOrderPage />} />
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
+          <Route path="/menu/:orgId" element={<PublicMenuPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
