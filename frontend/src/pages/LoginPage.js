@@ -18,6 +18,9 @@ const LoginPage = ({ setUser }) => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tempUser, setTempUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -93,21 +96,86 @@ const LoginPage = ({ setUser }) => {
           completeLogin(userData);
         }
       } else {
-        await axios.post(`${API}/auth/register`, {
+        // Step 1: Request OTP for registration
+        await axios.post(`${API}/auth/register-request`, {
           username: formData.username,
           email: formData.email,
           password: formData.password,
           role: 'admin'
         });
         
-        toast.success('🎉 Account created! Please login.');
-        setIsLogin(true);
-        setFormData({ ...formData, password: '' });
+        toast.success('📧 OTP sent to your email! Check your inbox.');
+        setShowOTPVerification(true);
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+    
+    setOtpLoading(true);
+    try {
+      await axios.post(`${API}/auth/verify-registration`, {
+        email: formData.email,
+        otp: otp
+      });
+      
+      toast.success('🎉 Email verified! Account created successfully. Please login.');
+      setShowOTPVerification(false);
+      setOtp('');
+      setIsLogin(true);
+      setFormData({ ...formData, password: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid OTP');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleSkipVerification = async () => {
+    setOtpLoading(true);
+    try {
+      // Register directly without OTP verification
+      await axios.post(`${API}/auth/register`, {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: 'admin'
+      });
+      
+      toast.success('🎉 Account created! Please login to continue.');
+      setShowOTPVerification(false);
+      setOtp('');
+      setIsLogin(true);
+      setFormData({ ...formData, password: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Registration failed');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setOtpLoading(true);
+    try {
+      await axios.post(`${API}/auth/register-request`, {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: 'admin'
+      });
+      toast.success('📧 New OTP sent to your email!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to resend OTP');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -130,6 +198,79 @@ const LoginPage = ({ setUser }) => {
     setShowOnboarding(false);
     completeLogin(tempUser);
   };
+
+  // OTP Verification Screen
+  if (showOTPVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-8 h-8 text-violet-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Verify Your Email</h2>
+            <p className="text-gray-500 mt-2">
+              We sent a 6-digit OTP to<br />
+              <span className="font-medium text-gray-700">{formData.email}</span>
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Enter OTP</Label>
+              <Input
+                type="text"
+                placeholder="Enter 6-digit OTP"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="h-12 text-center text-2xl tracking-widest font-mono mt-2"
+                maxLength={6}
+              />
+            </div>
+
+            <Button
+              onClick={handleVerifyOTP}
+              disabled={otpLoading || otp.length !== 6}
+              className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold rounded-xl"
+            >
+              {otpLoading ? 'Verifying...' : 'Verify & Create Account'}
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handleResendOTP}
+                disabled={otpLoading}
+                className="flex-1 h-10"
+              >
+                Resend OTP
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleSkipVerification}
+                disabled={otpLoading}
+                className="flex-1 h-10 text-gray-500 hover:text-gray-700"
+              >
+                Skip for now
+              </Button>
+            </div>
+
+            <p className="text-xs text-center text-gray-400 mt-4">
+              Didn't receive the email? Check your spam folder or click resend.
+              <br />You can also skip verification and verify later.
+            </p>
+
+            <button
+              onClick={() => { setShowOTPVerification(false); setOtp(''); }}
+              className="w-full text-sm text-violet-600 hover:text-violet-700 font-medium mt-2"
+            >
+              ← Back to Sign Up
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showOnboarding) {
     return (
