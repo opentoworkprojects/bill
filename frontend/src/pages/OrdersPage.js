@@ -281,7 +281,14 @@ const OrdersPage = ({ user }) => {
       notes: item.notes || ''
     }));
     setEditItems(items);
-    setEditOrderModal({ open: true, order });
+    setEditOrderModal({ 
+      open: true, 
+      order,
+      customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      payment_method: order.payment_method || 'cash',
+      is_credit: order.is_credit || false
+    });
     setActionMenuOpen(null);
   };
 
@@ -301,11 +308,15 @@ const OrdersPage = ({ user }) => {
         items: editItems,
         subtotal,
         tax,
-        total
+        total,
+        customer_name: editOrderModal.customer_name || '',
+        customer_phone: editOrderModal.customer_phone || '',
+        payment_method: editOrderModal.payment_method || 'cash',
+        is_credit: editOrderModal.is_credit || false
       });
 
       toast.success('Order updated!');
-      setEditOrderModal({ open: false, order: null });
+      setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false });
       setEditItems([]);
       await fetchOrders();
     } catch (error) {
@@ -1348,7 +1359,7 @@ const OrdersPage = ({ user }) => {
             <Card className="w-full max-w-2xl border-0 shadow-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
               <CardHeader className="relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6 flex-shrink-0">
                 <button
-                  onClick={() => { setEditOrderModal({ open: false, order: null }); setEditItems([]); }}
+                  onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false }); setEditItems([]); }}
                   className="absolute right-3 sm:right-4 top-3 sm:top-4 text-white/80 hover:text-white p-1"
                 >
                   <X className="w-5 h-5" />
@@ -1359,6 +1370,63 @@ const OrdersPage = ({ user }) => {
                 </CardTitle>
               </CardHeader>
               <div className="flex-1 overflow-hidden flex flex-col">
+                {/* Customer Details Section */}
+                <div className="p-3 sm:p-4 border-b bg-blue-50">
+                  <Label className="text-sm font-medium mb-2 block text-blue-800">Customer Details</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-gray-600">Customer Name</Label>
+                      <Input
+                        value={editOrderModal.customer_name || ''}
+                        onChange={(e) => setEditOrderModal({ ...editOrderModal, customer_name: e.target.value })}
+                        placeholder="Customer name"
+                        className="mt-1 h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600">Phone Number</Label>
+                      <Input
+                        value={editOrderModal.customer_phone || ''}
+                        onChange={(e) => setEditOrderModal({ ...editOrderModal, customer_phone: e.target.value })}
+                        placeholder="+91 9876543210"
+                        className="mt-1 h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Method Section */}
+                <div className="p-3 sm:p-4 border-b bg-green-50">
+                  <Label className="text-sm font-medium mb-2 block text-green-800">Payment</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {['cash', 'card', 'upi', 'credit'].map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setEditOrderModal({ 
+                          ...editOrderModal, 
+                          payment_method: method,
+                          is_credit: method === 'credit'
+                        })}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          editOrderModal.payment_method === method
+                            ? method === 'credit' 
+                              ? 'bg-orange-600 text-white' 
+                              : 'bg-green-600 text-white'
+                            : 'bg-white border hover:border-green-500'
+                        }`}
+                      >
+                        {method === 'cash' && '💵 Cash'}
+                        {method === 'card' && '💳 Card'}
+                        {method === 'upi' && '📱 UPI'}
+                        {method === 'credit' && '⚠️ Credit'}
+                      </button>
+                    ))}
+                  </div>
+                  {editOrderModal.is_credit && (
+                    <p className="text-xs text-orange-600 mt-2">⚠️ This bill will be marked as unpaid (credit)</p>
+                  )}
+                </div>
+
                 {/* Menu Items to Add */}
                 <div className="p-3 sm:p-4 border-b bg-gray-50">
                   <Label className="text-sm font-medium mb-2 block">Add Items</Label>
@@ -1442,7 +1510,7 @@ const OrdersPage = ({ user }) => {
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        onClick={() => { setEditOrderModal({ open: false, order: null }); setEditItems([]); }}
+                        onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false }); setEditItems([]); }}
                       >
                         Cancel
                       </Button>
