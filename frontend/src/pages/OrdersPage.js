@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Minus, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ShoppingCart, Clock, CheckCircle } from 'lucide-react';
+import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Minus, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
@@ -241,8 +241,21 @@ const OrdersPage = ({ user }) => {
   };
 
   const handleViewOrder = (order) => {
+    if (!order) return;
     setViewOrderModal({ open: true, order });
     setActionMenuOpen(null);
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-700',
+      preparing: 'bg-blue-100 text-blue-700',
+      ready: 'bg-green-100 text-green-700',
+      completed: 'bg-gray-100 text-gray-700',
+      cancelled: 'bg-red-100 text-red-700',
+      credit: 'bg-orange-100 text-orange-700'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
   };
 
   const handlePrintReceipt = (order) => {
@@ -352,6 +365,42 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Delete order failed:', error);
       toast.error(error.response?.data?.detail || 'Failed to delete order');
+    }
+  };
+
+  // Mark order as credit (unpaid)
+  const handleMarkAsCredit = async (order) => {
+    if (!order?.id) return;
+    try {
+      await axios.put(`${API}/orders/${order.id}`, {
+        ...order,
+        is_credit: true,
+        payment_method: 'credit'
+      });
+      toast.success('Marked as credit bill');
+      setActionMenuOpen(null);
+      await fetchOrders();
+    } catch (error) {
+      console.error('Mark as credit failed:', error);
+      toast.error(error.response?.data?.detail || 'Failed to mark as credit');
+    }
+  };
+
+  // Mark credit bill as paid
+  const handleMarkAsPaid = async (order) => {
+    if (!order?.id) return;
+    try {
+      await axios.put(`${API}/orders/${order.id}`, {
+        ...order,
+        is_credit: false,
+        payment_method: 'cash'
+      });
+      toast.success('Marked as paid');
+      setActionMenuOpen(null);
+      await fetchOrders();
+    } catch (error) {
+      console.error('Mark as paid failed:', error);
+      toast.error(error.response?.data?.detail || 'Failed to mark as paid');
     }
   };
 
@@ -955,10 +1004,19 @@ const OrdersPage = ({ user }) => {
                         )}
                         <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
                           {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                          {order.payment_method && <span className="ml-2">• Paid via {order.payment_method}</span>}
+                          {order.is_credit ? (
+                            <span className="ml-2 text-orange-600 font-medium">• ⚠️ Credit (Unpaid)</span>
+                          ) : order.payment_method && (
+                            <span className="ml-2">• Paid via {order.payment_method}</span>
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        {order.is_credit && (
+                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 shadow-sm">
+                            Credit
+                          </span>
+                        )}
                         <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap ${config.badge} shadow-sm`}>
                           {order.status}
                         </span>
@@ -989,6 +1047,24 @@ const OrdersPage = ({ user }) => {
                                     <Receipt className="w-4 h-4 text-gray-600" />
                                     <span>Print Receipt</span>
                                   </button>
+                                  {order.status === 'completed' && !order.is_credit && (
+                                    <button
+                                      onClick={() => handleMarkAsCredit(order)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-orange-50 flex items-center gap-2 text-orange-600 transition-colors"
+                                    >
+                                      <Wallet className="w-4 h-4" />
+                                      <span>Mark as Credit</span>
+                                    </button>
+                                  )}
+                                  {order.status === 'completed' && order.is_credit && (
+                                    <button
+                                      onClick={() => handleMarkAsPaid(order)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2 text-green-600 transition-colors"
+                                    >
+                                      <DollarSign className="w-4 h-4" />
+                                      <span>Mark as Paid</span>
+                                    </button>
+                                  )}
                                   {order.status === 'completed' && (
                                     <button
                                       onClick={() => handleEditOrder(order)}
@@ -1154,10 +1230,10 @@ const OrdersPage = ({ user }) => {
                 </button>
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg pr-8">
                   <Receipt className="w-5 h-5" />
-                  Order #{viewOrderModal.order.id.slice(0, 8)}
+                  Order #{(viewOrderModal.order?.id || '').slice(0, 8)}
                 </CardTitle>
                 <p className="text-violet-100 text-xs sm:text-sm mt-1">
-                  {new Date(viewOrderModal.order.created_at).toLocaleString()}
+                  {viewOrderModal.order?.created_at ? new Date(viewOrderModal.order.created_at).toLocaleString() : ''}
                 </p>
               </CardHeader>
               <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
@@ -1165,15 +1241,15 @@ const OrdersPage = ({ user }) => {
                 <div className="grid grid-cols-2 gap-2 sm:gap-4 text-sm">
                   <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
                     <p className="text-gray-500 text-xs">Table</p>
-                    <p className="font-bold text-base sm:text-lg">{viewOrderModal.order.table_number || 'Counter'}</p>
+                    <p className="font-bold text-base sm:text-lg">{viewOrderModal.order?.table_number || 'Counter'}</p>
                   </div>
                   <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
                     <p className="text-gray-500 text-xs">Status</p>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(viewOrderModal.order.status)}`}>
-                      {viewOrderModal.order.status}
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(viewOrderModal.order?.status)}`}>
+                      {viewOrderModal.order?.status || 'unknown'}
                     </span>
                   </div>
-                  {viewOrderModal.order.customer_name && (
+                  {viewOrderModal.order?.customer_name && (
                     <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
                       <p className="text-gray-500 text-xs">Customer</p>
                       <p className="font-bold text-sm truncate">{viewOrderModal.order.customer_name}</p>
@@ -1181,7 +1257,7 @@ const OrdersPage = ({ user }) => {
                   )}
                   <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
                     <p className="text-gray-500 text-xs">Server</p>
-                    <p className="font-bold text-sm truncate">{viewOrderModal.order.waiter_name}</p>
+                    <p className="font-bold text-sm truncate">{viewOrderModal.order?.waiter_name || 'N/A'}</p>
                   </div>
                 </div>
 
@@ -1189,13 +1265,13 @@ const OrdersPage = ({ user }) => {
                 <div className="border-t pt-3 sm:pt-4">
                   <h4 className="font-bold mb-2 sm:mb-3 text-sm sm:text-base">Order Items</h4>
                   <div className="space-y-1.5 sm:space-y-2 max-h-32 sm:max-h-40 overflow-y-auto">
-                    {viewOrderModal.order.items.map((item, idx) => (
+                    {(viewOrderModal.order?.items || []).map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 rounded-lg">
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm truncate">{item.quantity}× {item.name}</p>
                           {item.notes && <p className="text-xs text-orange-600 truncate">Note: {item.notes}</p>}
                         </div>
-                        <p className="font-bold text-sm ml-2 flex-shrink-0">₹{(item.price * item.quantity).toFixed(0)}</p>
+                        <p className="font-bold text-sm ml-2 flex-shrink-0">₹{((item.price || 0) * (item.quantity || 0)).toFixed(0)}</p>
                       </div>
                     ))}
                   </div>
@@ -1205,20 +1281,25 @@ const OrdersPage = ({ user }) => {
                 <div className="border-t pt-3 sm:pt-4 space-y-1 sm:space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
-                    <span className="font-medium">₹{viewOrderModal.order.subtotal.toFixed(0)}</span>
+                    <span className="font-medium">₹{(viewOrderModal.order?.subtotal || 0).toFixed(0)}</span>
                   </div>
                   <div className="flex justify-between text-xs sm:text-sm text-gray-600">
                     <span>Tax:</span>
-                    <span>₹{viewOrderModal.order.tax.toFixed(0)}</span>
+                    <span>₹{(viewOrderModal.order?.tax || 0).toFixed(0)}</span>
                   </div>
                   <div className="flex justify-between text-lg sm:text-xl font-bold text-violet-600 pt-2 border-t">
                     <span>Total:</span>
-                    <span>₹{viewOrderModal.order.total.toFixed(0)}</span>
+                    <span>₹{(viewOrderModal.order?.total || 0).toFixed(0)}</span>
                   </div>
-                  {viewOrderModal.order.payment_method && (
+                  {viewOrderModal.order?.payment_method && (
                     <div className="flex justify-between text-xs sm:text-sm">
                       <span className="text-gray-500">Payment:</span>
                       <span className="font-medium capitalize">{viewOrderModal.order.payment_method}</span>
+                    </div>
+                  )}
+                  {viewOrderModal.order?.is_credit && (
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="text-orange-600 font-medium">⚠️ Credit Bill (Unpaid)</span>
                     </div>
                   )}
                 </div>
@@ -1226,7 +1307,7 @@ const OrdersPage = ({ user }) => {
                 {/* Actions */}
                 <div className="flex gap-2 sm:gap-3 pt-3 sm:pt-4 border-t flex-wrap">
                   <Button
-                    onClick={() => handlePrintReceipt(viewOrderModal.order)}
+                    onClick={() => viewOrderModal.order && handlePrintReceipt(viewOrderModal.order)}
                     className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-sm h-9 sm:h-10"
                     disabled={printLoading}
                   >
@@ -1237,8 +1318,12 @@ const OrdersPage = ({ user }) => {
                     variant="outline"
                     className="border-green-500 text-green-600 hover:bg-green-50 text-sm h-9 sm:h-10"
                     onClick={() => {
+                      const orderId = viewOrderModal.order?.id;
+                      const customerName = viewOrderModal.order?.customer_name || 'Guest';
                       setViewOrderModal({ open: false, order: null });
-                      setWhatsappModal({ open: true, orderId: viewOrderModal.order.id, customerName: viewOrderModal.order.customer_name || 'Guest' });
+                      if (orderId) {
+                        setWhatsappModal({ open: true, orderId, customerName });
+                      }
                     }}
                   >
                     <MessageCircle className="w-4 h-4 sm:mr-1" />
