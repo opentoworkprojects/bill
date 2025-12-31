@@ -600,8 +600,17 @@ const OrdersPage = ({ user }) => {
           )}
         </div>
 
+        {/* Filter to show only live orders (not completed or cancelled) */}
         <div className="grid gap-3 sm:gap-4">
-          {orders.map((order) => {
+          {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).length === 0 && (
+            <Card className="p-8 text-center border-2 border-dashed border-gray-200">
+              <div className="text-4xl mb-3">🍽️</div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-1">No Active Orders</h3>
+              <p className="text-gray-500 text-sm">All tables are clear. Create a new order to get started!</p>
+              <p className="text-xs text-gray-400 mt-3">Completed & cancelled orders are in Reports → Bill History</p>
+            </Card>
+          )}
+          {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).map((order) => {
             const statusConfig = {
               pending: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: '⏳' },
               preparing: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', icon: '👨‍🍳' },

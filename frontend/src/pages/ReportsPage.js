@@ -1182,7 +1182,7 @@ const ReportsPage = ({ user }) => {
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           {/* Mobile-optimized scrollable tabs */}
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
-            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-6 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
+            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-7 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
               <TabsTrigger value="overview" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Overview</span>
                 <span className="sm:hidden">📊 Overview</span>
@@ -1202,6 +1202,10 @@ const ReportsPage = ({ user }) => {
               <TabsTrigger value="hours" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Peak Hours</span>
                 <span className="sm:hidden">⏰ Hours</span>
+              </TabsTrigger>
+              <TabsTrigger value="history" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Bill History</span>
+                <span className="sm:hidden">📜 History</span>
               </TabsTrigger>
               <TabsTrigger value="export" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Export</span>
@@ -1729,6 +1733,127 @@ const ReportsPage = ({ user }) => {
                   </div>
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
+
+          {/* Bill History Tab - Completed & Cancelled Orders */}
+          <TabsContent value="history" className="space-y-4 sm:space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
+                  Bill History
+                </CardTitle>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">Completed and cancelled orders from today</p>
+              </CardHeader>
+              <CardContent>
+                {dailyReport?.orders && dailyReport.orders.filter(o => ['completed', 'cancelled'].includes(o.status)).length > 0 ? (
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                    {dailyReport.orders
+                      .filter(order => ['completed', 'cancelled'].includes(order.status))
+                      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                      .map((order) => (
+                        <div
+                          key={order.id}
+                          className={`p-3 sm:p-4 rounded-xl border-2 ${
+                            order.status === 'completed' 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-red-50 border-red-200'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{order.status === 'completed' ? '✅' : '❌'}</span>
+                                <span className="font-bold text-sm sm:text-base">#{order.id.slice(0, 8)}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  order.status === 'completed' 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {order.status}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Table {order.table_number} • {order.waiter_name}
+                                {order.customer_name && ` • ${order.customer_name}`}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-lg sm:text-xl text-violet-600">₹{order.total.toFixed(0)}</p>
+                              <p className="text-[10px] sm:text-xs text-gray-400">
+                                {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="bg-white/60 rounded-lg p-2 mt-2">
+                            <div className="flex flex-wrap gap-1">
+                              {order.items.map((item, idx) => (
+                                <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                  {item.quantity}× {item.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {order.payment_method && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              💳 Paid via {order.payment_method}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-4xl mb-3">📋</div>
+                    <h3 className="text-lg font-semibold text-gray-700 mb-1">No Completed Bills Today</h3>
+                    <p className="text-gray-500 text-sm">Completed and cancelled orders will appear here</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Summary Stats for History */}
+            {dailyReport?.orders && dailyReport.orders.filter(o => o.status === 'completed').length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card className="border-0 shadow-md bg-green-50">
+                  <CardContent className="p-3 sm:p-4 text-center">
+                    <p className="text-xs text-gray-600">Completed</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-600">
+                      {dailyReport.orders.filter(o => o.status === 'completed').length}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-md bg-red-50">
+                  <CardContent className="p-3 sm:p-4 text-center">
+                    <p className="text-xs text-gray-600">Cancelled</p>
+                    <p className="text-xl sm:text-2xl font-bold text-red-600">
+                      {dailyReport.orders.filter(o => o.status === 'cancelled').length}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-md bg-violet-50">
+                  <CardContent className="p-3 sm:p-4 text-center">
+                    <p className="text-xs text-gray-600">Total Revenue</p>
+                    <p className="text-xl sm:text-2xl font-bold text-violet-600">
+                      ₹{dailyReport.orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total, 0).toFixed(0)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-md bg-blue-50">
+                  <CardContent className="p-3 sm:p-4 text-center">
+                    <p className="text-xs text-gray-600">Avg Bill</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                      ₹{(() => {
+                        const completed = dailyReport.orders.filter(o => o.status === 'completed');
+                        return completed.length > 0 
+                          ? (completed.reduce((sum, o) => sum + o.total, 0) / completed.length).toFixed(0)
+                          : '0';
+                      })()}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </TabsContent>
 
