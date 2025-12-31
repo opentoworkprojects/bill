@@ -580,7 +580,11 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        print(f"❌ Password verification exception: {str(e)}")
+        return False
 
 
 def create_access_token(data: dict) -> str:
@@ -1638,8 +1642,29 @@ async def login(credentials: UserLogin):
             {"_id": 0}
         )
     
-    if not user or not verify_password(credentials.password, user["password"]):
+    # Also try to find by email (users might login with email)
+    if not user:
+        user = await db.users.find_one(
+            {"email": {"$regex": f"^{credentials.username}$", "$options": "i"}}, 
+            {"_id": 0}
+        )
+    
+    if not user:
+        print(f"❌ Login failed: User not found for {credentials.username}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Verify password
+    try:
+        password_valid = verify_password(credentials.password, user["password"])
+    except Exception as e:
+        print(f"❌ Password verification error for {credentials.username}: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if not password_valid:
+        print(f"❌ Login failed: Invalid password for {credentials.username}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    print(f"✅ Login successful for {credentials.username}")
 
     token = create_access_token({"user_id": user["id"], "role": user["role"]})
     return {
@@ -1826,10 +1851,15 @@ async def reset_password(request: ResetPasswordRequest):
     
     # Update password
     hashed_password = hash_password(request.new_password)
+    print(f"🔐 Resetting password for {request.email}")
+    print(f"🔐 New password hash: {hashed_password[:20]}...")
+    
     await db.users.update_one(
         {"email": request.email},
         {"$set": {"password": hashed_password}}
     )
+    
+    print(f"✅ Password reset successful for {request.email}")
     
     # Remove used OTP
     del reset_tokens[request.email]
