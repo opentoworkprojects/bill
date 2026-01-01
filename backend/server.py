@@ -1030,6 +1030,24 @@ async def send_staff_verification_email(email: str, otp: str, staff_name: str, a
         return {"success": False, "message": str(e)}
 
 
+def get_secure_org_id(current_user: dict) -> str:
+    """
+    SECURITY CRITICAL: Get organization_id securely.
+    - For admin users: returns their own id
+    - For staff users: returns their organization_id (must be set)
+    - Raises exception if organization_id is missing for staff
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        # This should never happen if get_current_user is working correctly
+        print(f"🚨 SECURITY: User {current_user.get('email')} has no organization_id!")
+        raise HTTPException(
+            status_code=403, 
+            detail="Organization not configured. Contact support."
+        )
+    return org_id
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -1053,9 +1071,19 @@ async def get_current_user(
         user.setdefault("razorpay_key_id", None)
         user.setdefault("razorpay_key_secret", None)
         user.setdefault("subscription_expires_at", None)
-        user.setdefault(
-            "organization_id", user["id"] if user["role"] == "admin" else None
-        )
+        
+        # CRITICAL: Ensure organization_id is properly set
+        # For admin users: organization_id = their own id
+        # For staff users: organization_id MUST be set from database (linked to admin)
+        if user["role"] == "admin":
+            user["organization_id"] = user["id"]
+        elif not user.get("organization_id"):
+            # Staff without organization_id is a security risk - deny access
+            print(f"❌ SECURITY: Staff user {user['email']} has no organization_id!")
+            raise HTTPException(
+                status_code=403, 
+                detail="Staff account not properly linked to organization. Contact your admin."
+            )
 
         return user
     except jwt.ExpiredSignatureError:
@@ -1064,6 +1092,8 @@ async def get_current_user(
     except jwt.exceptions.InvalidTokenError as e:
         print(f"❌ JWT Error: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid token")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Auth error: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
@@ -2269,8 +2299,25 @@ async def update_business_settings(
 
 @api_router.get("/business/settings")
 async def get_business_settings(current_user: dict = Depends(get_current_user)):
+    # For staff users, get business settings from their admin
+    business_settings = current_user.get("business_settings")
+    
+    if current_user.get("role") in ["waiter", "cashier", "kitchen", "staff"]:
+        org_id = current_user.get("organization_id")
+        if org_id:
+            admin_user = await db.users.find_one(
+                {"id": org_id, "role": "admin"}, 
+                {"_id": 0, "business_settings": 1, "setup_completed": 1}
+            )
+            if admin_user:
+                business_settings = admin_user.get("business_settings")
+                return {
+                    "business_settings": business_settings,
+                    "setup_completed": admin_user.get("setup_completed", False),
+                }
+    
     return {
-        "business_settings": current_user.get("business_settings"),
+        "business_settings": business_settings,
         "setup_completed": current_user.get("setup_completed", False),
     }
 
@@ -2851,7 +2898,7 @@ async def create_menu_item(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     menu_obj = MenuItem(**item.model_dump(), organization_id=user_org_id)
     doc = menu_obj.model_dump()
@@ -2863,7 +2910,7 @@ async def create_menu_item(
 @api_router.get("/menu", response_model=List[MenuItem])
 async def get_menu(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     items = await db.menu_items.find(
         {"organization_id": user_org_id}, {"_id": 0}
@@ -2877,7 +2924,7 @@ async def get_menu(current_user: dict = Depends(get_current_user)):
 @api_router.get("/menu/{item_id}", response_model=MenuItem)
 async def get_menu_item(item_id: str, current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     item = await db.menu_items.find_one(
         {"id": item_id, "organization_id": user_org_id}, {"_id": 0}
@@ -2897,7 +2944,7 @@ async def update_menu_item(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     existing = await db.menu_items.find_one(
         {"id": item_id, "organization_id": user_org_id}, {"_id": 0}
@@ -2926,7 +2973,7 @@ async def delete_menu_item(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     result = await db.menu_items.delete_one(
         {"id": item_id, "organization_id": user_org_id}
@@ -2945,7 +2992,7 @@ async def create_table(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     table_obj = Table(**table.model_dump(), organization_id=user_org_id)
     await db.tables.insert_one(table_obj.model_dump())
@@ -2955,7 +3002,7 @@ async def create_table(
 @api_router.get("/tables", response_model=List[Table])
 async def get_tables(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     tables = await db.tables.find({"organization_id": user_org_id}, {"_id": 0}).to_list(
         1000
@@ -2968,7 +3015,7 @@ async def update_table(
     table_id: str, table: TableCreate, current_user: dict = Depends(get_current_user)
 ):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     existing = await db.tables.find_one(
         {"id": table_id, "organization_id": user_org_id}, {"_id": 0}
@@ -3094,7 +3141,7 @@ async def create_order(
         )
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     # Get business settings - handle None case
     business = current_user.get("business_settings") or {}
@@ -3164,8 +3211,13 @@ async def create_order(
 async def get_orders(
     status: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
-    # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    # Get user's organization_id - CRITICAL for data isolation
+    user_org_id = current_user.get("organization_id")
+    
+    # SECURITY: Ensure organization_id is valid
+    if not user_org_id:
+        print(f"🚨 SECURITY ALERT: User {current_user.get('email')} attempted to fetch orders without organization_id!")
+        raise HTTPException(status_code=403, detail="Organization not configured. Contact support.")
 
     query = {"organization_id": user_org_id}
     if status:
@@ -3186,7 +3238,7 @@ async def get_orders(
 @api_router.get("/orders/{order_id}", response_model=Order)
 async def get_order(order_id: str, current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
@@ -3208,7 +3260,7 @@ async def update_order_status(
     current_user: dict = Depends(get_current_user)
 ):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
@@ -3267,7 +3319,7 @@ async def update_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Update an existing order"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     # Verify order belongs to user's organization
     existing_order = await db.orders.find_one(
@@ -3353,7 +3405,7 @@ async def cancel_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Cancel an order"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}
@@ -3395,7 +3447,7 @@ async def delete_order(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admin can delete orders")
     
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}
@@ -3425,7 +3477,7 @@ async def create_payment_order(
     payment_data: PaymentCreate, current_user: dict = Depends(get_current_user)
 ):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     order = await db.orders.find_one(
         {"id": payment_data.order_id, "organization_id": user_org_id}, {"_id": 0}
@@ -3502,7 +3554,7 @@ async def verify_payment(
     current_user: dict = Depends(get_current_user),
 ):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     payment = await db.payments.find_one(
         {"razorpay_order_id": razorpay_order_id, "organization_id": user_org_id},
@@ -3528,7 +3580,7 @@ async def verify_payment(
 @api_router.get("/payments")
 async def get_payments(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     payments = await db.payments.find(
         {"organization_id": user_org_id}, {"_id": 0}
@@ -3548,7 +3600,7 @@ async def create_inventory_item(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     inv_obj = InventoryItem(**item.model_dump(), organization_id=user_org_id)
     doc = inv_obj.model_dump()
@@ -3560,7 +3612,7 @@ async def create_inventory_item(
 @api_router.get("/inventory", response_model=List[InventoryItem])
 async def get_inventory(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     # Optimized query with projection to reduce data transfer
     items = await db.inventory.find(
@@ -3584,7 +3636,7 @@ async def update_inventory_item(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     update_data = item.model_dump()
     update_data["last_updated"] = datetime.now(timezone.utc).isoformat()
@@ -3603,7 +3655,7 @@ async def update_inventory_item(
 @api_router.get("/inventory/low-stock")
 async def get_low_stock(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     # Optimized: Use database aggregation to filter low stock items directly
     pipeline = [
@@ -3629,7 +3681,7 @@ async def delete_inventory_item(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     result = await db.inventory.delete_one(
         {"id": item_id, "organization_id": user_org_id}
@@ -3669,7 +3721,7 @@ class Supplier(BaseModel):
 
 @api_router.get("/inventory/suppliers", response_model=List[Supplier])
 async def get_suppliers(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     suppliers = await db.suppliers.find(
         {"organization_id": user_org_id}, {"_id": 0}
     ).to_list(1000)
@@ -3683,7 +3735,7 @@ async def create_supplier(
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     supplier_obj = Supplier(**supplier.model_dump(), organization_id=user_org_id)
     doc = supplier_obj.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
@@ -3700,7 +3752,7 @@ async def update_supplier(
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     update_data = supplier.model_dump()
 
     await db.suppliers.update_one(
@@ -3730,7 +3782,7 @@ class Category(BaseModel):
 
 @api_router.get("/inventory/categories", response_model=List[Category])
 async def get_categories(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     categories = await db.categories.find(
         {"organization_id": user_org_id}, {"_id": 0}
     ).to_list(1000)
@@ -3744,7 +3796,7 @@ async def create_category(
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     category_obj = Category(**category.model_dump(), organization_id=user_org_id)
     doc = category_obj.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
@@ -3761,7 +3813,7 @@ async def update_category(
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     update_data = category.model_dump()
 
     await db.categories.update_one(
@@ -3797,7 +3849,7 @@ class StockMovement(BaseModel):
 
 @api_router.get("/inventory/movements", response_model=List[StockMovement])
 async def get_stock_movements(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     movements = await db.stock_movements.find(
         {"organization_id": user_org_id}, {"_id": 0}
     ).sort("created_at", -1).limit(100).to_list(100)
@@ -3811,7 +3863,7 @@ async def create_stock_movement(
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     # Update inventory quantity based on movement
     inventory_item = await db.inventory.find_one(
@@ -3846,7 +3898,7 @@ async def create_stock_movement(
 
 @api_router.get("/inventory/analytics")
 async def get_inventory_analytics(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     # Get all inventory items
     items = await db.inventory.find(
@@ -3915,7 +3967,7 @@ async def ai_chat(message: ChatMessage):
 @api_router.post("/ai/recommendations")
 async def get_recommendations(current_user: dict = Depends(get_current_user)):
     try:
-        user_org_id = current_user.get("organization_id") or current_user["id"]
+        user_org_id = get_secure_org_id(current_user)
         
         orders = await db.orders.find({
             "status": "completed",
@@ -3965,7 +4017,7 @@ async def get_recommendations(current_user: dict = Depends(get_current_user)):
 @api_router.post("/ai/sales-forecast")
 async def sales_forecast(current_user: dict = Depends(get_current_user)):
     try:
-        user_org_id = current_user.get("organization_id") or current_user["id"]
+        user_org_id = get_secure_org_id(current_user)
         
         orders = await db.orders.find({
             "status": "completed",
@@ -4029,7 +4081,7 @@ async def sales_forecast(current_user: dict = Depends(get_current_user)):
 # Reports
 @api_router.get("/reports/daily")
 async def daily_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     today = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -4083,7 +4135,7 @@ async def export_report(
     end_date: str,
     current_user: dict = Depends(get_current_user)
 ):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     # Parse dates and make them timezone-aware (UTC)
     start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
     end = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
@@ -4117,7 +4169,7 @@ async def export_report(
 
 @api_router.get("/reports/weekly")
 async def weekly_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     
     # Optimized: Use database aggregation instead of filtering in Python
@@ -4160,7 +4212,7 @@ async def weekly_report(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/reports/monthly")
 async def monthly_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     month_ago = datetime.now(timezone.utc) - timedelta(days=30)
     
     # Optimized: Use database aggregation instead of filtering in Python
@@ -4203,7 +4255,7 @@ async def monthly_report(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/reports/best-selling")
 async def best_selling_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     orders = await db.orders.find({
         "status": "completed",
@@ -4249,7 +4301,7 @@ async def best_selling_report(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/reports/staff-performance")
 async def staff_performance_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     orders = await db.orders.find({
         "status": "completed",
@@ -4279,7 +4331,7 @@ async def staff_performance_report(current_user: dict = Depends(get_current_user
 
 @api_router.get("/reports/peak-hours")
 async def peak_hours_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     orders = await db.orders.find({
         "status": "completed",
@@ -4309,7 +4361,7 @@ async def peak_hours_report(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/reports/category-analysis")
 async def category_analysis_report(current_user: dict = Depends(get_current_user)):
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     orders = await db.orders.find({
         "status": "completed",
@@ -4376,7 +4428,7 @@ async def print_bill(
     current_user: dict = Depends(get_current_user),
 ):
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
@@ -4428,7 +4480,7 @@ async def send_whatsapp_receipt(
 ):
     """Generate WhatsApp share link for order receipt"""
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
@@ -4610,7 +4662,7 @@ async def send_receipt_via_cloud_api(
         )
     
     # Get user's organization_id
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
 
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
@@ -4662,7 +4714,7 @@ async def send_status_via_cloud_api(
     frontend_url = business.get("frontend_url", "")
     
     # Get order for tracking URL
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id},
         {"_id": 0, "tracking_token": 1}
@@ -5745,7 +5797,7 @@ async def bulk_upload_menu(
         import csv
         reader = csv.DictReader(decoded)
         
-        user_org_id = current_user.get("organization_id") or current_user["id"]
+        user_org_id = get_secure_org_id(current_user)
         items_added = 0
         errors = []
         
@@ -5806,7 +5858,7 @@ async def bulk_upload_inventory(
         import csv
         reader = csv.DictReader(decoded)
         
-        user_org_id = current_user.get("organization_id") or current_user["id"]
+        user_org_id = get_secure_org_id(current_user)
         items_added = 0
         errors = []
         
@@ -5900,7 +5952,7 @@ async def export_orders_to_excel(
     current_user: dict = Depends(get_current_user)
 ):
     """Export all orders to Excel file with sequential invoice numbers"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     # Build query
     query = {"organization_id": user_org_id}
@@ -6071,7 +6123,7 @@ async def create_customer(
     current_user: dict = Depends(get_current_user)
 ):
     """Create or update customer record"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     # Check if customer already exists by phone
     existing = await db.customers.find_one({
@@ -6119,7 +6171,7 @@ async def get_customers(
     current_user: dict = Depends(get_current_user)
 ):
     """Get all customers"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     query = {"organization_id": user_org_id}
     
@@ -6142,7 +6194,7 @@ async def get_customer(
     current_user: dict = Depends(get_current_user)
 ):
     """Get customer details with order history"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     customer = await db.customers.find_one({
         "id": customer_id,
@@ -6189,7 +6241,7 @@ async def get_customer_by_phone(
     current_user: dict = Depends(get_current_user)
 ):
     """Get customer by phone number"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     customer = await db.customers.find_one({
         "phone": phone,
@@ -6209,7 +6261,7 @@ async def update_customer(
     current_user: dict = Depends(get_current_user)
 ):
     """Update customer details"""
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     result = await db.customers.update_one(
         {"id": customer_id, "organization_id": user_org_id},
@@ -6240,7 +6292,7 @@ async def delete_customer(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admin can delete customers")
     
-    user_org_id = current_user.get("organization_id") or current_user["id"]
+    user_org_id = get_secure_org_id(current_user)
     
     result = await db.customers.delete_one({
         "id": customer_id,
