@@ -483,6 +483,11 @@ class Order(BaseModel):
     tracking_token: Optional[str] = None  # For customer live tracking
     order_type: Optional[str] = "dine_in"  # dine_in, takeaway, delivery
     organization_id: Optional[str] = None
+    # Payment fields
+    payment_method: Optional[str] = "cash"
+    is_credit: bool = False
+    payment_received: float = 0
+    balance_amount: float = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -1070,7 +1075,24 @@ async def check_subscription(user: dict):
     - Trial: 7 days from account creation + any extension days
     - After trial: Must have active paid subscription
     - No bill count limit during trial
+    - Staff users inherit subscription from their organization admin
     """
+    
+    # For staff users, check the organization admin's subscription
+    if user.get("role") in ["waiter", "cashier", "kitchen", "staff"]:
+        org_id = user.get("organization_id")
+        if org_id:
+            # Find the admin of this organization
+            admin_user = await db.users.find_one(
+                {"id": org_id, "role": "admin"}, 
+                {"_id": 0, "subscription_active": 1, "subscription_expires_at": 1, "created_at": 1, "trial_extension_days": 1}
+            )
+            if admin_user:
+                # Use admin's subscription status
+                user = admin_user
+            else:
+                # If no admin found, allow access (shouldn't happen normally)
+                return True
     
     # Check if user has active paid subscription
     if user.get("subscription_active"):
@@ -1667,6 +1689,20 @@ async def login(credentials: UserLogin):
     
     print(f"✅ Login successful for {username_clean}")
 
+    # For staff users, get business_settings and subscription from their admin
+    business_settings = user.get("business_settings")
+    subscription_active = user.get("subscription_active", False)
+    organization_id = user.get("organization_id")
+    
+    if user.get("role") in ["waiter", "cashier", "kitchen", "staff"] and organization_id:
+        admin_user = await db.users.find_one(
+            {"id": organization_id, "role": "admin"}, 
+            {"_id": 0, "business_settings": 1, "subscription_active": 1}
+        )
+        if admin_user:
+            business_settings = admin_user.get("business_settings")
+            subscription_active = admin_user.get("subscription_active", False)
+
     token = create_access_token({"user_id": user["id"], "role": user["role"]})
     return {
         "token": token,
@@ -1677,11 +1713,12 @@ async def login(credentials: UserLogin):
             "email": user["email"],
             "phone": user.get("phone"),
             "login_method": user.get("login_method", "password"),
-            "subscription_active": user.get("subscription_active", False),
+            "subscription_active": subscription_active,
             "bill_count": user.get("bill_count", 0),
             "setup_completed": user.get("setup_completed", False),
             "onboarding_completed": user.get("onboarding_completed", False),
-            "business_settings": user.get("business_settings"),
+            "business_settings": business_settings,
+            "organization_id": organization_id,
         },
     }
 
@@ -1690,8 +1727,24 @@ async def login(credentials: UserLogin):
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Get current user with trial/subscription status"""
     
-    # Calculate trial info
-    created_at = current_user.get("created_at")
+    # For staff users, get business_settings and subscription from their admin
+    business_settings = current_user.get("business_settings")
+    subscription_active = current_user.get("subscription_active", False)
+    organization_id = current_user.get("organization_id")
+    admin_created_at = None
+    
+    if current_user.get("role") in ["waiter", "cashier", "kitchen", "staff"] and organization_id:
+        admin_user = await db.users.find_one(
+            {"id": organization_id, "role": "admin"}, 
+            {"_id": 0, "business_settings": 1, "subscription_active": 1, "created_at": 1, "trial_extension_days": 1}
+        )
+        if admin_user:
+            business_settings = admin_user.get("business_settings")
+            subscription_active = admin_user.get("subscription_active", False)
+            admin_created_at = admin_user.get("created_at")
+    
+    # Calculate trial info (use admin's created_at for staff)
+    created_at = admin_created_at or current_user.get("created_at")
     trial_info = {
         "is_trial": False,
         "trial_days_left": 0,
@@ -1711,14 +1764,19 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         days_left = (trial_end - now).days
         
         trial_info = {
-            "is_trial": not current_user.get("subscription_active", False),
+            "is_trial": not subscription_active,
             "trial_days_left": max(0, days_left),
-            "trial_expired": days_left < 0 and not current_user.get("subscription_active", False),
+            "trial_expired": days_left < 0 and not subscription_active,
             "trial_end_date": trial_end.isoformat()
         }
     
-    # Add trial info to response
-    user_data = {**current_user, "trial_info": trial_info}
+    # Add trial info and updated business_settings to response
+    user_data = {
+        **current_user, 
+        "trial_info": trial_info,
+        "business_settings": business_settings,
+        "subscription_active": subscription_active
+    }
     
     return user_data
 
@@ -2949,6 +3007,8 @@ def generate_whatsapp_notification(phone: str, message: str) -> str:
 
 def get_status_message(status: str, order: dict, business: dict, frontend_url: str = "") -> str:
     """Generate status-specific WhatsApp message"""
+    # Handle None business case
+    business = business or {}
     restaurant_name = business.get("restaurant_name", "Restaurant")
     currency = CURRENCY_SYMBOLS.get(business.get("currency", "INR"), "₹")
     order_id = order["id"][:8]
@@ -3036,8 +3096,9 @@ async def create_order(
     # Get user's organization_id
     user_org_id = current_user.get("organization_id") or current_user["id"]
 
-    business = current_user.get("business_settings", {})
-    tax_rate = business.get("tax_rate", 5.0) / 100
+    # Get business settings - handle None case
+    business = current_user.get("business_settings") or {}
+    tax_rate = (business.get("tax_rate", 5.0) or 5.0) / 100
     kot_mode_enabled = business.get("kot_mode_enabled", True)
 
     subtotal = sum(item.price * item.quantity for item in order_data.items)
@@ -3216,16 +3277,65 @@ async def update_order(
     if not existing_order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    # Don't allow editing completed orders
-    if existing_order.get("status") == "completed":
-        raise HTTPException(status_code=400, detail="Cannot edit completed orders")
+    # Handle status update separately (e.g., marking as completed from billing page)
+    if "status" in order_data and order_data.get("status") == "completed":
+        update_data = {
+            "status": "completed",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        # Also update payment fields if provided
+        payment_fields = ["payment_method", "is_credit", "payment_received", "balance_amount"]
+        for field in payment_fields:
+            if field in order_data:
+                update_data[field] = order_data[field]
+        
+        await db.orders.update_one(
+            {"id": order_id, "organization_id": user_org_id},
+            {"$set": update_data}
+        )
+        return {"message": "Order completed successfully"}
     
-    # Update order
+    # For completed orders, only allow updating payment-related fields
+    if existing_order.get("status") == "completed":
+        # Allow updating: is_credit, payment_method, payment_received, balance_amount, customer_name, customer_phone
+        allowed_fields = ["is_credit", "payment_method", "payment_received", "balance_amount", "customer_name", "customer_phone"]
+        update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+        
+        for field in allowed_fields:
+            if field in order_data:
+                update_data[field] = order_data[field]
+        
+        # Calculate balance if payment_received is provided
+        if "payment_received" in order_data:
+            total = existing_order.get("total", 0)
+            payment_received = order_data.get("payment_received", 0) or 0
+            update_data["balance_amount"] = total - payment_received
+            # Auto-mark as credit if there's a balance
+            if update_data["balance_amount"] > 0:
+                update_data["is_credit"] = True
+            elif update_data["balance_amount"] <= 0:
+                update_data["is_credit"] = False
+                update_data["balance_amount"] = 0
+        
+        await db.orders.update_one(
+            {"id": order_id, "organization_id": user_org_id},
+            {"$set": update_data}
+        )
+        
+        return {"message": "Order payment details updated successfully"}
+    
+    # For non-completed orders, allow full editing
     update_data = {
         "items": order_data.get("items", existing_order["items"]),
         "subtotal": order_data.get("subtotal", existing_order["subtotal"]),
         "tax": order_data.get("tax", existing_order["tax"]),
         "total": order_data.get("total", existing_order["total"]),
+        "customer_name": order_data.get("customer_name", existing_order.get("customer_name", "")),
+        "customer_phone": order_data.get("customer_phone", existing_order.get("customer_phone", "")),
+        "payment_method": order_data.get("payment_method", existing_order.get("payment_method", "cash")),
+        "is_credit": order_data.get("is_credit", existing_order.get("is_credit", False)),
+        "payment_received": order_data.get("payment_received", existing_order.get("payment_received", 0)),
+        "balance_amount": order_data.get("balance_amount", existing_order.get("balance_amount", 0)),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     

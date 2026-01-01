@@ -1151,6 +1151,34 @@ const SettingsPage = ({ user }) => {
                 />
               </div>
 
+              {/* Logo URL for Bills */}
+              <div className="md:col-span-2">
+                <Label>Restaurant Logo URL (for Bills)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={businessSettings.logo_url || ''}
+                    onChange={(e) => setBusinessSettings({ ...businessSettings, logo_url: e.target.value })}
+                    placeholder="https://example.com/your-logo.png"
+                    className="flex-1"
+                  />
+                  {businessSettings.logo_url && (
+                    <div className="w-12 h-12 border rounded-lg overflow-hidden flex-shrink-0">
+                      <img 
+                        src={businessSettings.logo_url} 
+                        alt="Logo preview" 
+                        className="w-full h-full object-contain"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter a direct URL to your logo image (PNG, JPG). Recommended size: 200x200px. 
+                  You can upload your logo to <a href="https://imgur.com" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Imgur</a> or 
+                  <a href="https://imgbb.com" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline ml-1">ImgBB</a> for free hosting.
+                </p>
+              </div>
+
               <div className="md:col-span-2">
                 <Label>Address</Label>
                 <Input

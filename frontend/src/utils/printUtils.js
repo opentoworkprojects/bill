@@ -262,10 +262,15 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   const fssai = business?.fssai || '';
   const tagline = business?.tagline || '';
   const footerMsg = business?.footer_message || 'Thank you for dining with us!';
+  const logoUrl = business?.logo_url || '';
   
   let html = '';
   
-  // Header
+  // Header with Logo
+  if (settings.show_logo && logoUrl) {
+    html += `<div class="center mb-2"><img src="${logoUrl}" alt="Logo" style="max-width: 80px; max-height: 60px; object-fit: contain;" onerror="this.style.display='none'" /></div>`;
+  }
+  
   html += `<div class="center header-logo">${restaurantName}</div>`;
   
   if (settings.show_tagline && tagline) {
