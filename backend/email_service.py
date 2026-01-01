@@ -193,3 +193,145 @@ async def send_otp_email(email: str, subject: str, html_body: str, text_body: st
         from_email="BillByteKOT <support@billbytekot.in>",
         reply_to="support@billbytekot.in"
     )
+
+
+async def send_receipt_email_with_html(
+    to_email: str,
+    user_name: str,
+    business_name: str,
+    receipt_number: str,
+    amount: float,
+    valid_from: str,
+    valid_until: str,
+    payment_id: str,
+    payment_method: str,
+    html_content: str
+) -> dict:
+    """Send receipt PDF as HTML email"""
+    
+    subject = f"BillByteKOT Payment Receipt - {receipt_number}"
+    
+    # Create a wrapper email with the receipt HTML embedded
+    email_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }}
+            .email-container {{ max-width: 700px; margin: 0 auto; }}
+            .email-header {{ background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 25px; text-align: center; border-radius: 12px 12px 0 0; }}
+            .email-header h1 {{ margin: 0; font-size: 24px; }}
+            .email-header p {{ margin: 8px 0 0; opacity: 0.9; font-size: 14px; }}
+            .email-body {{ background: white; padding: 25px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
+            .greeting {{ font-size: 16px; color: #333; margin-bottom: 15px; }}
+            .summary-box {{ background: #f8f5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+            .summary-row {{ display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9d5ff; }}
+            .summary-row:last-child {{ border-bottom: none; }}
+            .summary-label {{ color: #666; font-size: 14px; }}
+            .summary-value {{ color: #333; font-weight: 600; font-size: 14px; }}
+            .summary-value.highlight {{ color: #7c3aed; }}
+            .summary-value.amount {{ color: #10b981; font-size: 18px; }}
+            .cta-section {{ text-align: center; margin: 25px 0; }}
+            .cta-button {{ display: inline-block; background: #7c3aed; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; }}
+            .footer {{ text-align: center; padding: 20px; color: #666; font-size: 12px; }}
+            .receipt-section {{ margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee; }}
+            .receipt-title {{ font-size: 14px; color: #666; margin-bottom: 15px; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="email-header">
+                <h1>🍽️ Payment Receipt</h1>
+                <p>Thank you for your subscription!</p>
+            </div>
+            
+            <div class="email-body">
+                <p class="greeting">Dear {user_name},</p>
+                <p style="color: #666; font-size: 14px; line-height: 1.6;">
+                    Thank you for subscribing to BillByteKOT Premium! Your payment has been successfully received. 
+                    Below is your payment receipt for your records.
+                </p>
+                
+                <div class="summary-box">
+                    <div class="summary-row">
+                        <span class="summary-label">Receipt Number</span>
+                        <span class="summary-value highlight">{receipt_number}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Business Name</span>
+                        <span class="summary-value">{business_name}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Payment ID</span>
+                        <span class="summary-value">{payment_id}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Payment Method</span>
+                        <span class="summary-value">{payment_method.upper()}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Valid From</span>
+                        <span class="summary-value">{valid_from}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Valid Until</span>
+                        <span class="summary-value" style="color: #10b981;">{valid_until}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Amount Paid</span>
+                        <span class="summary-value amount">₹{amount:.2f}</span>
+                    </div>
+                </div>
+                
+                <div class="cta-section">
+                    <a href="https://billbytekot.in/login" class="cta-button">Login to Dashboard</a>
+                </div>
+                
+                <p style="color: #666; font-size: 13px; text-align: center;">
+                    Your subscription is now active. Enjoy all premium features!
+                </p>
+            </div>
+            
+            <div class="footer">
+                <p><strong>BillByteKOT</strong> - Smart Restaurant Management System</p>
+                <p>support@billbytekot.in | +91-8310832669</p>
+                <p>www.billbytekot.in</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    text_body = f"""
+BillByteKOT Payment Receipt
+
+Dear {user_name},
+
+Thank you for subscribing to BillByteKOT Premium! Your payment has been successfully received.
+
+Receipt Details:
+- Receipt Number: {receipt_number}
+- Business Name: {business_name}
+- Payment ID: {payment_id}
+- Payment Method: {payment_method.upper()}
+- Valid From: {valid_from}
+- Valid Until: {valid_until}
+- Amount Paid: ₹{amount:.2f}
+
+Your subscription is now active. Login at https://billbytekot.in/login to access all premium features.
+
+Thank you for choosing BillByteKOT!
+
+Best regards,
+BillByteKOT Team
+support@billbytekot.in | +91-8310832669
+    """
+    
+    return await send_email(
+        to_email,
+        subject,
+        email_html,
+        text_body,
+        from_email="BillByteKOT <support@billbytekot.in>",
+        reply_to="support@billbytekot.in"
+    )

@@ -106,9 +106,6 @@ const SuperAdminPage = () => {
     // Calculate subscription duration in months
     const monthsDiff = Math.round((expiresAt - subscriptionStartDate) / (1000 * 60 * 60 * 24 * 30));
     const amount = user.subscription_amount || 999;
-    const baseAmount = amount / 1.18; // Remove GST to get base
-    const cgst = baseAmount * 0.09;
-    const sgst = baseAmount * 0.09;
     
     const data = {
       invoiceNumber: generateInvoiceNumber(user.invoice_number),
@@ -122,18 +119,13 @@ const SuperAdminPage = () => {
       businessCity: user.business_settings?.city || '',
       businessState: user.business_settings?.state || 'Karnataka',
       businessPincode: user.business_settings?.pincode || '',
-      businessGST: user.business_settings?.gst_number || 'N/A',
       paymentId: user.subscription_payment_id || 'N/A',
       paymentMethod: user.subscription_type || 'Online',
       subscriptionPlan: 'BillByteKOT Premium',
       subscriptionPeriod: `${monthsDiff || 12} Months`,
       validFrom: subscriptionStartDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       validUntil: expiresAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      baseAmount: baseAmount,
-      cgst: cgst,
-      sgst: sgst,
       amount: amount,
-      gstRate: 18,
       amountInWords: numberToWords(amount)
     };
     
@@ -142,15 +134,14 @@ const SuperAdminPage = () => {
   };
 
   // Download invoice as PDF
-  const downloadInvoicePDF = () => {
+  const downloadInvoicePDF = async (sendEmail = false) => {
     if (!invoiceRef.current) return;
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Invoice - ${invoiceData?.invoiceNumber}</title>
+        <title>Receipt - ${invoiceData?.invoiceNumber}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Arial, sans-serif; background: white; color: #333; }
@@ -207,11 +198,45 @@ const SuperAdminPage = () => {
         ${invoiceRef.current.innerHTML}
       </body>
       </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 300);
+    `;
+    
+    if (sendEmail && invoiceData) {
+      try {
+        toast.loading('Sending receipt via email...');
+        const response = await axios.post(
+          `${API}/super-admin/send-receipt-pdf`,
+          {
+            user_email: invoiceData.customerEmail,
+            user_name: invoiceData.customerName,
+            business_name: invoiceData.businessName,
+            receipt_number: invoiceData.invoiceNumber,
+            amount: invoiceData.amount,
+            valid_from: invoiceData.validFrom,
+            valid_until: invoiceData.validUntil,
+            payment_id: invoiceData.paymentId,
+            payment_method: invoiceData.paymentMethod,
+            html_content: htmlContent
+          },
+          { params: credentials }
+        );
+        toast.dismiss();
+        if (response.data.success) {
+          toast.success('Receipt sent to ' + invoiceData.customerEmail);
+        } else {
+          toast.error('Failed to send receipt');
+        }
+      } catch (error) {
+        toast.dismiss();
+        toast.error(error.response?.data?.detail || 'Failed to send receipt email');
+      }
+    } else {
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+      }, 300);
+    }
   };
 
   // Check if team member has specific permission
@@ -1726,7 +1751,7 @@ const SuperAdminPage = () => {
         </div>
       )}
 
-      {/* Invoice Preview Modal */}
+      {/* Receipt Preview Modal */}
       {showInvoicePreview && invoiceData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl my-4">
@@ -1734,11 +1759,18 @@ const SuperAdminPage = () => {
             <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-purple-700">
               <h2 className="text-xl font-bold flex items-center gap-2 text-white">
                 <FileText className="w-5 h-5" />
-                Invoice Preview - {invoiceData.invoiceNumber}
+                Receipt Preview - {invoiceData.invoiceNumber}
               </h2>
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={downloadInvoicePDF}
+                  onClick={() => downloadInvoicePDF(true)}
+                  className="bg-green-500 hover:bg-green-600 text-white"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Send PDF
+                </Button>
+                <Button
+                  onClick={() => downloadInvoicePDF(false)}
                   className="bg-white text-purple-600 hover:bg-purple-50"
                 >
                   <Download className="w-4 h-4 mr-2" />
@@ -1754,7 +1786,7 @@ const SuperAdminPage = () => {
               </div>
             </div>
             
-            {/* Invoice Content */}
+            {/* Receipt Content */}
             <div ref={invoiceRef} className="p-8 bg-white overflow-auto max-h-[80vh]">
               <div className="invoice-container relative">
                 {/* Watermark */}
@@ -1775,22 +1807,21 @@ const SuperAdminPage = () => {
                     <div className="text-[10px] text-gray-400 mt-3 leading-relaxed">
                       BillByte Innovations<br />
                       Bangalore, Karnataka 560001, India<br />
-                      GSTIN: 29XXXXX1234X1ZX<br />
                       support@billbytekot.in | +91-8310832669
                     </div>
                   </div>
                   <div className="text-right">
-                    <h1 className="text-3xl font-bold text-gray-800 tracking-wider">TAX INVOICE</h1>
+                    <h1 className="text-3xl font-bold text-gray-800 tracking-wider">PAYMENT RECEIPT</h1>
                     <div className="text-purple-600 font-semibold mt-2 bg-purple-50 px-3 py-1.5 rounded inline-block text-sm">
                       {invoiceData.invoiceNumber}
                     </div>
                   </div>
                 </div>
                 
-                {/* Invoice Meta - 3 Column Grid */}
+                {/* Receipt Meta - 3 Column Grid */}
                 <div className="grid grid-cols-3 gap-4 mb-6 relative z-10">
                   <div className="bg-gray-50 p-4 rounded-lg border-l-[3px] border-purple-600">
-                    <h3 className="text-[10px] text-purple-600 uppercase tracking-wider mb-2 font-semibold">Bill To</h3>
+                    <h3 className="text-[10px] text-purple-600 uppercase tracking-wider mb-2 font-semibold">Received From</h3>
                     <p className="font-semibold text-gray-800 text-sm">{invoiceData.businessName}</p>
                     <p className="text-xs text-gray-600 mt-1">{invoiceData.customerName}</p>
                     <p className="text-xs text-gray-600">{invoiceData.customerEmail}</p>
@@ -1798,14 +1829,11 @@ const SuperAdminPage = () => {
                     {invoiceData.businessAddress !== 'N/A' && (
                       <p className="text-xs text-gray-600 mt-1">{invoiceData.businessAddress}</p>
                     )}
-                    {invoiceData.businessGST !== 'N/A' && (
-                      <p className="text-xs text-purple-600 font-medium mt-1">GSTIN: {invoiceData.businessGST}</p>
-                    )}
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg border-l-[3px] border-purple-600">
-                    <h3 className="text-[10px] text-purple-600 uppercase tracking-wider mb-2 font-semibold">Invoice Details</h3>
-                    <p className="text-xs mb-1"><span className="text-gray-500">Invoice Date:</span> <span className="font-medium">{invoiceData.invoiceDate}</span></p>
-                    <p className="text-xs mb-1"><span className="text-gray-500">Due Date:</span> <span className="font-medium">{invoiceData.dueDate}</span></p>
+                    <h3 className="text-[10px] text-purple-600 uppercase tracking-wider mb-2 font-semibold">Receipt Details</h3>
+                    <p className="text-xs mb-1"><span className="text-gray-500">Receipt Date:</span> <span className="font-medium">{invoiceData.invoiceDate}</span></p>
+                    <p className="text-xs mb-1"><span className="text-gray-500">Receipt No:</span> <span className="font-medium text-purple-600">{invoiceData.invoiceNumber}</span></p>
                     <p className="text-xs mb-1"><span className="text-gray-500">Payment ID:</span> <span className="font-medium text-purple-600">{invoiceData.paymentId}</span></p>
                     <p className="text-xs"><span className="text-gray-500">Payment Mode:</span> <span className="font-medium uppercase">{invoiceData.paymentMethod}</span></p>
                   </div>
@@ -1823,9 +1851,8 @@ const SuperAdminPage = () => {
                   <thead>
                     <tr className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
                       <th className="py-3 px-3 text-left text-[10px] uppercase tracking-wider rounded-tl-lg">Description</th>
-                      <th className="py-3 px-3 text-center text-[10px] uppercase tracking-wider">HSN/SAC</th>
+                      <th className="py-3 px-3 text-center text-[10px] uppercase tracking-wider">Duration</th>
                       <th className="py-3 px-3 text-center text-[10px] uppercase tracking-wider">Qty</th>
-                      <th className="py-3 px-3 text-right text-[10px] uppercase tracking-wider">Rate (₹)</th>
                       <th className="py-3 px-3 text-right text-[10px] uppercase tracking-wider rounded-tr-lg">Amount (₹)</th>
                     </tr>
                   </thead>
@@ -1834,7 +1861,7 @@ const SuperAdminPage = () => {
                       <td className="py-4 px-3">
                         <div className="font-semibold text-gray-800 text-sm">BillByteKOT Premium Subscription</div>
                         <div className="text-[10px] text-gray-500 mt-1 leading-relaxed">
-                          {invoiceData.subscriptionPeriod} subscription with all premium features:<br />
+                          Premium subscription with all features:<br />
                           • Unlimited Bills & KOT Generation<br />
                           • AI-Powered Analytics & Reports<br />
                           • Thermal Printer Integration<br />
@@ -1842,42 +1869,19 @@ const SuperAdminPage = () => {
                           • Priority Customer Support
                         </div>
                       </td>
-                      <td className="py-4 px-3 text-center text-xs text-gray-600">998314</td>
+                      <td className="py-4 px-3 text-center text-xs text-gray-600">{invoiceData.subscriptionPeriod}</td>
                       <td className="py-4 px-3 text-center text-xs">1</td>
-                      <td className="py-4 px-3 text-right text-xs">{invoiceData.baseAmount.toFixed(2)}</td>
-                      <td className="py-4 px-3 text-right font-semibold text-sm">{invoiceData.baseAmount.toFixed(2)}</td>
+                      <td className="py-4 px-3 text-right font-semibold text-sm">₹{invoiceData.amount.toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>
                 
                 {/* Totals Section */}
-                <div className="flex justify-between mb-5 relative z-10">
-                  {/* Bank Details */}
-                  <div className="flex-1 bg-purple-50 p-4 rounded-lg mr-5">
-                    <h4 className="text-[10px] text-purple-600 uppercase tracking-wider mb-2 font-semibold">Bank Details (For Reference)</h4>
-                    <p className="text-[11px] text-gray-600">Bank: HDFC Bank</p>
-                    <p className="text-[11px] text-gray-600">A/C Name: BillByte Innovations</p>
-                    <p className="text-[11px] text-gray-600">A/C No: XXXX XXXX 1234</p>
-                    <p className="text-[11px] text-gray-600">IFSC: HDFC0001234</p>
-                    <p className="text-[11px] text-gray-600">Branch: Bangalore</p>
-                  </div>
-                  
+                <div className="flex justify-end mb-5 relative z-10">
                   {/* Totals */}
                   <div className="w-72">
-                    <div className="flex justify-between py-2 px-3 text-xs bg-gray-50 rounded-t">
-                      <span className="text-gray-600">Subtotal</span>
-                      <span>₹{invoiceData.baseAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between py-2 px-3 text-xs">
-                      <span className="text-gray-600">CGST @ 9%</span>
-                      <span>₹{invoiceData.cgst.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between py-2 px-3 text-xs bg-gray-50">
-                      <span className="text-gray-600">SGST @ 9%</span>
-                      <span>₹{invoiceData.sgst.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between py-3 px-3 text-base font-bold text-white bg-gradient-to-r from-purple-600 to-purple-700 rounded-b mt-1">
-                      <span>Grand Total</span>
+                    <div className="flex justify-between py-3 px-3 text-lg font-bold text-white bg-gradient-to-r from-purple-600 to-purple-700 rounded">
+                      <span>Total Amount Received</span>
                       <span>₹{invoiceData.amount.toFixed(2)}</span>
                     </div>
                   </div>
@@ -1889,15 +1893,11 @@ const SuperAdminPage = () => {
                   <p className="text-xs text-gray-800 font-medium mt-1">{invoiceData.amountInWords}</p>
                 </div>
                 
-                {/* Terms & Conditions */}
-                <div className="bg-gray-50 p-4 rounded-lg mb-5 relative z-10">
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-semibold">Terms & Conditions</h4>
-                  <ul className="text-[10px] text-gray-500 list-disc pl-4 space-y-1">
-                    <li>This is a digitally generated invoice and is valid without signature.</li>
-                    <li>Subscription is non-refundable once activated.</li>
-                    <li>For support queries, contact support@billbytekot.in</li>
-                    <li>Subject to Bangalore jurisdiction.</li>
-                  </ul>
+                {/* Note */}
+                <div className="bg-green-50 p-4 rounded-lg mb-5 border border-green-200 relative z-10">
+                  <p className="text-xs text-green-700">
+                    <span className="font-semibold">✓ Payment Confirmed:</span> This receipt confirms that we have received your payment for the BillByteKOT Premium subscription. Your subscription is now active.
+                  </p>
                 </div>
                 
                 {/* Footer */}
@@ -1907,6 +1907,7 @@ const SuperAdminPage = () => {
                   <p className="text-[10px] text-gray-400 mt-3">
                     www.billbytekot.in | support@billbytekot.in | +91-8310832669
                   </p>
+                  <p className="text-[9px] text-gray-400 mt-2">This is a computer-generated receipt and does not require a signature.</p>
                 </div>
               </div>
             </div>

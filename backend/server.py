@@ -6819,6 +6819,52 @@ async def get_all_subscriptions(
     return {"subscriptions": subscriptions, "total": total}
 
 
+class ReceiptPDFRequest(BaseModel):
+    user_email: str
+    user_name: str
+    business_name: str
+    receipt_number: str
+    amount: float
+    valid_from: str
+    valid_until: str
+    payment_id: str
+    payment_method: str
+    html_content: str
+
+
+@api_router.post("/super-admin/send-receipt-pdf")
+async def send_receipt_pdf(
+    request: ReceiptPDFRequest,
+    username: str,
+    password: str
+):
+    """Send receipt PDF via email - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    try:
+        from email_service import send_receipt_email_with_html
+        
+        # Send email with receipt HTML
+        result = await send_receipt_email_with_html(
+            to_email=request.user_email,
+            user_name=request.user_name,
+            business_name=request.business_name,
+            receipt_number=request.receipt_number,
+            amount=request.amount,
+            valid_from=request.valid_from,
+            valid_until=request.valid_until,
+            payment_id=request.payment_id,
+            payment_method=request.payment_method,
+            html_content=request.html_content
+        )
+        
+        return {"success": result.get("success", False), "message": result.get("message", "Receipt sent")}
+    except Exception as e:
+        print(f"Error sending receipt: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send receipt: {str(e)}")
+
+
 @api_router.post("/super-admin/users/{user_id}/send-invoice")
 async def send_invoice_to_user(
     user_id: str,
