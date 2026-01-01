@@ -151,7 +151,14 @@ const DesktopDownloadSection = () => {
   
   const handleDownloadWindows = () => {
     if (appVersions.windows?.download_url) {
-      window.open(appVersions.windows.download_url, '_blank');
+      // Handle both relative and absolute URLs
+      let downloadUrl = appVersions.windows.download_url;
+      if (downloadUrl.startsWith('/api/')) {
+        // Relative URL - prepend backend URL
+        const backendUrl = API.replace('/api', '');
+        downloadUrl = backendUrl + downloadUrl;
+      }
+      window.open(downloadUrl, '_blank');
       toast.success("Downloading BillByteKOT for Windows...");
     } else {
       toast.error("Windows app not available yet");
@@ -160,7 +167,14 @@ const DesktopDownloadSection = () => {
   
   const handleDownloadAndroid = () => {
     if (appVersions.android?.download_url) {
-      window.open(appVersions.android.download_url, '_blank');
+      // Handle both relative and absolute URLs
+      let downloadUrl = appVersions.android.download_url;
+      if (downloadUrl.startsWith('/api/')) {
+        // Relative URL - prepend backend URL
+        const backendUrl = API.replace('/api', '');
+        downloadUrl = backendUrl + downloadUrl;
+      }
+      window.open(downloadUrl, '_blank');
       toast.success("Downloading BillByteKOT for Android...");
     } else {
       toast.error("Android app not available yet");
@@ -628,9 +642,25 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [saleOffer, setSaleOffer] = useState(null);
   
   // Initialize scroll animations
   useScrollAnimation();
+
+  // Fetch sale offer
+  useEffect(() => {
+    const fetchSaleOffer = async () => {
+      try {
+        const response = await axios.get(`${API}/sale-offer`);
+        if (response.data?.enabled) {
+          setSaleOffer(response.data);
+        }
+      } catch (error) {
+        // No sale offer active
+      }
+    };
+    fetchSaleOffer();
+  }, []);
 
   const handleGetStarted = () => {
     navigate("/login");
@@ -809,8 +839,42 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white" data-testid="landing-page">
-      {/* New Year Campaign Banner */}
-      <NewYearBanner />
+      {/* Dynamic Sale Offer Banner */}
+      {saleOffer && saleOffer.enabled && (
+        <div className={`relative overflow-hidden bg-gradient-to-r ${saleOffer.bg_color || 'from-red-500 to-orange-500'} text-white py-3`}>
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              {saleOffer.badge_text && (
+                <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold animate-pulse">
+                  {saleOffer.badge_text}
+                </span>
+              )}
+              <div className="flex items-center gap-3">
+                <Gift className="w-5 h-5" />
+                <span className="font-semibold">{saleOffer.title}</span>
+                {saleOffer.subtitle && (
+                  <span className="text-white/90 hidden sm:inline">- {saleOffer.subtitle}</span>
+                )}
+              </div>
+              {saleOffer.discount_text && (
+                <span className="px-3 py-1 bg-white text-red-600 rounded-full text-sm font-bold">
+                  {saleOffer.discount_text}
+                </span>
+              )}
+              <Button
+                size="sm"
+                onClick={() => navigate('/login')}
+                className="bg-white text-gray-900 hover:bg-gray-100 text-xs"
+              >
+                Get Offer <ArrowRight className="w-3 h-3 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* New Year Campaign Banner - Show only if no dynamic offer */}
+      {!saleOffer?.enabled && <NewYearBanner />}
       
       {/* Lead Capture Popup */}
       <LeadCapturePopup />

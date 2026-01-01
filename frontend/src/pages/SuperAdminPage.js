@@ -11,7 +11,7 @@ import {
   CheckCircle, Clock, XCircle, UserPlus, Calendar, CreditCard,
   Mail, FileText, Upload, RefreshCw, Lock, Download, Eye, X,
   Smartphone, Monitor, Package, Plus, Trash2, Edit, ExternalLink,
-  Database, HardDrive
+  Database, HardDrive, Tag, Gift, Percent
 } from 'lucide-react';
 
 const SuperAdminPage = () => {
@@ -48,6 +48,8 @@ const SuperAdminPage = () => {
     username: '', email: '', password: '', role: 'sales', 
     permissions: [], full_name: '', phone: '' 
   });
+  const [editingTeamMember, setEditingTeamMember] = useState(null);
+  const [showEditTeamModal, setShowEditTeamModal] = useState(false);
   const [appVersions, setAppVersions] = useState([]);
   const [showAppVersionModal, setShowAppVersionModal] = useState(false);
   const [editingVersion, setEditingVersion] = useState(null);
@@ -61,6 +63,22 @@ const SuperAdminPage = () => {
     is_mandatory: false,
     file_size: ''
   });
+  const [appFile, setAppFile] = useState(null);
+  const [uploadingApp, setUploadingApp] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const appFileRef = useRef(null);
+  // Sale/Offer Day Feature
+  const [saleOffer, setSaleOffer] = useState({
+    enabled: false,
+    title: '',
+    subtitle: '',
+    discount_text: '',
+    badge_text: '',
+    bg_color: 'from-red-500 to-orange-500',
+    end_date: ''
+  });
+  const [showSaleOfferModal, setShowSaleOfferModal] = useState(false);
+  const [savingSaleOffer, setSavingSaleOffer] = useState(false);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [businessDetails, setBusinessDetails] = useState(null);
   const [businessDetailsLoading, setBusinessDetailsLoading] = useState(false);
@@ -276,7 +294,7 @@ const SuperAdminPage = () => {
   // Get available tabs based on user type and permissions
   const getAvailableTabs = () => {
     if (userType === 'super-admin') {
-      return ['dashboard', 'users', 'leads', 'team', 'tickets', 'analytics', 'app-versions'];
+      return ['dashboard', 'users', 'leads', 'team', 'tickets', 'analytics', 'app-versions', 'promotions'];
     }
     
     const tabs = [];
@@ -376,6 +394,18 @@ const SuperAdminPage = () => {
         params: credentials
       });
       setAppVersions(appVersionsRes.data.versions || []);
+
+      // Fetch sale/offer settings
+      try {
+        const saleOfferRes = await axios.get(`${API}/super-admin/sale-offer`, {
+          params: credentials
+        });
+        if (saleOfferRes.data) {
+          setSaleOffer(saleOfferRes.data);
+        }
+      } catch (e) {
+        // Sale offer not configured yet
+      }
     } catch (error) {
       console.error('Failed to fetch data', error);
     }
@@ -662,20 +692,72 @@ const SuperAdminPage = () => {
   };
 
   // App Version Management Functions
+  const handleAppFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const validExtensions = newAppVersion.platform === 'android' ? ['.apk'] : ['.exe', '.msi', '.zip'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (!validExtensions.includes(fileExt)) {
+        toast.error(`Please select a valid ${newAppVersion.platform === 'android' ? 'APK' : 'Windows installer'} file`);
+        return;
+      }
+      setAppFile(file);
+      // Auto-fill file size
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setNewAppVersion(prev => ({ ...prev, file_size: `${sizeMB} MB` }));
+    }
+  };
+
   const createAppVersion = async () => {
-    if (!newAppVersion.version || !newAppVersion.download_url) {
-      toast.error('Please fill version and download URL');
+    if (!newAppVersion.version) {
+      toast.error('Please fill version number');
+      return;
+    }
+    
+    // Either file or URL is required
+    if (!appFile && !newAppVersion.download_url) {
+      toast.error('Please upload a file or provide a download URL');
       return;
     }
 
+    setUploadingApp(true);
+    setUploadProgress(0);
+    
     try {
+      let downloadUrl = newAppVersion.download_url;
+      
+      // If file is selected, upload it first
+      if (appFile) {
+        const formData = new FormData();
+        formData.append('file', appFile);
+        formData.append('platform', newAppVersion.platform);
+        formData.append('version', newAppVersion.version);
+        
+        const uploadResponse = await axios.post(
+          `${API}/super-admin/app-versions/upload`,
+          formData,
+          { 
+            params: credentials,
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: (progressEvent) => {
+              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              setUploadProgress(progress);
+            }
+          }
+        );
+        downloadUrl = uploadResponse.data.download_url;
+      }
+      
+      // Create version record
       await axios.post(
         `${API}/super-admin/app-versions`,
-        newAppVersion,
+        { ...newAppVersion, download_url: downloadUrl },
         { params: credentials }
       );
+      
       toast.success(`${newAppVersion.platform.toUpperCase()} app version created`);
       setShowAppVersionModal(false);
+      setAppFile(null);
       setNewAppVersion({
         platform: 'android',
         version: '',
@@ -689,21 +771,52 @@ const SuperAdminPage = () => {
       fetchAllData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to create app version');
+    } finally {
+      setUploadingApp(false);
+      setUploadProgress(0);
     }
   };
 
   const updateAppVersion = async () => {
     if (!editingVersion) return;
 
+    setUploadingApp(true);
+    setUploadProgress(0);
+    
     try {
+      let downloadUrl = newAppVersion.download_url;
+      
+      // If new file is selected, upload it
+      if (appFile) {
+        const formData = new FormData();
+        formData.append('file', appFile);
+        formData.append('platform', newAppVersion.platform);
+        formData.append('version', newAppVersion.version);
+        
+        const uploadResponse = await axios.post(
+          `${API}/super-admin/app-versions/upload`,
+          formData,
+          { 
+            params: credentials,
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: (progressEvent) => {
+              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              setUploadProgress(progress);
+            }
+          }
+        );
+        downloadUrl = uploadResponse.data.download_url;
+      }
+      
       await axios.put(
         `${API}/super-admin/app-versions/${editingVersion.id}`,
-        newAppVersion,
+        { ...newAppVersion, download_url: downloadUrl },
         { params: credentials }
       );
       toast.success('App version updated');
       setShowAppVersionModal(false);
       setEditingVersion(null);
+      setAppFile(null);
       setNewAppVersion({
         platform: 'android',
         version: '',
@@ -717,6 +830,9 @@ const SuperAdminPage = () => {
       fetchAllData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update app version');
+    } finally {
+      setUploadingApp(false);
+      setUploadProgress(0);
     }
   };
 
@@ -761,6 +877,42 @@ const SuperAdminPage = () => {
       file_size: version.file_size || ''
     });
     setShowAppVersionModal(true);
+  };
+
+  // Sale/Offer Management
+  const saveSaleOffer = async () => {
+    setSavingSaleOffer(true);
+    try {
+      await axios.post(
+        `${API}/super-admin/sale-offer`,
+        saleOffer,
+        { params: credentials }
+      );
+      toast.success(saleOffer.enabled ? 'Sale offer enabled and saved!' : 'Sale offer disabled');
+      setShowSaleOfferModal(false);
+    } catch (error) {
+      toast.error('Failed to save sale offer');
+      console.error(error);
+    } finally {
+      setSavingSaleOffer(false);
+    }
+  };
+
+  const toggleSaleOffer = async () => {
+    const newEnabled = !saleOffer.enabled;
+    setSaleOffer({ ...saleOffer, enabled: newEnabled });
+    
+    try {
+      await axios.post(
+        `${API}/super-admin/sale-offer`,
+        { ...saleOffer, enabled: newEnabled },
+        { params: credentials }
+      );
+      toast.success(newEnabled ? 'Sale offer enabled!' : 'Sale offer disabled');
+    } catch (error) {
+      toast.error('Failed to toggle sale offer');
+      setSaleOffer({ ...saleOffer, enabled: !newEnabled }); // Revert
+    }
   };
 
   // View Business Details
@@ -928,7 +1080,7 @@ const SuperAdminPage = () => {
           <CardHeader>
             <div className="flex items-center gap-2 justify-center">
               <Shield className="w-8 h-8 text-purple-400" />
-              <CardTitle className="text-2xl text-white">Super Admin Panel</CardTitle>
+              <CardTitle className="text-2xl text-white">Ops Controls</CardTitle>
             </div>
             <p className="text-center text-gray-400 text-sm">Site Owner & Team Access</p>
           </CardHeader>
@@ -978,7 +1130,7 @@ const SuperAdminPage = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
               <Shield className="w-8 h-8 text-purple-600" />
-              {userType === 'super-admin' ? 'Super Admin Panel' : 'Team Panel'}
+              {userType === 'super-admin' ? 'Ops Controls' : 'Team Panel'}
             </h1>
             <p className="text-gray-600">
               {userType === 'super-admin' ? (
@@ -1163,132 +1315,152 @@ const SuperAdminPage = () => {
                         <td className="p-2">
                           <div className="flex flex-wrap gap-1">
                             {/* View Business Details */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => viewBusinessDetails(user.id)}
-                              className="text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                              title="View Business Details"
-                              disabled={businessDetailsLoading}
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              Details
-                            </Button>
+                            {hasPermission('view_details') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => viewBusinessDetails(user.id)}
+                                className="text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                title="View Business Details"
+                                disabled={businessDetailsLoading}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                Details
+                              </Button>
+                            )}
                             
                             {/* Export Data (JSON) */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => exportUserData(user.id, user.username)}
-                              className="text-xs text-teal-600 border-teal-200 hover:bg-teal-50"
-                              title="Export All Business Data (JSON)"
-                              disabled={exportingData === user.id}
-                            >
-                              <Download className="w-3 h-3 mr-1" />
-                              {exportingData === user.id ? '...' : 'JSON'}
-                            </Button>
+                            {hasPermission('export_data') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => exportUserData(user.id, user.username)}
+                                className="text-xs text-teal-600 border-teal-200 hover:bg-teal-50"
+                                title="Export All Business Data (JSON)"
+                                disabled={exportingData === user.id}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                {exportingData === user.id ? '...' : 'JSON'}
+                              </Button>
+                            )}
                             
                             {/* Export Database (SQLite .db) */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => exportUserDatabase(user.id, user.username)}
-                              className="text-xs text-cyan-600 border-cyan-200 hover:bg-cyan-50"
-                              title="Export SQLite Database (.db)"
-                              disabled={exportingDb === user.id}
-                            >
-                              <Database className="w-3 h-3 mr-1" />
-                              {exportingDb === user.id ? '...' : 'DB'}
-                            </Button>
+                            {hasPermission('export_data') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => exportUserDatabase(user.id, user.username)}
+                                className="text-xs text-cyan-600 border-cyan-200 hover:bg-cyan-50"
+                                title="Export SQLite Database (.db)"
+                                disabled={exportingDb === user.id}
+                              >
+                                <Database className="w-3 h-3 mr-1" />
+                                {exportingDb === user.id ? '...' : 'DB'}
+                              </Button>
+                            )}
                             
                             {/* Import Database */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openImportModal(user.id, user.username)}
-                              className="text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
-                              title="Import SQLite Database (.db)"
-                            >
-                              <Upload className="w-3 h-3 mr-1" />
-                              Import
-                            </Button>
+                            {hasPermission('import_data') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openImportModal(user.id, user.username)}
+                                className="text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
+                                title="Import SQLite Database (.db)"
+                              >
+                                <Upload className="w-3 h-3 mr-1" />
+                                Import
+                              </Button>
+                            )}
                             
                             {/* Subscription Management */}
                             {user.subscription_active ? (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => sendInvoiceEmail(user.id)}
-                                  className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
-                                  title="Send Invoice Email"
-                                >
-                                  <Mail className="w-3 h-3 mr-1" />
-                                  Email
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => previewInvoice(user)}
-                                  className="text-xs text-purple-600 border-purple-200 hover:bg-purple-50"
-                                  title="Preview & Download Invoice"
-                                >
-                                  <FileText className="w-3 h-3 mr-1" />
-                                  Invoice
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => deactivateSubscription(user.id)}
-                                  className="text-xs text-red-600 border-red-200 hover:bg-red-50"
-                                >
-                                  <XCircle className="w-3 h-3 mr-1" />
-                                  Deactivate
-                                </Button>
+                                {hasPermission('send_invoice') && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => sendInvoiceEmail(user.id)}
+                                    className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                                    title="Send Invoice Email"
+                                  >
+                                    <Mail className="w-3 h-3 mr-1" />
+                                    Email
+                                  </Button>
+                                )}
+                                {hasPermission('send_invoice') && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => previewInvoice(user)}
+                                    className="text-xs text-purple-600 border-purple-200 hover:bg-purple-50"
+                                    title="Preview & Download Invoice"
+                                  >
+                                    <FileText className="w-3 h-3 mr-1" />
+                                    Invoice
+                                  </Button>
+                                )}
+                                {hasPermission('deactivate_license') && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => deactivateSubscription(user.id)}
+                                    className="text-xs text-red-600 border-red-200 hover:bg-red-50"
+                                  >
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    Deactivate
+                                  </Button>
+                                )}
                               </>
                             ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => openSubscriptionModal(user)}
-                                className="text-xs bg-green-600 hover:bg-green-700"
-                              >
-                                <CreditCard className="w-3 h-3 mr-1" />
-                                Activate
-                              </Button>
+                              hasPermission('activate_license') && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => openSubscriptionModal(user)}
+                                  className="text-xs bg-green-600 hover:bg-green-700"
+                                >
+                                  <CreditCard className="w-3 h-3 mr-1" />
+                                  Activate
+                                </Button>
+                              )
                             )}
                             
                             {/* Extend Trial */}
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                placeholder="Days"
-                                className="w-14 h-7 text-xs"
-                                min="1"
-                                max="365"
-                                id={`trial-days-${user.id}`}
-                              />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs h-7 bg-blue-50 hover:bg-blue-100"
-                                onClick={() => {
-                                  const input = document.getElementById(`trial-days-${user.id}`);
-                                  extendTrial(user.id, input?.value);
-                                }}
-                              >
-                                +Trial
-                              </Button>
-                            </div>
+                            {hasPermission('extend_trial') && (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  placeholder="Days"
+                                  className="w-14 h-7 text-xs"
+                                  min="1"
+                                  max="365"
+                                  id={`trial-days-${user.id}`}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 bg-blue-50 hover:bg-blue-100"
+                                  onClick={() => {
+                                    const input = document.getElementById(`trial-days-${user.id}`);
+                                    extendTrial(user.id, input?.value);
+                                  }}
+                                >
+                                  +Trial
+                                </Button>
+                              </div>
+                            )}
                             
                             {/* Delete User */}
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => deleteUser(user.id)}
-                              className="text-xs h-7"
-                            >
-                              Delete
-                            </Button>
+                            {hasPermission('delete_user') && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => deleteUser(user.id)}
+                                className="text-xs h-7"
+                              >
+                                Delete
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1651,7 +1823,17 @@ const SuperAdminPage = () => {
                           </span>
                         </td>
                         <td className="p-2 text-sm">
-                          {member.permissions?.join(', ') || 'None'}
+                          <div className="flex flex-wrap gap-1">
+                            {member.permissions?.filter(p => ['leads', 'tickets', 'users', 'analytics'].includes(p)).map(p => (
+                              <span key={p} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{p}</span>
+                            ))}
+                            {member.permissions?.filter(p => !['leads', 'tickets', 'users', 'analytics'].includes(p)).length > 0 && (
+                              <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                                +{member.permissions.filter(p => !['leads', 'tickets', 'users', 'analytics'].includes(p)).length} actions
+                              </span>
+                            )}
+                            {(!member.permissions || member.permissions.length === 0) && <span className="text-gray-400">None</span>}
+                          </div>
                         </td>
                         <td className="p-2">
                           <button
@@ -1664,13 +1846,37 @@ const SuperAdminPage = () => {
                           </button>
                         </td>
                         <td className="p-2">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteTeamMember(member.id)}
-                          >
-                            Delete
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingTeamMember(member);
+                                setNewTeamMember({
+                                  username: member.username,
+                                  email: member.email,
+                                  password: '',
+                                  role: member.role,
+                                  permissions: member.permissions || [],
+                                  full_name: member.full_name || '',
+                                  phone: member.phone || ''
+                                });
+                                setShowEditTeamModal(true);
+                              }}
+                              className="text-xs"
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => deleteTeamMember(member.id)}
+                              className="text-xs"
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1923,6 +2129,168 @@ const SuperAdminPage = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Promotions Tab - Super Admin Only */}
+        {activeTab === 'promotions' && userType === 'super-admin' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="w-5 h-5" />
+                    Sale & Promotions
+                  </CardTitle>
+                  <p className="text-sm text-gray-500 mt-1">Manage landing page sale banners and offers</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Sale Offer Toggle Card */}
+              <div className={`p-6 rounded-xl border-2 ${saleOffer.enabled ? 'border-green-500 bg-gradient-to-r from-green-50 to-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${saleOffer.enabled ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                      <Percent className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Sale Day / Special Offer</h3>
+                      <p className="text-sm text-gray-500">Show promotional banner on landing page</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={toggleSaleOffer}
+                    className={`relative w-14 h-7 rounded-full transition-colors ${saleOffer.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${saleOffer.enabled ? 'translate-x-8' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                {saleOffer.enabled && (
+                  <div className="space-y-4 pt-4 border-t">
+                    {/* Preview */}
+                    <div className="mb-4">
+                      <Label className="text-xs text-gray-500 mb-2 block">Preview:</Label>
+                      <div className={`p-4 rounded-lg bg-gradient-to-r ${saleOffer.bg_color || 'from-red-500 to-orange-500'} text-white`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            {saleOffer.badge_text && (
+                              <span className="px-2 py-1 bg-white/20 rounded text-xs font-bold mb-1 inline-block">{saleOffer.badge_text}</span>
+                            )}
+                            <h4 className="font-bold text-lg">{saleOffer.title || 'Sale Title'}</h4>
+                            <p className="text-sm opacity-90">{saleOffer.subtitle || 'Sale subtitle goes here'}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-2xl font-bold">{saleOffer.discount_text || '50% OFF'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Edit Form */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Badge Text (e.g., "LIMITED TIME")</Label>
+                        <Input
+                          value={saleOffer.badge_text}
+                          onChange={(e) => setSaleOffer({...saleOffer, badge_text: e.target.value})}
+                          placeholder="🔥 LIMITED TIME"
+                        />
+                      </div>
+                      <div>
+                        <Label>Discount Text</Label>
+                        <Input
+                          value={saleOffer.discount_text}
+                          onChange={(e) => setSaleOffer({...saleOffer, discount_text: e.target.value})}
+                          placeholder="50% OFF"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Title</Label>
+                      <Input
+                        value={saleOffer.title}
+                        onChange={(e) => setSaleOffer({...saleOffer, title: e.target.value})}
+                        placeholder="New Year Sale!"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Subtitle</Label>
+                      <Input
+                        value={saleOffer.subtitle}
+                        onChange={(e) => setSaleOffer({...saleOffer, subtitle: e.target.value})}
+                        placeholder="Get premium subscription at discounted price"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Background Color</Label>
+                        <select
+                          value={saleOffer.bg_color}
+                          onChange={(e) => setSaleOffer({...saleOffer, bg_color: e.target.value})}
+                          className="w-full px-3 py-2 border rounded-lg"
+                        >
+                          <option value="from-red-500 to-orange-500">Red to Orange</option>
+                          <option value="from-purple-500 to-pink-500">Purple to Pink</option>
+                          <option value="from-blue-500 to-cyan-500">Blue to Cyan</option>
+                          <option value="from-green-500 to-emerald-500">Green to Emerald</option>
+                          <option value="from-yellow-500 to-orange-500">Yellow to Orange</option>
+                          <option value="from-indigo-500 to-purple-500">Indigo to Purple</option>
+                          <option value="from-pink-500 to-rose-500">Pink to Rose</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>End Date (optional)</Label>
+                        <Input
+                          type="date"
+                          value={saleOffer.end_date}
+                          onChange={(e) => setSaleOffer({...saleOffer, end_date: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={saveSaleOffer}
+                      disabled={savingSaleOffer}
+                      className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                    >
+                      {savingSaleOffer ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {!saleOffer.enabled && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Enable to show a promotional banner on the landing page. Configure the offer details after enabling.
+                  </p>
+                )}
+              </div>
+
+              {/* Info */}
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-sm text-blue-800 mb-2">💡 How it works:</h4>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• When enabled, a promotional banner will appear on the landing page</li>
+                  <li>• The banner shows your custom title, subtitle, and discount text</li>
+                  <li>• Set an end date to automatically expire the offer</li>
+                  <li>• Toggle off anytime to hide the banner immediately</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* App Version Modal */}
@@ -1941,7 +2309,10 @@ const SuperAdminPage = () => {
                   <Label>Platform *</Label>
                   <select
                     value={newAppVersion.platform}
-                    onChange={(e) => setNewAppVersion({...newAppVersion, platform: e.target.value})}
+                    onChange={(e) => {
+                      setNewAppVersion({...newAppVersion, platform: e.target.value});
+                      setAppFile(null); // Reset file when platform changes
+                    }}
                     className="w-full px-3 py-2 border rounded-lg mt-1"
                     disabled={!!editingVersion}
                   >
@@ -1971,15 +2342,72 @@ const SuperAdminPage = () => {
                   </div>
                 </div>
 
+                {/* File Upload Section */}
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+                  <Label className="text-purple-700 font-medium">
+                    Upload {newAppVersion.platform === 'android' ? 'APK' : 'Windows Installer'} File
+                  </Label>
+                  <input
+                    ref={appFileRef}
+                    type="file"
+                    accept={newAppVersion.platform === 'android' ? '.apk' : '.exe,.msi,.zip'}
+                    onChange={handleAppFileChange}
+                    className="hidden"
+                  />
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => appFileRef.current?.click()}
+                      className="w-full justify-center border-purple-300 hover:bg-purple-100"
+                      disabled={uploadingApp}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {appFile ? appFile.name : `Choose ${newAppVersion.platform === 'android' ? '.apk' : '.exe/.msi'} File`}
+                    </Button>
+                  </div>
+                  {appFile && (
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-green-600">✓ {(appFile.size / (1024 * 1024)).toFixed(1)} MB</span>
+                      <button
+                        onClick={() => setAppFile(null)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {uploadingApp && uploadProgress > 0 && (
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-center mt-1 text-purple-600">{uploadProgress}% uploaded</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* OR Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 border-t border-gray-300"></div>
+                  <span className="text-xs text-gray-500 font-medium">OR</span>
+                  <div className="flex-1 border-t border-gray-300"></div>
+                </div>
+
+                {/* URL Input */}
                 <div>
-                  <Label>Download URL * (Direct link to APK/EXE)</Label>
+                  <Label>Download URL (Direct link to APK/EXE)</Label>
                   <Input
                     value={newAppVersion.download_url}
                     onChange={(e) => setNewAppVersion({...newAppVersion, download_url: e.target.value})}
                     placeholder="https://example.com/app.apk"
+                    disabled={!!appFile}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Use direct download links from Google Drive, Dropbox, GitHub Releases, etc.
+                    {appFile ? 'URL will be auto-generated after upload' : 'Use direct download links from Google Drive, Dropbox, GitHub Releases, etc.'}
                   </p>
                 </div>
 
@@ -2028,17 +2456,27 @@ const SuperAdminPage = () => {
                     onClick={() => {
                       setShowAppVersionModal(false);
                       setEditingVersion(null);
+                      setAppFile(null);
                     }}
                     variant="outline"
                     className="flex-1"
+                    disabled={uploadingApp}
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={editingVersion ? updateAppVersion : createAppVersion}
                     className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    disabled={uploadingApp}
                   >
-                    {editingVersion ? 'Update Version' : 'Create Version'}
+                    {uploadingApp ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        {uploadProgress > 0 ? 'Uploading...' : 'Processing...'}
+                      </>
+                    ) : (
+                      editingVersion ? 'Update Version' : 'Create Version'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -2216,32 +2654,38 @@ const SuperAdminPage = () => {
 
             {/* Footer Actions */}
             <div className="p-4 border-t bg-gray-50 flex gap-3 flex-wrap flex-shrink-0">
-              <Button
-                onClick={() => exportUserData(businessDetails.user?.id, businessDetails.user?.username)}
-                className="bg-teal-600 hover:bg-teal-700"
-                disabled={exportingData === businessDetails.user?.id}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {exportingData === businessDetails.user?.id ? 'Exporting...' : 'Export JSON'}
-              </Button>
-              <Button
-                onClick={() => exportUserDatabase(businessDetails.user?.id, businessDetails.user?.username)}
-                className="bg-cyan-600 hover:bg-cyan-700"
-                disabled={exportingDb === businessDetails.user?.id}
-              >
-                <Database className="w-4 h-4 mr-2" />
-                {exportingDb === businessDetails.user?.id ? 'Exporting...' : 'Export DB'}
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowBusinessDetails(false);
-                  openImportModal(businessDetails.user?.id, businessDetails.user?.username);
-                }}
-                className="bg-amber-600 hover:bg-amber-700"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Import DB
-              </Button>
+              {hasPermission('export_data') && (
+                <Button
+                  onClick={() => exportUserData(businessDetails.user?.id, businessDetails.user?.username)}
+                  className="bg-teal-600 hover:bg-teal-700"
+                  disabled={exportingData === businessDetails.user?.id}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {exportingData === businessDetails.user?.id ? 'Exporting...' : 'Export JSON'}
+                </Button>
+              )}
+              {hasPermission('export_data') && (
+                <Button
+                  onClick={() => exportUserDatabase(businessDetails.user?.id, businessDetails.user?.username)}
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                  disabled={exportingDb === businessDetails.user?.id}
+                >
+                  <Database className="w-4 h-4 mr-2" />
+                  {exportingDb === businessDetails.user?.id ? 'Exporting...' : 'Export DB'}
+                </Button>
+              )}
+              {hasPermission('import_data') && (
+                <Button
+                  onClick={() => {
+                    setShowBusinessDetails(false);
+                    openImportModal(businessDetails.user?.id, businessDetails.user?.username);
+                  }}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import DB
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setShowBusinessDetails(false)}
@@ -2508,34 +2952,225 @@ const SuperAdminPage = () => {
                 </div>
                 <div>
                   <Label>Permissions</Label>
-                  <div className="space-y-2 mt-2">
-                    {['leads', 'tickets', 'users', 'analytics'].map(perm => (
-                      <label key={perm} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={newTeamMember.permissions.includes(perm)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewTeamMember({
-                                ...newTeamMember,
-                                permissions: [...newTeamMember.permissions, perm]
-                              });
-                            } else {
-                              setNewTeamMember({
-                                ...newTeamMember,
-                                permissions: newTeamMember.permissions.filter(p => p !== perm)
-                              });
-                            }
-                          }}
-                        />
-                        <span className="capitalize">{perm}</span>
-                      </label>
-                    ))}
+                  <div className="space-y-3 mt-2">
+                    <p className="text-xs text-gray-500 font-medium">Tab Access:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['leads', 'tickets', 'users', 'analytics'].map(perm => (
+                        <label key={perm} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={newTeamMember.permissions.includes(perm)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewTeamMember({
+                                  ...newTeamMember,
+                                  permissions: [...newTeamMember.permissions, perm]
+                                });
+                              } else {
+                                setNewTeamMember({
+                                  ...newTeamMember,
+                                  permissions: newTeamMember.permissions.filter(p => p !== perm)
+                                });
+                              }
+                            }}
+                          />
+                          <span className="capitalize text-sm">{perm}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {newTeamMember.permissions.includes('users') && (
+                      <>
+                        <p className="text-xs text-gray-500 font-medium mt-3 pt-3 border-t">User Management Actions:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { key: 'activate_license', label: 'Activate License' },
+                            { key: 'deactivate_license', label: 'Deactivate License' },
+                            { key: 'extend_trial', label: 'Extend Trial' },
+                            { key: 'delete_user', label: 'Delete User' },
+                            { key: 'export_data', label: 'Export Data (JSON/DB)' },
+                            { key: 'import_data', label: 'Import Data' },
+                            { key: 'view_details', label: 'View Business Details' },
+                            { key: 'send_invoice', label: 'Send Invoice' }
+                          ].map(perm => (
+                            <label key={perm.key} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={newTeamMember.permissions.includes(perm.key)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setNewTeamMember({
+                                      ...newTeamMember,
+                                      permissions: [...newTeamMember.permissions, perm.key]
+                                    });
+                                  } else {
+                                    setNewTeamMember({
+                                      ...newTeamMember,
+                                      permissions: newTeamMember.permissions.filter(p => p !== perm.key)
+                                    });
+                                  }
+                                }}
+                              />
+                              <span className="text-sm">{perm.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={createTeamMember} className="flex-1">Create Member</Button>
                   <Button onClick={() => setShowCreateTeam(false)} variant="outline" className="flex-1">Cancel</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Team Member Modal */}
+      {showEditTeamModal && editingTeamMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <Card className="w-full max-w-md my-8 mx-4">
+            <CardHeader>
+              <CardTitle>Edit Team Member: {editingTeamMember.username}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label>Full Name</Label>
+                  <Input
+                    value={newTeamMember.full_name}
+                    onChange={(e) => setNewTeamMember({...newTeamMember, full_name: e.target.value})}
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    value={newTeamMember.phone}
+                    onChange={(e) => setNewTeamMember({...newTeamMember, phone: e.target.value})}
+                    placeholder="+91-9876543210"
+                  />
+                </div>
+                <div>
+                  <Label>Role</Label>
+                  <select
+                    value={newTeamMember.role}
+                    onChange={(e) => setNewTeamMember({...newTeamMember, role: e.target.value})}
+                    className="w-full px-3 py-2 border rounded"
+                  >
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Permissions</Label>
+                  <div className="space-y-3 mt-2">
+                    <p className="text-xs text-gray-500 font-medium">Tab Access:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['leads', 'tickets', 'users', 'analytics'].map(perm => (
+                        <label key={perm} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={newTeamMember.permissions.includes(perm)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewTeamMember({
+                                  ...newTeamMember,
+                                  permissions: [...newTeamMember.permissions, perm]
+                                });
+                              } else {
+                                // Remove tab permission and related action permissions
+                                let newPerms = newTeamMember.permissions.filter(p => p !== perm);
+                                if (perm === 'users') {
+                                  // Remove all user action permissions
+                                  newPerms = newPerms.filter(p => !['activate_license', 'deactivate_license', 'extend_trial', 'delete_user', 'export_data', 'import_data', 'view_details', 'send_invoice'].includes(p));
+                                }
+                                setNewTeamMember({
+                                  ...newTeamMember,
+                                  permissions: newPerms
+                                });
+                              }
+                            }}
+                          />
+                          <span className="capitalize text-sm">{perm}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {newTeamMember.permissions.includes('users') && (
+                      <>
+                        <p className="text-xs text-gray-500 font-medium mt-3 pt-3 border-t">User Management Actions:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { key: 'activate_license', label: 'Activate License' },
+                            { key: 'deactivate_license', label: 'Deactivate License' },
+                            { key: 'extend_trial', label: 'Extend Trial' },
+                            { key: 'delete_user', label: 'Delete User' },
+                            { key: 'export_data', label: 'Export Data (JSON/DB)' },
+                            { key: 'import_data', label: 'Import Data' },
+                            { key: 'view_details', label: 'View Business Details' },
+                            { key: 'send_invoice', label: 'Send Invoice' }
+                          ].map(perm => (
+                            <label key={perm.key} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={newTeamMember.permissions.includes(perm.key)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setNewTeamMember({
+                                      ...newTeamMember,
+                                      permissions: [...newTeamMember.permissions, perm.key]
+                                    });
+                                  } else {
+                                    setNewTeamMember({
+                                      ...newTeamMember,
+                                      permissions: newTeamMember.permissions.filter(p => p !== perm.key)
+                                    });
+                                  }
+                                }}
+                              />
+                              <span className="text-sm">{perm.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        await updateTeamMember(editingTeamMember.id, {
+                          full_name: newTeamMember.full_name,
+                          phone: newTeamMember.phone,
+                          role: newTeamMember.role,
+                          permissions: newTeamMember.permissions
+                        });
+                        setShowEditTeamModal(false);
+                        setEditingTeamMember(null);
+                      } catch (error) {
+                        console.error(error);
+                      }
+                    }} 
+                    className="flex-1"
+                  >
+                    Save Changes
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setShowEditTeamModal(false);
+                      setEditingTeamMember(null);
+                    }} 
+                    variant="outline" 
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </div>
             </CardContent>

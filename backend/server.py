@@ -8253,6 +8253,141 @@ async def get_app_versions(username: str, password: str):
     
     return {"versions": versions}
 
+
+@api_router.post("/super-admin/app-versions/upload")
+async def upload_app_file(
+    file: UploadFile = File(...),
+    platform: str = Query(...),
+    version: str = Query(...),
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Upload APK/EXE file and store in database - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    # Validate file extension
+    valid_extensions = {
+        'android': ['.apk'],
+        'windows': ['.exe', '.msi', '.zip']
+    }
+    
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in valid_extensions.get(platform, []):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type. Expected {valid_extensions.get(platform)} for {platform}"
+        )
+    
+    # Read file content
+    content = await file.read()
+    file_size_mb = len(content) / (1024 * 1024)
+    
+    # Max file size: 200MB
+    if file_size_mb > 200:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 200MB")
+    
+    # Store file in database (GridFS-like approach using base64 for smaller files, or chunks for larger)
+    file_id = str(uuid.uuid4())
+    filename = f"{platform}_{version}_{file_id}{file_ext}"
+    
+    # For files under 16MB, store directly in document
+    # For larger files, store in chunks
+    if file_size_mb < 16:
+        import base64
+        file_doc = {
+            "id": file_id,
+            "filename": filename,
+            "original_filename": file.filename,
+            "platform": platform,
+            "version": version,
+            "content_type": file.content_type,
+            "size": len(content),
+            "size_mb": round(file_size_mb, 2),
+            "data": base64.b64encode(content).decode('utf-8'),
+            "chunked": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.app_files.insert_one(file_doc)
+    else:
+        # Store in chunks (1MB each)
+        import base64
+        chunk_size = 1024 * 1024  # 1MB
+        chunks = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size)]
+        
+        file_doc = {
+            "id": file_id,
+            "filename": filename,
+            "original_filename": file.filename,
+            "platform": platform,
+            "version": version,
+            "content_type": file.content_type,
+            "size": len(content),
+            "size_mb": round(file_size_mb, 2),
+            "chunked": True,
+            "chunk_count": len(chunks),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.app_files.insert_one(file_doc)
+        
+        # Store chunks
+        for i, chunk in enumerate(chunks):
+            chunk_doc = {
+                "file_id": file_id,
+                "chunk_index": i,
+                "data": base64.b64encode(chunk).decode('utf-8')
+            }
+            await db.app_file_chunks.insert_one(chunk_doc)
+    
+    # Generate download URL (relative to API)
+    download_url = f"/api/app-download/{file_id}"
+    
+    return {
+        "message": "File uploaded successfully",
+        "file_id": file_id,
+        "filename": filename,
+        "size_mb": round(file_size_mb, 2),
+        "download_url": download_url
+    }
+
+
+@api_router.get("/app-download/{file_id}")
+async def download_app_file(file_id: str):
+    """Download app file by ID - Public endpoint for app downloads"""
+    import base64
+    
+    file_doc = await db.app_files.find_one({"id": file_id})
+    if not file_doc:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if file_doc.get("chunked"):
+        # Reassemble chunks
+        chunks = await db.app_file_chunks.find(
+            {"file_id": file_id}
+        ).sort("chunk_index", 1).to_list(1000)
+        
+        content = b""
+        for chunk in chunks:
+            content += base64.b64decode(chunk["data"])
+    else:
+        content = base64.b64decode(file_doc["data"])
+    
+    # Determine content type
+    content_type = file_doc.get("content_type", "application/octet-stream")
+    if file_doc["filename"].endswith(".apk"):
+        content_type = "application/vnd.android.package-archive"
+    elif file_doc["filename"].endswith(".exe"):
+        content_type = "application/x-msdownload"
+    
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f"attachment; filename={file_doc.get('original_filename', file_doc['filename'])}"
+        }
+    )
+
+
 @api_router.post("/super-admin/app-versions")
 async def create_app_version(
     version_data: AppVersionCreate,
@@ -8396,6 +8531,74 @@ async def check_app_update(platform: str, current_version: str):
         "release_notes": latest.get("release_notes", "") if update_available else None,
         "file_size": latest.get("file_size")
     }
+
+
+# Sale/Offer Management Endpoints
+@api_router.get("/super-admin/sale-offer")
+async def get_sale_offer(username: str, password: str):
+    """Get current sale offer settings - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    offer = await db.site_settings.find_one({"type": "sale_offer"})
+    if not offer:
+        return {
+            "enabled": False,
+            "title": "",
+            "subtitle": "",
+            "discount_text": "",
+            "badge_text": "",
+            "bg_color": "from-red-500 to-orange-500",
+            "end_date": ""
+        }
+    
+    offer.pop("_id", None)
+    offer.pop("type", None)
+    return offer
+
+
+@api_router.post("/super-admin/sale-offer")
+async def update_sale_offer(
+    offer_data: dict,
+    username: str,
+    password: str
+):
+    """Update sale offer settings - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    offer_data["type"] = "sale_offer"
+    offer_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.site_settings.update_one(
+        {"type": "sale_offer"},
+        {"$set": offer_data},
+        upsert=True
+    )
+    
+    return {"message": "Sale offer updated successfully"}
+
+
+@api_router.get("/sale-offer")
+async def get_public_sale_offer():
+    """Get active sale offer for landing page - Public endpoint"""
+    offer = await db.site_settings.find_one({"type": "sale_offer", "enabled": True})
+    
+    if not offer:
+        return {"enabled": False}
+    
+    # Check if offer has expired
+    if offer.get("end_date"):
+        try:
+            end_date = datetime.fromisoformat(offer["end_date"])
+            if datetime.now() > end_date:
+                return {"enabled": False}
+        except:
+            pass
+    
+    offer.pop("_id", None)
+    offer.pop("type", None)
+    return offer
 
 
 # Serve Windows app download

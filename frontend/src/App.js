@@ -747,7 +747,7 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/help" element={<PrivateRoute isAuthChecking={isAuthChecking}><HelpPage user={user} /></PrivateRoute>} />
-          <Route path="/super-admin-panel-secret" element={<SuperAdminPage />} />
+          <Route path="/ops" element={<SuperAdminPage />} />
           {/* 404 Not Found Route - Must be last */}
           <Route path="*" element={<NotFound />} />
         </Routes>
