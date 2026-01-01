@@ -369,6 +369,24 @@ axios.interceptors.response.use(
   }
 );
 
+// Global logout callback - will be set by App component
+let globalLogoutCallback = null;
+
+export const setLogoutCallback = (callback) => {
+  globalLogoutCallback = callback;
+};
+
+export const logout = () => {
+  // Clear all storage
+  delete axios.defaults.headers.common['Authorization'];
+  clearAuthData();
+  
+  // Call the global callback to clear React state
+  if (globalLogoutCallback) {
+    globalLogoutCallback();
+  }
+};
+
 export const setAuthToken = (token, userData = null) => {
   if (token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -477,6 +495,14 @@ function App() {
     return storedUser;
   });
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  // Set up the global logout callback
+  useEffect(() => {
+    setLogoutCallback(() => {
+      setUser(null);
+    });
+    return () => setLogoutCallback(null);
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {

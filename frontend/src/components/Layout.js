@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
-import { setAuthToken } from '../App';
+import { logout } from '../App';
 import { 
   Home, UtensilsCrossed, ShoppingBag, Table, ChefHat, Package, 
   FileText, LogOut, Menu, X, Settings as SettingsIcon, Crown, Users,
-  MoreHorizontal, Printer, HelpCircle
+  MoreHorizontal, HelpCircle
 } from 'lucide-react';
 
 const Layout = ({ user, children }) => {
@@ -15,8 +15,8 @@ const Layout = ({ user, children }) => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const handleLogout = () => {
-    // setAuthToken(null) now clears all storage mechanisms
-    setAuthToken(null);
+    // Use the global logout function that clears both storage and React state
+    logout();
     navigate('/login');
   };
 
