@@ -2366,10 +2366,10 @@ async def get_razorpay_settings(current_user: dict = Depends(get_current_user)):
 
 
 # Subscription - ₹999/year with 7-day free trial
-# NEW YEAR CAMPAIGN: ₹599/year (40% OFF) till Jan 31, 2026
+# NEW YEAR CAMPAIGN: ₹599/year (40% OFF) - January 1, 2026 ONLY
 SUBSCRIPTION_PRICE_PAISE = 99900  # ₹999 in paise (regular price)
 NEW_YEAR_PRICE_PAISE = 59900  # ₹599 in paise (New Year price - 40% off)
-NEW_YEAR_END_DATE = datetime(2026, 1, 31, 23, 59, 59, tzinfo=timezone.utc)
+NEW_YEAR_END_DATE = datetime(2026, 1, 1, 23, 59, 59, tzinfo=timezone.utc)
 TRIAL_DAYS = 7
 SUBSCRIPTION_DAYS = 365
 
@@ -2382,7 +2382,7 @@ ACTIVE_CAMPAIGNS = {
         "original_price_paise": 99900,  # ₹999
         "discount_percent": 40,
         "start_date": "2026-01-01T00:00:00+00:00",
-        "end_date": "2026-01-31T23:59:59+00:00",
+        "end_date": "2026-01-01T23:59:59+00:00",
         "active": True,
         "badge": "🎉 40% OFF",
         "max_users": 5000,
@@ -2405,7 +2405,7 @@ def get_current_subscription_price():
             "campaign_name": "New Year Special",
             "campaign_active": True,
             "campaign_ends": NEW_YEAR_END_DATE.isoformat(),
-            "badge": "🎉 40% OFF - New Year Special"
+            "badge": "🎉 40% OFF - New Year Day Only!"
         }
     
     # Regular pricing

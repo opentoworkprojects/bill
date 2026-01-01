@@ -21,9 +21,9 @@ const SubscriptionPage = ({ user }) => {
   useEffect(() => {
     fetchSubscriptionStatus();
     
-    // Countdown timer for New Year offer
+    // Countdown timer for New Year offer - January 1, 2026 ONLY
     const calculateTimeLeft = () => {
-      const endDate = new Date('2026-01-31T23:59:59');
+      const endDate = new Date('2026-01-01T23:59:59');
       const now = new Date();
       const difference = endDate - now;
       
@@ -429,7 +429,7 @@ const SubscriptionPage = ({ user }) => {
             {[
               { q: 'How long is the free trial?', a: 'You get 7 days of full access to all premium features, no credit card required.' },
               { q: 'What happens after the trial?', a: 'After 7 days, you can subscribe for ₹599/year (New Year Special!) or continue with limited features.' },
-              { q: 'What is the New Year Special offer?', a: 'Get 40% off on annual subscription - pay only ₹599 instead of ₹999! This offer is valid for a limited time.' },
+              { q: 'What is the New Year Special offer?', a: 'Get 40% off on annual subscription - pay only ₹599 instead of ₹999! This offer is valid on January 1, 2026 ONLY!' },
               { q: 'Can I cancel anytime?', a: 'Yes! Cancel anytime. We also offer a 30-day money-back guarantee.' },
               { q: 'Is my data secure?', a: 'Absolutely. We use bank-grade encryption and never share your data.' },
             ].map((faq, i) => (

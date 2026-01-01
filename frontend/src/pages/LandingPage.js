@@ -318,7 +318,7 @@ const NewYearSpecialSection = ({ navigate }) => {
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const endDate = new Date('2026-01-31T23:59:59');
+      const endDate = new Date('2026-01-01T23:59:59');
       const now = new Date();
       const difference = endDate - now;
       
@@ -408,7 +408,7 @@ const NewYearSpecialSection = ({ navigate }) => {
               </Button>
               
               <p className="text-sm text-white/70">
-                ⏰ Offer valid till January 31, 2026 • No hidden charges • Cancel anytime
+                ⏰ Offer valid on January 1, 2026 ONLY • No hidden charges • Cancel anytime
               </p>
             </div>
             
@@ -493,7 +493,7 @@ const NewYearBanner = () => {
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const endDate = new Date('2026-01-31T23:59:59');
+      const endDate = new Date('2026-01-01T23:59:59');
       const now = new Date();
       const difference = endDate - now;
       
@@ -746,7 +746,7 @@ const LandingPage = () => {
       price: "₹599",
       period: "per year",
       originalPrice: "₹999",
-      badge: "40% OFF - Till Jan 31",
+      badge: "40% OFF - Jan 1 Only",
       features: [
         "Unlimited bills forever",
         "All premium features",
@@ -1775,7 +1775,7 @@ const LandingPage = () => {
             {[
               {
                 q: "How does the free trial work?",
-                a: "You get 7 days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ₹599/year with our New Year Special (40% OFF till Jan 31, 2026)!",
+                a: "You get 7 days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ₹599/year with our New Year Special (40% OFF on January 1, 2026 only)!",
               },
               {
                 q: "Can I use my own Razorpay account?",
@@ -1799,7 +1799,7 @@ const LandingPage = () => {
               },
               {
                 q: "What's included in the Premium plan?",
-                a: "Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, WhatsApp integration, and all future features. New Year Special: Just ₹599/year (40% OFF) till Jan 31, 2026!",
+                a: "Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, WhatsApp integration, and all future features. New Year Special: Just ₹599/year (40% OFF) on January 1, 2026 only!",
               },
             ].map((faq, index) => (
               <Card key={index} className="border-0 shadow-lg">
