@@ -39,6 +39,7 @@ import DesktopInfo from './components/DesktopInfo';
 import UpdateBanner from './components/UpdateBanner';
 import { Toaster } from './components/ui/sonner';
 import { setupAutoSync } from './utils/offlineSync';
+import { startNotificationPolling, requestNotificationPermission } from './utils/pushNotifications';
 
 // Electron navigation handler component
 const ElectronNavigator = () => {
@@ -536,6 +537,16 @@ function App() {
     
     // Setup offline sync
     setupAutoSync(axios.create({ baseURL: API }));
+    
+    // Start notification polling for in-app notifications
+    startNotificationPolling(API, 60000); // Check every 60 seconds
+    
+    // Request notification permission after a delay (better UX)
+    setTimeout(() => {
+      if (Notification.permission === 'default') {
+        requestNotificationPermission();
+      }
+    }, 10000);
     
     // Register service worker for offline support
     if ('serviceWorker' in navigator) {

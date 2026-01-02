@@ -11,7 +11,7 @@ import {
   CheckCircle, Clock, XCircle, UserPlus, Calendar, CreditCard,
   Mail, FileText, Upload, RefreshCw, Lock, Download, Eye, X,
   Smartphone, Monitor, Package, Plus, Trash2, Edit, ExternalLink,
-  Database, HardDrive, Tag, Gift, Percent, DollarSign
+  Database, HardDrive, Tag, Gift, Percent, DollarSign, Bell, Send, MessageSquare
 } from 'lucide-react';
 
 const SuperAdminPage = () => {
@@ -108,6 +108,22 @@ const SuperAdminPage = () => {
   const [importing, setImporting] = useState(false);
   const importFileRef = useRef(null);
   const invoiceRef = useRef(null);
+  // Notifications
+  const [notifications, setNotifications] = useState([]);
+  const [notificationTemplates, setNotificationTemplates] = useState([]);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [newNotification, setNewNotification] = useState({
+    title: '',
+    message: '',
+    type: 'info',
+    target: 'all',
+    target_users: [],
+    action_url: '',
+    action_label: '',
+    priority: 'normal',
+    expires_at: ''
+  });
+  const [sendingNotification, setSendingNotification] = useState(false);
 
   // Generate invoice number with format: BBK/2025-26/INV/0001
   const generateInvoiceNumber = (existingInvoiceNo = null) => {
@@ -310,7 +326,7 @@ const SuperAdminPage = () => {
   // Get available tabs based on user type and permissions
   const getAvailableTabs = () => {
     if (userType === 'super-admin') {
-      return ['dashboard', 'users', 'leads', 'team', 'tickets', 'analytics', 'app-versions', 'promotions', 'pricing'];
+      return ['dashboard', 'users', 'leads', 'team', 'tickets', 'analytics', 'app-versions', 'promotions', 'pricing', 'notifications'];
     }
     
     const tabs = [];
@@ -2556,6 +2572,284 @@ const SuperAdminPage = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Notifications Tab - Super Admin Only */}
+        {activeTab === 'notifications' && userType === 'super-admin' && (
+          <div className="space-y-4">
+            {/* Send Notification Card */}
+            <Card>
+              <CardHeader className="bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-t-lg">
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Push Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  {/* Quick Templates */}
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Quick Templates</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { icon: '🎉', label: 'Welcome', title: 'Welcome to BillByteKOT!', message: 'Thanks for joining! Start creating orders and managing your restaurant like a pro.', type: 'success' },
+                        { icon: '🚀', label: 'New Feature', title: 'New Feature Alert!', message: 'We\'ve added exciting new features. Check them out now!', type: 'info' },
+                        { icon: '🎁', label: 'Promo', title: 'Special Offer Just For You!', message: 'Get 50% off on your subscription. Limited time only!', type: 'promo' },
+                        { icon: '⚠️', label: 'Maintenance', title: 'Scheduled Maintenance', message: 'We\'ll be performing maintenance soon. Service may be briefly unavailable.', type: 'warning' },
+                        { icon: '⏰', label: 'Trial Ending', title: 'Your Trial Ends Soon!', message: 'Don\'t lose access! Subscribe now to continue using all features.', type: 'warning' },
+                        { icon: '💜', label: 'Thank You', title: 'Thank You!', message: 'Thanks for being part of the BillByteKOT family. We appreciate you!', type: 'success' },
+                        { icon: '✨', label: 'Update', title: 'App Updated!', message: 'We\'ve made improvements to make your experience even better.', type: 'info' },
+                        { icon: '💡', label: 'Pro Tip', title: 'Pro Tip', message: 'Did you know? You can print receipts directly from the app!', type: 'info' }
+                      ].map((template, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setNewNotification({
+                            ...newNotification,
+                            title: template.title,
+                            message: template.message,
+                            type: template.type
+                          })}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-violet-100 rounded-full text-xs font-medium transition-colors flex items-center gap-1"
+                        >
+                          {template.icon} {template.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Notification Form */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Title *</Label>
+                      <Input
+                        value={newNotification.title}
+                        onChange={(e) => setNewNotification({...newNotification, title: e.target.value})}
+                        placeholder="Notification title"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Type</Label>
+                      <select
+                        value={newNotification.type}
+                        onChange={(e) => setNewNotification({...newNotification, type: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg mt-1"
+                      >
+                        <option value="info">📢 Info</option>
+                        <option value="success">✅ Success</option>
+                        <option value="warning">⚠️ Warning</option>
+                        <option value="error">❌ Error</option>
+                        <option value="promo">🎉 Promo</option>
+                        <option value="order">🍽️ Order</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Message *</Label>
+                    <textarea
+                      value={newNotification.message}
+                      onChange={(e) => setNewNotification({...newNotification, message: e.target.value})}
+                      placeholder="Notification message..."
+                      className="w-full px-3 py-2 border rounded-lg mt-1 h-20 resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Target Audience</Label>
+                      <select
+                        value={newNotification.target}
+                        onChange={(e) => setNewNotification({...newNotification, target: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg mt-1"
+                      >
+                        <option value="all">All Users</option>
+                        <option value="subscribed">Subscribed Users Only</option>
+                        <option value="trial">Trial Users Only</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Priority</Label>
+                      <select
+                        value={newNotification.priority}
+                        onChange={(e) => setNewNotification({...newNotification, priority: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg mt-1"
+                      >
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  <div className="p-4 bg-gray-900 rounded-xl">
+                    <p className="text-xs text-gray-400 mb-2">Preview:</p>
+                    <div className={`p-4 rounded-xl text-white ${
+                      newNotification.type === 'success' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                      newNotification.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
+                      newNotification.type === 'error' ? 'bg-gradient-to-r from-red-500 to-rose-500' :
+                      newNotification.type === 'promo' ? 'bg-gradient-to-r from-pink-500 to-rose-400' :
+                      newNotification.type === 'order' ? 'bg-gradient-to-r from-amber-400 to-yellow-400' :
+                      'bg-gradient-to-r from-violet-500 to-purple-500'
+                    }`}>
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">
+                          {newNotification.type === 'success' ? '✅' :
+                           newNotification.type === 'warning' ? '⚠️' :
+                           newNotification.type === 'error' ? '❌' :
+                           newNotification.type === 'promo' ? '🎉' :
+                           newNotification.type === 'order' ? '🍽️' : '📢'}
+                        </span>
+                        <div>
+                          <p className="font-bold">{newNotification.title || 'Notification Title'}</p>
+                          <p className="text-sm opacity-90 mt-1">{newNotification.message || 'Notification message will appear here...'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Send Button */}
+                  <Button
+                    onClick={async () => {
+                      if (!newNotification.title || !newNotification.message) {
+                        toast.error('Title and message are required');
+                        return;
+                      }
+                      setSendingNotification(true);
+                      try {
+                        const response = await axios.post(
+                          `${API}/super-admin/notifications/send?username=${credentials.username}&password=${credentials.password}`,
+                          newNotification
+                        );
+                        toast.success(`Notification sent to ${response.data.target_users_count} users!`);
+                        setNewNotification({
+                          title: '',
+                          message: '',
+                          type: 'info',
+                          target: 'all',
+                          target_users: [],
+                          action_url: '',
+                          action_label: '',
+                          priority: 'normal',
+                          expires_at: ''
+                        });
+                        // Refresh notifications list
+                        const notifResponse = await axios.get(
+                          `${API}/super-admin/notifications?username=${credentials.username}&password=${credentials.password}`
+                        );
+                        setNotifications(notifResponse.data.notifications || []);
+                      } catch (error) {
+                        toast.error(error.response?.data?.detail || 'Failed to send notification');
+                      }
+                      setSendingNotification(false);
+                    }}
+                    disabled={sendingNotification || !newNotification.title || !newNotification.message}
+                    className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                  >
+                    {sendingNotification ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Notification
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sent Notifications History */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    Sent Notifications
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await axios.get(
+                          `${API}/super-admin/notifications?username=${credentials.username}&password=${credentials.password}`
+                        );
+                        setNotifications(response.data.notifications || []);
+                        toast.success('Refreshed');
+                      } catch (error) {
+                        toast.error('Failed to load notifications');
+                      }
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Bell className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>No notifications sent yet</p>
+                    <p className="text-sm">Send your first notification above!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map((notif) => (
+                      <div key={notif.id} className="p-4 bg-gray-50 rounded-lg border">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                notif.type === 'success' ? 'bg-green-100 text-green-700' :
+                                notif.type === 'warning' ? 'bg-amber-100 text-amber-700' :
+                                notif.type === 'error' ? 'bg-red-100 text-red-700' :
+                                notif.type === 'promo' ? 'bg-pink-100 text-pink-700' :
+                                'bg-violet-100 text-violet-700'
+                              }`}>
+                                {notif.type}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(notif.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="font-semibold">{notif.title}</p>
+                            <p className="text-sm text-gray-600 mt-1">{notif.message}</p>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                              <span>Target: {notif.target}</span>
+                              <span>Sent to: {notif.sent_count} users</span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await axios.delete(
+                                  `${API}/super-admin/notifications/${notif.id}?username=${credentials.username}&password=${credentials.password}`
+                                );
+                                setNotifications(notifications.filter(n => n.id !== notif.id));
+                                toast.success('Notification deleted');
+                              } catch (error) {
+                                toast.error('Failed to delete');
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
 

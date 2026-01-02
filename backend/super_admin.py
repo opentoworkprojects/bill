@@ -711,3 +711,188 @@ async def update_pricing(
     )
     
     return {"message": "Pricing updated successfully"}
+
+
+# ============ PUSH NOTIFICATION MANAGEMENT ============
+
+@super_admin_router.get("/notifications")
+async def get_all_notifications(
+    username: str = Query(...),
+    password: str = Query(...),
+    skip: int = Query(0),
+    limit: int = Query(50)
+):
+    """Get all sent notifications - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    db = get_db()
+    
+    notifications = await db.admin_notifications.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    total = await db.admin_notifications.count_documents({})
+    
+    return {
+        "notifications": notifications,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
+
+
+@super_admin_router.post("/notifications/send")
+async def send_notification(
+    notification_data: dict,
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Send notification to all users or specific users - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    db = get_db()
+    
+    import uuid
+    notification_id = str(uuid.uuid4())
+    
+    notification = {
+        "id": notification_id,
+        "title": notification_data.get("title", "Notification"),
+        "message": notification_data.get("message", ""),
+        "type": notification_data.get("type", "info"),  # info, success, warning, error, order, promo
+        "target": notification_data.get("target", "all"),  # all, subscribed, trial, specific
+        "target_users": notification_data.get("target_users", []),  # for specific targeting
+        "action_url": notification_data.get("action_url", ""),
+        "action_label": notification_data.get("action_label", ""),
+        "priority": notification_data.get("priority", "normal"),  # low, normal, high
+        "expires_at": notification_data.get("expires_at", ""),  # ISO date string
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "sent_count": 0,
+        "read_count": 0,
+        "status": "active"
+    }
+    
+    await db.admin_notifications.insert_one(notification)
+    
+    # Get target users count
+    query = {}
+    if notification["target"] == "subscribed":
+        query["subscription_active"] = True
+    elif notification["target"] == "trial":
+        query["subscription_active"] = False
+    elif notification["target"] == "specific":
+        query["id"] = {"$in": notification["target_users"]}
+    
+    target_count = await db.users.count_documents(query)
+    
+    # Update sent count
+    await db.admin_notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"sent_count": target_count}}
+    )
+    
+    notification["sent_count"] = target_count
+    notification.pop("_id", None)
+    
+    return {
+        "message": "Notification sent successfully",
+        "notification": notification,
+        "target_users_count": target_count
+    }
+
+
+@super_admin_router.delete("/notifications/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Delete a notification - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    db = get_db()
+    
+    result = await db.admin_notifications.delete_one({"id": notification_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {
+        "message": "Notification deleted successfully",
+        "notification_id": notification_id
+    }
+
+
+@super_admin_router.get("/notifications/templates")
+async def get_notification_templates(
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Get pre-built notification templates - Site Owner Only"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    templates = [
+        {
+            "id": "welcome",
+            "name": "Welcome Message",
+            "title": "Welcome to BillByteKOT! 🎉",
+            "message": "Thanks for joining! Start creating orders and managing your restaurant like a pro.",
+            "type": "success"
+        },
+        {
+            "id": "new_feature",
+            "name": "New Feature Announcement",
+            "title": "New Feature Alert! 🚀",
+            "message": "We've added exciting new features. Check them out now!",
+            "type": "info"
+        },
+        {
+            "id": "promo",
+            "name": "Promotional Offer",
+            "title": "Special Offer Just For You! 🎁",
+            "message": "Get 50% off on your subscription. Limited time only!",
+            "type": "promo"
+        },
+        {
+            "id": "maintenance",
+            "name": "Maintenance Notice",
+            "title": "Scheduled Maintenance ⚠️",
+            "message": "We'll be performing maintenance on [DATE]. Service may be briefly unavailable.",
+            "type": "warning"
+        },
+        {
+            "id": "trial_ending",
+            "name": "Trial Ending Soon",
+            "title": "Your Trial Ends Soon! ⏰",
+            "message": "Don't lose access! Subscribe now to continue using all features.",
+            "type": "warning"
+        },
+        {
+            "id": "thank_you",
+            "name": "Thank You",
+            "title": "Thank You! 💜",
+            "message": "Thanks for being part of the BillByteKOT family. We appreciate you!",
+            "type": "success"
+        },
+        {
+            "id": "update",
+            "name": "App Update",
+            "title": "App Updated! ✨",
+            "message": "We've made improvements to make your experience even better.",
+            "type": "info"
+        },
+        {
+            "id": "tip",
+            "name": "Pro Tip",
+            "title": "Pro Tip 💡",
+            "message": "Did you know? You can print receipts directly from the app!",
+            "type": "info"
+        }
+    ]
+    
+    return {"templates": templates}

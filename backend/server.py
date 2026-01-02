@@ -5557,6 +5557,68 @@ async def api_health_check():
     return await health_check()
 
 
+@app.get("/api/notifications/check")
+async def check_notifications(user_id: str = Query(None), since: str = Query("0")):
+    """Check for new notifications for a user"""
+    try:
+        # Get active notifications
+        query = {"status": "active"}
+        
+        # Filter by expiry
+        now = datetime.now(timezone.utc).isoformat()
+        
+        notifications = await db.admin_notifications.find(
+            query,
+            {"_id": 0}
+        ).sort("created_at", -1).limit(10).to_list(10)
+        
+        # Filter notifications based on target
+        user = None
+        if user_id:
+            user = await db.users.find_one({"id": user_id}, {"_id": 0, "subscription_active": 1})
+        
+        filtered = []
+        for notif in notifications:
+            # Check expiry
+            if notif.get("expires_at") and notif["expires_at"] < now:
+                continue
+            
+            # Check target
+            target = notif.get("target", "all")
+            if target == "all":
+                filtered.append(notif)
+            elif target == "subscribed" and user and user.get("subscription_active"):
+                filtered.append(notif)
+            elif target == "trial" and user and not user.get("subscription_active"):
+                filtered.append(notif)
+            elif target == "specific" and user_id in notif.get("target_users", []):
+                filtered.append(notif)
+        
+        # Check if user has seen these notifications
+        seen_key = f"seen_notifications_{user_id}" if user_id else "seen_notifications"
+        seen_doc = await db.user_notification_status.find_one({"key": seen_key})
+        seen_ids = seen_doc.get("seen", []) if seen_doc else []
+        
+        # Filter out seen notifications
+        new_notifications = [n for n in filtered if n["id"] not in seen_ids]
+        
+        # Mark as seen
+        if new_notifications and user_id:
+            new_seen_ids = [n["id"] for n in new_notifications]
+            await db.user_notification_status.update_one(
+                {"key": seen_key},
+                {"$addToSet": {"seen": {"$each": new_seen_ids}}},
+                upsert=True
+            )
+        
+        return {
+            "notifications": new_notifications,
+            "count": len(new_notifications)
+        }
+    except Exception as e:
+        return {"notifications": [], "count": 0}
+
+
 @app.get("/api/app-version")
 async def get_app_version():
     """Get latest app version info for in-app updates"""
