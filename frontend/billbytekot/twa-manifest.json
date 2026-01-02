@@ -21,7 +21,7 @@
     "alias": "android"
   },
   "appVersionName": "17",
-  "appVersionCode": 16,
+  "appVersionCode": 17,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://billbytekot.in/manifest.json",

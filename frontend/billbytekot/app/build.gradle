@@ -57,7 +57,7 @@ android {
         applicationId "in.billbytekot.twa"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 16
+        versionCode 17
         versionName "17"
 
         // The name for the application
