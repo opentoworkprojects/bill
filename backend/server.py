@@ -5557,6 +5557,45 @@ async def api_health_check():
     return await health_check()
 
 
+@app.get("/api/app-version")
+async def get_app_version():
+    """Get latest app version info for in-app updates"""
+    try:
+        # Get version info from database (can be managed from Ops Controls)
+        version_doc = await db.app_settings.find_one({"type": "app_version"})
+        
+        if version_doc:
+            return {
+                "version": version_doc.get("version", "1.4.0"),
+                "release_notes": version_doc.get("release_notes", "Bug fixes and performance improvements"),
+                "force_update": version_doc.get("force_update", False),
+                "message": version_doc.get("message", "A new version is available with improvements!"),
+                "download_url": version_doc.get("download_url", None),
+                "min_version": version_doc.get("min_version", "1.0.0"),
+                "updated_at": version_doc.get("updated_at", datetime.now(timezone.utc).isoformat())
+            }
+        
+        # Default version info
+        return {
+            "version": "1.4.0",
+            "release_notes": "• Enhanced print flow for mobile\n• Bluetooth printer support\n• Offline sync capability\n• Bug fixes",
+            "force_update": False,
+            "message": "Update available with new features!",
+            "download_url": None,
+            "min_version": "1.0.0",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        return {
+            "version": "1.4.0",
+            "release_notes": "",
+            "force_update": False,
+            "message": "",
+            "download_url": None,
+            "min_version": "1.0.0"
+        }
+
+
 # Root endpoint
 @app.get("/")
 async def root():

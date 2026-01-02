@@ -36,7 +36,9 @@ import POSSoftwarePage from './pages/POSSoftwarePage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import NotFound from './pages/NotFound';
 import DesktopInfo from './components/DesktopInfo';
+import UpdateBanner from './components/UpdateBanner';
 import { Toaster } from './components/ui/sonner';
+import { setupAutoSync } from './utils/offlineSync';
 
 // Electron navigation handler component
 const ElectronNavigator = () => {
@@ -531,6 +533,28 @@ function App() {
     };
     
     initAuth();
+    
+    // Setup offline sync
+    setupAutoSync(axios.create({ baseURL: API }));
+    
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('Service Worker registered:', registration.scope);
+          
+          // Check for updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('New version available!');
+              }
+            });
+          });
+        })
+        .catch(err => console.log('Service Worker registration failed:', err));
+    }
 
     // Setup axios interceptor for trial expiration
     const interceptor = axios.interceptors.response.use(
@@ -752,6 +776,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         <DesktopInfo />
+        <UpdateBanner />
       </BrowserRouter>
       <Toaster position="top-center" richColors />
     </div>
