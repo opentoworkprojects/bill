@@ -8533,52 +8533,7 @@ async def check_app_update(platform: str, current_version: str):
     }
 
 
-# Sale/Offer Management Endpoints
-@api_router.get("/super-admin/sale-offer")
-async def get_sale_offer(username: str, password: str):
-    """Get current sale offer settings - Site Owner Only"""
-    if not verify_super_admin(username, password):
-        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
-    
-    offer = await db.site_settings.find_one({"type": "sale_offer"})
-    if not offer:
-        return {
-            "enabled": False,
-            "title": "",
-            "subtitle": "",
-            "discount_text": "",
-            "badge_text": "",
-            "bg_color": "from-red-500 to-orange-500",
-            "end_date": ""
-        }
-    
-    offer.pop("_id", None)
-    offer.pop("type", None)
-    return offer
-
-
-@api_router.post("/super-admin/sale-offer")
-async def update_sale_offer(
-    offer_data: dict,
-    username: str,
-    password: str
-):
-    """Update sale offer settings - Site Owner Only"""
-    if not verify_super_admin(username, password):
-        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
-    
-    offer_data["type"] = "sale_offer"
-    offer_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    await db.site_settings.update_one(
-        {"type": "sale_offer"},
-        {"$set": offer_data},
-        upsert=True
-    )
-    
-    return {"message": "Sale offer updated successfully"}
-
-
+# Public Sale/Offer Endpoint (no auth required)
 @api_router.get("/sale-offer")
 async def get_public_sale_offer():
     """Get active sale offer for landing page - Public endpoint"""
@@ -8617,56 +8572,7 @@ async def get_public_sale_offer():
     return offer
 
 
-# Pricing Management Endpoints
-@api_router.get("/super-admin/pricing")
-async def get_pricing(username: str, password: str):
-    """Get current pricing settings - Site Owner Only"""
-    if not verify_super_admin(username, password):
-        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
-    
-    pricing = await db.site_settings.find_one({"type": "pricing"})
-    if not pricing:
-        return {
-            "regular_price": 999,
-            "regular_price_display": "₹999",
-            "campaign_price": 599,
-            "campaign_price_display": "₹599",
-            "campaign_active": False,
-            "campaign_name": "NEWYEAR2026",
-            "campaign_discount_percent": 40,
-            "campaign_start_date": "",
-            "campaign_end_date": "",
-            "trial_days": 7,
-            "subscription_months": 12
-        }
-    
-    pricing.pop("_id", None)
-    pricing.pop("type", None)
-    return pricing
-
-
-@api_router.post("/super-admin/pricing")
-async def update_pricing(
-    pricing_data: dict,
-    username: str,
-    password: str
-):
-    """Update pricing settings - Site Owner Only"""
-    if not verify_super_admin(username, password):
-        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
-    
-    pricing_data["type"] = "pricing"
-    pricing_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    await db.site_settings.update_one(
-        {"type": "pricing"},
-        {"$set": pricing_data},
-        upsert=True
-    )
-    
-    return {"message": "Pricing updated successfully"}
-
-
+# Public Pricing Endpoint (no auth required)
 @api_router.get("/pricing")
 async def get_public_pricing():
     """Get current pricing for subscription page - Public endpoint"""
