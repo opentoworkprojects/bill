@@ -569,55 +569,55 @@ const OrdersPage = ({ user }) => {
     <Layout user={user}>
       {/* Full-screen Menu Selection Page (Step 2) */}
       {showMenuPage && (
-        <div className="fixed inset-0 z-50 bg-gray-50">
+        <div className="fixed inset-0 z-50 bg-gradient-to-b from-gray-50 to-gray-100">
           <div className="h-full flex flex-col">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white p-4 shadow-lg">
+            {/* Header - Enhanced */}
+            <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 text-white px-4 py-3 shadow-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => { setShowMenuPage(false); resetForm(); }}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-all active:scale-95"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
                   <div>
-                    <h1 className="text-lg font-bold">Select Items</h1>
-                    <p className="text-xs text-white/80">
+                    <h1 className="text-lg font-bold tracking-tight">Select Items</h1>
+                    <p className="text-xs text-white/70">
                       {formData.table_id ? `Table ${tables.find(t => t.id === formData.table_id)?.table_number || ''}` : 'Counter'}
                       {formData.customer_name && ` • ${formData.customer_name}`}
                     </p>
                   </div>
                 </div>
                 {selectedItems.length > 0 && (
-                  <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full">
+                  <div className="flex items-center gap-2 bg-white text-violet-600 px-4 py-2 rounded-full shadow-lg">
                     <ShoppingCart className="w-4 h-4" />
-                    <span className="font-bold">{selectedItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                    <span className="font-bold text-lg">{selectedItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Search and Categories */}
-            <div className="bg-white border-b p-3 space-y-3">
+            {/* Search and Categories - Enhanced */}
+            <div className="bg-white shadow-sm px-4 py-3 space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   placeholder="Search menu items..."
                   value={menuSearch}
                   onChange={(e) => setMenuSearch(e.target.value)}
-                  className="pl-11 h-12 text-base"
+                  className="pl-12 h-12 text-base rounded-xl border-2 border-gray-100 focus:border-violet-400 bg-gray-50 focus:bg-white transition-all"
                 />
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
                 {categories.map(cat => (
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
                       activeCategory === cat
-                        ? 'bg-violet-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-200 scale-105'
+                        : 'bg-gray-100 text-gray-600 hover:bg-violet-50 hover:text-violet-600 active:scale-95'
                     }`}
                   >
                     {cat === 'all' ? 'All Items' : cat}
@@ -626,8 +626,8 @@ const OrdersPage = ({ user }) => {
               </div>
             </div>
 
-            {/* Menu Grid - Full screen scrollable */}
-            <div className="flex-1 overflow-y-auto p-3 pb-36">
+            {/* Menu Grid - Enhanced Cards */}
+            <div className="flex-1 overflow-y-auto px-3 py-4 pb-44">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {menuItems
                   .filter(item => {
@@ -643,63 +643,68 @@ const OrdersPage = ({ user }) => {
                       <div
                         key={item.id}
                         onClick={() => quantity === 0 && handleAddItem(item)}
-                        className={`relative p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer select-none active:scale-95 ${
+                        className={`relative bg-white rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer select-none ${
                           quantity > 0 
-                            ? 'border-violet-500 bg-gradient-to-br from-violet-50 to-purple-50 shadow-lg shadow-violet-100' 
-                            : 'border-gray-100 bg-white hover:border-violet-300 hover:shadow-lg hover:shadow-violet-50 active:bg-violet-50'
+                            ? 'ring-2 ring-violet-500 shadow-xl shadow-violet-100 scale-[1.02]' 
+                            : 'shadow-md hover:shadow-xl hover:scale-[1.02] active:scale-95'
                         }`}
                       >
-                        {/* Quantity Badge */}
+                        {/* Quantity Badge - Enhanced */}
                         {quantity > 0 && (
-                          <div className="absolute -top-2.5 -right-2.5 w-8 h-8 bg-gradient-to-br from-violet-600 to-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg animate-bounce-in">
+                          <div className="absolute top-2 right-2 z-10 w-8 h-8 bg-gradient-to-br from-violet-600 to-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg animate-bounce-in">
                             {quantity}
                           </div>
                         )}
                         
-                        {/* Item Info */}
-                        <div className="mb-2">
-                          <p className="font-semibold text-sm line-clamp-2 leading-tight">{item.name}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{item.category}</p>
+                        {/* Card Content */}
+                        <div className="p-3">
+                          {/* Item Name & Category */}
+                          <div className="mb-2">
+                            <p className="font-bold text-gray-800 text-sm line-clamp-2 leading-snug">{item.name}</p>
+                            <p className="text-[11px] text-gray-400 mt-1 uppercase tracking-wide">{item.category}</p>
+                          </div>
+                          
+                          {/* Price - Enhanced */}
+                          <p className="text-xl font-black text-violet-600 mb-3">
+                            <span className="text-sm font-medium">₹</span>{item.price}
+                          </p>
+                          
+                          {/* Add/Quantity Controls - Enhanced */}
+                          {quantity === 0 ? (
+                            <button className="w-full py-2.5 bg-gradient-to-r from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 rounded-xl text-violet-600 font-semibold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 border-2 border-violet-100">
+                              <Plus className="w-4 h-4" />
+                              Add
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-between bg-gradient-to-r from-violet-100 to-purple-100 rounded-xl p-1" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => {
+                                  const idx = selectedItems.findIndex(si => si.menu_item_id === item.id);
+                                  if (quantity === 1) {
+                                    handleRemoveItem(idx);
+                                  } else {
+                                    playSound('remove');
+                                    handleQuantityChange(idx, quantity - 1);
+                                  }
+                                }}
+                                className="w-9 h-9 flex items-center justify-center bg-white rounded-lg shadow-sm text-violet-600 font-bold text-lg active:scale-90 transition-transform hover:bg-violet-50"
+                              >
+                                −
+                              </button>
+                              <span className="font-black text-violet-700 text-xl min-w-[2.5rem] text-center">{quantity}</span>
+                              <button
+                                onClick={() => {
+                                  playSound('add');
+                                  const idx = selectedItems.findIndex(si => si.menu_item_id === item.id);
+                                  handleQuantityChange(idx, quantity + 1);
+                                }}
+                                className="w-9 h-9 flex items-center justify-center bg-gradient-to-br from-violet-600 to-purple-600 rounded-lg shadow-md text-white font-bold text-lg active:scale-90 transition-transform hover:shadow-lg"
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        
-                        {/* Price */}
-                        <p className="text-lg font-bold text-violet-600 mb-2">₹{item.price}</p>
-                        
-                        {/* Add/Quantity Controls */}
-                        {quantity === 0 ? (
-                          <div className="flex items-center justify-center gap-1 py-2 bg-violet-100 rounded-lg text-violet-700 font-medium text-sm">
-                            <Plus className="w-4 h-4" />
-                            <span>Add</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between bg-violet-100 rounded-lg p-1" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => {
-                                const idx = selectedItems.findIndex(si => si.menu_item_id === item.id);
-                                if (quantity === 1) {
-                                  handleRemoveItem(idx);
-                                } else {
-                                  playSound('remove');
-                                  handleQuantityChange(idx, quantity - 1);
-                                }
-                              }}
-                              className="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm text-violet-600 font-bold active:scale-90 transition-transform"
-                            >
-                              −
-                            </button>
-                            <span className="font-bold text-violet-700 text-lg min-w-[2rem] text-center">{quantity}</span>
-                            <button
-                              onClick={() => {
-                                playSound('add');
-                                const idx = selectedItems.findIndex(si => si.menu_item_id === item.id);
-                                handleQuantityChange(idx, quantity + 1);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center bg-violet-600 rounded-md shadow-sm text-white font-bold active:scale-90 transition-transform"
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
