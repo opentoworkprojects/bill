@@ -873,8 +873,8 @@ const LandingPage = () => {
         </div>
       )}
       
-      {/* New Year Campaign Banner - Show only if no dynamic offer */}
-      {!saleOffer?.enabled && <NewYearBanner />}
+      {/* New Year Campaign Banner - Removed, now controlled from Ops Controls */}
+      {/* To show a banner, enable it from Ops Controls > Promotions */}
       
       {/* Lead Capture Popup */}
       <LeadCapturePopup />
@@ -1140,8 +1140,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* New Year Special Offer Section */}
-      <NewYearSpecialSection navigate={navigate} />
+      {/* Special Offer Section - Only show if sale offer is enabled */}
+      {saleOffer && saleOffer.enabled && <NewYearSpecialSection navigate={navigate} />}
 
       {/* SEO Content Section - Main Homepage Content */}
       <section className="py-16 bg-white">
