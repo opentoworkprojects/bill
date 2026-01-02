@@ -17,7 +17,7 @@ export const getPrintSettings = () => {
       show_email: settings.show_email ?? false,
       show_website: settings.show_website ?? false,
       show_gstin: settings.show_gstin ?? true,
-      show_fssai: settings.show_fssai ?? false,
+      show_fssai: settings.show_fssai ?? true,
       show_tagline: settings.show_tagline ?? true,
       show_customer_name: settings.show_customer_name ?? true,
       show_waiter_name: settings.show_waiter_name ?? true,
@@ -37,35 +37,37 @@ export const getPrintSettings = () => {
     };
   } catch (error) {
     console.error('Error getting print settings:', error);
-    return {
-      paper_width: '80mm',
-      font_size: 'medium',
-      print_copies: 1,
-      kot_auto_print: true,
-      kot_font_size: 'large',
-      auto_print: false,
-      show_logo: true,
-      show_address: true,
-      show_phone: true,
-      show_email: false,
-      show_website: false,
-      show_gstin: true,
-      show_fssai: false,
-      show_tagline: true,
-      show_customer_name: true,
-      show_waiter_name: true,
-      show_table_number: true,
-      show_order_time: true,
-      show_item_notes: true,
-      border_style: 'single',
-      separator_style: 'dashes',
-      footer_style: 'simple',
-      qr_code_enabled: false,
-      kot_show_time: true,
-      kot_highlight_notes: true,
-    };
+    return getDefaultPrintSettings();
   }
 };
+
+const getDefaultPrintSettings = () => ({
+  paper_width: '80mm',
+  font_size: 'medium',
+  print_copies: 1,
+  kot_auto_print: true,
+  kot_font_size: 'large',
+  auto_print: false,
+  show_logo: true,
+  show_address: true,
+  show_phone: true,
+  show_email: false,
+  show_website: false,
+  show_gstin: true,
+  show_fssai: true,
+  show_tagline: true,
+  show_customer_name: true,
+  show_waiter_name: true,
+  show_table_number: true,
+  show_order_time: true,
+  show_item_notes: true,
+  border_style: 'single',
+  separator_style: 'dashes',
+  footer_style: 'simple',
+  qr_code_enabled: false,
+  kot_show_time: true,
+  kot_highlight_notes: true,
+});
 
 // Get business settings safely
 export const getBusinessSettings = () => {
@@ -78,7 +80,23 @@ export const getBusinessSettings = () => {
   }
 };
 
-// Direct thermal print function - opens print dialog immediately
+// Generate a clean bill number from order ID or use order_number
+const getBillNumber = (order) => {
+  // If order has a numeric order_number, use it
+  if (order.order_number) {
+    return order.order_number.toString().padStart(5, '0');
+  }
+  // Otherwise generate from ID - take last 5 digits or create numeric hash
+  const id = order.id || '';
+  if (typeof id === 'number') {
+    return id.toString().padStart(5, '0');
+  }
+  // For UUID-style IDs, create a numeric representation
+  const numericPart = id.replace(/[^0-9]/g, '').slice(-5) || '00001';
+  return numericPart.padStart(5, '0');
+};
+
+// Direct thermal print function - prints immediately without dialog
 export const printThermal = (htmlContent, paperWidth = '80mm') => {
   const printWindow = window.open('', '_blank', 'width=400,height=600');
   
@@ -88,7 +106,7 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
   }
 
   const width = paperWidth === '58mm' ? '58mm' : '80mm';
-  const fontSize = paperWidth === '58mm' ? '10px' : '12px';
+  const baseFontSize = paperWidth === '58mm' ? '11px' : '13px';
   
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -113,6 +131,8 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
             width: ${width};
             margin: 0 !important;
             padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .no-print {
             display: none !important;
@@ -121,14 +141,16 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
         
         body {
           font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
-          font-size: ${fontSize};
-          line-height: 1.3;
+          font-size: ${baseFontSize};
+          font-weight: 600;
+          line-height: 1.4;
           width: ${width};
           max-width: ${width};
           margin: 0 auto;
-          padding: 5mm;
+          padding: 3mm;
           background: #fff;
           color: #000;
+          -webkit-font-smoothing: none;
         }
         
         .receipt {
@@ -140,31 +162,47 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
         }
         
         .bold {
-          font-weight: bold;
+          font-weight: 900 !important;
         }
         
         .large {
-          font-size: 1.2em;
+          font-size: 1.3em;
+          font-weight: 900;
+        }
+        
+        .xlarge {
+          font-size: 1.5em;
+          font-weight: 900;
         }
         
         .small {
-          font-size: 0.85em;
+          font-size: 0.9em;
+        }
+        
+        .xsmall {
+          font-size: 0.8em;
         }
         
         .separator {
           border-top: 1px dashed #000;
-          margin: 3mm 0;
+          margin: 2mm 0;
         }
         
         .double-line {
           border-top: 2px solid #000;
-          margin: 3mm 0;
+          margin: 2mm 0;
+        }
+        
+        .dotted-line {
+          border-top: 1px dotted #000;
+          margin: 2mm 0;
         }
         
         .item-row {
           display: flex;
           justify-content: space-between;
           margin: 1mm 0;
+          font-weight: 600;
         }
         
         .item-name {
@@ -172,60 +210,90 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
           word-break: break-word;
         }
         
-        .item-price {
+        .item-qty {
+          min-width: 30px;
+          text-align: center;
+          font-weight: 900;
+        }
+        
+        .item-rate {
+          min-width: 50px;
           text-align: right;
-          white-space: nowrap;
-          margin-left: 2mm;
+        }
+        
+        .item-amt {
+          min-width: 60px;
+          text-align: right;
+          font-weight: 900;
         }
         
         .total-row {
           display: flex;
           justify-content: space-between;
-          font-weight: bold;
+          font-weight: 700;
           margin: 1mm 0;
         }
         
         .grand-total {
-          font-size: 1.3em;
+          font-size: 1.4em;
+          font-weight: 900;
           margin: 2mm 0;
         }
         
         .note {
-          font-size: 0.8em;
-          color: #333;
+          font-size: 0.85em;
           margin-left: 3mm;
+          font-style: italic;
         }
         
+        .header-logo {
+          font-size: 1.5em;
+          font-weight: 900;
+          margin-bottom: 1mm;
+          letter-spacing: 0.5px;
+        }
+        
+        .footer {
+          margin-top: 3mm;
+          font-size: 0.9em;
+        }
+        
+        .bill-info {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.95em;
+          margin: 1mm 0;
+        }
+        
+        .table-header {
+          display: flex;
+          justify-content: space-between;
+          font-weight: 900;
+          border-bottom: 1px solid #000;
+          padding-bottom: 1mm;
+          margin-bottom: 1mm;
+        }
+        
+        .mb-1 { margin-bottom: 1mm; }
+        .mb-2 { margin-bottom: 2mm; }
+        .mt-1 { margin-top: 1mm; }
+        .mt-2 { margin-top: 2mm; }
+        
         .kot-item {
-          font-size: 1.1em;
-          font-weight: bold;
+          font-size: 1.2em;
+          font-weight: 900;
           margin: 2mm 0;
-          padding: 1mm;
-          border: 1px solid #000;
+          padding: 2mm;
+          border: 2px solid #000;
         }
         
         .kot-note {
           background: #000;
           color: #fff;
-          padding: 1mm 2mm;
+          padding: 2mm;
           margin: 1mm 0 2mm 3mm;
-          font-weight: bold;
+          font-weight: 900;
         }
-        
-        .header-logo {
-          font-size: 1.4em;
-          font-weight: bold;
-          margin-bottom: 2mm;
-        }
-        
-        .footer {
-          margin-top: 4mm;
-          font-size: 0.9em;
-        }
-        
-        .mb-1 { margin-bottom: 1mm; }
-        .mb-2 { margin-bottom: 2mm; }
-        .mt-2 { margin-top: 2mm; }
       </style>
     </head>
     <body>
@@ -238,8 +306,8 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
             window.print();
             setTimeout(function() {
               window.close();
-            }, 500);
-          }, 200);
+            }, 300);
+          }, 100);
         };
       </script>
     </body>
@@ -250,7 +318,8 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
   return true;
 };
 
-// Generate receipt HTML for thermal printer
+
+// Generate professional receipt HTML for thermal printer
 export const generateReceiptHTML = (order, businessOverride = null) => {
   const settings = getPrintSettings();
   const business = businessOverride || getBusinessSettings();
@@ -261,83 +330,89 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   const gstin = business?.gstin || '';
   const fssai = business?.fssai || '';
   const tagline = business?.tagline || '';
-  const footerMsg = business?.footer_message || 'Thank you for dining with us!';
+  const footerMsg = business?.footer_message || 'Thank you! Visit Again...';
   const logoUrl = business?.logo_url || '';
   const upiId = business?.upi_id || '';
+  
+  const billNo = getBillNumber(order);
   
   let html = '';
   
   // Header with Logo
   if (settings.show_logo && logoUrl) {
-    html += `<div class="center mb-2"><img src="${logoUrl}" alt="Logo" style="max-width: 80px; max-height: 60px; object-fit: contain;" onerror="this.style.display='none'" /></div>`;
+    html += `<div class="center mb-1"><img src="${logoUrl}" alt="Logo" style="max-width: 70px; max-height: 50px; object-fit: contain;" onerror="this.style.display='none'" /></div>`;
   }
   
+  // Restaurant Name - Large and Bold
   html += `<div class="center header-logo">${restaurantName}</div>`;
   
+  // Tagline
   if (settings.show_tagline && tagline) {
     html += `<div class="center small mb-1">${tagline}</div>`;
   }
   
+  // FSSAI Number
+  if (settings.show_fssai && fssai) {
+    html += `<div class="center xsmall bold">FSSAI NO: ${fssai}</div>`;
+  }
+  
+  // Address
+  if (settings.show_address && address) {
+    html += `<div class="center xsmall">${address}</div>`;
+  }
+  
+  // Phone
+  if (settings.show_phone && phone) {
+    html += `<div class="center xsmall">Contact No : ${phone}</div>`;
+  }
+  
+  html += '<div class="dotted-line"></div>';
+  
+  // BILL Title
+  html += `<div class="center large mb-1">BILL</div>`;
+  
+  // Bill Info Row - Bill No, Table No, Date/Time
+  html += `<div class="bill-info">
+    <span>Bill No :${billNo}</span>
+    <span>Table No :${order.table_number ? 'T' + order.table_number : 'Counter'}</span>
+    <span>Date :${new Date(order.created_at || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+  </div>`;
+  
+  html += `<div class="bill-info">
+    <span>Captain :${order.waiter_name || 'Self'}</span>
+    <span></span>
+    <span>(${new Date(order.created_at || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })})</span>
+  </div>`;
+  
+  // Customer name if available
+  if (settings.show_customer_name && order.customer_name) {
+    html += `<div class="bill-info"><span>Customer : ${order.customer_name}</span></div>`;
+  }
+  
   html += '<div class="double-line"></div>';
   
-  // Business Info
-  if (settings.show_address && address) {
-    html += `<div class="center small">${address}</div>`;
-  }
-  if (settings.show_phone && phone) {
-    html += `<div class="center small">📞 ${phone}</div>`;
-  }
-  if (settings.show_gstin && gstin) {
-    html += `<div class="center small">GSTIN: ${gstin}</div>`;
-  }
-  if (settings.show_fssai && fssai) {
-    html += `<div class="center small">FSSAI: ${fssai}</div>`;
-  }
-  
-  html += '<div class="separator"></div>';
-  
-  // Order Info
-  html += `<div class="item-row"><span>🧾 BILL #${(order.id || '').toString().slice(0, 8)}</span></div>`;
-  
-  if (settings.show_table_number && order.table_number) {
-    html += `<div class="item-row"><span>🪑 Table ${order.table_number}</span>`;
-    if (settings.show_waiter_name && order.waiter_name) {
-      html += `<span>👤 ${order.waiter_name}</span>`;
-    }
-    html += '</div>';
-  } else if (settings.show_waiter_name && order.waiter_name) {
-    html += `<div class="item-row"><span>👤 ${order.waiter_name}</span></div>`;
-  }
-  
-  if (settings.show_customer_name && order.customer_name) {
-    html += `<div class="item-row"><span>👥 ${order.customer_name}</span></div>`;
-  }
-  
-  if (settings.show_order_time) {
-    const date = new Date(order.created_at || Date.now());
-    html += `<div class="item-row"><span>📅 ${date.toLocaleDateString()} ${date.toLocaleTimeString()}</span></div>`;
-  }
-  
-  html += '<div class="separator"></div>';
-  html += '<div class="center bold mb-2">ORDER ITEMS</div>';
-  html += '<div class="separator"></div>';
+  // Items Table Header
+  html += `<div class="table-header">
+    <span style="flex: 2;">Item</span>
+    <span style="width: 35px; text-align: center;">Qty</span>
+    <span style="width: 55px; text-align: right;">Rate</span>
+    <span style="width: 60px; text-align: right;">Amt</span>
+  </div>`;
   
   // Items
   (order.items || []).forEach(item => {
     const itemTotal = (item.quantity * item.price).toFixed(2);
     html += `
       <div class="item-row">
-        <span class="item-name">${item.quantity}× ${item.name}</span>
-        <span class="item-price">₹${item.price.toFixed(2)}</span>
-      </div>
-      <div class="item-row">
-        <span></span>
-        <span class="item-price bold">₹${itemTotal}</span>
+        <span style="flex: 2;">${item.name}</span>
+        <span style="width: 35px; text-align: center;">${item.quantity}</span>
+        <span style="width: 55px; text-align: right;">${item.price.toFixed(2)}</span>
+        <span style="width: 60px; text-align: right;">${itemTotal}</span>
       </div>
     `;
     
     if (settings.show_item_notes && item.notes) {
-      html += `<div class="note">📝 ${item.notes}</div>`;
+      html += `<div class="note">Note: ${item.notes}</div>`;
     }
   });
   
@@ -347,35 +422,48 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   const subtotal = order.subtotal || 0;
   const tax = order.tax || 0;
   const total = order.total || 0;
-  const paymentReceived = order.payment_received || 0;
-  const balanceAmount = order.balance_amount || 0;
-  const isCredit = order.is_credit || false;
+  const totalItems = (order.items || []).reduce((sum, i) => sum + i.quantity, 0);
   
   html += `
     <div class="total-row">
-      <span>Subtotal</span>
-      <span>₹${subtotal.toFixed(2)}</span>
-    </div>
-    <div class="total-row small">
-      <span>Tax (5.0%)</span>
-      <span>₹${tax.toFixed(2)}</span>
+      <span>Sub Total</span>
+      <span>${totalItems}</span>
+      <span>-</span>
+      <span>${subtotal.toFixed(2)}</span>
     </div>
   `;
+  
+  if (tax > 0) {
+    const taxPercent = subtotal > 0 ? ((tax / subtotal) * 100).toFixed(1) : '5.0';
+    html += `
+      <div class="total-row small">
+        <span>Tax (${taxPercent}%)</span>
+        <span></span>
+        <span></span>
+        <span>${tax.toFixed(2)}</span>
+      </div>
+    `;
+  }
   
   html += '<div class="double-line"></div>';
   
+  // Grand Total
   html += `
     <div class="total-row grand-total">
-      <span>💰 TOTAL</span>
-      <span>₹${total.toFixed(2)}</span>
+      <span>TOTAL DUE</span>
+      <span>${total.toFixed(2)}</span>
     </div>
   `;
   
-  // Split payment details
+  // Payment details
+  const paymentReceived = order.payment_received || 0;
+  const balanceAmount = order.balance_amount || 0;
+  const isCredit = order.is_credit || false;
   const cashAmount = order.cash_amount || 0;
   const cardAmount = order.card_amount || 0;
   const upiAmount = order.upi_amount || 0;
   const creditAmount = order.credit_amount || 0;
+  
   const isSplitPayment = order.payment_method === 'split' || 
     (cashAmount > 0 && (cardAmount > 0 || upiAmount > 0 || creditAmount > 0)) ||
     (cardAmount > 0 && (upiAmount > 0 || creditAmount > 0)) ||
@@ -383,138 +471,126 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   
   if (isSplitPayment) {
     html += '<div class="separator"></div>';
-    html += '<div class="center bold small mb-1">PAYMENT BREAKDOWN</div>';
+    html += '<div class="center bold small mb-1">PAYMENT DETAILS</div>';
     
     if (cashAmount > 0) {
-      html += `<div class="total-row small"><span>💵 Cash</span><span>₹${cashAmount.toFixed(2)}</span></div>`;
+      html += `<div class="total-row small"><span>Cash</span><span>${cashAmount.toFixed(2)}</span></div>`;
     }
     if (cardAmount > 0) {
-      html += `<div class="total-row small"><span>💳 Card</span><span>₹${cardAmount.toFixed(2)}</span></div>`;
+      html += `<div class="total-row small"><span>Card</span><span>${cardAmount.toFixed(2)}</span></div>`;
     }
     if (upiAmount > 0) {
-      html += `<div class="total-row small"><span>📱 UPI</span><span>₹${upiAmount.toFixed(2)}</span></div>`;
+      html += `<div class="total-row small"><span>UPI</span><span>${upiAmount.toFixed(2)}</span></div>`;
     }
     if (creditAmount > 0) {
-      html += `<div class="total-row small" style="color: #d97706;"><span>⚠️ Credit</span><span>₹${creditAmount.toFixed(2)}</span></div>`;
+      html += `<div class="total-row small"><span>Credit (Due)</span><span>${creditAmount.toFixed(2)}</span></div>`;
     }
-    
-    const totalPaid = cashAmount + cardAmount + upiAmount;
-    if (totalPaid > 0) {
-      html += `<div class="total-row" style="color: green;"><span>✅ Total Paid</span><span>₹${totalPaid.toFixed(2)}</span></div>`;
-    }
-  }
-  
-  // Credit bill payment details (for non-split or credit amount)
-  if ((isCredit || balanceAmount > 0 || creditAmount > 0) && !isSplitPayment) {
+  } else if (isCredit || balanceAmount > 0) {
     html += '<div class="separator"></div>';
     html += `
-      <div class="total-row" style="color: green;">
-        <span>✅ Received</span>
-        <span>₹${paymentReceived.toFixed(2)}</span>
+      <div class="total-row">
+        <span>Received</span>
+        <span>${paymentReceived.toFixed(2)}</span>
       </div>
-      <div class="total-row" style="color: #d97706; font-weight: bold;">
-        <span>⚠️ BALANCE DUE</span>
-        <span>₹${balanceAmount.toFixed(2)}</span>
+      <div class="total-row bold">
+        <span>BALANCE DUE</span>
+        <span>${balanceAmount.toFixed(2)}</span>
       </div>
     `;
   }
   
-  // Show balance due for split payment with credit
-  if (isSplitPayment && creditAmount > 0) {
-    html += `<div class="total-row" style="color: #d97706; font-weight: bold;"><span>⚠️ BALANCE DUE</span><span>₹${creditAmount.toFixed(2)}</span></div>`;
+  // Payment method
+  if (order.payment_method && !isSplitPayment) {
+    const methodDisplay = {
+      'cash': 'CASH',
+      'card': 'CARD',
+      'upi': 'UPI',
+      'credit': 'CREDIT'
+    }[order.payment_method] || order.payment_method.toUpperCase();
+    html += `<div class="center small mt-1">Payment: ${methodDisplay}</div>`;
   }
   
   // UPI QR Code for balance payment
   const balanceForQR = isSplitPayment ? creditAmount : balanceAmount;
   if (upiId && balanceForQR > 0 && settings.qr_code_enabled) {
-    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restaurantName)}&am=${balanceForQR.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Balance Payment - Bill #' + (order.id || '').toString().slice(0, 8))}`;
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restaurantName)}&am=${balanceForQR.toFixed(2)}&cu=INR`;
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(upiUrl)}`;
     
     html += `
       <div class="separator"></div>
-      <div class="center bold mb-1">📱 Scan to Pay Balance</div>
+      <div class="center bold small">Scan to Pay</div>
       <div class="center mb-1">
-        <img src="${qrApiUrl}" alt="UPI QR" style="width: 120px; height: 120px;" onerror="this.style.display='none'" />
+        <img src="${qrApiUrl}" alt="UPI QR" style="width: 100px; height: 100px;" onerror="this.style.display='none'" />
       </div>
-      <div class="center small">UPI: ${upiId}</div>
+      <div class="center xsmall">UPI: ${upiId}</div>
     `;
   }
   
   html += '<div class="double-line"></div>';
   
-  // Payment method if available
-  if (order.payment_method && !isSplitPayment) {
-    const methodDisplay = order.payment_method === 'credit' ? 'CREDIT (UNPAID)' : order.payment_method.toUpperCase();
-    html += `<div class="center small mb-2">Payment: ${methodDisplay}</div>`;
-  } else if (isSplitPayment) {
-    html += `<div class="center small mb-2">Payment: SPLIT</div>`;
-  }
-  
-  // Credit warning
-  if (isCredit || creditAmount > 0) {
-    html += `<div class="center bold" style="color: #d97706; padding: 5px; border: 1px dashed #d97706; margin: 5px 0;">⚠️ CREDIT BILL - BALANCE PENDING</div>`;
-  }
-  
   // Footer
   html += `
     <div class="footer center">
-      <div class="mb-1">✨ ${footerMsg} ✨</div>
-      ${gstin ? `<div class="small">GSTIN: ${gstin}</div>` : ''}
+      <div class="bold">${footerMsg}</div>
+      <div class="xsmall mt-1">Software Developed by BillByteKOT</div>
+      <div class="xsmall">(billbytekot.in)</div>
     </div>
   `;
   
   return html;
 };
 
+
 // Generate KOT HTML for thermal printer
 export const generateKOTHTML = (order, businessOverride = null) => {
   const settings = getPrintSettings();
   const business = businessOverride || getBusinessSettings();
   
+  const billNo = getBillNumber(order);
+  
   let html = '';
   
   // KOT Header
   html += `
-    <div class="center bold large">🍳 KITCHEN ORDER TICKET 🍳</div>
+    <div class="center xlarge bold">*** KOT ***</div>
+    <div class="center large">KITCHEN ORDER TICKET</div>
     <div class="double-line"></div>
   `;
   
   // Order Info
   html += `
-    <div class="item-row bold">
-      <span>ORDER #${(order.id || '').toString().slice(0, 8)}</span>
+    <div class="bill-info">
+      <span class="bold">Order #${billNo}</span>
+      <span class="bold">Table: ${order.table_number ? 'T' + order.table_number : 'Counter'}</span>
     </div>
-    <div class="item-row large bold">
-      <span>🪑 TABLE: ${order.table_number || 'N/A'}</span>
-    </div>
-    <div class="item-row">
-      <span>👤 Server: ${order.waiter_name || 'N/A'}</span>
+    <div class="bill-info">
+      <span>Captain: ${order.waiter_name || 'Self'}</span>
     </div>
   `;
   
   if (settings.kot_show_time) {
     const date = new Date(order.created_at || Date.now());
-    html += `<div class="item-row"><span>⏰ ${date.toLocaleTimeString()}</span></div>`;
+    html += `<div class="bill-info"><span>Time: ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span></div>`;
   }
   
   if (order.customer_name) {
-    html += `<div class="item-row"><span>👥 Customer: ${order.customer_name}</span></div>`;
+    html += `<div class="bill-info"><span>Customer: ${order.customer_name}</span></div>`;
   }
   
   html += '<div class="double-line"></div>';
-  html += '<div class="center bold large mb-2">📋 ITEMS TO PREPARE</div>';
+  html += '<div class="center large bold mb-2">ITEMS TO PREPARE</div>';
   html += '<div class="separator"></div>';
   
   // Items - Large and clear for kitchen
   (order.items || []).forEach(item => {
     html += `
       <div class="kot-item">
-        ${item.quantity}× ${item.name.toUpperCase()}
+        ${item.quantity} × ${item.name.toUpperCase()}
       </div>
     `;
     
     if (settings.kot_highlight_notes && item.notes) {
-      html += `<div class="kot-note">⚠️ ${item.notes.toUpperCase()}</div>`;
+      html += `<div class="kot-note">*** ${item.notes.toUpperCase()} ***</div>`;
     }
   });
   
@@ -523,7 +599,7 @@ export const generateKOTHTML = (order, businessOverride = null) => {
   // Total items count
   const totalItems = (order.items || []).reduce((sum, i) => sum + i.quantity, 0);
   html += `
-    <div class="center bold large mt-2">
+    <div class="center large bold mt-2">
       TOTAL ITEMS: ${totalItems}
     </div>
   `;
@@ -533,7 +609,7 @@ export const generateKOTHTML = (order, businessOverride = null) => {
   // Priority indicator
   html += `
     <div class="center bold">
-      ${order.priority === 'high' ? '🔴 HIGH PRIORITY' : '🟢 NORMAL'}
+      ${order.priority === 'high' ? '*** HIGH PRIORITY ***' : 'NORMAL PRIORITY'}
     </div>
   `;
   
@@ -550,15 +626,17 @@ export const generateReceiptContent = (order, businessOverride = null) => {
     const sep = settings.separator_style === 'dashes' ? '-'.repeat(width) : 
                 settings.separator_style === 'dots' ? '.'.repeat(width) :
                 settings.separator_style === 'equals' ? '='.repeat(width) : 
-                '─'.repeat(width);
+                '-'.repeat(width);
     
-    const doubleSep = settings.border_style === 'double' ? '═'.repeat(width) : sep;
+    const doubleSep = '='.repeat(width);
     
     const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
     const centeredName = restaurantName.length <= width ? 
       restaurantName.padStart((width + restaurantName.length) / 2).padEnd(width) : 
       restaurantName.substring(0, width);
 
+    const billNo = getBillNumber(order);
+    
     let receipt = '';
     
     receipt += doubleSep + '\n';
@@ -571,41 +649,41 @@ export const generateReceiptContent = (order, businessOverride = null) => {
     
     receipt += doubleSep + '\n';
     
+    if (settings.show_fssai && businessSettings?.fssai) {
+      receipt += `FSSAI: ${businessSettings.fssai}\n`;
+    }
     if (settings.show_address && businessSettings?.address) {
       receipt += businessSettings.address.substring(0, width) + '\n';
     }
     if (settings.show_phone && businessSettings?.phone) {
-      receipt += `Phone: ${businessSettings.phone}\n`;
-    }
-    if (settings.show_gstin && businessSettings?.gstin) {
-      receipt += `GSTIN: ${businessSettings.gstin}\n`;
+      receipt += `Contact: ${businessSettings.phone}\n`;
     }
     
     receipt += sep + '\n';
+    receipt += 'BILL'.padStart((width + 4) / 2).padEnd(width) + '\n';
+    receipt += sep + '\n';
     
-    receipt += `Bill #: ${order.id?.toString().slice(0, 8) || 'N/A'}\n`;
-    if (settings.show_table_number && order.table_number) {
-      receipt += `Table: ${order.table_number}\n`;
-    }
+    receipt += `Bill No: ${billNo}  Table: ${order.table_number ? 'T' + order.table_number : 'Counter'}\n`;
+    receipt += `Date: ${new Date(order.created_at || Date.now()).toLocaleDateString('en-IN')}\n`;
+    receipt += `Time: ${new Date(order.created_at || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}\n`;
+    
     if (settings.show_waiter_name && order.waiter_name) {
-      receipt += `Server: ${order.waiter_name}\n`;
+      receipt += `Captain: ${order.waiter_name}\n`;
     }
     if (settings.show_customer_name && order.customer_name) {
       receipt += `Customer: ${order.customer_name}\n`;
     }
-    if (settings.show_order_time) {
-      receipt += `Date: ${new Date(order.created_at || Date.now()).toLocaleString()}\n`;
-    }
     
     receipt += sep + '\n';
-    receipt += 'ITEMS:\n';
+    receipt += 'Item            Qty    Rate     Amt\n';
     receipt += sep + '\n';
     
     (order.items || []).forEach(item => {
-      const itemLine = `${item.quantity}x ${item.name}`;
-      const priceLine = `₹${(item.quantity * item.price).toFixed(2)}`;
-      const spaces = width - itemLine.length - priceLine.length;
-      receipt += itemLine + ' '.repeat(Math.max(1, spaces)) + priceLine + '\n';
+      const name = item.name.substring(0, 14).padEnd(14);
+      const qty = item.quantity.toString().padStart(3);
+      const rate = item.price.toFixed(2).padStart(8);
+      const amt = (item.quantity * item.price).toFixed(2).padStart(8);
+      receipt += `${name} ${qty} ${rate} ${amt}\n`;
       
       if (settings.show_item_notes && item.notes) {
         receipt += `   Note: ${item.notes}\n`;
@@ -617,15 +695,19 @@ export const generateReceiptContent = (order, businessOverride = null) => {
     const subtotal = order.subtotal || 0;
     const tax = order.tax || 0;
     const total = order.total || 0;
+    const totalItems = (order.items || []).reduce((sum, i) => sum + i.quantity, 0);
     
-    receipt += `Subtotal:${' '.repeat(width - 18)}₹${subtotal.toFixed(2)}\n`;
-    receipt += `Tax:${' '.repeat(width - 13)}₹${tax.toFixed(2)}\n`;
+    receipt += `Sub Total       ${totalItems.toString().padStart(3)}     -  ${subtotal.toFixed(2).padStart(8)}\n`;
+    if (tax > 0) {
+      receipt += `Tax (5%)                       ${tax.toFixed(2).padStart(8)}\n`;
+    }
     receipt += doubleSep + '\n';
-    receipt += `TOTAL:${' '.repeat(width - 15)}₹${total.toFixed(2)}\n`;
+    receipt += `TOTAL DUE                      ${total.toFixed(2).padStart(8)}\n`;
     receipt += doubleSep + '\n';
     
-    const footer = businessSettings?.footer_message || 'Thank you for dining with us!';
+    const footer = businessSettings?.footer_message || 'Thank you! Visit Again...';
     receipt += '\n' + footer.padStart((width + footer.length) / 2).padEnd(width) + '\n';
+    receipt += 'Software by BillByteKOT\n'.padStart((width + 22) / 2).padEnd(width);
     
     receipt += doubleSep + '\n';
     
@@ -646,18 +728,20 @@ export const generateKOTContent = (order, businessOverride = null) => {
     const sep = '='.repeat(width);
     const dash = '-'.repeat(width);
     
+    const billNo = getBillNumber(order);
+    
     let kot = '';
     
     kot += sep + '\n';
-    kot += '*** KITCHEN ORDER TICKET ***'.padStart((width + 28) / 2).padEnd(width) + '\n';
+    kot += '*** KOT ***'.padStart((width + 11) / 2).padEnd(width) + '\n';
+    kot += 'KITCHEN ORDER TICKET'.padStart((width + 20) / 2).padEnd(width) + '\n';
     kot += sep + '\n\n';
     
-    kot += `ORDER #: ${order.id?.toString().slice(0, 8) || 'N/A'}\n`;
-    kot += `TABLE: ${order.table_number || 'N/A'}\n`;
-    kot += `SERVER: ${order.waiter_name || 'N/A'}\n`;
+    kot += `Order #: ${billNo}  Table: ${order.table_number ? 'T' + order.table_number : 'Counter'}\n`;
+    kot += `Captain: ${order.waiter_name || 'Self'}\n`;
     
     if (settings.kot_show_time) {
-      kot += `TIME: ${new Date(order.created_at || Date.now()).toLocaleTimeString()}\n`;
+      kot += `Time: ${new Date(order.created_at || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}\n`;
     }
     
     kot += '\n' + dash + '\n';
@@ -665,7 +749,7 @@ export const generateKOTContent = (order, businessOverride = null) => {
     kot += dash + '\n\n';
     
     (order.items || []).forEach((item, idx) => {
-      kot += `${item.quantity}x ${item.name.toUpperCase()}\n`;
+      kot += `${item.quantity} x ${item.name.toUpperCase()}\n`;
       
       if (settings.kot_highlight_notes && item.notes) {
         kot += `    *** ${item.notes.toUpperCase()} ***\n`;
@@ -713,7 +797,7 @@ export const printKOT = (order, businessOverride = null) => {
 };
 
 // Legacy print document function (for backward compatibility)
-export const printDocument = (content, title = 'Print', type = 'receipt') => {
+export const printDocument = (content, title = 'Print') => {
   try {
     const settings = getPrintSettings();
     const paperWidth = settings.paper_width || '80mm';
@@ -746,11 +830,12 @@ export const printDocument = (content, title = 'Print', type = 'receipt') => {
           }
           body {
             font-family: 'Courier New', monospace;
-            font-size: ${paperWidth === '58mm' ? '10px' : '12px'};
-            line-height: 1.3;
+            font-size: ${paperWidth === '58mm' ? '11px' : '13px'};
+            font-weight: 600;
+            line-height: 1.4;
             width: ${width};
             margin: 0 auto;
-            padding: 5mm;
+            padding: 3mm;
             white-space: pre-wrap;
           }
         </style>
@@ -760,8 +845,8 @@ export const printDocument = (content, title = 'Print', type = 'receipt') => {
         window.onload = function() {
           setTimeout(function() {
             window.print();
-            setTimeout(function() { window.close(); }, 500);
-          }, 200);
+            setTimeout(function() { window.close(); }, 300);
+          }, 100);
         };
       </script>
       </html>
@@ -778,14 +863,14 @@ export const printDocument = (content, title = 'Print', type = 'receipt') => {
 };
 
 // Print with multiple copies
-export const printWithCopies = (content, title = 'Print', type = 'receipt') => {
+export const printWithCopies = (content, title = 'Print') => {
   try {
     const settings = getPrintSettings();
     const copies = settings.print_copies || 1;
     
     for (let i = 0; i < copies; i++) {
       setTimeout(() => {
-        printDocument(content, `${title} (Copy ${i + 1}/${copies})`, type);
+        printDocument(content, `${title} (Copy ${i + 1}/${copies})`);
       }, i * 1500);
     }
     
@@ -796,6 +881,13 @@ export const printWithCopies = (content, title = 'Print', type = 'receipt') => {
     return true;
   } catch (error) {
     console.error('Error printing multiple copies:', error);
-    return printDocument(content, title, type);
+    return printDocument(content, title);
   }
+};
+
+// Silent print function - attempts to print without dialog (for supported browsers/apps)
+export const silentPrint = (htmlContent, paperWidth = '80mm') => {
+  // For Electron/Desktop apps, this can be enhanced to use native printing
+  // For web, we use the standard print approach
+  return printThermal(htmlContent, paperWidth);
 };
