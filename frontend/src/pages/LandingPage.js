@@ -358,13 +358,17 @@ const DesktopDownloadSection = () => {
   );
 };
 
-// New Year Special Section Component with working countdown
-const NewYearSpecialSection = ({ navigate }) => {
+// Dynamic Sale/Promotional Section Component - Content from Ops Controls
+const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const endDate = new Date('2026-01-01T23:59:59');
+      // Use valid_until from saleOffer if available, otherwise end_date
+      const endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
+      if (!endDateStr) return;
+      
+      const endDate = new Date(endDateStr);
       const now = new Date();
       const difference = endDate - now;
       
@@ -381,10 +385,18 @@ const NewYearSpecialSection = ({ navigate }) => {
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [saleOffer]);
+
+  // Get dynamic values from saleOffer and pricing
+  const offerTitle = saleOffer?.title || 'Special Offer';
+  const offerSubtitle = saleOffer?.subtitle || 'Limited time deal!';
+  const discountText = saleOffer?.discount_text || pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '';
+  const campaignPrice = pricing?.campaign_price_display || '₹599';
+  const regularPrice = pricing?.regular_price_display || '₹999';
+  const bgColor = saleOffer?.bg_color || 'from-red-500 via-orange-500 to-yellow-500';
 
   return (
-    <section id="new-year-offer" className="py-16 bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 relative overflow-hidden">
+    <section id="sale-offer" className={`py-16 bg-gradient-to-br ${bgColor} relative overflow-hidden`}>
       {/* Animated background particles */}
       <div className="absolute inset-0">
         {[...Array(30)].map((_, i) => (
@@ -406,36 +418,38 @@ const NewYearSpecialSection = ({ navigate }) => {
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Left Content */}
             <div className="text-white space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur rounded-full animate-bounce">
-                <span className="text-2xl">🎉</span>
-                <span className="font-bold">NEW YEAR SPECIAL</span>
-                <span className="text-2xl">🎉</span>
-              </div>
+              {saleOffer?.badge_text && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur rounded-full animate-bounce">
+                  <span className="text-2xl">🎉</span>
+                  <span className="font-bold">{saleOffer.badge_text}</span>
+                  <span className="text-2xl">🎉</span>
+                </div>
+              )}
               
               <h2 className="text-4xl md:text-5xl font-black leading-tight" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                New Year 2026
-                <span className="block text-yellow-200">Special Deal!</span>
+                {offerTitle}
+                <span className="block text-yellow-200">{offerSubtitle}</span>
               </h2>
               
               <p className="text-xl text-white/90">
-                Start 2026 with the best restaurant management system at an amazing price!
+                Get the best restaurant management system at an amazing price!
               </p>
               
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="text-center">
                   <div className="text-sm text-white/70 line-through">Regular Price</div>
-                  <div className="text-2xl font-bold text-white/70">₹999/year</div>
+                  <div className="text-2xl font-bold text-white/70">{regularPrice}/year</div>
                 </div>
                 <ArrowRight className="w-8 h-8 text-yellow-200 animate-pulse hidden sm:block" />
                 <div className="text-center bg-white/20 backdrop-blur rounded-xl p-4">
-                  <div className="text-sm text-yellow-200 font-bold">New Year Price</div>
-                  <div className="text-5xl font-black text-white">₹599</div>
+                  <div className="text-sm text-yellow-200 font-bold">Special Price</div>
+                  <div className="text-5xl font-black text-white">{campaignPrice}</div>
                   <div className="text-sm text-white/80">per year</div>
                 </div>
               </div>
               
               <div className="flex flex-wrap gap-2 sm:gap-3">
-                {["Unlimited Bills", "All Features", "Priority Support", "40% OFF"].map((item, i) => (
+                {["Unlimited Bills", "All Features", "Priority Support", discountText].filter(Boolean).map((item, i) => (
                   <div key={i} className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-2 rounded-full">
                     <CheckCircle className="w-4 h-4 text-yellow-200" />
                     <span className="text-sm font-medium">{item}</span>
@@ -449,12 +463,12 @@ const NewYearSpecialSection = ({ navigate }) => {
                 onClick={() => navigate("/login")}
               >
                 <Gift className="w-5 h-5 mr-2" />
-                Get ₹599/Year Deal Now
+                Get {campaignPrice}/Year Deal Now
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               
               <p className="text-sm text-white/70">
-                ⏰ Offer valid on January 1, 2026 ONLY • No hidden charges • Cancel anytime
+                ⏰ Limited time offer • No hidden charges • Cancel anytime
               </p>
             </div>
             
@@ -493,7 +507,7 @@ const NewYearSpecialSection = ({ navigate }) => {
                     </div>
                   </div>
                   <p className="text-center text-sm text-white/80 mt-4">
-                    🎯 Limited time New Year offer!
+                    🎯 Limited time offer!
                   </p>
                 </CardContent>
               </Card>
@@ -503,7 +517,7 @@ const NewYearSpecialSection = ({ navigate }) => {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Gift className="w-5 h-5 text-red-500" />
-                    What You Get for ₹599/Year
+                    What You Get for {campaignPrice}/Year
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3">
@@ -513,7 +527,7 @@ const NewYearSpecialSection = ({ navigate }) => {
                     { icon: "📱", text: "WhatsApp Integration" },
                     { icon: "🤖", text: "AI-Powered Analytics" },
                     { icon: "👥", text: "Multi-Staff Management" },
-                    { icon: "🎉", text: "New Year Special Badge" },
+                    { icon: "🎉", text: "Special Offer Badge" },
                     { icon: "📞", text: "Priority 24/7 Support" },
                     { icon: "🔄", text: "Free Updates Forever" }
                   ].map((item, i) => (
@@ -532,14 +546,17 @@ const NewYearSpecialSection = ({ navigate }) => {
   );
 };
 
-// New Year Campaign Banner Component
-const NewYearBanner = () => {
+// Dynamic Campaign Banner Component - Content from Ops Controls
+const CampaignBanner = ({ saleOffer, pricing }) => {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const endDate = new Date('2026-01-01T23:59:59');
+      const endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
+      if (!endDateStr) return;
+      
+      const endDate = new Date(endDateStr);
       const now = new Date();
       const difference = endDate - now;
       
@@ -556,10 +573,17 @@ const NewYearBanner = () => {
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [saleOffer]);
+
+  // Get dynamic values
+  const campaignPrice = pricing?.campaign_price_display || '₹599';
+  const regularPrice = pricing?.regular_price_display || '₹999';
+  const discountText = saleOffer?.discount_text || (pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '');
+  const badgeText = saleOffer?.badge_text || 'SPECIAL OFFER';
+  const bgColor = saleOffer?.bg_color || 'from-orange-500 via-red-500 to-pink-500';
   
   return (
-    <div className="relative overflow-hidden bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white py-3 animate-gradient" style={{ backgroundSize: '200% 200%' }}>
+    <div className={`relative overflow-hidden bg-gradient-to-r ${bgColor} text-white py-3 animate-gradient`} style={{ backgroundSize: '200% 200%' }}>
       {/* Animated sparkles */}
       <div className="absolute inset-0 overflow-hidden">
         {[...Array(20)].map((_, i) => (
@@ -578,23 +602,25 @@ const NewYearBanner = () => {
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-center">
-          {/* Fire emoji with animation */}
+          {/* Badge with animation */}
           <div className="flex items-center gap-2 animate-bounce">
             <span className="text-2xl">🎉</span>
-            <span className="font-bold text-lg md:text-xl tracking-wide">NEW YEAR SPECIAL</span>
+            <span className="font-bold text-lg md:text-xl tracking-wide">{badgeText}</span>
             <span className="text-2xl">🎉</span>
           </div>
           
           {/* Price highlight */}
           <div className="flex items-center gap-2">
-            <span className="text-sm md:text-base line-through opacity-70">₹999/year</span>
+            <span className="text-sm md:text-base line-through opacity-70">{regularPrice}/year</span>
             <div className="relative">
               <span className="text-2xl md:text-3xl font-black animate-pulse-glow px-3 py-1 bg-white/20 rounded-lg">
-                ₹599/year
+                {campaignPrice}/year
               </span>
-              <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full animate-bounce">
-                40% OFF
-              </span>
+              {discountText && (
+                <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full animate-bounce">
+                  {discountText}
+                </span>
+              )}
             </div>
           </div>
           
@@ -643,23 +669,46 @@ const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [saleOffer, setSaleOffer] = useState(null);
+  const [pricing, setPricing] = useState(null);
   
   // Initialize scroll animations
   useScrollAnimation();
 
-  // Fetch sale offer
+  // Fetch sale offer and pricing
   useEffect(() => {
     const fetchSaleOffer = async () => {
       try {
         const response = await axios.get(`${API}/sale-offer`);
         if (response.data?.enabled) {
           setSaleOffer(response.data);
+        } else {
+          setSaleOffer(null);
         }
       } catch (error) {
-        // No sale offer active
+        setSaleOffer(null);
       }
     };
+    
+    const fetchPricing = async () => {
+      try {
+        const response = await axios.get(`${API}/pricing`);
+        setPricing(response.data);
+      } catch (error) {
+        // Use default pricing
+        setPricing({
+          regular_price: 999,
+          regular_price_display: '₹999',
+          campaign_price: 599,
+          campaign_price_display: '₹599',
+          campaign_active: false,
+          campaign_discount_percent: 40,
+          trial_days: 7
+        });
+      }
+    };
+    
     fetchSaleOffer();
+    fetchPricing();
   }, []);
 
   const handleGetStarted = () => {
@@ -787,46 +836,54 @@ const LandingPage = () => {
     },
   ];
 
-  const pricingPlans = [
-    {
-      name: "Free Trial",
-      price: "₹0",
-      period: "7 Days Free",
-      features: [
-        "7 days full access",
-        "All premium features",
-        "AI recommendations",
-        "Unlimited bills (trial)",
-        "Single restaurant",
-        "Email support",
-      ],
-      cta: "Start Free Trial",
-      popular: false,
-    },
-    {
-      name: "New Year Special",
-      price: "₹599",
-      period: "per year",
-      originalPrice: "₹999",
-      badge: "40% OFF - Jan 1 Only",
-      features: [
-        "Unlimited bills forever",
-        "All premium features",
-        "Advanced AI analytics",
-        "Priority 24/7 support",
-        "Multiple restaurants",
-        "Phone & chat support",
-        "Custom integrations",
-        "Export to CSV/PDF",
-        "Multi-currency",
-        "6 thermal printer themes",
-        "WhatsApp integration",
-        "New Year special badge",
-      ],
-      cta: "🎉 Get ₹599/Year Deal",
-      popular: true,
-    },
-  ];
+  // Dynamic pricing plans based on API data
+  const getPricingPlans = () => {
+    const isPromoActive = saleOffer?.enabled || pricing?.campaign_active;
+    const currentPrice = isPromoActive ? (pricing?.campaign_price_display || '₹599') : (pricing?.regular_price_display || '₹999');
+    const discountPercent = pricing?.campaign_discount_percent || 40;
+    
+    return [
+      {
+        name: "Free Trial",
+        price: "₹0",
+        period: `${pricing?.trial_days || 7} Days Free`,
+        features: [
+          `${pricing?.trial_days || 7} days full access`,
+          "All premium features",
+          "AI recommendations",
+          "Unlimited bills (trial)",
+          "Single restaurant",
+          "Email support",
+        ],
+        cta: "Start Free Trial",
+        popular: false,
+      },
+      {
+        name: isPromoActive ? "Special Offer" : "Premium",
+        price: currentPrice,
+        period: "per year",
+        originalPrice: isPromoActive ? (pricing?.regular_price_display || '₹999') : null,
+        badge: isPromoActive ? `${discountPercent}% OFF` : null,
+        features: [
+          "Unlimited bills forever",
+          "All premium features",
+          "Advanced AI analytics",
+          "Priority 24/7 support",
+          "Multiple restaurants",
+          "Phone & chat support",
+          "Custom integrations",
+          "Export to CSV/PDF",
+          "Multi-currency",
+          "6 thermal printer themes",
+          "WhatsApp integration",
+        ],
+        cta: isPromoActive ? `🎉 Get ${currentPrice}/Year Deal` : `Subscribe - ${currentPrice}/year`,
+        popular: true,
+      },
+    ];
+  };
+
+  const pricingPlans = getPricingPlans();
 
   const [earlyAccessEmail, setEarlyAccessEmail] = useState("");
 
@@ -1049,18 +1106,29 @@ const LandingPage = () => {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto font-light animate-fade-in-up delay-200">
-              AI-powered POS system trusted by 500+ restaurants. 
-              <span className="font-semibold text-red-600"> New Year Special: ₹599/year (40% OFF)!</span>
+              AI-powered POS system trusted by 500+ restaurants.
+              {(saleOffer?.enabled || pricing?.campaign_active) && (
+                <span className="font-semibold text-red-600"> {saleOffer?.discount_text || `${pricing?.campaign_discount_percent}% OFF`}!</span>
+              )}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 animate-fade-in-up delay-400">
               <Button
                 size="lg"
-                className="bg-gradient-to-r from-red-500 to-orange-500 h-14 px-8 text-lg btn-animate hover-lift animate-pulse-glow"
+                className={`h-14 px-8 text-lg btn-animate hover-lift ${(saleOffer?.enabled || pricing?.campaign_active) ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse-glow' : 'bg-gradient-to-r from-violet-600 to-purple-600'}`}
                 onClick={handleGetStarted}
               >
-                <Gift className="w-5 h-5 mr-2" />
-                Get ₹599/Year Deal
+                {(saleOffer?.enabled || pricing?.campaign_active) ? (
+                  <>
+                    <Gift className="w-5 h-5 mr-2" />
+                    Get {pricing?.campaign_price_display || '₹599'}/Year Deal
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="w-5 h-5 mr-2" />
+                    Start Free Trial
+                  </>
+                )}
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               <Button
@@ -1141,7 +1209,7 @@ const LandingPage = () => {
       </section>
 
       {/* Special Offer Section - Only show if sale offer is enabled */}
-      {saleOffer && saleOffer.enabled && <NewYearSpecialSection navigate={navigate} />}
+      {saleOffer && saleOffer.enabled && <SaleOfferSection navigate={navigate} saleOffer={saleOffer} pricing={pricing} />}
 
       {/* SEO Content Section - Main Homepage Content */}
       <section className="py-16 bg-white">
@@ -1389,8 +1457,10 @@ const LandingPage = () => {
                 <CardContent className="pt-6">
                   <ul className="space-y-4">
                     {[
-                      "₹599/year - New Year Special (40% OFF)",
-                      "7-day free trial, no credit card",
+                      (saleOffer?.enabled || pricing?.campaign_active) 
+                        ? `${pricing?.campaign_price_display || '₹599'}/year - ${saleOffer?.title || 'Special Offer'} (${pricing?.campaign_discount_percent || 40}% OFF)`
+                        : `${pricing?.regular_price_display || '₹999'}/year - Affordable pricing`,
+                      `${pricing?.trial_days || 7}-day free trial, no credit card`,
                       "Cloud-based - Access anywhere",
                       "Automatic updates included",
                       "WhatsApp integration built-in",
@@ -1871,7 +1941,7 @@ const LandingPage = () => {
             {[
               {
                 q: "How does the free trial work?",
-                a: "You get 7 days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ₹599/year with our New Year Special (40% OFF on January 1, 2026 only)!",
+                a: `You get ${pricing?.trial_days || 7} days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ${pricing?.regular_price_display || '₹999'}/year.`,
               },
               {
                 q: "Can I use my own Razorpay account?",
@@ -1895,7 +1965,7 @@ const LandingPage = () => {
               },
               {
                 q: "What's included in the Premium plan?",
-                a: "Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, WhatsApp integration, and all future features. New Year Special: Just ₹599/year (40% OFF) on January 1, 2026 only!",
+                a: `Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, WhatsApp integration, and all future features. Just ${pricing?.regular_price_display || '₹999'}/year.`,
               },
             ].map((faq, index) => (
               <Card key={index} className="border-0 shadow-lg">
@@ -1959,7 +2029,7 @@ const LandingPage = () => {
                       <Shield className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">New Year Special Badge</h4>
+                      <h4 className="font-semibold text-gray-900">Early Adopter Badge</h4>
                       <p className="text-gray-600 text-sm">Special recognition in the app</p>
                     </div>
                   </div>
