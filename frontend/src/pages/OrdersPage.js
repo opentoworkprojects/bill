@@ -669,7 +669,7 @@ const OrdersPage = ({ user }) => {
             </div>
 
             {/* Fixed Bottom Cart Summary */}
-            <div className="fixed bottom-16 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-4 z-50 safe-area-bottom">
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-4 z-[60] safe-area-bottom">
               {selectedItems.length > 0 ? (
                 <div className="space-y-3">
                   {/* Expandable items list */}
