@@ -623,25 +623,26 @@ const OrdersPage = ({ user }) => {
                   </button>
                 )}
               </div>
-              <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {categories.map(cat => (
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                    style={{ minWidth: 'fit-content' }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       activeCategory === cat
-                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-700 hover:bg-violet-100 hover:text-violet-700'
+                        ? 'bg-violet-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600'
                     }`}
                   >
-                    {cat === 'all' ? 'All Items' : cat}
+                    {cat === 'all' ? 'All' : cat}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Menu Grid - Premium Cards */}
-            <div className="flex-1 overflow-y-auto px-3 py-4 pb-72">
+            <div className="flex-1 overflow-y-auto px-3 py-4" style={{ paddingBottom: '280px' }}>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {menuItems
                   .filter(item => {
