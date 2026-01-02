@@ -13,6 +13,50 @@ import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
 
+// Sound effects for better UX
+const playSound = (type) => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const audioContext = new AudioContext();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    if (type === 'add') {
+      // Pleasant "pop" sound for adding item
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.05);
+      oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.15);
+    } else if (type === 'remove') {
+      // Soft "thud" for removing
+      oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    } else if (type === 'success') {
+      // Success chime
+      oscillator.frequency.setValueAtTime(523, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1);
+      oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.4);
+    }
+  } catch (e) {
+    // Silently fail if audio not supported
+  }
+};
+
 const OrdersPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
   const [tables, setTables] = useState([]);
@@ -124,6 +168,7 @@ const OrdersPage = ({ user }) => {
   };
 
   const handleAddItem = (menuItem) => {
+    playSound('add');
     const existingIndex = selectedItems.findIndex(item => item.menu_item_id === menuItem.id);
     if (existingIndex !== -1) {
       const updated = [...selectedItems];
@@ -141,6 +186,7 @@ const OrdersPage = ({ user }) => {
   };
 
   const handleRemoveItem = (index) => {
+    playSound('remove');
     setSelectedItems(selectedItems.filter((_, i) => i !== index));
   };
 
@@ -581,7 +627,7 @@ const OrdersPage = ({ user }) => {
             </div>
 
             {/* Menu Grid - Full screen scrollable */}
-            <div className="flex-1 overflow-y-auto p-3 pb-32">
+            <div className="flex-1 overflow-y-auto p-3 pb-36">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {menuItems
                   .filter(item => {
@@ -596,59 +642,62 @@ const OrdersPage = ({ user }) => {
                     return (
                       <div
                         key={item.id}
-                        className={`relative p-3 rounded-xl border-2 transition-all bg-white shadow-sm ${
+                        onClick={() => quantity === 0 && handleAddItem(item)}
+                        className={`relative p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer select-none active:scale-95 ${
                           quantity > 0 
-                            ? 'border-violet-500 bg-violet-50 shadow-violet-100' 
-                            : 'border-gray-100 hover:border-violet-300 hover:shadow-md'
+                            ? 'border-violet-500 bg-gradient-to-br from-violet-50 to-purple-50 shadow-lg shadow-violet-100' 
+                            : 'border-gray-100 bg-white hover:border-violet-300 hover:shadow-lg hover:shadow-violet-50 active:bg-violet-50'
                         }`}
                       >
+                        {/* Quantity Badge */}
                         {quantity > 0 && (
-                          <div className="absolute -top-2 -right-2 w-7 h-7 bg-violet-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
+                          <div className="absolute -top-2.5 -right-2.5 w-8 h-8 bg-gradient-to-br from-violet-600 to-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg animate-bounce-in">
                             {quantity}
                           </div>
                         )}
-                        <div className="mb-3">
-                          <p className="font-semibold text-base line-clamp-2 leading-tight">{item.name}</p>
-                          <p className="text-xs text-gray-500 mt-1">{item.category}</p>
-                          <p className="text-lg font-bold text-violet-600 mt-2">₹{item.price}</p>
+                        
+                        {/* Item Info */}
+                        <div className="mb-2">
+                          <p className="font-semibold text-sm line-clamp-2 leading-tight">{item.name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{item.category}</p>
                         </div>
                         
+                        {/* Price */}
+                        <p className="text-lg font-bold text-violet-600 mb-2">₹{item.price}</p>
+                        
+                        {/* Add/Quantity Controls */}
                         {quantity === 0 ? (
-                          <Button
-                            onClick={() => handleAddItem(item)}
-                            className="w-full h-10 bg-violet-600 hover:bg-violet-700"
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Add
-                          </Button>
+                          <div className="flex items-center justify-center gap-1 py-2 bg-violet-100 rounded-lg text-violet-700 font-medium text-sm">
+                            <Plus className="w-4 h-4" />
+                            <span>Add</span>
+                          </div>
                         ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
+                          <div className="flex items-center justify-between bg-violet-100 rounded-lg p-1" onClick={(e) => e.stopPropagation()}>
+                            <button
                               onClick={() => {
                                 const idx = selectedItems.findIndex(si => si.menu_item_id === item.id);
                                 if (quantity === 1) {
                                   handleRemoveItem(idx);
                                 } else {
+                                  playSound('remove');
                                   handleQuantityChange(idx, quantity - 1);
                                 }
                               }}
-                              className="h-10 w-10 p-0 border-2"
+                              className="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm text-violet-600 font-bold active:scale-90 transition-transform"
                             >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="font-bold text-lg">{quantity}</span>
-                            <Button
-                              size="sm"
+                              −
+                            </button>
+                            <span className="font-bold text-violet-700 text-lg min-w-[2rem] text-center">{quantity}</span>
+                            <button
                               onClick={() => {
+                                playSound('add');
                                 const idx = selectedItems.findIndex(si => si.menu_item_id === item.id);
                                 handleQuantityChange(idx, quantity + 1);
                               }}
-                              className="h-10 w-10 p-0 bg-violet-600 hover:bg-violet-700"
+                              className="w-8 h-8 flex items-center justify-center bg-violet-600 rounded-md shadow-sm text-white font-bold active:scale-90 transition-transform"
                             >
-                              <Plus className="w-4 h-4" />
-                            </Button>
+                              +
+                            </button>
                           </div>
                         )}
                       </div>
@@ -656,37 +705,39 @@ const OrdersPage = ({ user }) => {
                   })}
               </div>
               
+              {/* Empty State */}
               {menuItems.filter(item => {
                 const matchesSearch = item.name.toLowerCase().includes(menuSearch.toLowerCase());
                 const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
                 return matchesSearch && matchesCategory;
               }).length === 0 && (
                 <div className="text-center py-12 text-gray-500">
-                  <p className="text-lg">No items found</p>
+                  <Search className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-lg font-medium">No items found</p>
                   <p className="text-sm mt-1">Try a different search or category</p>
                 </div>
               )}
             </div>
 
-            {/* Fixed Bottom Cart Summary */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-4 z-[60] safe-area-bottom">
+            {/* Fixed Bottom Cart Summary - Enhanced */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-violet-200 shadow-2xl z-[60] safe-area-bottom">
               {selectedItems.length > 0 ? (
-                <div className="space-y-3">
-                  {/* Expandable items list */}
-                  <div className="max-h-32 overflow-y-auto space-y-1.5 bg-gray-50 rounded-lg p-2">
+                <div className="p-3">
+                  {/* Compact items list */}
+                  <div className="max-h-28 overflow-y-auto space-y-1 mb-3 bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-2">
                     {selectedItems.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between text-sm">
+                      <div key={index} className="flex items-center justify-between text-sm bg-white/80 rounded-lg px-2 py-1.5">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="font-bold text-violet-600">{item.quantity}×</span>
-                          <span className="truncate">{item.name}</span>
+                          <span className="w-6 h-6 bg-violet-600 text-white rounded-full flex items-center justify-center text-xs font-bold">{item.quantity}</span>
+                          <span className="truncate font-medium">{item.name}</span>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="font-medium">₹{(item.price * item.quantity).toFixed(0)}</span>
+                          <span className="font-bold text-violet-600">₹{(item.price * item.quantity).toFixed(0)}</span>
                           <button
                             onClick={() => handleRemoveItem(index)}
-                            className="text-red-500 hover:text-red-700 p-1"
+                            className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -694,25 +745,46 @@ const OrdersPage = ({ user }) => {
                   </div>
                   
                   {/* Total and Create Order */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} items</p>
-                      <p className="text-2xl font-bold text-violet-600">
-                        ₹{selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(0)}
-                      </p>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-purple-600 rounded-xl flex items-center justify-center">
+                        <ShoppingCart className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} items</p>
+                        <p className="text-2xl font-bold text-violet-600">
+                          ₹{selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(0)}
+                        </p>
+                      </div>
                     </div>
                     <Button 
-                      onClick={handleSubmitOrder}
+                      onClick={() => {
+                        playSound('success');
+                        handleSubmitOrder();
+                      }}
                       disabled={loading || selectedItems.length === 0}
-                      className="bg-gradient-to-r from-violet-600 to-purple-600 h-14 px-8 text-lg font-semibold shadow-lg disabled:opacity-50"
+                      className="bg-gradient-to-r from-violet-600 to-purple-600 h-14 px-6 text-base font-bold shadow-xl shadow-violet-200 disabled:opacity-50 active:scale-95 transition-transform"
                     >
-                      {loading ? 'Creating...' : 'Create Order'}
+                      {loading ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          Creating...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5" />
+                          Create Order
+                        </span>
+                      )}
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-3 text-gray-500">
-                  <p>Tap items above to add them to your order</p>
+                <div className="p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 text-gray-400">
+                    <ShoppingCart className="w-5 h-5" />
+                    <p>Tap items to add to order</p>
+                  </div>
                 </div>
               )}
             </div>
