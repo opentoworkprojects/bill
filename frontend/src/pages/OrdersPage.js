@@ -1507,387 +1507,213 @@ const OrdersPage = ({ user }) => {
           </div>
         )}
 
-        {/* Edit Order Modal */}
+        {/* Edit Order Modal - Improved UI/UX */}
         {editOrderModal.open && editOrderModal.order && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-            <Card className="w-full max-w-2xl border-0 shadow-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
-              <CardHeader className="relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6 flex-shrink-0">
-                <button
-                  onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0 }); setEditItems([]); }}
-                  className="absolute right-3 sm:right-4 top-3 sm:top-4 text-white/80 hover:text-white p-1"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg pr-8">
-                  <Edit className="w-5 h-5" />
-                  Edit Order #{editOrderModal.order.id.slice(0, 8)}
-                </CardTitle>
+          <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
+            <Card className="w-full sm:max-w-lg border-0 shadow-2xl max-h-[85vh] sm:mx-4 sm:rounded-xl rounded-t-2xl rounded-b-none sm:rounded-b-xl overflow-hidden flex flex-col">
+              {/* Header */}
+              <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Edit className="w-4 h-4" />
+                    Edit #{editOrderModal.order.id.slice(0, 8)}
+                  </CardTitle>
+                  <button
+                    onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0 }); setEditItems([]); }}
+                    className="p-1 hover:bg-white/20 rounded-full"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </CardHeader>
-              <div className="flex-1 overflow-hidden flex flex-col">
-                {/* Customer Details Section */}
-                <div className="p-3 sm:p-4 border-b bg-blue-50">
-                  <Label className="text-sm font-medium mb-2 block text-blue-800">Customer Details</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto">
+                {/* Customer - Compact */}
+                <div className="p-3 border-b bg-gray-50">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs text-gray-600">
-                        Customer Name {editOrderModal.is_credit && <span className="text-red-500">*</span>}
-                      </Label>
+                      <Label className="text-[10px] text-gray-500">Name {editOrderModal.is_credit && <span className="text-red-500">*</span>}</Label>
                       <Input
                         value={editOrderModal.customer_name || ''}
                         onChange={(e) => setEditOrderModal({ ...editOrderModal, customer_name: e.target.value })}
-                        placeholder="Customer name"
-                        className={`mt-1 h-10 ${editOrderModal.is_credit && !editOrderModal.customer_name?.trim() ? 'border-red-500' : ''}`}
-                        required={editOrderModal.is_credit}
+                        placeholder="Customer"
+                        className={`h-8 text-sm ${editOrderModal.is_credit && !editOrderModal.customer_name?.trim() ? 'border-red-400' : ''}`}
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-gray-600">Phone Number (Optional)</Label>
+                      <Label className="text-[10px] text-gray-500">Phone</Label>
                       <Input
                         value={editOrderModal.customer_phone || ''}
                         onChange={(e) => setEditOrderModal({ ...editOrderModal, customer_phone: e.target.value })}
                         placeholder="+91 9876543210"
-                        className="mt-1 h-10"
+                        className="h-8 text-sm"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Payment Method Section */}
-                <div className="p-3 sm:p-4 border-b bg-green-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-medium text-green-800">Payment</Label>
+                {/* Payment - Compact */}
+                <div className="p-3 border-b">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs font-medium">Payment</Label>
                     <button
                       onClick={() => {
                         const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
                         if (editOrderModal.use_split_payment) {
-                          // Switching to single payment
-                          setEditOrderModal({ 
-                            ...editOrderModal, 
-                            use_split_payment: false,
-                            payment_method: 'cash',
-                            payment_received: total,
-                            balance_amount: 0,
-                            cash_amount: 0,
-                            card_amount: 0,
-                            upi_amount: 0,
-                            credit_amount: 0,
-                            is_credit: false
-                          });
+                          setEditOrderModal({ ...editOrderModal, use_split_payment: false, payment_method: 'cash', payment_received: total, balance_amount: 0, cash_amount: 0, card_amount: 0, upi_amount: 0, credit_amount: 0, is_credit: false });
                         } else {
-                          // Switching to split payment
-                          setEditOrderModal({ 
-                            ...editOrderModal, 
-                            use_split_payment: true,
-                            payment_method: 'split',
-                            cash_amount: 0,
-                            card_amount: 0,
-                            upi_amount: 0,
-                            credit_amount: 0
-                          });
+                          setEditOrderModal({ ...editOrderModal, use_split_payment: true, payment_method: 'split', cash_amount: 0, card_amount: 0, upi_amount: 0, credit_amount: 0 });
                         }
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        editOrderModal.use_split_payment 
-                          ? 'bg-purple-600 text-white' 
-                          : 'bg-white border border-purple-300 text-purple-600 hover:bg-purple-50'
-                      }`}
+                      className={`px-2 py-1 rounded-full text-[10px] font-medium ${editOrderModal.use_split_payment ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-purple-100'}`}
                     >
-                      {editOrderModal.use_split_payment ? '✓ Split Payment' : '➕ Split Payment'}
+                      {editOrderModal.use_split_payment ? '✓ Split' : 'Split'}
                     </button>
                   </div>
                   
                   {!editOrderModal.use_split_payment ? (
-                    <>
-                      {/* Single Payment Mode */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {['cash', 'card', 'upi', 'credit'].map((method) => (
-                          <button
-                            key={method}
-                            onClick={() => {
-                              const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
-                              setEditOrderModal({ 
-                                ...editOrderModal, 
-                                payment_method: method,
-                                is_credit: method === 'credit',
-                                payment_received: method === 'credit' ? 0 : total,
-                                balance_amount: method === 'credit' ? total : 0
-                              });
-                            }}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                              editOrderModal.payment_method === method
-                                ? method === 'credit' 
-                                  ? 'bg-orange-600 text-white' 
-                                  : 'bg-green-600 text-white'
-                                : 'bg-white border hover:border-green-500'
-                            }`}
-                          >
-                            {method === 'cash' && '💵 Cash'}
-                            {method === 'card' && '💳 Card'}
-                            {method === 'upi' && '📱 UPI'}
-                            {method === 'credit' && '⚠️ Credit'}
-                          </button>
+                    <div className="flex gap-1.5">
+                      {['cash', 'card', 'upi', 'credit'].map((method) => (
+                        <button
+                          key={method}
+                          onClick={() => {
+                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                            setEditOrderModal({ ...editOrderModal, payment_method: method, is_credit: method === 'credit', payment_received: method === 'credit' ? 0 : total, balance_amount: method === 'credit' ? total : 0 });
+                          }}
+                          className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium ${
+                            editOrderModal.payment_method === method
+                              ? method === 'credit' ? 'bg-orange-500 text-white' : 'bg-green-600 text-white'
+                              : 'bg-gray-100 hover:bg-gray-200'
+                          }`}
+                        >
+                          {method === 'cash' && '💵'}
+                          {method === 'card' && '💳'}
+                          {method === 'upi' && '📱'}
+                          {method === 'credit' && '⚠️'}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-purple-50 rounded-lg p-2 space-y-2">
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { key: 'cash_amount', label: '💵' },
+                          { key: 'card_amount', label: '💳' },
+                          { key: 'upi_amount', label: '📱' },
+                          { key: 'credit_amount', label: '⚠️' }
+                        ].map(({ key, label }) => (
+                          <div key={key}>
+                            <Label className="text-[9px] text-gray-500 block text-center">{label}</Label>
+                            <Input
+                              type="number"
+                              value={editOrderModal[key] || ''}
+                              onChange={(e) => setEditOrderModal({ ...editOrderModal, [key]: parseFloat(e.target.value) || 0, is_credit: key === 'credit_amount' ? parseFloat(e.target.value) > 0 : editOrderModal.is_credit })}
+                              placeholder="0"
+                              className={`h-7 text-xs text-center px-1 ${key === 'credit_amount' ? 'border-orange-300' : ''}`}
+                              min="0"
+                            />
+                          </div>
                         ))}
                       </div>
-                      
-                      {/* Payment Received & Balance for Credit Bills */}
-                      {(editOrderModal.is_credit || editOrderModal.payment_method === 'credit') && (
-                        <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg space-y-3">
-                          <p className="text-xs text-orange-700 font-medium">💰 Credit Bill Payment Details</p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs text-gray-600">Amount Received</Label>
-                              <Input
-                                type="number"
-                                value={editOrderModal.payment_received || 0}
-                                onChange={(e) => {
-                                  const received = parseFloat(e.target.value) || 0;
-                                  const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
-                                  setEditOrderModal({ 
-                                    ...editOrderModal, 
-                                    payment_received: received,
-                                    balance_amount: Math.max(0, total - received)
-                                  });
-                                }}
-                                placeholder="0"
-                                className="mt-1 h-10"
-                                min="0"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs text-gray-600">Balance Amount</Label>
-                              <div className="mt-1 h-10 px-3 flex items-center bg-orange-100 border border-orange-300 rounded-md font-bold text-orange-800">
-                                ₹{(editOrderModal.balance_amount || (editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05 - (editOrderModal.payment_received || 0))).toFixed(2)}
-                              </div>
-                            </div>
+                      {(() => {
+                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                        const paid = (parseFloat(editOrderModal.cash_amount) || 0) + (parseFloat(editOrderModal.card_amount) || 0) + (parseFloat(editOrderModal.upi_amount) || 0);
+                        const credit = parseFloat(editOrderModal.credit_amount) || 0;
+                        const remaining = total - paid - credit;
+                        return (
+                          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-purple-200">
+                            <span>₹{total.toFixed(0)}</span>
+                            <span className="text-green-600">Paid: ₹{paid.toFixed(0)}</span>
+                            {credit > 0 && <span className="text-orange-600">Credit: ₹{credit.toFixed(0)}</span>}
+                            <span className={remaining > 0.5 ? 'text-red-600 font-bold' : 'text-green-600'}>
+                              {remaining > 0.5 ? `⚠️₹${remaining.toFixed(0)}` : '✓'}
+                            </span>
                           </div>
-                          <p className="text-xs text-orange-600">⚠️ Customer name is required for credit bills</p>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {/* Split Payment Mode */}
-                      <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg space-y-3">
-                        <p className="text-xs text-purple-700 font-medium">💳 Split Payment - Enter amounts for each method</p>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-xs text-gray-600 flex items-center gap-1">💵 Cash</Label>
-                            <Input
-                              type="number"
-                              value={editOrderModal.cash_amount || ''}
-                              onChange={(e) => setEditOrderModal({ ...editOrderModal, cash_amount: parseFloat(e.target.value) || 0 })}
-                              placeholder="0"
-                              className="mt-1 h-10"
-                              min="0"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs text-gray-600 flex items-center gap-1">💳 Card</Label>
-                            <Input
-                              type="number"
-                              value={editOrderModal.card_amount || ''}
-                              onChange={(e) => setEditOrderModal({ ...editOrderModal, card_amount: parseFloat(e.target.value) || 0 })}
-                              placeholder="0"
-                              className="mt-1 h-10"
-                              min="0"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs text-gray-600 flex items-center gap-1">📱 UPI</Label>
-                            <Input
-                              type="number"
-                              value={editOrderModal.upi_amount || ''}
-                              onChange={(e) => setEditOrderModal({ ...editOrderModal, upi_amount: parseFloat(e.target.value) || 0 })}
-                              placeholder="0"
-                              className="mt-1 h-10"
-                              min="0"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs text-gray-600 flex items-center gap-1">⚠️ Credit (Unpaid)</Label>
-                            <Input
-                              type="number"
-                              value={editOrderModal.credit_amount || ''}
-                              onChange={(e) => setEditOrderModal({ ...editOrderModal, credit_amount: parseFloat(e.target.value) || 0, is_credit: parseFloat(e.target.value) > 0 })}
-                              placeholder="0"
-                              className="mt-1 h-10 border-orange-300"
-                              min="0"
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Split Payment Summary */}
-                        <div className="pt-2 border-t border-purple-200 space-y-1">
-                          {(() => {
+                        );
+                      })()}
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
                             const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
-                            const paid = (parseFloat(editOrderModal.cash_amount) || 0) + 
-                                        (parseFloat(editOrderModal.card_amount) || 0) + 
-                                        (parseFloat(editOrderModal.upi_amount) || 0);
-                            const credit = parseFloat(editOrderModal.credit_amount) || 0;
-                            const totalEntered = paid + credit;
-                            const diff = total - totalEntered;
-                            
-                            return (
-                              <>
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-gray-600">Bill Total:</span>
-                                  <span className="font-bold">₹{total.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-xs text-green-600">
-                                  <span>Paid (Cash+Card+UPI):</span>
-                                  <span className="font-bold">₹{paid.toFixed(2)}</span>
-                                </div>
-                                {credit > 0 && (
-                                  <div className="flex justify-between text-xs text-orange-600">
-                                    <span>Credit (Unpaid):</span>
-                                    <span className="font-bold">₹{credit.toFixed(2)}</span>
-                                  </div>
-                                )}
-                                <div className={`flex justify-between text-xs font-bold ${Math.abs(diff) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
-                                  <span>{Math.abs(diff) < 0.01 ? '✓ Balanced' : diff > 0 ? '⚠️ Remaining:' : '⚠️ Excess:'}</span>
-                                  <span>{Math.abs(diff) < 0.01 ? '' : `₹${Math.abs(diff).toFixed(2)}`}</span>
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                        
-                        {/* Quick Fill Buttons */}
-                        <div className="flex gap-2 pt-2">
-                          <button
-                            onClick={() => {
-                              const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
-                              const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
-                              if (remaining > 0) {
-                                setEditOrderModal({ ...editOrderModal, cash_amount: (parseFloat(editOrderModal.cash_amount) || 0) + remaining });
-                              }
-                            }}
-                            className="text-xs px-2 py-1 bg-white border rounded hover:bg-gray-50"
-                          >
-                            Fill Cash
-                          </button>
-                          <button
-                            onClick={() => {
-                              const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
-                              const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
-                              if (remaining > 0) {
-                                setEditOrderModal({ ...editOrderModal, credit_amount: (parseFloat(editOrderModal.credit_amount) || 0) + remaining, is_credit: true });
-                              }
-                            }}
-                            className="text-xs px-2 py-1 bg-orange-100 border border-orange-300 rounded hover:bg-orange-200 text-orange-700"
-                          >
-                            Fill Credit
-                          </button>
-                        </div>
+                            const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
+                            if (remaining > 0) setEditOrderModal({ ...editOrderModal, cash_amount: (parseFloat(editOrderModal.cash_amount) || 0) + remaining });
+                          }}
+                          className="text-[9px] px-2 py-0.5 bg-white border rounded flex-1"
+                        >
+                          Fill Cash
+                        </button>
+                        <button
+                          onClick={() => {
+                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                            const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
+                            if (remaining > 0) setEditOrderModal({ ...editOrderModal, credit_amount: (parseFloat(editOrderModal.credit_amount) || 0) + remaining, is_credit: true });
+                          }}
+                          className="text-[9px] px-2 py-0.5 bg-orange-100 border-orange-300 border rounded text-orange-700 flex-1"
+                        >
+                          Fill Credit
+                        </button>
                       </div>
-                      
-                      {editOrderModal.credit_amount > 0 && !editOrderModal.customer_name?.trim() && (
-                        <p className="text-xs text-red-600 mt-2 font-medium">❌ Customer name required for credit amount</p>
-                      )}
-                    </>
+                    </div>
                   )}
-                  
-                  {!editOrderModal.use_split_payment && editOrderModal.is_credit && !editOrderModal.customer_name?.trim() && (
-                    <p className="text-xs text-red-600 mt-2 font-medium">❌ Please enter customer name above</p>
+                  {editOrderModal.is_credit && !editOrderModal.customer_name?.trim() && (
+                    <p className="text-[9px] text-red-500 mt-1">⚠️ Name required</p>
                   )}
                 </div>
 
-                {/* Menu Items to Add */}
-                <div className="p-3 sm:p-4 border-b bg-gray-50">
-                  <Label className="text-sm font-medium mb-2 block">Add Items</Label>
-                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {menuItems.slice(0, 10).map(item => (
+                {/* Add Items */}
+                <div className="p-2 border-b bg-gray-50">
+                  <Label className="text-[10px] text-gray-500 mb-1 block">Add Items</Label>
+                  <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+                    {menuItems.slice(0, 8).map(item => (
                       <button
                         key={item.id}
                         onClick={() => handleAddEditItem(item)}
-                        className="flex-shrink-0 px-3 py-2 bg-white border rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-sm"
+                        className="flex-shrink-0 px-2 py-1 bg-white border rounded text-[10px] hover:border-blue-400 hover:bg-blue-50 whitespace-nowrap"
                       >
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-gray-500 ml-1">₹{item.price}</span>
+                        {item.name} ₹{item.price}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Current Order Items */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-                  <Label className="text-sm font-medium mb-2 block">Order Items</Label>
+                {/* Items List */}
+                <div className="p-2 min-h-[100px]">
                   {editItems.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {editItems.map((item, index) => (
-                        <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <div key={index} className="flex items-center gap-1.5 p-1.5 bg-gray-50 rounded">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{item.name}</p>
-                            <p className="text-xs text-gray-500">₹{item.price} each</p>
+                            <p className="text-xs font-medium truncate">{item.name}</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                if (item.quantity === 1) {
-                                  handleRemoveEditItem(index);
-                                } else {
-                                  handleEditQuantityChange(index, item.quantity - 1);
-                                }
-                              }}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="w-8 text-center font-bold">{item.quantity}</span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => handleEditQuantityChange(index, item.quantity + 1)}
-                              className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                            <span className="w-16 text-right font-bold">₹{(item.price * item.quantity).toFixed(0)}</span>
-                            <button
-                              onClick={() => handleRemoveEditItem(index)}
-                              className="p-1 text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          <button onClick={() => item.quantity === 1 ? handleRemoveEditItem(index) : handleEditQuantityChange(index, item.quantity - 1)} className="w-6 h-6 bg-gray-200 rounded text-xs">−</button>
+                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
+                          <button onClick={() => handleEditQuantityChange(index, item.quantity + 1)} className="w-6 h-6 bg-blue-600 text-white rounded text-xs">+</button>
+                          <span className="w-12 text-right text-xs font-bold">₹{(item.price * item.quantity).toFixed(0)}</span>
+                          <button onClick={() => handleRemoveEditItem(index)} className="text-red-400 p-0.5"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>No items in order</p>
-                    </div>
+                    <div className="text-center py-4 text-gray-400 text-xs">No items</div>
                   )}
                 </div>
+              </div>
 
-                {/* Summary and Actions */}
-                <div className="border-t bg-white p-3 sm:p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs text-gray-500">{editItems.reduce((sum, item) => sum + item.quantity, 0)} items</p>
-                      <p className="text-lg font-bold text-blue-600">
-                        ₹{editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(0)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0 }); setEditItems([]); }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleUpdateOrder}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600"
-                        disabled={editItems.length === 0}
-                      >
-                        Update Order
-                      </Button>
-                    </div>
+              {/* Footer - Fixed */}
+              <div className="border-t bg-white p-3 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-gray-400">{editItems.reduce((sum, item) => sum + item.quantity, 0)} items</p>
+                    <p className="text-lg font-bold text-blue-600">₹{(editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05).toFixed(0)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0 }); setEditItems([]); }}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleUpdateOrder} className="bg-blue-600 px-5" disabled={editItems.length === 0}>
+                      Update
+                    </Button>
                   </div>
                 </div>
               </div>
