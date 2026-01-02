@@ -623,25 +623,25 @@ const OrdersPage = ({ user }) => {
                   </button>
                 )}
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+              <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide">
                 {categories.map(cat => (
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-5 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
                       activeCategory === cat
-                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xl shadow-violet-300/50 scale-105 border-2 border-violet-400'
-                        : 'bg-white text-gray-600 hover:bg-violet-50 hover:text-violet-600 active:scale-95 border-2 border-gray-100 shadow-sm'
+                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-700 hover:bg-violet-100 hover:text-violet-700'
                     }`}
                   >
-                    {cat === 'all' ? '🍽️ All' : cat}
+                    {cat === 'all' ? 'All Items' : cat}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Menu Grid - Premium Cards */}
-            <div className="flex-1 overflow-y-auto px-3 py-4 pb-52">
+            <div className="flex-1 overflow-y-auto px-3 py-4 pb-72">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {menuItems
                   .filter(item => {
@@ -674,10 +674,10 @@ const OrdersPage = ({ user }) => {
                         <div className="p-4">
                           {/* Item Name & Category */}
                           <div className="mb-3">
-                            <p className="font-bold text-gray-800 text-[15px] line-clamp-2 leading-tight">{item.name}</p>
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <span className="px-2 py-0.5 bg-violet-100 text-violet-600 rounded-lg text-[10px] font-bold uppercase tracking-wider">{item.category}</span>
-                            </div>
+                            <p className="font-bold text-gray-800 text-sm line-clamp-2 leading-tight">{item.name}</p>
+                            {item.category && (
+                              <span className="inline-block mt-1.5 px-2 py-0.5 bg-violet-100 text-violet-600 rounded text-[10px] font-semibold uppercase">{item.category}</span>
+                            )}
                           </div>
                           
                           {/* Price - Premium */}
