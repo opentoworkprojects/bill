@@ -8211,6 +8211,88 @@ async def team_login(credentials: TeamLogin):
     }
 
 
+# ============ PUBLIC ENDPOINTS (No Auth Required) ============
+
+# Public Sale/Offer Endpoint
+@api_router.get("/sale-offer")
+async def get_public_sale_offer():
+    """Get active sale offer for landing page - Public endpoint"""
+    offer = await db.site_settings.find_one({"type": "sale_offer", "enabled": True})
+    
+    if not offer:
+        return {"enabled": False}
+    
+    # Check if offer has expired based on end_date or valid_until
+    now = datetime.now(timezone.utc)
+    
+    # Check end_date (date only)
+    if offer.get("end_date"):
+        try:
+            end_date = datetime.fromisoformat(offer["end_date"])
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+            if now.replace(tzinfo=None) > end_date:
+                return {"enabled": False}
+        except:
+            pass
+    
+    # Check valid_until (datetime with time)
+    if offer.get("valid_until"):
+        try:
+            valid_until = datetime.fromisoformat(offer["valid_until"])
+            if valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=timezone.utc)
+            if now > valid_until:
+                return {"enabled": False}
+        except:
+            pass
+    
+    offer.pop("_id", None)
+    offer.pop("type", None)
+    return offer
+
+
+# Public Pricing Endpoint
+@api_router.get("/pricing")
+async def get_public_pricing():
+    """Get current pricing for subscription page - Public endpoint"""
+    pricing = await db.site_settings.find_one({"type": "pricing"})
+    
+    if not pricing:
+        # Default pricing
+        return {
+            "regular_price": 999,
+            "regular_price_display": "₹999",
+            "campaign_price": 599,
+            "campaign_price_display": "₹599",
+            "campaign_active": False,
+            "campaign_discount_percent": 40,
+            "trial_days": 7
+        }
+    
+    # Check if campaign is active based on dates
+    campaign_active = pricing.get("campaign_active", False)
+    if campaign_active and pricing.get("campaign_start_date") and pricing.get("campaign_end_date"):
+        try:
+            start_date = datetime.fromisoformat(pricing["campaign_start_date"])
+            end_date = datetime.fromisoformat(pricing["campaign_end_date"])
+            now = datetime.now()
+            campaign_active = start_date <= now <= end_date
+        except:
+            pass
+    
+    return {
+        "regular_price": pricing.get("regular_price", 999),
+        "regular_price_display": pricing.get("regular_price_display", "₹999"),
+        "campaign_price": pricing.get("campaign_price", 599),
+        "campaign_price_display": pricing.get("campaign_price_display", "₹599"),
+        "campaign_active": campaign_active,
+        "campaign_name": pricing.get("campaign_name", ""),
+        "campaign_discount_percent": pricing.get("campaign_discount_percent", 0),
+        "trial_days": pricing.get("trial_days", 7)
+    }
+
+
 # Include all API routes
 app.include_router(api_router)
 
@@ -8530,86 +8612,6 @@ async def check_app_update(platform: str, current_version: str):
         "download_url": latest["download_url"] if update_available else None,
         "release_notes": latest.get("release_notes", "") if update_available else None,
         "file_size": latest.get("file_size")
-    }
-
-
-# Public Sale/Offer Endpoint (no auth required)
-@api_router.get("/sale-offer")
-async def get_public_sale_offer():
-    """Get active sale offer for landing page - Public endpoint"""
-    offer = await db.site_settings.find_one({"type": "sale_offer", "enabled": True})
-    
-    if not offer:
-        return {"enabled": False}
-    
-    # Check if offer has expired based on end_date or valid_until
-    now = datetime.now(timezone.utc)
-    
-    # Check end_date (date only)
-    if offer.get("end_date"):
-        try:
-            end_date = datetime.fromisoformat(offer["end_date"])
-            if end_date.tzinfo is None:
-                end_date = end_date.replace(hour=23, minute=59, second=59)
-            if now.replace(tzinfo=None) > end_date:
-                return {"enabled": False}
-        except:
-            pass
-    
-    # Check valid_until (datetime with time)
-    if offer.get("valid_until"):
-        try:
-            valid_until = datetime.fromisoformat(offer["valid_until"])
-            if valid_until.tzinfo is None:
-                valid_until = valid_until.replace(tzinfo=timezone.utc)
-            if now > valid_until:
-                return {"enabled": False}
-        except:
-            pass
-    
-    offer.pop("_id", None)
-    offer.pop("type", None)
-    return offer
-
-
-# Public Pricing Endpoint (no auth required)
-@api_router.get("/pricing")
-async def get_public_pricing():
-    """Get current pricing for subscription page - Public endpoint"""
-    pricing = await db.site_settings.find_one({"type": "pricing"})
-    
-    if not pricing:
-        # Default pricing
-        return {
-            "regular_price": 999,
-            "regular_price_display": "₹999",
-            "campaign_price": 599,
-            "campaign_price_display": "₹599",
-            "campaign_active": False,
-            "campaign_discount_percent": 40,
-            "trial_days": 7
-        }
-    
-    # Check if campaign is active based on dates
-    campaign_active = pricing.get("campaign_active", False)
-    if campaign_active and pricing.get("campaign_start_date") and pricing.get("campaign_end_date"):
-        try:
-            start_date = datetime.fromisoformat(pricing["campaign_start_date"])
-            end_date = datetime.fromisoformat(pricing["campaign_end_date"])
-            now = datetime.now()
-            campaign_active = start_date <= now <= end_date
-        except:
-            pass
-    
-    return {
-        "regular_price": pricing.get("regular_price", 999),
-        "regular_price_display": pricing.get("regular_price_display", "₹999"),
-        "campaign_price": pricing.get("campaign_price", 599),
-        "campaign_price_display": pricing.get("campaign_price_display", "₹599"),
-        "campaign_active": campaign_active,
-        "campaign_name": pricing.get("campaign_name", ""),
-        "campaign_discount_percent": pricing.get("campaign_discount_percent", 0),
-        "trial_days": pricing.get("trial_days", 7)
     }
 
 
