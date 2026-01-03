@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '../App';
@@ -6,13 +6,31 @@ import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { AlertTriangle, Sparkles, Clock, Gift } from 'lucide-react';
 
+// Cache for sale offer and pricing data (5 minute TTL)
+const cache = {
+  data: null,
+  timestamp: 0,
+  TTL: 5 * 60 * 1000 // 5 minutes
+};
+
 const TrialBanner = ({ user }) => {
   const navigate = useNavigate();
-  const [saleOffer, setSaleOffer] = useState(null);
-  const [pricing, setPricing] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [saleOffer, setSaleOffer] = useState(cache.data?.saleOffer || null);
+  const [pricing, setPricing] = useState(cache.data?.pricing || null);
+  const [loading, setLoading] = useState(!cache.data);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    // Skip if already fetched or cache is valid
+    if (fetchedRef.current) return;
+    if (cache.data && Date.now() - cache.timestamp < cache.TTL) {
+      setSaleOffer(cache.data.saleOffer);
+      setPricing(cache.data.pricing);
+      setLoading(false);
+      return;
+    }
+    
+    fetchedRef.current = true;
     fetchData();
   }, []);
 
@@ -22,18 +40,24 @@ const TrialBanner = ({ user }) => {
         axios.get(`${API}/sale-offer`),
         axios.get(`${API}/pricing`)
       ]);
-      setSaleOffer(saleRes.data);
-      setPricing(pricingRes.data);
+      const data = { saleOffer: saleRes.data, pricing: pricingRes.data };
+      cache.data = data;
+      cache.timestamp = Date.now();
+      setSaleOffer(data.saleOffer);
+      setPricing(data.pricing);
     } catch (error) {
-      console.error('Failed to fetch data', error);
-      setSaleOffer({ enabled: false });
-      setPricing({
-        regular_price: 1999,
-        regular_price_display: '₹1999',
-        trial_expired_discount: 10,
-        trial_expired_price: 1799,
-        trial_expired_price_display: '₹1799'
-      });
+      const fallback = {
+        saleOffer: { enabled: false },
+        pricing: {
+          regular_price: 1999,
+          regular_price_display: '₹1999',
+          trial_expired_discount: 10,
+          trial_expired_price: 1799,
+          trial_expired_price_display: '₹1799'
+        }
+      };
+      setSaleOffer(fallback.saleOffer);
+      setPricing(fallback.pricing);
     } finally {
       setLoading(false);
     }

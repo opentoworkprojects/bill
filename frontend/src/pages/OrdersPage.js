@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -99,39 +99,40 @@ const OrdersPage = ({ user }) => {
   const [showMenuPage, setShowMenuPage] = useState(false);
   // Tab state for Active Orders vs Today's Bills
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const dataLoadedRef = useRef(false);
 
   // Get unique categories from menu items
   const categories = ['all', ...new Set(menuItems.map(item => item.category).filter(Boolean))];
 
   useEffect(() => {
-    loadInitialData();
+    if (!dataLoadedRef.current) {
+      dataLoadedRef.current = true;
+      loadInitialData();
+    }
   }, []);
 
   const loadInitialData = async () => {
-    setLoading(true);
     try {
-      await Promise.all([
-        fetchOrders(),
-        fetchTables(),
-        fetchMenuItems(),
-        fetchBusinessSettings()
+      // Load all data in parallel for faster initial load
+      const [ordersRes, tablesRes, menuRes, settingsRes] = await Promise.all([
+        axios.get(`${API}/orders`).catch(() => ({ data: [] })),
+        axios.get(`${API}/tables`).catch(() => ({ data: [] })),
+        axios.get(`${API}/menu`).catch(() => ({ data: [] })),
+        axios.get(`${API}/business/settings`).catch(() => ({ data: { business_settings: {} } }))
       ]);
+      
+      const ordersData = Array.isArray(ordersRes.data) ? ordersRes.data : [];
+      setOrders(ordersData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      setTables(Array.isArray(tablesRes.data) ? tablesRes.data : []);
+      const items = Array.isArray(menuRes.data) ? menuRes.data : [];
+      setMenuItems(items.filter(item => item.available));
+      setBusinessSettings(settingsRes.data.business_settings || {});
     } catch (error) {
       console.error('Failed to load initial data', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchBusinessSettings = async () => {
-    try {
-      const response = await axios.get(`${API}/business/settings`);
-      setBusinessSettings(response.data.business_settings || {});
-    } catch (error) {
-      console.error('Failed to fetch business settings', error);
-      setBusinessSettings({});
     }
   };
 

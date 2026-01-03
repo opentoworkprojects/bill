@@ -538,8 +538,8 @@ function App() {
     // Setup offline sync
     setupAutoSync(axios.create({ baseURL: API }));
     
-    // Start notification polling for in-app notifications
-    startNotificationPolling(API, 60000); // Check every 60 seconds
+    // Start notification polling for in-app notifications (less frequent)
+    startNotificationPolling(API, 120000); // Check every 2 minutes instead of 1
     
     // Request notification permission after a delay (better UX)
     setTimeout(() => {
