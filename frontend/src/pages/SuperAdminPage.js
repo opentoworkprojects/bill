@@ -82,15 +82,16 @@ const SuperAdminPage = () => {
   const [savingSaleOffer, setSavingSaleOffer] = useState(false);
   // Pricing Management
   const [pricing, setPricing] = useState({
-    regular_price: 999,
-    regular_price_display: '₹999',
-    campaign_price: 599,
-    campaign_price_display: '₹599',
+    regular_price: 1999,
+    regular_price_display: '₹1999',
+    campaign_price: 1799,
+    campaign_price_display: '₹1799',
     campaign_active: false,
-    campaign_name: 'NEWYEAR2026',
-    campaign_discount_percent: 40,
+    campaign_name: '',
+    campaign_discount_percent: 10,
     campaign_start_date: '',
     campaign_end_date: '',
+    trial_expired_discount: 10,
     trial_days: 7,
     subscription_months: 12
   });
@@ -2422,7 +2423,7 @@ const SuperAdminPage = () => {
                       type="number"
                       value={pricing.regular_price}
                       onChange={(e) => setPricing({...pricing, regular_price: parseInt(e.target.value) || 0, regular_price_display: `₹${e.target.value}`})}
-                      placeholder="999"
+                      placeholder="1999"
                     />
                   </div>
                   <div>
@@ -2442,6 +2443,25 @@ const SuperAdminPage = () => {
                       onChange={(e) => setPricing({...pricing, subscription_months: parseInt(e.target.value) || 12})}
                       placeholder="12"
                     />
+                  </div>
+                  <div>
+                    <Label>Trial Expired Discount (%)</Label>
+                    <Input
+                      type="number"
+                      value={pricing.trial_expired_discount}
+                      onChange={(e) => setPricing({...pricing, trial_expired_discount: parseInt(e.target.value) || 10})}
+                      placeholder="10"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Discount shown when user's trial expires</p>
+                  </div>
+                </div>
+                {/* Trial Expired Preview */}
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700 font-medium">Trial Expired Offer Preview:</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="line-through text-gray-500">₹{pricing.regular_price}</span>
+                    <span className="text-xl font-bold text-red-600">₹{Math.round(pricing.regular_price * (100 - pricing.trial_expired_discount) / 100)}</span>
+                    <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs">{pricing.trial_expired_discount}% OFF</span>
                   </div>
                 </div>
               </div>

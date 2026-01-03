@@ -58,14 +58,17 @@ const SubscriptionPage = ({ user }) => {
       const response = await axios.get(`${API}/pricing`);
       setPricing(response.data);
     } catch (error) {
-      // Use default pricing
+      // Use default pricing - ₹1999 base
       setPricing({
-        regular_price: 999,
-        regular_price_display: '₹999',
-        campaign_price: 599,
-        campaign_price_display: '₹599',
+        regular_price: 1999,
+        regular_price_display: '₹1999',
+        campaign_price: 1799,
+        campaign_price_display: '₹1799',
         campaign_active: false,
-        campaign_discount_percent: 40,
+        campaign_discount_percent: 10,
+        trial_expired_discount: 10,
+        trial_expired_price: 1799,
+        trial_expired_price_display: '₹1799',
         trial_days: 7
       });
     }
@@ -195,10 +198,14 @@ const SubscriptionPage = ({ user }) => {
       <div className="max-w-6xl mx-auto space-y-8" data-testid="subscription-page">
         {/* Hero Section */}
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold animate-pulse">
-            <Gift className="w-4 h-4" />
-            🎉 New Year Special - 40% OFF!
-          </div>
+          {(pricing?.campaign_active || subscriptionStatus?.needs_subscription) && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold animate-pulse">
+              <Gift className="w-4 h-4" />
+              {pricing?.campaign_active 
+                ? `🎉 ${pricing?.campaign_name || 'Special Offer'} - ${pricing?.campaign_discount_percent || 10}% OFF!`
+                : `🎁 Trial Expired - Get ${pricing?.trial_expired_discount || 10}% OFF!`}
+            </div>
+          )}
           <h1 className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-transparent" 
               style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             Upgrade to Premium
@@ -320,27 +327,46 @@ const SubscriptionPage = ({ user }) => {
                 {(pricing?.campaign_active || subscriptionStatus?.campaign_active) ? (
                   <>
                     <div className="flex items-center justify-center gap-2 mb-2">
-                      <span className="text-2xl text-gray-400 line-through">{pricing?.regular_price_display || '₹999'}</span>
+                      <span className="text-2xl text-gray-400 line-through">{pricing?.regular_price_display || '₹1999'}</span>
                       <span className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                        {pricing?.campaign_discount_percent || 40}% OFF
+                        {pricing?.campaign_discount_percent || 10}% OFF
                       </span>
                     </div>
                     <p className="text-6xl font-black bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-                      {pricing?.campaign_price_display || '₹599'}
+                      {pricing?.campaign_price_display || '₹1799'}
                     </p>
-                    <p className="text-gray-500">per year • Just ₹{Math.round((pricing?.campaign_price || 599) / 12)}/month!</p>
+                    <p className="text-gray-500">per year • Just ₹{Math.round((pricing?.campaign_price || 1799) / 12)}/month!</p>
                     <div className="mt-2 p-2 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200">
                       <p className="text-sm text-red-700 font-medium">
-                        🎉 Special Offer - Save ₹{(pricing?.regular_price || 999) - (pricing?.campaign_price || 599)}!
+                        🎉 {pricing?.campaign_name || 'Special Offer'} - Save ₹{(pricing?.regular_price || 1999) - (pricing?.campaign_price || 1799)}!
+                      </p>
+                    </div>
+                  </>
+                ) : subscriptionStatus?.needs_subscription ? (
+                  // Trial expired - show trial expired discount
+                  <>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <span className="text-2xl text-gray-400 line-through">{pricing?.regular_price_display || '₹1999'}</span>
+                      <span className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                        {pricing?.trial_expired_discount || 10}% OFF
+                      </span>
+                    </div>
+                    <p className="text-6xl font-black bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+                      {pricing?.trial_expired_price_display || '₹1799'}
+                    </p>
+                    <p className="text-gray-500">per year • Just ₹{Math.round((pricing?.trial_expired_price || 1799) / 12)}/month!</p>
+                    <div className="mt-2 p-2 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200">
+                      <p className="text-sm text-red-700 font-medium">
+                        🎁 Trial Expired Offer - Save ₹{(pricing?.regular_price || 1999) - (pricing?.trial_expired_price || 1799)}!
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
                     <p className="text-6xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                      {pricing?.regular_price_display || subscriptionStatus?.price_display || '₹999'}
+                      {pricing?.regular_price_display || '₹1999'}
                     </p>
-                    <p className="text-gray-500">per year • Just ₹{Math.round((pricing?.regular_price || subscriptionStatus?.price || 999) / 12)}/month</p>
+                    <p className="text-gray-500">per year • Just ₹{Math.round((pricing?.regular_price || 1999) / 12)}/month</p>
                   </>
                 )}
               </div>
@@ -367,14 +393,16 @@ const SubscriptionPage = ({ user }) => {
               ) : (
                 <Button onClick={handleSubscribe} disabled={loading}
                   className={`w-full h-14 text-lg font-bold shadow-lg ${
-                    (pricing?.campaign_active || subscriptionStatus?.campaign_active)
+                    (pricing?.campaign_active || subscriptionStatus?.campaign_active || subscriptionStatus?.needs_subscription)
                       ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600' 
                       : 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700'
                   }`}>
                   <Rocket className="w-5 h-5 mr-2" />
                   {loading ? 'Processing...' : (pricing?.campaign_active || subscriptionStatus?.campaign_active)
-                      ? `🎉 Get ${pricing?.campaign_price_display || '₹599'}/Year Deal Now!`
-                      : `Subscribe Now - ${pricing?.regular_price_display || subscriptionStatus?.price_display || '₹999'}/year`}
+                      ? `🎉 Get ${pricing?.campaign_price_display || '₹1799'}/Year Deal Now!`
+                      : subscriptionStatus?.needs_subscription
+                        ? `🎁 Get ${pricing?.trial_expired_discount || 10}% OFF - ${pricing?.trial_expired_price_display || '₹1799'}/year`
+                        : `Subscribe Now - ${pricing?.regular_price_display || '₹1999'}/year`}
                 </Button>
               )}
             </CardContent>
@@ -447,9 +475,9 @@ const SubscriptionPage = ({ user }) => {
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { q: 'How long is the free trial?', a: 'You get 7 days of full access to all premium features, no credit card required.' },
-              { q: 'What happens after the trial?', a: 'After 7 days, you can subscribe for ₹599/year (New Year Special!) or continue with limited features.' },
-              { q: 'What is the New Year Special offer?', a: 'Get 40% off on annual subscription - pay only ₹599 instead of ₹999! This offer is valid on January 1, 2026 ONLY!' },
+              { q: 'How long is the free trial?', a: `You get ${pricing?.trial_days || 7} days of full access to all premium features, no credit card required.` },
+              { q: 'What happens after the trial?', a: `After your trial ends, you get a special ${pricing?.trial_expired_discount || 10}% discount - pay only ${pricing?.trial_expired_price_display || '₹1799'} instead of ${pricing?.regular_price_display || '₹1999'}!` },
+              { q: 'What is the regular price?', a: `The regular subscription price is ${pricing?.regular_price_display || '₹1999'}/year. Special discounts may apply during campaigns or after trial expiry.` },
               { q: 'Can I cancel anytime?', a: 'Yes! Cancel anytime. We also offer a 30-day money-back guarantee.' },
               { q: 'Is my data secure?', a: 'Absolutely. We use bank-grade encryption and never share your data.' },
             ].map((faq, i) => (

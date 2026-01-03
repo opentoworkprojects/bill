@@ -8360,14 +8360,18 @@ async def get_public_pricing():
     pricing = await db.site_settings.find_one({"type": "pricing"})
     
     if not pricing:
-        # Default pricing
+        # Default pricing - ₹1999 base price
         return {
-            "regular_price": 999,
-            "regular_price_display": "₹999",
-            "campaign_price": 599,
-            "campaign_price_display": "₹599",
+            "regular_price": 1999,
+            "regular_price_display": "₹1999",
+            "campaign_price": 1799,
+            "campaign_price_display": "₹1799",
             "campaign_active": False,
-            "campaign_discount_percent": 40,
+            "campaign_discount_percent": 10,
+            "campaign_name": "",
+            "trial_expired_discount": 10,
+            "trial_expired_price": 1799,
+            "trial_expired_price_display": "₹1799",
             "trial_days": 7
         }
     
@@ -8382,14 +8386,21 @@ async def get_public_pricing():
         except:
             pass
     
+    regular_price = pricing.get("regular_price", 1999)
+    trial_expired_discount = pricing.get("trial_expired_discount", 10)
+    trial_expired_price = int(regular_price * (100 - trial_expired_discount) / 100)
+    
     return {
-        "regular_price": pricing.get("regular_price", 999),
-        "regular_price_display": pricing.get("regular_price_display", "₹999"),
-        "campaign_price": pricing.get("campaign_price", 599),
-        "campaign_price_display": pricing.get("campaign_price_display", "₹599"),
+        "regular_price": regular_price,
+        "regular_price_display": pricing.get("regular_price_display", f"₹{regular_price}"),
+        "campaign_price": pricing.get("campaign_price", 1799),
+        "campaign_price_display": pricing.get("campaign_price_display", "₹1799"),
         "campaign_active": campaign_active,
         "campaign_name": pricing.get("campaign_name", ""),
-        "campaign_discount_percent": pricing.get("campaign_discount_percent", 0),
+        "campaign_discount_percent": pricing.get("campaign_discount_percent", 10),
+        "trial_expired_discount": trial_expired_discount,
+        "trial_expired_price": trial_expired_price,
+        "trial_expired_price_display": f"₹{trial_expired_price}",
         "trial_days": pricing.get("trial_days", 7)
     }
 

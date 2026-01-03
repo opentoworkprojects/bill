@@ -9,19 +9,31 @@ import { AlertTriangle, Sparkles, Clock, Gift } from 'lucide-react';
 const TrialBanner = ({ user }) => {
   const navigate = useNavigate();
   const [saleOffer, setSaleOffer] = useState(null);
+  const [pricing, setPricing] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchSaleOffer();
+    fetchData();
   }, []);
 
-  const fetchSaleOffer = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(`${API}/sale-offer`);
-      setSaleOffer(response.data);
+      const [saleRes, pricingRes] = await Promise.all([
+        axios.get(`${API}/sale-offer`),
+        axios.get(`${API}/pricing`)
+      ]);
+      setSaleOffer(saleRes.data);
+      setPricing(pricingRes.data);
     } catch (error) {
-      console.error('Failed to fetch sale offer', error);
+      console.error('Failed to fetch data', error);
       setSaleOffer({ enabled: false });
+      setPricing({
+        regular_price: 1999,
+        regular_price_display: '₹1999',
+        trial_expired_discount: 10,
+        trial_expired_price: 1799,
+        trial_expired_price_display: '₹1799'
+      });
     } finally {
       setLoading(false);
     }
@@ -40,12 +52,24 @@ const TrialBanner = ({ user }) => {
   // Don't show if user has active subscription
   if (!is_trial) return null;
 
+  // Get pricing details
+  const regularPrice = pricing?.regular_price_display || '₹1999';
+  const trialExpiredDiscount = pricing?.trial_expired_discount || 10;
+  const trialExpiredPrice = pricing?.trial_expired_price_display || '₹1799';
+  
   // Get offer details from super admin settings
   const offerTitle = saleOffer.title || 'Special Offer';
-  const offerPrice = saleOffer.price || '₹599/Year';
   const offerBgColor = saleOffer.bg_color || 'from-red-500 to-orange-500';
 
-  // Trial expired - urgent banner
+  // Use campaign price if campaign is active, otherwise use trial expired price
+  const displayPrice = pricing?.campaign_active 
+    ? pricing.campaign_price_display 
+    : trialExpiredPrice;
+  const displayDiscount = pricing?.campaign_active 
+    ? pricing.campaign_discount_percent 
+    : trialExpiredDiscount;
+
+  // Trial expired - urgent banner with discount
   if (trial_expired) {
     return (
       <Card className="border-0 shadow-lg border-l-4 border-l-red-500 bg-red-50 mb-6">
@@ -54,15 +78,17 @@ const TrialBanner = ({ user }) => {
             <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
             <div>
               <p className="font-bold text-red-900">Trial Expired - Subscription Required</p>
-              <p className="text-sm text-red-700">Your 7-day trial has ended. Subscribe now to continue using BillByteKOT.</p>
+              <p className="text-sm text-red-700">
+                Your trial has ended. Get {displayDiscount}% OFF - Pay only {displayPrice} instead of {regularPrice}!
+              </p>
             </div>
           </div>
           <Button 
             onClick={() => navigate('/subscription')} 
-            className={`bg-gradient-to-r ${offerBgColor} hover:opacity-90`}
+            className="bg-gradient-to-r from-red-500 to-orange-500 hover:opacity-90"
           >
             <Gift className="w-4 h-4 mr-2" />
-            {offerTitle} - {offerPrice}
+            Get {displayDiscount}% OFF - {displayPrice}
           </Button>
         </CardContent>
       </Card>
@@ -81,7 +107,7 @@ const TrialBanner = ({ user }) => {
             <div>
               <p className="font-bold">⚠️ Trial Ending Soon!</p>
               <p className="text-sm text-white/90">
-                Only {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} left • {offerTitle}: {offerPrice}
+                Only {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} left • {offerTitle}
               </p>
             </div>
           </div>
@@ -91,7 +117,7 @@ const TrialBanner = ({ user }) => {
             className="bg-white text-gray-800 hover:bg-gray-100"
           >
             <Gift className="w-4 h-4 mr-2" />
-            Get {offerPrice}
+            Subscribe - {regularPrice}/year
           </Button>
         </CardContent>
       </Card>
@@ -109,7 +135,7 @@ const TrialBanner = ({ user }) => {
           <div>
             <p className="font-bold">🎁 Free Trial Active!</p>
             <p className="text-sm text-green-100">
-              {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} remaining • {offerTitle}: {offerPrice}
+              {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} remaining • {offerTitle}
             </p>
           </div>
         </div>
@@ -119,7 +145,7 @@ const TrialBanner = ({ user }) => {
           className="bg-white text-green-600 hover:bg-green-50"
         >
           <Gift className="w-4 h-4 mr-2" />
-          Upgrade - {offerPrice}
+          Upgrade - {regularPrice}/year
         </Button>
       </CardContent>
     </Card>
