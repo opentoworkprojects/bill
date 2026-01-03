@@ -14,7 +14,7 @@
   "enableNotifications": true,
   "startUrl": "/",
   "iconUrl": "https://billbytekot.in/icon-512.png",
-  "maskableIconUrl": "https://billbytekot.in/icon-512.png",
+  "maskableIconUrl": "https://billbytekot.in/icon-512-maskable.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\billbytekot\\android.keystore",
