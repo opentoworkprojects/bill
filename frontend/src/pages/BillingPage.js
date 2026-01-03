@@ -33,6 +33,7 @@ const BillingPage = ({ user }) => {
   const [showSplitBill, setShowSplitBill] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [showTip, setShowTip] = useState(false);
+  const [customTaxRate, setCustomTaxRate] = useState(null); // null means use settings
 
   useEffect(() => {
     fetchOrder();
@@ -314,6 +315,18 @@ const BillingPage = ({ user }) => {
     return symbols[businessSettings?.currency || 'INR'] || '₹';
   };
 
+  // Get effective tax rate (custom or from settings)
+  const getEffectiveTaxRate = () => {
+    if (customTaxRate !== null) return customTaxRate;
+    return businessSettings?.tax_rate ?? 5;
+  };
+
+  // Calculate tax based on effective rate
+  const calculateTax = () => {
+    if (!order) return 0;
+    return (order.subtotal * getEffectiveTaxRate()) / 100;
+  };
+
   const calculateDiscount = () => {
     if (!order) return 0;
     if (discountType === 'percentage') {
@@ -324,8 +337,10 @@ const BillingPage = ({ user }) => {
 
   const calculateFinalTotal = () => {
     if (!order) return 0;
+    const subtotal = order.subtotal;
+    const taxAmount = calculateTax();
     const discountAmount = calculateDiscount();
-    return order.total - discountAmount + tip;
+    return subtotal + taxAmount - discountAmount + tip;
   };
 
   const calculateSplitAmount = () => {
@@ -409,12 +424,12 @@ const BillingPage = ({ user }) => {
                 <span className="font-medium">{getCurrencySymbol()}{order.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-600">
-                <span>Tax ({businessSettings?.tax_rate || 5}%):</span>
-                <span>{getCurrencySymbol()}{order.tax.toFixed(2)}</span>
+                <span>Tax ({getEffectiveTaxRate()}%):</span>
+                <span>{getCurrencySymbol()}{calculateTax().toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-2xl font-bold text-violet-600 pt-2 border-t" data-testid="order-total">
                 <span>Total:</span>
-                <span>{getCurrencySymbol()}{order.total.toFixed(2)}</span>
+                <span>{getCurrencySymbol()}{(order.subtotal + calculateTax()).toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
@@ -617,9 +632,22 @@ const BillingPage = ({ user }) => {
                 <span>Subtotal:</span>
                 <span>{getCurrencySymbol()}{order?.subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm opacity-90">
-                <span>Tax:</span>
-                <span>{getCurrencySymbol()}{order?.tax.toFixed(2)}</span>
+              <div className="flex justify-between items-center text-sm opacity-90">
+                <div className="flex items-center gap-2">
+                  <span>Tax ({getEffectiveTaxRate()}%):</span>
+                  <select
+                    value={customTaxRate !== null ? customTaxRate : (businessSettings?.tax_rate ?? 5)}
+                    onChange={(e) => setCustomTaxRate(Number(e.target.value))}
+                    className="bg-white/20 text-white text-xs px-2 py-1 rounded border border-white/30"
+                  >
+                    <option value="0" className="text-gray-800">No Tax (0%)</option>
+                    <option value="5" className="text-gray-800">5%</option>
+                    <option value="12" className="text-gray-800">12%</option>
+                    <option value="18" className="text-gray-800">18%</option>
+                    <option value="28" className="text-gray-800">28%</option>
+                  </select>
+                </div>
+                <span>{getCurrencySymbol()}{calculateTax().toFixed(2)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-sm text-green-300">
@@ -696,7 +724,7 @@ const BillingPage = ({ user }) => {
                 className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 h-12 text-lg"
                 data-testid="complete-payment-button"
               >
-                {loading ? 'Processing...' : paymentCompleted ? '✓ Paid' : `Pay ${getCurrencySymbol()}${order.total.toFixed(2)}`}
+                {loading ? 'Processing...' : paymentCompleted ? '✓ Paid' : `Pay ${getCurrencySymbol()}${calculateFinalTotal().toFixed(2)}`}
               </Button>
               <Button
                 variant="outline"

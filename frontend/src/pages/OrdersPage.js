@@ -382,7 +382,8 @@ const OrdersPage = ({ user }) => {
 
     try {
       const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const tax = subtotal * 0.05;
+      const taxRate = (businessSettings?.tax_rate ?? 5) / 100;
+      const tax = subtotal * taxRate;
       const total = subtotal + tax;
 
       let paymentReceived, balanceAmount, isCredit, paymentMethod;
