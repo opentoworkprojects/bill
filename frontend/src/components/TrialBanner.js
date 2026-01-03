@@ -1,10 +1,37 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { API } from '../App';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { AlertTriangle, Sparkles, Clock, Gift } from 'lucide-react';
 
 const TrialBanner = ({ user }) => {
   const navigate = useNavigate();
+  const [saleOffer, setSaleOffer] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSaleOffer();
+  }, []);
+
+  const fetchSaleOffer = async () => {
+    try {
+      const response = await axios.get(`${API}/sale-offer`);
+      setSaleOffer(response.data);
+    } catch (error) {
+      console.error('Failed to fetch sale offer', error);
+      setSaleOffer({ enabled: false });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Don't show anything while loading
+  if (loading) return null;
+
+  // Don't show if sale offer is not enabled from Super Admin
+  if (!saleOffer?.enabled) return null;
 
   if (!user?.trial_info) return null;
 
@@ -12,6 +39,11 @@ const TrialBanner = ({ user }) => {
 
   // Don't show if user has active subscription
   if (!is_trial) return null;
+
+  // Get offer details from super admin settings
+  const offerTitle = saleOffer.title || 'Special Offer';
+  const offerPrice = saleOffer.price || '₹599/Year';
+  const offerBgColor = saleOffer.bg_color || 'from-red-500 to-orange-500';
 
   // Trial expired - urgent banner
   if (trial_expired) {
@@ -27,10 +59,10 @@ const TrialBanner = ({ user }) => {
           </div>
           <Button 
             onClick={() => navigate('/subscription')} 
-            className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+            className={`bg-gradient-to-r ${offerBgColor} hover:opacity-90`}
           >
             <Gift className="w-4 h-4 mr-2" />
-            Get ₹599/Year Deal
+            {offerTitle} - {offerPrice}
           </Button>
         </CardContent>
       </Card>
@@ -40,7 +72,7 @@ const TrialBanner = ({ user }) => {
   // Trial expiring soon (2 days or less) - warning banner
   if (trial_days_left <= 2) {
     return (
-      <Card className="border-0 shadow-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white mb-6">
+      <Card className={`border-0 shadow-lg bg-gradient-to-r ${offerBgColor} text-white mb-6`}>
         <CardContent className="p-4 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -48,18 +80,18 @@ const TrialBanner = ({ user }) => {
             </div>
             <div>
               <p className="font-bold">⚠️ Trial Ending Soon!</p>
-              <p className="text-sm text-orange-100">
-                Only {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} left • New Year Special: ₹599/year (40% OFF)!
+              <p className="text-sm text-white/90">
+                Only {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} left • {offerTitle}: {offerPrice}
               </p>
             </div>
           </div>
           <Button 
             onClick={() => navigate('/subscription')} 
             variant="secondary" 
-            className="bg-white text-orange-600 hover:bg-orange-50"
+            className="bg-white text-gray-800 hover:bg-gray-100"
           >
             <Gift className="w-4 h-4 mr-2" />
-            Get ₹599/Year Deal
+            Get {offerPrice}
           </Button>
         </CardContent>
       </Card>
@@ -77,7 +109,7 @@ const TrialBanner = ({ user }) => {
           <div>
             <p className="font-bold">🎁 Free Trial Active!</p>
             <p className="text-sm text-green-100">
-              {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} remaining • New Year Special: ₹599/year!
+              {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} remaining • {offerTitle}: {offerPrice}
             </p>
           </div>
         </div>
@@ -87,7 +119,7 @@ const TrialBanner = ({ user }) => {
           className="bg-white text-green-600 hover:bg-green-50"
         >
           <Gift className="w-4 h-4 mr-2" />
-          Upgrade - ₹599/Year
+          Upgrade - {offerPrice}
         </Button>
       </CardContent>
     </Card>
