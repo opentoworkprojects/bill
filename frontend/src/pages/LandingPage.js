@@ -12,6 +12,7 @@ import {
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
 import LeadCapturePopup from "../components/LeadCapturePopup";
+import SaleBanner from "../components/SaleBanner";
 import {
   ChefHat,
   Sparkles,
@@ -896,42 +897,10 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white" data-testid="landing-page">
-      {/* Dynamic Sale Offer Banner */}
+      {/* Dynamic Sale Banner - Top Position */}
       {saleOffer && saleOffer.enabled && (
-        <div className={`relative overflow-hidden bg-gradient-to-r ${saleOffer.bg_color || 'from-red-500 to-orange-500'} text-white py-3`}>
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-center gap-4 flex-wrap">
-              {saleOffer.badge_text && (
-                <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold animate-pulse">
-                  {saleOffer.badge_text}
-                </span>
-              )}
-              <div className="flex items-center gap-3">
-                <Gift className="w-5 h-5" />
-                <span className="font-semibold">{saleOffer.title}</span>
-                {saleOffer.subtitle && (
-                  <span className="text-white/90 hidden sm:inline">- {saleOffer.subtitle}</span>
-                )}
-              </div>
-              {saleOffer.discount_text && (
-                <span className="px-3 py-1 bg-white text-red-600 rounded-full text-sm font-bold">
-                  {saleOffer.discount_text}
-                </span>
-              )}
-              <Button
-                size="sm"
-                onClick={() => navigate('/login')}
-                className="bg-white text-gray-900 hover:bg-gray-100 text-xs"
-              >
-                Get Offer <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        <SaleBanner position="top" />
       )}
-      
-      {/* New Year Campaign Banner - Removed, now controlled from Ops Controls */}
-      {/* To show a banner, enable it from Ops Controls > Promotions */}
       
       {/* Lead Capture Popup */}
       <LeadCapturePopup />
@@ -1210,6 +1179,13 @@ const LandingPage = () => {
 
       {/* Special Offer Section - Only show if sale offer is enabled */}
       {saleOffer && saleOffer.enabled && <SaleOfferSection navigate={navigate} saleOffer={saleOffer} pricing={pricing} />}
+      
+      {/* Hero Position Sale Banner - Shows themed banner when sale is active */}
+      {saleOffer && saleOffer.enabled && saleOffer.theme && saleOffer.theme !== 'default' && (
+        <div className="container mx-auto px-4 py-8">
+          <SaleBanner position="hero" />
+        </div>
+      )}
 
       {/* SEO Content Section - Main Homepage Content */}
       <section className="py-16 bg-white">
@@ -2592,6 +2568,11 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+      
+      {/* Floating Corner Sale Banner */}
+      {saleOffer && saleOffer.enabled && (
+        <SaleBanner position="corner" />
+      )}
     </div>
   );
 };

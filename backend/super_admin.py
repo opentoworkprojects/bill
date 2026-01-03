@@ -626,7 +626,13 @@ async def get_sale_offer(
             "badge_text": "",
             "bg_color": "from-red-500 to-orange-500",
             "end_date": "",
-            "valid_until": ""
+            "valid_until": "",
+            "theme": "default",
+            "discount_percent": 20,
+            "original_price": 1999,
+            "sale_price": 1599,
+            "cta_text": "Grab This Deal Now!",
+            "urgency_text": "⚡ Limited slots available. Offer ends soon!"
         }
     
     offer.pop("_id", None)

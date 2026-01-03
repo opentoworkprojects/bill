@@ -4,173 +4,181 @@ import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { AlertTriangle, Sparkles, Clock, Gift } from 'lucide-react';
+import { AlertTriangle, Sparkles, Clock, Gift, Zap } from 'lucide-react';
 
-// Cache for sale offer and pricing data (5 minute TTL)
+// Cache for pricing data (5 minute TTL)
 const cache = {
   data: null,
   timestamp: 0,
-  TTL: 5 * 60 * 1000 // 5 minutes
+  TTL: 5 * 60 * 1000
 };
 
 const TrialBanner = ({ user }) => {
   const navigate = useNavigate();
-  const [saleOffer, setSaleOffer] = useState(cache.data?.saleOffer || null);
   const [pricing, setPricing] = useState(cache.data?.pricing || null);
   const [loading, setLoading] = useState(!cache.data);
   const fetchedRef = useRef(false);
 
   useEffect(() => {
-    // Skip if already fetched or cache is valid
     if (fetchedRef.current) return;
     if (cache.data && Date.now() - cache.timestamp < cache.TTL) {
-      setSaleOffer(cache.data.saleOffer);
       setPricing(cache.data.pricing);
       setLoading(false);
       return;
     }
-    
     fetchedRef.current = true;
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [saleRes, pricingRes] = await Promise.all([
-        axios.get(`${API}/sale-offer`),
-        axios.get(`${API}/pricing`)
-      ]);
-      const data = { saleOffer: saleRes.data, pricing: pricingRes.data };
-      cache.data = data;
+      const response = await axios.get(`${API}/pricing`);
+      cache.data = { pricing: response.data };
       cache.timestamp = Date.now();
-      setSaleOffer(data.saleOffer);
-      setPricing(data.pricing);
+      setPricing(response.data);
     } catch (error) {
-      const fallback = {
-        saleOffer: { enabled: false },
-        pricing: {
-          regular_price: 1999,
-          regular_price_display: '₹1999',
-          trial_expired_discount: 10,
-          trial_expired_price: 1799,
-          trial_expired_price_display: '₹1799'
-        }
-      };
-      setSaleOffer(fallback.saleOffer);
-      setPricing(fallback.pricing);
+      // Fallback pricing
+      setPricing({
+        regular_price: 1999,
+        regular_price_display: '₹1999',
+        trial_expired_discount: 10,
+        trial_expired_price: 1799,
+        trial_expired_price_display: '₹1799'
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Don't show anything while loading
-  if (loading) return null;
-
-  // Don't show if sale offer is not enabled from Super Admin
-  if (!saleOffer?.enabled) return null;
-
-  if (!user?.trial_info) return null;
+  // Don't show while loading or if no user/trial info
+  if (loading || !user?.trial_info) return null;
 
   const { is_trial, trial_days_left, trial_expired } = user.trial_info;
 
-  // Don't show if user has active subscription
-  if (!is_trial) return null;
+  // Don't show if user has active subscription (not in trial)
+  if (!is_trial && !trial_expired) return null;
 
-  // Get pricing details
+  // Get dynamic pricing from Super Admin
   const regularPrice = pricing?.regular_price_display || '₹1999';
-  const trialExpiredDiscount = pricing?.trial_expired_discount || 10;
-  const trialExpiredPrice = pricing?.trial_expired_price_display || '₹1799';
-  
-  // Get offer details from super admin settings
-  const offerTitle = saleOffer.title || 'Special Offer';
-  const offerBgColor = saleOffer.bg_color || 'from-red-500 to-orange-500';
+  const discountPercent = pricing?.trial_expired_discount || 10;
+  const discountedPrice = pricing?.trial_expired_price_display || '₹1799';
 
-  // Use campaign price if campaign is active, otherwise use trial expired price
-  const displayPrice = pricing?.campaign_active 
-    ? pricing.campaign_price_display 
-    : trialExpiredPrice;
-  const displayDiscount = pricing?.campaign_active 
-    ? pricing.campaign_discount_percent 
-    : trialExpiredDiscount;
+  // Determine banner color based on trial days
+  const getBannerStyle = () => {
+    if (trial_expired) {
+      return {
+        bg: 'bg-gradient-to-r from-red-500 to-rose-600',
+        border: 'border-l-red-600',
+        icon: AlertTriangle,
+        iconBg: 'bg-red-100',
+        iconColor: 'text-red-600'
+      };
+    }
+    if (trial_days_left <= 1) {
+      return {
+        bg: 'bg-gradient-to-r from-red-500 to-orange-500',
+        border: 'border-l-red-500',
+        icon: AlertTriangle,
+        iconBg: 'bg-white/20',
+        iconColor: 'text-white'
+      };
+    }
+    if (trial_days_left <= 3) {
+      return {
+        bg: 'bg-gradient-to-r from-orange-500 to-amber-500',
+        border: 'border-l-orange-500',
+        icon: Clock,
+        iconBg: 'bg-white/20',
+        iconColor: 'text-white'
+      };
+    }
+    if (trial_days_left <= 5) {
+      return {
+        bg: 'bg-gradient-to-r from-yellow-500 to-amber-500',
+        border: 'border-l-yellow-500',
+        icon: Clock,
+        iconBg: 'bg-white/20',
+        iconColor: 'text-white'
+      };
+    }
+    // More than 5 days - green/healthy
+    return {
+      bg: 'bg-gradient-to-r from-emerald-500 to-green-600',
+      border: 'border-l-green-500',
+      icon: Sparkles,
+      iconBg: 'bg-white/20',
+      iconColor: 'text-white'
+    };
+  };
 
-  // Trial expired - urgent banner with discount
+  const style = getBannerStyle();
+  const IconComponent = style.icon;
+
+  // Trial Expired Banner
   if (trial_expired) {
     return (
-      <Card className="border-0 shadow-lg border-l-4 border-l-red-500 bg-red-50 mb-6">
-        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
-            <div>
-              <p className="font-bold text-red-900">Trial Expired - Subscription Required</p>
-              <p className="text-sm text-red-700">
-                Your trial has ended. Get {displayDiscount}% OFF - Pay only {displayPrice} instead of {regularPrice}!
-              </p>
+      <Card className="border-0 shadow-xl bg-red-50 border-l-4 border-l-red-500 mb-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 ${style.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
+                <IconComponent className={`w-5 h-5 ${style.iconColor}`} />
+              </div>
+              <div>
+                <p className="font-bold text-red-900 text-sm sm:text-base">Trial Expired - Subscription Required</p>
+                <p className="text-xs sm:text-sm text-red-700">
+                  Get {discountPercent}% OFF → <span className="line-through opacity-60">{regularPrice}</span> <span className="font-bold">{discountedPrice}/year</span>
+                </p>
+              </div>
             </div>
+            <Button 
+              onClick={() => navigate('/subscription')} 
+              size="sm"
+              className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-lg"
+            >
+              <Gift className="w-4 h-4 mr-1" />
+              Get {discountedPrice}/Year Deal
+            </Button>
           </div>
-          <Button 
-            onClick={() => navigate('/subscription')} 
-            className="bg-gradient-to-r from-red-500 to-orange-500 hover:opacity-90"
-          >
-            <Gift className="w-4 h-4 mr-2" />
-            Get {displayDiscount}% OFF - {displayPrice}
-          </Button>
         </CardContent>
       </Card>
     );
   }
 
-  // Trial expiring soon (2 days or less) - warning banner
-  if (trial_days_left <= 2) {
-    return (
-      <Card className={`border-0 shadow-lg bg-gradient-to-r ${offerBgColor} text-white mb-6`}>
-        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold">⚠️ Trial Ending Soon!</p>
-              <p className="text-sm text-white/90">
-                Only {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} left • {offerTitle}
-              </p>
-            </div>
-          </div>
-          <Button 
-            onClick={() => navigate('/subscription')} 
-            variant="secondary" 
-            className="bg-white text-gray-800 hover:bg-gray-100"
-          >
-            <Gift className="w-4 h-4 mr-2" />
-            Subscribe - {regularPrice}/year
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Trial active - info banner
+  // Active Trial Banner - Color changes based on days left
   return (
-    <Card className="border-0 shadow-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white mb-6">
-      <CardContent className="p-4 flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5" />
+    <Card className={`border-0 shadow-xl ${style.bg} text-white mb-4`}>
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 ${style.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
+              <IconComponent className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm sm:text-base">
+                {trial_days_left <= 1 && '⚠️ Last Day of Trial!'}
+                {trial_days_left === 2 && '⚠️ Trial Ending Tomorrow!'}
+                {trial_days_left > 2 && trial_days_left <= 5 && `⏰ ${trial_days_left} Days Left in Trial`}
+                {trial_days_left > 5 && `🎁 Free Trial - ${trial_days_left} Days Left`}
+              </p>
+              <p className="text-xs sm:text-sm opacity-90">
+                {trial_days_left <= 3 
+                  ? `Subscribe now & get ${discountPercent}% OFF → ${discountedPrice}/year`
+                  : `Upgrade anytime for just ${regularPrice}/year`
+                }
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold">🎁 Free Trial Active!</p>
-            <p className="text-sm text-green-100">
-              {trial_days_left} {trial_days_left === 1 ? 'day' : 'days'} remaining • {offerTitle}
-            </p>
-          </div>
+          <Button 
+            onClick={() => navigate('/subscription')} 
+            size="sm"
+            variant="secondary"
+            className={`${trial_days_left <= 3 ? 'bg-white text-red-600 hover:bg-red-50' : 'bg-white/20 text-white hover:bg-white/30 border border-white/30'}`}
+          >
+            <Zap className="w-4 h-4 mr-1" />
+            {trial_days_left <= 3 ? `Get ${discountedPrice}` : 'Upgrade'}
+          </Button>
         </div>
-        <Button 
-          onClick={() => navigate('/subscription')} 
-          variant="secondary" 
-          className="bg-white text-green-600 hover:bg-green-50"
-        >
-          <Gift className="w-4 h-4 mr-2" />
-          Upgrade - {regularPrice}/year
-        </Button>
       </CardContent>
     </Card>
   );

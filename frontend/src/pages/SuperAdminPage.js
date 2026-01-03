@@ -76,7 +76,13 @@ const SuperAdminPage = () => {
     badge_text: '',
     bg_color: 'from-red-500 to-orange-500',
     end_date: '',
-    valid_until: '' // Exact datetime when offer expires
+    valid_until: '', // Exact datetime when offer expires
+    theme: 'default', // Theme: default, diwali, christmas, newyear, flash, blackfriday, summer, republic, holi
+    discount_percent: 20,
+    original_price: 1999,
+    sale_price: 1599,
+    cta_text: 'Grab This Deal Now!',
+    urgency_text: '⚡ Limited slots available. Offer ends soon!'
   });
   const [showSaleOfferModal, setShowSaleOfferModal] = useState(false);
   const [savingSaleOffer, setSavingSaleOffer] = useState(false);
@@ -2308,6 +2314,59 @@ const SuperAdminPage = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
+                        <Label>Sale Theme</Label>
+                        <select
+                          value={saleOffer.theme || 'default'}
+                          onChange={(e) => setSaleOffer({...saleOffer, theme: e.target.value})}
+                          className="w-full px-3 py-2 border rounded-lg"
+                        >
+                          <option value="default">🎯 Default (Violet)</option>
+                          <option value="flash">⚡ Flash Sale (Red/Orange)</option>
+                          <option value="blackfriday">🖤 Black Friday</option>
+                          <option value="diwali">🪔 Diwali Special</option>
+                          <option value="christmas">🎄 Christmas</option>
+                          <option value="newyear">🎉 New Year</option>
+                          <option value="republic">🇮🇳 Republic Day</option>
+                          <option value="holi">🎨 Holi Festival</option>
+                          <option value="summer">☀️ Summer Sale</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Discount Percent</Label>
+                        <Input
+                          type="number"
+                          value={saleOffer.discount_percent || 20}
+                          onChange={(e) => setSaleOffer({...saleOffer, discount_percent: Number(e.target.value)})}
+                          placeholder="20"
+                          min="1"
+                          max="90"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Original Price (₹)</Label>
+                        <Input
+                          type="number"
+                          value={saleOffer.original_price || 1999}
+                          onChange={(e) => setSaleOffer({...saleOffer, original_price: Number(e.target.value)})}
+                          placeholder="1999"
+                        />
+                      </div>
+                      <div>
+                        <Label>Sale Price (₹)</Label>
+                        <Input
+                          type="number"
+                          value={saleOffer.sale_price || 1599}
+                          onChange={(e) => setSaleOffer({...saleOffer, sale_price: Number(e.target.value)})}
+                          placeholder="1599"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
                         <Label>Background Color</Label>
                         <select
                           value={saleOffer.bg_color}
@@ -2321,16 +2380,38 @@ const SuperAdminPage = () => {
                           <option value="from-yellow-500 to-orange-500">Yellow to Orange</option>
                           <option value="from-indigo-500 to-purple-500">Indigo to Purple</option>
                           <option value="from-pink-500 to-rose-500">Pink to Rose</option>
+                          <option value="from-orange-500 via-red-500 to-pink-500">Diwali (Orange-Red-Pink)</option>
+                          <option value="from-red-600 via-red-500 to-green-600">Christmas (Red-Green)</option>
+                          <option value="from-indigo-900 via-purple-900 to-pink-900">New Year (Dark Purple)</option>
+                          <option value="from-gray-900 via-black to-gray-900">Black Friday</option>
                         </select>
                       </div>
                       <div>
-                        <Label>End Date (date only)</Label>
+                        <Label>End Date</Label>
                         <Input
                           type="date"
                           value={saleOffer.end_date}
                           onChange={(e) => setSaleOffer({...saleOffer, end_date: e.target.value})}
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <Label>CTA Button Text</Label>
+                      <Input
+                        value={saleOffer.cta_text || ''}
+                        onChange={(e) => setSaleOffer({...saleOffer, cta_text: e.target.value})}
+                        placeholder="Grab This Deal Now!"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Urgency Text</Label>
+                      <Input
+                        value={saleOffer.urgency_text || ''}
+                        onChange={(e) => setSaleOffer({...saleOffer, urgency_text: e.target.value})}
+                        placeholder="⚡ Limited slots available. Offer ends soon!"
+                      />
                     </div>
 
                     {/* Exact Validity DateTime */}
