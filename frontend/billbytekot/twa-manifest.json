@@ -20,8 +20,8 @@
     "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\billbytekot\\android.keystore",
     "alias": "android"
   },
-  "appVersionName": "24",
-  "appVersionCode": 24,
+  "appVersionName": "25",
+  "appVersionCode": 25,
   "shortcuts": [
     {
       "name": "New Order",
@@ -69,5 +69,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "navigate-existing",
   "displayOverride": [],
-  "appVersion": "24"
+  "appVersion": "25"
 }

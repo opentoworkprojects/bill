@@ -1,7 +1,7 @@
 // BillByteKOT Service Worker - Offline Support & Caching
-const CACHE_NAME = 'billbytekot-v1.4.0';
-const STATIC_CACHE = 'billbytekot-static-v1.4.0';
-const DYNAMIC_CACHE = 'billbytekot-dynamic-v1.4.0';
+const CACHE_NAME = 'billbytekot-v1.5.0';
+const STATIC_CACHE = 'billbytekot-static-v1.5.0';
+const DYNAMIC_CACHE = 'billbytekot-dynamic-v1.5.0';
 
 // Files to cache for offline use
 const STATIC_FILES = [
@@ -62,6 +62,12 @@ self.addEventListener('fetch', (event) => {
   
   // Skip chrome-extension and other non-http requests
   if (!url.protocol.startsWith('http')) return;
+  
+  // For navigation requests (HTML pages), always go network first
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstStrategy(request));
+    return;
+  }
   
   // API requests - network first, cache fallback
   if (url.pathname.startsWith('/api/')) {
