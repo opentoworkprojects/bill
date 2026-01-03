@@ -13,6 +13,7 @@ import { Input } from "../components/ui/input";
 import { toast } from "sonner";
 import LeadCapturePopup from "../components/LeadCapturePopup";
 import SaleBanner from "../components/SaleBanner";
+import TopBanner from "../components/TopBanner";
 import {
   ChefHat,
   Sparkles,
@@ -391,9 +392,9 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
   // Get dynamic values from saleOffer and pricing
   const offerTitle = saleOffer?.title || 'Special Offer';
   const offerSubtitle = saleOffer?.subtitle || 'Limited time deal!';
-  const discountText = saleOffer?.discount_text || pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '';
-  const campaignPrice = pricing?.campaign_price_display || '₹599';
-  const regularPrice = pricing?.regular_price_display || '₹999';
+  const discountText = saleOffer?.discount_text || (pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '');
+  const campaignPrice = pricing?.campaign_price_display || '₹1799';
+  const regularPrice = pricing?.regular_price_display || '₹1999';
   const bgColor = saleOffer?.bg_color || 'from-red-500 via-orange-500 to-yellow-500';
 
   return (
@@ -577,8 +578,8 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
   }, [saleOffer]);
 
   // Get dynamic values
-  const campaignPrice = pricing?.campaign_price_display || '₹599';
-  const regularPrice = pricing?.regular_price_display || '₹999';
+  const campaignPrice = pricing?.campaign_price_display || '₹1799';
+  const regularPrice = pricing?.regular_price_display || '₹1999';
   const discountText = saleOffer?.discount_text || (pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '');
   const badgeText = saleOffer?.badge_text || 'SPECIAL OFFER';
   const bgColor = saleOffer?.bg_color || 'from-orange-500 via-red-500 to-pink-500';
@@ -695,14 +696,14 @@ const LandingPage = () => {
         const response = await axios.get(`${API}/pricing`);
         setPricing(response.data);
       } catch (error) {
-        // Use default pricing
+        // Use default pricing - ₹1999 base price
         setPricing({
-          regular_price: 999,
-          regular_price_display: '₹999',
-          campaign_price: 599,
-          campaign_price_display: '₹599',
+          regular_price: 1999,
+          regular_price_display: '₹1999',
+          campaign_price: 1799,
+          campaign_price_display: '₹1799',
           campaign_active: false,
-          campaign_discount_percent: 40,
+          campaign_discount_percent: 10,
           trial_days: 7
         });
       }
@@ -839,9 +840,10 @@ const LandingPage = () => {
 
   // Dynamic pricing plans based on API data
   const getPricingPlans = () => {
-    const isPromoActive = saleOffer?.enabled || pricing?.campaign_active;
-    const currentPrice = isPromoActive ? (pricing?.campaign_price_display || '₹599') : (pricing?.regular_price_display || '₹999');
-    const discountPercent = pricing?.campaign_discount_percent || 40;
+    // Only show promo pricing when campaign is ACTUALLY active (not just saleOffer enabled)
+    const isPromoActive = pricing?.campaign_active === true;
+    const currentPrice = isPromoActive ? (pricing?.campaign_price_display || '₹1799') : (pricing?.regular_price_display || '₹1999');
+    const discountPercent = pricing?.campaign_discount_percent || 10;
     
     return [
       {
@@ -863,7 +865,7 @@ const LandingPage = () => {
         name: isPromoActive ? "Special Offer" : "Premium",
         price: currentPrice,
         period: "per year",
-        originalPrice: isPromoActive ? (pricing?.regular_price_display || '₹999') : null,
+        originalPrice: isPromoActive ? (pricing?.regular_price_display || '₹1999') : null,
         badge: isPromoActive ? `${discountPercent}% OFF` : null,
         features: [
           "Unlimited bills forever",
@@ -897,10 +899,8 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white" data-testid="landing-page">
-      {/* Dynamic Sale Banner - Top Position */}
-      {saleOffer && saleOffer.enabled && (
-        <SaleBanner position="top" />
-      )}
+      {/* Dynamic Top Banner - Multiple Designs from Super Admin */}
+      <TopBanner />
       
       {/* Lead Capture Popup */}
       <LeadCapturePopup />
@@ -1076,21 +1076,21 @@ const LandingPage = () => {
 
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto font-light animate-fade-in-up delay-200">
               AI-powered POS system trusted by 500+ restaurants.
-              {(saleOffer?.enabled || pricing?.campaign_active) && (
-                <span className="font-semibold text-red-600"> {saleOffer?.discount_text || `${pricing?.campaign_discount_percent}% OFF`}!</span>
+              {pricing?.campaign_active && (
+                <span className="font-semibold text-red-600"> {pricing?.campaign_discount_percent || 10}% OFF!</span>
               )}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 animate-fade-in-up delay-400">
               <Button
                 size="lg"
-                className={`h-14 px-8 text-lg btn-animate hover-lift ${(saleOffer?.enabled || pricing?.campaign_active) ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse-glow' : 'bg-gradient-to-r from-violet-600 to-purple-600'}`}
+                className={`h-14 px-8 text-lg btn-animate hover-lift ${pricing?.campaign_active ? 'bg-gradient-to-r from-red-500 to-orange-500 animate-pulse-glow' : 'bg-gradient-to-r from-violet-600 to-purple-600'}`}
                 onClick={handleGetStarted}
               >
-                {(saleOffer?.enabled || pricing?.campaign_active) ? (
+                {pricing?.campaign_active ? (
                   <>
                     <Gift className="w-5 h-5 mr-2" />
-                    Get {pricing?.campaign_price_display || '₹599'}/Year Deal
+                    Get {pricing?.campaign_price_display || '₹1799'}/Year Deal
                   </>
                 ) : (
                   <>
@@ -1433,9 +1433,9 @@ const LandingPage = () => {
                 <CardContent className="pt-6">
                   <ul className="space-y-4">
                     {[
-                      (saleOffer?.enabled || pricing?.campaign_active) 
-                        ? `${pricing?.campaign_price_display || '₹599'}/year - ${saleOffer?.title || 'Special Offer'} (${pricing?.campaign_discount_percent || 40}% OFF)`
-                        : `${pricing?.regular_price_display || '₹999'}/year - Affordable pricing`,
+                      pricing?.campaign_active 
+                        ? `${pricing?.campaign_price_display || '₹1799'}/year - ${pricing?.campaign_name || 'Special Offer'} (${pricing?.campaign_discount_percent || 10}% OFF)`
+                        : `${pricing?.regular_price_display || '₹1999'}/year - Affordable pricing`,
                       `${pricing?.trial_days || 7}-day free trial, no credit card`,
                       "Cloud-based - Access anywhere",
                       "Automatic updates included",
@@ -1917,7 +1917,7 @@ const LandingPage = () => {
             {[
               {
                 q: "How does the free trial work?",
-                a: `You get ${pricing?.trial_days || 7} days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ${pricing?.regular_price_display || '₹999'}/year.`,
+                a: `You get ${pricing?.trial_days || 7} days of full access to all premium features, completely free. No credit card required. After the trial, upgrade to Premium for just ${pricing?.regular_price_display || '₹1999'}/year.`,
               },
               {
                 q: "Can I use my own Razorpay account?",
@@ -1941,7 +1941,7 @@ const LandingPage = () => {
               },
               {
                 q: "What's included in the Premium plan?",
-                a: `Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, WhatsApp integration, and all future features. Just ${pricing?.regular_price_display || '₹999'}/year.`,
+                a: `Unlimited bills, 6 thermal print formats, advanced AI analytics, priority 24/7 support, multi-currency, WhatsApp integration, and all future features. Just ${pricing?.regular_price_display || '₹1999'}/year.`,
               },
             ].map((faq, index) => (
               <Card key={index} className="border-0 shadow-lg">

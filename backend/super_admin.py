@@ -628,6 +628,7 @@ async def get_sale_offer(
             "end_date": "",
             "valid_until": "",
             "theme": "default",
+            "banner_design": "gradient-wave",
             "discount_percent": 20,
             "original_price": 1999,
             "sale_price": 1599,

@@ -15,17 +15,60 @@ import { useNavigate } from 'react-router-dom';
 const SubscriptionPage = ({ user }) => {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true); // Loading state for initial data
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [pricing, setPricing] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchSubscriptionStatus();
-    fetchPricing();
-    
-    // Countdown timer for New Year offer - January 1, 2026 ONLY
+    loadPageData();
+  }, []);
+
+  // Load all data before showing the page
+  const loadPageData = async () => {
+    setPageLoading(true);
+    try {
+      const [statusRes, pricingRes] = await Promise.all([
+        axios.get(`${API}/subscription/status`).catch(() => ({ data: null })),
+        axios.get(`${API}/pricing`).catch(() => ({ data: null }))
+      ]);
+      
+      if (statusRes.data) {
+        setSubscriptionStatus(statusRes.data);
+      }
+      
+      if (pricingRes.data) {
+        setPricing(pricingRes.data);
+      } else {
+        // Fallback pricing
+        setPricing({
+          regular_price: 1999,
+          regular_price_display: '₹1999',
+          campaign_price: 1799,
+          campaign_price_display: '₹1799',
+          campaign_active: false,
+          campaign_discount_percent: 10,
+          trial_expired_discount: 10,
+          trial_expired_price: 1799,
+          trial_expired_price_display: '₹1799',
+          trial_days: 7
+        });
+      }
+      
+      // Setup countdown timer only if campaign is active
+      if (pricingRes.data?.campaign_active && pricingRes.data?.campaign_end_date) {
+        setupCountdownTimer(pricingRes.data.campaign_end_date);
+      }
+    } catch (error) {
+      console.error('Failed to load page data', error);
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  const setupCountdownTimer = (endDateStr) => {
     const calculateTimeLeft = () => {
-      const endDate = new Date('2026-01-01T23:59:59');
+      const endDate = new Date(endDateStr);
       const now = new Date();
       const difference = endDate - now;
       
@@ -42,7 +85,7 @@ const SubscriptionPage = ({ user }) => {
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(timer);
-  }, []);
+  };
 
   const fetchSubscriptionStatus = async () => {
     try {
@@ -195,15 +238,34 @@ const SubscriptionPage = ({ user }) => {
 
   return (
     <Layout user={user}>
+      {/* Show loading skeleton while fetching data */}
+      {pageLoading ? (
+        <div className="max-w-6xl mx-auto space-y-8 animate-pulse">
+          <div className="text-center space-y-4">
+            <div className="h-12 bg-gray-200 rounded-lg w-64 mx-auto"></div>
+            <div className="h-6 bg-gray-200 rounded w-96 mx-auto"></div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="h-96 bg-gray-200 rounded-2xl"></div>
+            <div className="h-96 bg-gray-200 rounded-2xl"></div>
+          </div>
+        </div>
+      ) : (
       <div className="max-w-6xl mx-auto space-y-8" data-testid="subscription-page">
         {/* Hero Section */}
         <div className="text-center space-y-4">
-          {(pricing?.campaign_active || subscriptionStatus?.needs_subscription) && (
+          {/* Only show campaign banner when campaign is ACTUALLY active */}
+          {pricing?.campaign_active && (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold animate-pulse">
               <Gift className="w-4 h-4" />
-              {pricing?.campaign_active 
-                ? `🎉 ${pricing?.campaign_name || 'Special Offer'} - ${pricing?.campaign_discount_percent || 10}% OFF!`
-                : `🎁 Trial Expired - Get ${pricing?.trial_expired_discount || 10}% OFF!`}
+              🎉 {pricing?.campaign_name || 'Special Offer'} - {pricing?.campaign_discount_percent || 10}% OFF!
+            </div>
+          )}
+          {/* Show trial expired banner only when trial is expired and no campaign */}
+          {!pricing?.campaign_active && subscriptionStatus?.needs_subscription && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold animate-pulse">
+              <Gift className="w-4 h-4" />
+              🎁 Trial Expired - Get {pricing?.trial_expired_discount || 10}% OFF!
             </div>
           )}
           <h1 className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-transparent" 
@@ -214,8 +276,8 @@ const SubscriptionPage = ({ user }) => {
             Unlock unlimited potential for your restaurant with our powerful features
           </p>
           
-          {/* Countdown Timer */}
-          {subscriptionStatus?.campaign_active && (
+          {/* Countdown Timer - Only show when campaign is active */}
+          {pricing?.campaign_active && (
             <div className="inline-flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-xl">
               <Timer className="w-5 h-5 text-red-600" />
               <span className="text-sm font-medium text-red-700">Offer ends in:</span>
@@ -307,9 +369,13 @@ const SubscriptionPage = ({ user }) => {
               <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" /> ACTIVE
               </div>
-            ) : (
+            ) : (pricing?.campaign_active || subscriptionStatus?.needs_subscription) ? (
               <div className="absolute top-4 right-4 bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                🔥 BEST VALUE
+                🔥 {pricing?.campaign_active ? 'LIMITED OFFER' : 'SPECIAL DEAL'}
+              </div>
+            ) : (
+              <div className="absolute top-4 right-4 bg-gradient-to-r from-violet-500 to-purple-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                ⭐ BEST VALUE
               </div>
             )}
             <CardHeader className="text-center pb-2">
@@ -323,8 +389,8 @@ const SubscriptionPage = ({ user }) => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="text-center">
-                {/* Dynamic Pricing from Backend */}
-                {(pricing?.campaign_active || subscriptionStatus?.campaign_active) ? (
+                {/* Dynamic Pricing from Backend - Only show campaign when ACTUALLY active */}
+                {pricing?.campaign_active ? (
                   <>
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span className="text-2xl text-gray-400 line-through">{pricing?.regular_price_display || '₹1999'}</span>
@@ -362,6 +428,7 @@ const SubscriptionPage = ({ user }) => {
                     </div>
                   </>
                 ) : (
+                  // Regular pricing - no campaign, no trial expired
                   <>
                     <p className="text-6xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
                       {pricing?.regular_price_display || '₹1999'}
@@ -393,12 +460,12 @@ const SubscriptionPage = ({ user }) => {
               ) : (
                 <Button onClick={handleSubscribe} disabled={loading}
                   className={`w-full h-14 text-lg font-bold shadow-lg ${
-                    (pricing?.campaign_active || subscriptionStatus?.campaign_active || subscriptionStatus?.needs_subscription)
+                    (pricing?.campaign_active || subscriptionStatus?.needs_subscription)
                       ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600' 
                       : 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700'
                   }`}>
                   <Rocket className="w-5 h-5 mr-2" />
-                  {loading ? 'Processing...' : (pricing?.campaign_active || subscriptionStatus?.campaign_active)
+                  {loading ? 'Processing...' : pricing?.campaign_active
                       ? `🎉 Get ${pricing?.campaign_price_display || '₹1799'}/Year Deal Now!`
                       : subscriptionStatus?.needs_subscription
                         ? `🎁 Get ${pricing?.trial_expired_discount || 10}% OFF - ${pricing?.trial_expired_price_display || '₹1799'}/year`
@@ -489,6 +556,7 @@ const SubscriptionPage = ({ user }) => {
           </CardContent>
         </Card>
       </div>
+      )}
     </Layout>
   );
 };

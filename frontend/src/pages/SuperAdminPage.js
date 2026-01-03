@@ -78,6 +78,7 @@ const SuperAdminPage = () => {
     end_date: '',
     valid_until: '', // Exact datetime when offer expires
     theme: 'default', // Theme: default, diwali, christmas, newyear, flash, blackfriday, summer, republic, holi
+    banner_design: 'gradient-wave', // Top banner design
     discount_percent: 20,
     original_price: 1999,
     sale_price: 1599,
@@ -2312,9 +2313,31 @@ const SuperAdminPage = () => {
                       />
                     </div>
 
+                    {/* Banner Design Selector */}
+                    <div className="p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg border border-violet-200">
+                      <Label className="text-violet-700 font-medium mb-2 block">🎨 Top Banner Design</Label>
+                      <p className="text-xs text-violet-600 mb-3">Choose an animated banner design for the landing page</p>
+                      <select
+                        value={saleOffer.banner_design || 'gradient-wave'}
+                        onChange={(e) => setSaleOffer({...saleOffer, banner_design: e.target.value})}
+                        className="w-full px-3 py-2 border border-violet-300 rounded-lg bg-white"
+                      >
+                        <option value="gradient-wave">🌊 Gradient Wave (Floating particles)</option>
+                        <option value="neon-glow">� NeonB Glow (Cyberpunk style)</option>
+                        <option value="festive-confetti">🎊 Festive Confetti (Celebration)</option>
+                        <option value="minimal-elegant">✨ Minimal Elegant (Clean & Simple)</option>
+                        <option value="marquee-urgent">🔥 Marquee Urgent (Scrolling text)</option>
+                        <option value="glass-modern">🪟 Glass Modern (Glassmorphism)</option>
+                        <option value="retro-pixel">👾 Retro Pixel (Gaming style)</option>
+                        <option value="rainbow-gradient">🌈 Rainbow Gradient (Colorful)</option>
+                        <option value="split-diagonal">⚡ Split Diagonal (Bold)</option>
+                        <option value="countdown-focus">⏰ Countdown Focus (Timer prominent)</option>
+                      </select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label>Sale Theme</Label>
+                        <Label>Sale Theme (Hero Banner)</Label>
                         <select
                           value={saleOffer.theme || 'default'}
                           onChange={(e) => setSaleOffer({...saleOffer, theme: e.target.value})}
