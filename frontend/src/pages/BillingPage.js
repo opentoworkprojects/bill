@@ -186,109 +186,295 @@ const BillingPage = ({ user }) => {
   const downloadBillPDF = async () => {
     if (!order) return;
     try {
-      // Generate PDF using jsPDF
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
+      
+      // Colors
+      const primaryColor = [124, 58, 237]; // Violet
+      const darkColor = [31, 41, 55];
+      const grayColor = [107, 114, 128];
+      const lightGray = [243, 244, 246];
       
       // Restaurant details
       const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
       const address = businessSettings?.address || '';
       const phone = businessSettings?.phone || '';
-      const gst = businessSettings?.gst_number || '';
+      const email = businessSettings?.email || '';
+      const gstin = businessSettings?.gstin || '';
+      const fssai = businessSettings?.fssai || '';
+      const website = businessSettings?.website || '';
+      const tagline = businessSettings?.tagline || '';
+      const currency = getCurrencySymbol();
       
-      // Header
-      doc.setFontSize(20);
+      // Page dimensions
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      
+      // ===== HEADER SECTION =====
+      // Purple header bar
+      doc.setFillColor(...primaryColor);
+      doc.rect(0, 0, pageWidth, 45, 'F');
+      
+      // Restaurant name
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
       doc.setFont(undefined, 'bold');
-      doc.text(restaurantName, 105, 20, { align: 'center' });
+      doc.text(restaurantName, margin, 22);
       
+      // Tagline
+      if (tagline) {
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(tagline, margin, 32);
+      }
+      
+      // Invoice label on right
+      doc.setFontSize(28);
+      doc.setFont(undefined, 'bold');
+      doc.text('INVOICE', pageWidth - margin, 25, { align: 'right' });
+      
+      // Invoice number below
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      if (address) doc.text(address, 105, 28, { align: 'center' });
-      if (phone) doc.text(`Phone: ${phone}`, 105, 34, { align: 'center' });
-      if (gst) doc.text(`GSTIN: ${gst}`, 105, 40, { align: 'center' });
+      doc.text(`#${order.invoice_number || order.id.slice(0, 8).toUpperCase()}`, pageWidth - margin, 35, { align: 'right' });
       
-      // Line
-      doc.line(20, 45, 190, 45);
+      // ===== BUSINESS & CUSTOMER INFO =====
+      let yPos = 55;
       
-      // Invoice details
-      doc.setFontSize(12);
+      // Left side - Business details
+      doc.setTextColor(...darkColor);
+      doc.setFontSize(9);
       doc.setFont(undefined, 'bold');
-      doc.text('INVOICE', 105, 52, { align: 'center' });
-      
-      doc.setFontSize(10);
+      doc.text('FROM:', margin, yPos);
       doc.setFont(undefined, 'normal');
-      doc.text(`Invoice #: ${order.id.slice(0, 8).toUpperCase()}`, 20, 60);
-      doc.text(`Date: ${new Date(order.created_at).toLocaleString()}`, 20, 66);
-      if (order.table_number) doc.text(`Table: ${order.table_number}`, 20, 72);
-      if (order.customer_name) doc.text(`Customer: ${order.customer_name}`, 20, 78);
+      yPos += 5;
       
-      // Items table
-      let yPos = 90;
+      doc.setFontSize(8);
+      doc.setTextColor(...grayColor);
+      if (address) { doc.text(address, margin, yPos); yPos += 4; }
+      if (phone) { doc.text(`📞 ${phone}`, margin, yPos); yPos += 4; }
+      if (email) { doc.text(`✉️ ${email}`, margin, yPos); yPos += 4; }
+      if (website) { doc.text(`🌐 ${website}`, margin, yPos); yPos += 4; }
+      if (gstin) { doc.text(`GSTIN: ${gstin}`, margin, yPos); yPos += 4; }
+      if (fssai) { doc.text(`FSSAI: ${fssai}`, margin, yPos); yPos += 4; }
+      
+      // Right side - Invoice details box
+      const boxX = pageWidth - margin - 70;
+      const boxY = 50;
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(boxX, boxY, 70, 35, 3, 3, 'F');
+      
+      doc.setTextColor(...darkColor);
+      doc.setFontSize(8);
+      let rightY = boxY + 8;
+      
       doc.setFont(undefined, 'bold');
-      doc.text('Item', 20, yPos);
-      doc.text('Qty', 120, yPos, { align: 'right' });
-      doc.text('Price', 150, yPos, { align: 'right' });
-      doc.text('Total', 180, yPos, { align: 'right' });
-      
-      doc.line(20, yPos + 2, 190, yPos + 2);
-      yPos += 8;
-      
+      doc.text('Invoice Date:', boxX + 5, rightY);
       doc.setFont(undefined, 'normal');
-      order.items.forEach(item => {
-        doc.text(item.name, 20, yPos);
-        doc.text(item.quantity.toString(), 120, yPos, { align: 'right' });
-        doc.text(`${getCurrencySymbol()}${item.price.toFixed(2)}`, 150, yPos, { align: 'right' });
-        doc.text(`${getCurrencySymbol()}${(item.quantity * item.price).toFixed(2)}`, 180, yPos, { align: 'right' });
-        yPos += 6;
+      doc.text(new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }), boxX + 35, rightY);
+      rightY += 6;
+      
+      doc.setFont(undefined, 'bold');
+      doc.text('Time:', boxX + 5, rightY);
+      doc.setFont(undefined, 'normal');
+      doc.text(new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), boxX + 35, rightY);
+      rightY += 6;
+      
+      if (order.table_number && order.table_number !== 0) {
+        doc.setFont(undefined, 'bold');
+        doc.text('Table:', boxX + 5, rightY);
+        doc.setFont(undefined, 'normal');
+        doc.text(`#${order.table_number}`, boxX + 35, rightY);
+        rightY += 6;
+      }
+      
+      doc.setFont(undefined, 'bold');
+      doc.text('Order Type:', boxX + 5, rightY);
+      doc.setFont(undefined, 'normal');
+      const orderTypeLabel = order.order_type === 'dine_in' ? 'Dine In' : order.order_type === 'takeaway' ? 'Takeaway' : order.order_type === 'delivery' ? 'Delivery' : 'Dine In';
+      doc.text(orderTypeLabel, boxX + 35, rightY);
+      
+      // Customer info (if available)
+      if (order.customer_name || order.customer_phone) {
+        yPos = Math.max(yPos, 90);
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 18, 2, 2, 'F');
+        
+        doc.setTextColor(...darkColor);
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.text('BILL TO:', margin + 5, yPos + 7);
+        doc.setFont(undefined, 'normal');
+        const customerInfo = [order.customer_name, order.customer_phone].filter(Boolean).join(' • ');
+        doc.text(customerInfo, margin + 30, yPos + 7);
+        
+        if (order.waiter_name) {
+          doc.text(`Served by: ${order.waiter_name}`, pageWidth - margin - 5, yPos + 7, { align: 'right' });
+        }
+        yPos += 25;
+      } else {
+        yPos = Math.max(yPos + 10, 95);
+      }
+      
+      // ===== ITEMS TABLE =====
+      // Table header
+      doc.setFillColor(...primaryColor);
+      doc.rect(margin, yPos, pageWidth - 2 * margin, 10, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.text('ITEM', margin + 5, yPos + 7);
+      doc.text('QTY', pageWidth - margin - 65, yPos + 7, { align: 'center' });
+      doc.text('PRICE', pageWidth - margin - 35, yPos + 7, { align: 'right' });
+      doc.text('AMOUNT', pageWidth - margin - 5, yPos + 7, { align: 'right' });
+      
+      yPos += 12;
+      
+      // Table rows
+      doc.setTextColor(...darkColor);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      
+      let isAlternate = false;
+      order.items.forEach((item, index) => {
+        // Alternate row background
+        if (isAlternate) {
+          doc.setFillColor(250, 250, 252);
+          doc.rect(margin, yPos - 4, pageWidth - 2 * margin, 8, 'F');
+        }
+        isAlternate = !isAlternate;
+        
+        // Item name (truncate if too long)
+        const itemName = item.name.length > 35 ? item.name.substring(0, 35) + '...' : item.name;
+        doc.text(itemName, margin + 5, yPos);
+        doc.text(item.quantity.toString(), pageWidth - margin - 65, yPos, { align: 'center' });
+        doc.text(`${currency}${item.price.toFixed(2)}`, pageWidth - margin - 35, yPos, { align: 'right' });
+        doc.text(`${currency}${(item.quantity * item.price).toFixed(2)}`, pageWidth - margin - 5, yPos, { align: 'right' });
+        
+        // Item notes if any
+        if (item.notes) {
+          doc.setFontSize(7);
+          doc.setTextColor(...grayColor);
+          yPos += 4;
+          doc.text(`  Note: ${item.notes}`, margin + 5, yPos);
+          doc.setFontSize(9);
+          doc.setTextColor(...darkColor);
+        }
+        
+        yPos += 8;
       });
       
-      // Totals
-      yPos += 5;
-      doc.line(20, yPos, 190, yPos);
+      // Line after items
+      doc.setDrawColor(...grayColor);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
       
-      const subtotal = order.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      const tax = order.tax || 0;
-      const discount = order.discount || 0;
-      const total = order.total;
+      // ===== TOTALS SECTION =====
+      const totalsX = pageWidth - margin - 80;
       
-      doc.text('Subtotal:', 130, yPos);
-      doc.text(`${getCurrencySymbol()}${subtotal.toFixed(2)}`, 180, yPos, { align: 'right' });
+      // Subtotal
+      doc.setFontSize(9);
+      doc.setTextColor(...grayColor);
+      doc.text('Subtotal:', totalsX, yPos);
+      doc.setTextColor(...darkColor);
+      doc.text(`${currency}${order.subtotal.toFixed(2)}`, pageWidth - margin - 5, yPos, { align: 'right' });
       yPos += 6;
       
-      if (discount > 0) {
-        doc.text('Discount:', 130, yPos);
-        doc.text(`-${getCurrencySymbol()}${discount.toFixed(2)}`, 180, yPos, { align: 'right' });
+      // Discount (if any)
+      const discountAmount = calculateDiscount();
+      if (discountAmount > 0) {
+        doc.setTextColor(34, 197, 94); // Green
+        doc.text('Discount:', totalsX, yPos);
+        doc.text(`-${currency}${discountAmount.toFixed(2)}`, pageWidth - margin - 5, yPos, { align: 'right' });
         yPos += 6;
       }
       
-      if (tax > 0) {
-        doc.text('Tax:', 130, yPos);
-        doc.text(`${getCurrencySymbol()}${tax.toFixed(2)}`, 180, yPos, { align: 'right' });
+      // Tax
+      const taxAmount = calculateTax();
+      const taxRate = getEffectiveTaxRate();
+      doc.setTextColor(...grayColor);
+      doc.text(`Tax (${taxRate}%):`, totalsX, yPos);
+      doc.setTextColor(...darkColor);
+      doc.text(`${currency}${taxAmount.toFixed(2)}`, pageWidth - margin - 5, yPos, { align: 'right' });
+      yPos += 6;
+      
+      // Tip (if any)
+      if (tip > 0) {
+        doc.setTextColor(...grayColor);
+        doc.text('Tip:', totalsX, yPos);
+        doc.setTextColor(...darkColor);
+        doc.text(`${currency}${tip.toFixed(2)}`, pageWidth - margin - 5, yPos, { align: 'right' });
         yPos += 6;
       }
       
-      doc.setFont(undefined, 'bold');
+      // Total box
+      yPos += 2;
+      doc.setFillColor(...primaryColor);
+      doc.roundedRect(totalsX - 5, yPos - 4, pageWidth - margin - totalsX + 10, 14, 2, 2, 'F');
+      
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
-      doc.text('Total:', 130, yPos);
-      doc.text(`${getCurrencySymbol()}${total.toFixed(2)}`, 180, yPos, { align: 'right' });
+      doc.setFont(undefined, 'bold');
+      doc.text('TOTAL:', totalsX, yPos + 5);
+      doc.text(`${currency}${calculateFinalTotal().toFixed(2)}`, pageWidth - margin - 5, yPos + 5, { align: 'right' });
       
-      // Payment method
-      yPos += 10;
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Payment Method: ${order.payment_method || 'Cash'}`, 20, yPos);
+      yPos += 20;
       
-      // Footer
-      yPos += 15;
+      // ===== PAYMENT INFO =====
+      doc.setTextColor(...darkColor);
       doc.setFontSize(9);
-      doc.text('Thank you for your business!', 105, yPos, { align: 'center' });
-      yPos += 5;
-      doc.text('Powered by BillByteKOT - billbytekot.in', 105, yPos, { align: 'center' });
+      doc.setFont(undefined, 'bold');
+      doc.text('Payment Method:', margin, yPos);
+      doc.setFont(undefined, 'normal');
+      
+      const paymentMethodLabel = {
+        'cash': '💵 Cash',
+        'card': '💳 Card',
+        'upi': '📱 UPI',
+        'credit': '📝 Credit',
+        'split': '🔀 Split Payment'
+      }[order.payment_method] || 'Cash';
+      doc.text(paymentMethodLabel, margin + 40, yPos);
+      
+      // Payment status
+      const isPaid = !order.is_credit && order.balance_amount <= 0;
+      doc.setFont(undefined, 'bold');
+      if (isPaid) {
+        doc.setTextColor(34, 197, 94);
+        doc.text('✓ PAID', pageWidth - margin, yPos, { align: 'right' });
+      } else {
+        doc.setTextColor(239, 68, 68);
+        doc.text(`BALANCE: ${currency}${(order.balance_amount || 0).toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+      }
+      
+      // ===== FOOTER =====
+      // Thank you message
+      yPos = pageHeight - 35;
+      doc.setDrawColor(...lightGray);
+      doc.line(margin, yPos - 5, pageWidth - margin, yPos - 5);
+      
+      doc.setTextColor(...darkColor);
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.text('Thank you for your visit!', pageWidth / 2, yPos, { align: 'center' });
+      
+      // Footer message
+      const footerMsg = businessSettings?.footer_message || 'We hope to serve you again soon.';
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(...grayColor);
+      doc.text(footerMsg, pageWidth / 2, yPos + 6, { align: 'center' });
+      
+      // Powered by
+      doc.setFontSize(7);
+      doc.text('Generated by BillByteKOT • billbytekot.in', pageWidth / 2, yPos + 14, { align: 'center' });
       
       // Save PDF
-      doc.save(`invoice-${order.id.slice(0, 8)}.pdf`);
-      toast.success('Invoice downloaded as PDF!');
+      const fileName = `Invoice-${order.invoice_number || order.id.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      toast.success('Invoice downloaded!');
     } catch (error) {
       console.error('Failed to generate PDF', error);
       toast.error('Failed to download invoice');
