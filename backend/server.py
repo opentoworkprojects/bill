@@ -23,6 +23,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 # Import super admin router
 from super_admin import super_admin_router, set_database as set_super_admin_db
@@ -146,10 +147,16 @@ api_router = APIRouter(prefix="/api")
 # In-memory cache for frequently accessed data
 from functools import lru_cache
 from time import time
+import threading
 
-# Simple cache decorator
+# Simple cache with thread-safe operations
 _cache = {}
 _cache_ttl = {}
+_cache_lock = threading.Lock()
+
+# Request deduplication to prevent duplicate concurrent requests
+_pending_requests = {}
+_pending_lock = threading.Lock()
 
 def cache_response(ttl_seconds=60):
     """Cache decorator for API responses"""
@@ -160,18 +167,38 @@ def cache_response(ttl_seconds=60):
             current_time = time()
             
             # Check if cached and not expired
-            if cache_key in _cache and cache_key in _cache_ttl:
-                if current_time < _cache_ttl[cache_key]:
-                    return _cache[cache_key]
+            with _cache_lock:
+                if cache_key in _cache and cache_key in _cache_ttl:
+                    if current_time < _cache_ttl[cache_key]:
+                        return _cache[cache_key]
             
             # Execute function and cache result
             result = await func(*args, **kwargs)
-            _cache[cache_key] = result
-            _cache_ttl[cache_key] = current_time + ttl_seconds
+            
+            with _cache_lock:
+                _cache[cache_key] = result
+                _cache_ttl[cache_key] = current_time + ttl_seconds
             
             return result
         return wrapper
     return decorator
+
+def clear_expired_cache():
+    """Clear expired cache entries to free memory"""
+    current_time = time()
+    with _cache_lock:
+        expired_keys = [k for k, v in _cache_ttl.items() if current_time >= v]
+        for key in expired_keys:
+            _cache.pop(key, None)
+            _cache_ttl.pop(key, None)
+
+# Semaphore to limit concurrent database operations (free tier optimization)
+DB_SEMAPHORE = asyncio.Semaphore(20)  # Max 20 concurrent DB operations
+
+async def rate_limited_db_operation(operation):
+    """Execute database operation with rate limiting for free tier"""
+    async with DB_SEMAPHORE:
+        return await operation
 
 
 # Dynamic CORS origin checker
@@ -224,6 +251,9 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# Add GZip compression for faster response times (compress responses > 500 bytes)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 # Currency symbols mapping
@@ -5980,6 +6010,24 @@ async def startup_validation():
         print("🔄 Server will continue running with degraded functionality")
 
     print(f"🚀 Server starting on port {os.getenv('PORT', '5000')}")
+    
+    # Start background cache cleanup task
+    asyncio.create_task(periodic_cache_cleanup())
+    print("✅ Background cache cleanup task started")
+
+
+async def periodic_cache_cleanup():
+    """Periodically clean up expired cache entries to free memory"""
+    while True:
+        await asyncio.sleep(300)  # Run every 5 minutes
+        clear_expired_cache()
+
+
+# Keep-alive endpoint for preventing cold starts
+@api_router.get("/ping")
+async def ping():
+    """Simple ping endpoint for health checks and keeping server warm"""
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 # ============ BULK UPLOAD ENDPOINTS ============

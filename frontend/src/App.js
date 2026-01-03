@@ -541,6 +541,21 @@ function App() {
     // Start notification polling for in-app notifications (less frequent)
     startNotificationPolling(API, 120000); // Check every 2 minutes instead of 1
     
+    // Keep-alive ping to prevent Render free tier cold starts
+    // Ping every 10 minutes to keep the server warm
+    const keepAliveInterval = setInterval(async () => {
+      try {
+        await axios.get(`${API}/ping`, { timeout: 5000 });
+        console.log('Keep-alive ping successful');
+      } catch (e) {
+        // Silent fail - server might be waking up
+        console.log('Keep-alive ping failed, server may be cold starting');
+      }
+    }, 10 * 60 * 1000); // 10 minutes
+    
+    // Initial ping to wake up server immediately
+    axios.get(`${API}/ping`, { timeout: 10000 }).catch(() => {});
+    
     // Request notification permission after a delay (better UX)
     setTimeout(() => {
       if (Notification.permission === 'default') {
@@ -597,9 +612,10 @@ function App() {
       }
     );
 
-    // Cleanup interceptor on unmount
+    // Cleanup interceptor and intervals on unmount
     return () => {
       axios.interceptors.response.eject(interceptor);
+      clearInterval(keepAliveInterval);
     };
   }, []);
 
