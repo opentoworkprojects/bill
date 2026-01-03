@@ -2552,10 +2552,60 @@ ACTIVE_CAMPAIGNS = {
 }
 
 async def get_current_subscription_price():
-    """Get current subscription price based on database settings and active campaigns"""
+    """Get current subscription price based on database settings and active campaigns/sales"""
     now = datetime.now(timezone.utc)
     
-    # Fetch pricing from database
+    # First, check if there's an active sale offer (from Promotions tab)
+    sale_offer = await db.site_settings.find_one({"type": "sale_offer", "enabled": True})
+    
+    if sale_offer:
+        # Check if sale offer has expired
+        sale_active = True
+        
+        # Check valid_until (datetime)
+        if sale_offer.get("valid_until"):
+            try:
+                valid_until = datetime.fromisoformat(sale_offer["valid_until"])
+                if valid_until.tzinfo is None:
+                    valid_until = valid_until.replace(tzinfo=timezone.utc)
+                if now > valid_until:
+                    sale_active = False
+            except:
+                pass
+        
+        # Check end_date (date only)
+        if sale_active and sale_offer.get("end_date"):
+            try:
+                end_date = datetime.fromisoformat(sale_offer["end_date"])
+                if end_date.tzinfo is None:
+                    end_date = end_date.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+                if now > end_date:
+                    sale_active = False
+            except:
+                pass
+        
+        if sale_active:
+            sale_price = sale_offer.get("sale_price", 1799)
+            original_price = sale_offer.get("original_price", 1999)
+            discount_percent = sale_offer.get("discount_percent", 10)
+            title = sale_offer.get("title", "Special Offer")
+            
+            return {
+                "price_paise": sale_price * 100,
+                "original_price_paise": original_price * 100,
+                "price_display": f"₹{sale_price}",
+                "original_price_display": f"₹{original_price}",
+                "discount_percent": discount_percent,
+                "campaign_name": title,
+                "campaign_active": True,
+                "campaign_ends": sale_offer.get("valid_until") or sale_offer.get("end_date"),
+                "badge": f"🎉 {discount_percent}% OFF!",
+                "trial_expired_discount": 10,
+                "trial_expired_price_paise": int(original_price * 0.9) * 100,
+                "source": "sale_offer"
+            }
+    
+    # Fetch pricing from database (campaign pricing)
     pricing_doc = await db.site_settings.find_one({"type": "pricing"})
     
     if pricing_doc:
@@ -2594,7 +2644,8 @@ async def get_current_subscription_price():
                 "campaign_ends": end_date if end_date else None,
                 "badge": f"🎉 {campaign_discount}% OFF!",
                 "trial_expired_discount": trial_expired_discount,
-                "trial_expired_price_paise": int(regular_price * (100 - trial_expired_discount) / 100) * 100
+                "trial_expired_price_paise": int(regular_price * (100 - trial_expired_discount) / 100) * 100,
+                "source": "pricing_campaign"
             }
         
         # Regular pricing with trial expired discount info
@@ -2610,7 +2661,8 @@ async def get_current_subscription_price():
             "campaign_ends": None,
             "badge": None,
             "trial_expired_discount": trial_expired_discount,
-            "trial_expired_price_paise": trial_expired_price * 100
+            "trial_expired_price_paise": trial_expired_price * 100,
+            "source": "regular"
         }
     
     # Default pricing if no database entry
@@ -2625,7 +2677,8 @@ async def get_current_subscription_price():
         "campaign_ends": None,
         "badge": None,
         "trial_expired_discount": 10,
-        "trial_expired_price_paise": 179900
+        "trial_expired_price_paise": 179900,
+        "source": "default"
     }
 
 

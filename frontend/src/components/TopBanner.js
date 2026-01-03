@@ -15,15 +15,24 @@ const TopBanner = () => {
   }, []);
 
   useEffect(() => {
-    if (bannerData?.end_date || bannerData?.valid_until) {
-      const timer = setInterval(() => {
-        const end = new Date(bannerData.valid_until || bannerData.end_date);
+    // Get the end date from either valid_until or end_date
+    let endDateStr = bannerData?.valid_until || bannerData?.end_date;
+    
+    if (endDateStr) {
+      // If it's just a date (YYYY-MM-DD), add end of day time
+      if (endDateStr.length === 10) {
+        endDateStr = endDateStr + 'T23:59:59';
+      }
+      
+      // Calculate time left immediately
+      const calculateTimeLeft = () => {
+        const end = new Date(endDateStr);
         const now = new Date();
         const diff = end - now;
         
         if (diff <= 0) {
           setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-          clearInterval(timer);
+          return false; // Timer expired
         } else {
           setTimeLeft({
             days: Math.floor(diff / (1000 * 60 * 60 * 24)),
@@ -31,8 +40,21 @@ const TopBanner = () => {
             minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
             seconds: Math.floor((diff % (1000 * 60)) / 1000)
           });
+          return true; // Timer still running
+        }
+      };
+      
+      // Calculate immediately on mount
+      calculateTimeLeft();
+      
+      // Then update every second
+      const timer = setInterval(() => {
+        const stillRunning = calculateTimeLeft();
+        if (!stillRunning) {
+          clearInterval(timer);
         }
       }, 1000);
+      
       return () => clearInterval(timer);
     }
   }, [bannerData]);
@@ -412,94 +434,134 @@ const TopBanner = () => {
     );
   }
 
-  // Design 11: Early Adopter Special - ₹9/Year 99% OFF
+  // Design 11: Early Adopter Special - ₹9/Year 99% OFF - ULTIMATE VERSION
   if (design === 'early-adopter') {
     const salePrice = bannerData.sale_price ? `₹${bannerData.sale_price}` : '₹9';
     const originalPrice = bannerData.original_price ? `₹${bannerData.original_price}` : '₹999';
     const discountPercent = bannerData.discount_percent || 99;
     
     return (
-      <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white">
-        {/* Fire/Flame particles */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(20)].map((_, i) => (
-            <div key={i} className="absolute animate-float" style={{
+      <div className="relative overflow-hidden text-white" style={{
+        background: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 25%, #ff4757 50%, #ff6348 75%, #ff9f43 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-x 3s ease infinite'
+      }}>
+        {/* Animated fire background - pointer-events-none to not block clicks */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(25)].map((_, i) => (
+            <div key={i} className="absolute text-2xl animate-float opacity-60" style={{
               left: `${Math.random() * 100}%`,
-              bottom: '-10px',
-              fontSize: `${12 + Math.random() * 16}px`,
+              bottom: '-20px',
               animationDelay: `${Math.random() * 3}s`,
               animationDuration: `${2 + Math.random() * 2}s`
             }}>🔥</div>
           ))}
         </div>
-        {/* Sparkle effects */}
-        <div className="absolute inset-0">
-          {[...Array(15)].map((_, i) => (
-            <Sparkles key={i} className="absolute w-4 h-4 text-yellow-200 animate-ping" style={{ 
+        
+        {/* Glowing orbs - pointer-events-none */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-32 h-32 bg-yellow-400 rounded-full filter blur-3xl opacity-40 animate-pulse" />
+          <div className="absolute top-0 right-1/4 w-32 h-32 bg-orange-500 rounded-full filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '0.5s' }} />
+          <div className="absolute top-0 left-1/2 w-24 h-24 bg-red-500 rounded-full filter blur-2xl opacity-30 animate-ping" style={{ animationDuration: '2s' }} />
+        </div>
+        
+        {/* Sparkles - pointer-events-none */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(12)].map((_, i) => (
+            <Sparkles key={i} className="absolute w-5 h-5 text-yellow-200 animate-ping" style={{ 
               left: `${Math.random() * 100}%`, 
               top: `${Math.random() * 100}%`, 
               animationDelay: `${Math.random() * 2}s`,
-              opacity: 0.6
+              animationDuration: '1.5s'
             }} />
           ))}
         </div>
-        <div className="relative z-10 py-3 px-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 sm:gap-5 flex-wrap">
-            {/* Badge */}
-            <div className="flex items-center gap-2 bg-black/30 backdrop-blur px-3 py-1.5 rounded-full animate-bounce">
-              <Flame className="w-5 h-5 text-yellow-300 animate-pulse" />
-              <span className="font-black text-sm sm:text-base tracking-wide">{bannerData.badge_text || '🔥 EARLY ADOPTER'}</span>
-              <Flame className="w-5 h-5 text-yellow-300 animate-pulse" />
+        
+        <div className="relative z-10 py-4 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
+            
+            {/* Animated Badge */}
+            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full border border-yellow-400/50 shadow-lg shadow-orange-500/30">
+              <Flame className="w-6 h-6 text-yellow-300 animate-pulse" />
+              <span className="font-black text-base sm:text-lg tracking-wide text-yellow-100 drop-shadow-lg">
+                {bannerData.badge_text || '🔥 EARLY ADOPTER SPECIAL'}
+              </span>
+              <Flame className="w-6 h-6 text-yellow-300 animate-pulse" />
             </div>
             
-            {/* Price Display */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className="text-white/60 line-through text-sm sm:text-base">{originalPrice}/yr</span>
-              <div className="relative">
-                <span className="text-3xl sm:text-4xl font-black text-yellow-200 drop-shadow-lg animate-pulse">{salePrice}</span>
-                <span className="text-sm text-yellow-200">/year</span>
+            {/* MEGA Price Display */}
+            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/20">
+              <div className="text-center">
+                <span className="text-white/50 line-through text-sm block">{originalPrice}/yr</span>
               </div>
-              <div className="bg-yellow-400 text-black px-2 py-1 rounded-lg font-black text-xs sm:text-sm animate-bounce">
+              <ArrowRight className="w-5 h-5 text-yellow-300 animate-pulse" />
+              <div className="relative">
+                <span className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-100 to-yellow-300 drop-shadow-2xl" style={{
+                  textShadow: '0 0 30px rgba(255,255,0,0.5), 0 0 60px rgba(255,200,0,0.3)'
+                }}>
+                  {salePrice}
+                </span>
+                <span className="text-yellow-200 text-lg font-bold">/year</span>
+                {/* Glow effect */}
+                <div className="absolute inset-0 bg-yellow-400 filter blur-xl opacity-30 animate-pulse" />
+              </div>
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-3 py-1.5 rounded-xl font-black text-sm sm:text-base animate-bounce shadow-lg">
                 {discountPercent}% OFF
               </div>
             </div>
             
-            {/* Countdown */}
-            <div className="hidden sm:flex items-center gap-1 bg-black/30 backdrop-blur px-3 py-1.5 rounded-full">
-              <Timer className="w-4 h-4 text-yellow-300" />
-              <span className="text-xs font-mono">
-                {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
-              </span>
+            {/* Countdown Timer */}
+            <div className="hidden md:flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-xl border border-red-400/30">
+              <Timer className="w-5 h-5 text-red-400 animate-pulse" />
+              <div className="flex gap-1">
+                {[
+                  { val: timeLeft.days, label: 'd' },
+                  { val: timeLeft.hours, label: 'h' },
+                  { val: timeLeft.minutes, label: 'm' },
+                  { val: timeLeft.seconds, label: 's' }
+                ].map((item, i) => (
+                  <div key={i} className="bg-red-600/80 px-2 py-1 rounded text-center min-w-[32px]">
+                    <span className="font-mono font-black text-white">{String(item.val).padStart(2, '0')}</span>
+                    <span className="text-[10px] text-red-200">{item.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
             
-            {/* CTA Button */}
+            {/* MEGA CTA Button */}
             <button 
               onClick={() => navigate('/login')} 
-              className="relative bg-yellow-400 text-black px-5 sm:px-6 py-2 rounded-full font-black text-sm hover:bg-white hover:scale-110 transition-all shadow-xl group overflow-hidden"
+              className="relative bg-gradient-to-r from-yellow-400 via-yellow-300 to-orange-400 text-black px-6 sm:px-8 py-3 rounded-full font-black text-base sm:text-lg shadow-2xl shadow-yellow-500/50 hover:shadow-yellow-400/70 transform hover:scale-110 transition-all duration-300 group overflow-hidden border-2 border-yellow-200"
+              style={{
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }}
             >
               <span className="relative z-10 flex items-center gap-2">
-                <Rocket className="w-4 h-4 group-hover:animate-bounce" />
-                {bannerData.cta_text || 'Grab ₹9 Deal!'}
+                <Rocket className="w-5 h-5 group-hover:animate-bounce" />
+                {bannerData.cta_text || `Grab ${salePrice} Deal NOW!`}
+                <Zap className="w-5 h-5 animate-pulse" />
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-orange-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              {/* Shine effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
             </button>
             
             {/* Close */}
-            <button onClick={() => setDismissed(true)} className="text-white/60 hover:text-white">
-              <X className="w-4 h-4" />
+            <button onClick={() => setDismissed(true)} className="text-white/60 hover:text-white hover:scale-125 transition-transform">
+              <X className="w-5 h-5" />
             </button>
           </div>
           
-          {/* Scrolling urgency text */}
-          <div className="mt-1 overflow-hidden">
-            <div className="animate-marquee whitespace-nowrap text-xs text-yellow-100/80">
-              <span className="mx-4">🔥 Limited Time Only</span>
-              <span className="mx-4">⚡ First 1000 Users</span>
-              <span className="mx-4">🎉 99% OFF - Just {salePrice}/Year</span>
-              <span className="mx-4">🚀 Unlimited Bills Forever</span>
-              <span className="mx-4">💎 All Premium Features</span>
-              <span className="mx-4">🔥 Limited Time Only</span>
-              <span className="mx-4">⚡ First 1000 Users</span>
+          {/* Scrolling urgency text - Enhanced */}
+          <div className="mt-2 overflow-hidden border-t border-white/10 pt-2">
+            <div className="animate-marquee whitespace-nowrap text-sm font-medium">
+              <span className="mx-6 text-yellow-200">🔥 LIMITED TIME ONLY</span>
+              <span className="mx-6 text-white">⚡ FIRST 1000 USERS</span>
+              <span className="mx-6 text-yellow-200">🎉 99% OFF - JUST {salePrice}/YEAR</span>
+              <span className="mx-6 text-white">🚀 UNLIMITED BILLS FOREVER</span>
+              <span className="mx-6 text-yellow-200">💎 ALL PREMIUM FEATURES</span>
+              <span className="mx-6 text-white">📞 24/7 PRIORITY SUPPORT</span>
+              <span className="mx-6 text-yellow-200">🔥 LIMITED TIME ONLY</span>
+              <span className="mx-6 text-white">⚡ FIRST 1000 USERS</span>
             </div>
           </div>
         </div>

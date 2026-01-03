@@ -367,8 +367,13 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
   useEffect(() => {
     const calculateTimeLeft = () => {
       // Use valid_until from saleOffer if available, otherwise end_date
-      const endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
+      let endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
       if (!endDateStr) return;
+      
+      // If it's just a date (YYYY-MM-DD), add end of day time
+      if (endDateStr.length === 10) {
+        endDateStr = endDateStr + 'T23:59:59';
+      }
       
       const endDate = new Date(endDateStr);
       const now = new Date();
@@ -381,6 +386,8 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
           minutes: Math.floor((difference / 1000 / 60) % 60),
           seconds: Math.floor((difference / 1000) % 60)
         });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
     };
     
@@ -557,8 +564,13 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
+      let endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
       if (!endDateStr) return;
+      
+      // If it's just a date (YYYY-MM-DD), add end of day time
+      if (endDateStr.length === 10) {
+        endDateStr = endDateStr + 'T23:59:59';
+      }
       
       const endDate = new Date(endDateStr);
       const now = new Date();
@@ -571,6 +583,8 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
           minutes: Math.floor((difference / 1000 / 60) % 60),
           seconds: Math.floor((difference / 1000) % 60)
         });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
     };
     
@@ -925,7 +939,7 @@ const LandingPage = () => {
       <LeadCapturePopup />
       
       {/* Header/Navbar */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200">
+      <header className="sticky top-0 z-[60] bg-white/95 backdrop-blur-sm border-b border-gray-200">
         <nav className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -995,8 +1009,9 @@ const LandingPage = () => {
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden"
+              className="md:hidden relative z-50 p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
             >
               {mobileMenuOpen ? (
                 <X className="w-6 h-6" />

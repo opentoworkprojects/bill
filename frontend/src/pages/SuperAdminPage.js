@@ -441,7 +441,8 @@ const SuperAdminPage = () => {
           params: credentials
         });
         if (saleOfferRes.data) {
-          setSaleOffer(saleOfferRes.data);
+          // Merge with default state to ensure all fields exist
+          setSaleOffer(prev => ({...prev, ...saleOfferRes.data}));
         }
       } catch (e) {
         // Sale offer not configured yet

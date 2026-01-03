@@ -20,8 +20,8 @@
     "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\billbytekot\\android.keystore",
     "alias": "android"
   },
-  "appVersionName": "19",
-  "appVersionCode": 19,
+  "appVersionName": "20",
+  "appVersionCode": 20,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://billbytekot.in/manifest.json",
@@ -57,5 +57,5 @@
     "standalone",
     "minimal-ui"
   ],
-  "appVersion": "19"
+  "appVersion": "20"
 }
