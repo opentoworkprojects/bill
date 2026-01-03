@@ -18,6 +18,7 @@ const SubscriptionPage = ({ user }) => {
   const [pageLoading, setPageLoading] = useState(true); // Loading state for initial data
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [pricing, setPricing] = useState(null);
+  const [saleOffer, setSaleOffer] = useState(null); // Sale offer from super admin
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,9 +29,10 @@ const SubscriptionPage = ({ user }) => {
   const loadPageData = async () => {
     setPageLoading(true);
     try {
-      const [statusRes, pricingRes] = await Promise.all([
+      const [statusRes, pricingRes, saleOfferRes] = await Promise.all([
         axios.get(`${API}/subscription/status`).catch(() => ({ data: null })),
-        axios.get(`${API}/pricing`).catch(() => ({ data: null }))
+        axios.get(`${API}/pricing`).catch(() => ({ data: null })),
+        axios.get(`${API}/sale-offer`).catch(() => ({ data: null }))
       ]);
       
       if (statusRes.data) {
@@ -40,7 +42,7 @@ const SubscriptionPage = ({ user }) => {
       if (pricingRes.data) {
         setPricing(pricingRes.data);
       } else {
-        // Fallback pricing
+        // Fallback pricing - base price ₹1999
         setPricing({
           regular_price: 1999,
           regular_price_display: '₹1999',
@@ -55,8 +57,16 @@ const SubscriptionPage = ({ user }) => {
         });
       }
       
-      // Setup countdown timer only if campaign is active
-      if (pricingRes.data?.campaign_active && pricingRes.data?.campaign_end_date) {
+      // Set sale offer if enabled
+      if (saleOfferRes.data?.enabled) {
+        setSaleOffer(saleOfferRes.data);
+        // Setup countdown timer for sale offer
+        const endDate = saleOfferRes.data.valid_until || saleOfferRes.data.end_date;
+        if (endDate) {
+          setupCountdownTimer(endDate);
+        }
+      } else if (pricingRes.data?.campaign_active && pricingRes.data?.campaign_end_date) {
+        // Fallback to pricing campaign if no sale offer
         setupCountdownTimer(pricingRes.data.campaign_end_date);
       }
     } catch (error) {
@@ -64,6 +74,36 @@ const SubscriptionPage = ({ user }) => {
     } finally {
       setPageLoading(false);
     }
+  };
+
+  // Helper to get current sale/campaign info
+  const getSaleInfo = () => {
+    // Priority: Sale offer from super admin > Pricing campaign
+    if (saleOffer?.enabled) {
+      return {
+        isActive: true,
+        discountPercent: saleOffer.discount_percent || 10,
+        originalPrice: saleOffer.original_price || 1999,
+        salePrice: saleOffer.sale_price || 1799,
+        originalPriceDisplay: `₹${saleOffer.original_price || 1999}`,
+        salePriceDisplay: `₹${saleOffer.sale_price || 1799}`,
+        campaignName: saleOffer.title || 'Special Offer',
+        savings: (saleOffer.original_price || 1999) - (saleOffer.sale_price || 1799)
+      };
+    }
+    if (pricing?.campaign_active) {
+      return {
+        isActive: true,
+        discountPercent: pricing.campaign_discount_percent || 10,
+        originalPrice: pricing.regular_price || 1999,
+        salePrice: pricing.campaign_price || 1799,
+        originalPriceDisplay: pricing.regular_price_display || '₹1999',
+        salePriceDisplay: pricing.campaign_price_display || '₹1799',
+        campaignName: pricing.campaign_name || 'Special Offer',
+        savings: (pricing.regular_price || 1999) - (pricing.campaign_price || 1799)
+      };
+    }
+    return { isActive: false };
   };
 
   const setupCountdownTimer = (endDateStr) => {
@@ -93,27 +133,6 @@ const SubscriptionPage = ({ user }) => {
       setSubscriptionStatus(response.data);
     } catch (error) {
       toast.error('Failed to fetch subscription status');
-    }
-  };
-
-  const fetchPricing = async () => {
-    try {
-      const response = await axios.get(`${API}/pricing`);
-      setPricing(response.data);
-    } catch (error) {
-      // Use default pricing - ₹1999 base
-      setPricing({
-        regular_price: 1999,
-        regular_price_display: '₹1999',
-        campaign_price: 1799,
-        campaign_price_display: '₹1799',
-        campaign_active: false,
-        campaign_discount_percent: 10,
-        trial_expired_discount: 10,
-        trial_expired_price: 1799,
-        trial_expired_price_display: '₹1799',
-        trial_days: 7
-      });
     }
   };
 
@@ -226,14 +245,14 @@ const SubscriptionPage = ({ user }) => {
   };
 
   const features = [
-    { icon: Zap, title: 'Unlimited Bills', desc: 'No restrictions on billing' },
-    { icon: Printer, title: '6 Print Formats', desc: 'Professional thermal printing' },
-    { icon: BarChart3, title: 'Advanced Analytics', desc: 'Detailed reports & insights' },
-    { icon: Users, title: 'Unlimited Staff', desc: 'Add unlimited team members' },
-    { icon: Smartphone, title: 'Multi-Device', desc: 'Access from any device' },
-    { icon: Globe, title: 'Cloud Sync', desc: 'Real-time data sync' },
-    { icon: Shield, title: 'Priority Support', desc: '24/7 premium support' },
-    { icon: Sparkles, title: 'AI Features', desc: 'Smart recommendations' },
+    { icon: Zap, title: 'Unlimited Bills', desc: 'No restrictions on billing volume' },
+    { icon: Printer, title: '6 Print Formats', desc: 'Professional thermal printing themes' },
+    { icon: BarChart3, title: 'Advanced Analytics', desc: 'AI-powered reports & insights' },
+    { icon: Users, title: 'Unlimited Staff', desc: 'Add unlimited team members with roles' },
+    { icon: Smartphone, title: 'Multi-Device', desc: 'Access from any device, anywhere' },
+    { icon: Globe, title: 'Cloud Sync', desc: 'Real-time data sync across devices' },
+    { icon: Shield, title: 'Priority Support', desc: '24/7 premium WhatsApp & phone support' },
+    { icon: Sparkles, title: 'AI Features', desc: 'Smart menu & sales recommendations' },
   ];
 
   return (
@@ -254,15 +273,15 @@ const SubscriptionPage = ({ user }) => {
       <div className="max-w-6xl mx-auto space-y-8" data-testid="subscription-page">
         {/* Hero Section */}
         <div className="text-center space-y-4">
-          {/* Only show campaign banner when campaign is ACTUALLY active */}
-          {pricing?.campaign_active && (
+          {/* Only show campaign banner when sale is ACTUALLY active */}
+          {getSaleInfo().isActive && (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold animate-pulse">
               <Gift className="w-4 h-4" />
-              🎉 {pricing?.campaign_name || 'Special Offer'} - {pricing?.campaign_discount_percent || 10}% OFF!
+              🎉 {getSaleInfo().campaignName} - {getSaleInfo().discountPercent}% OFF!
             </div>
           )}
           {/* Show trial expired banner only when trial is expired and no campaign */}
-          {!pricing?.campaign_active && subscriptionStatus?.needs_subscription && (
+          {!getSaleInfo().isActive && subscriptionStatus?.needs_subscription && (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold animate-pulse">
               <Gift className="w-4 h-4" />
               🎁 Trial Expired - Get {pricing?.trial_expired_discount || 10}% OFF!
@@ -276,8 +295,8 @@ const SubscriptionPage = ({ user }) => {
             Unlock unlimited potential for your restaurant with our powerful features
           </p>
           
-          {/* Countdown Timer - Only show when campaign is active */}
-          {pricing?.campaign_active && (
+          {/* Countdown Timer - Only show when sale is active */}
+          {getSaleInfo().isActive && (
             <div className="inline-flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-xl">
               <Timer className="w-5 h-5 text-red-600" />
               <span className="text-sm font-medium text-red-700">Offer ends in:</span>
@@ -369,9 +388,9 @@ const SubscriptionPage = ({ user }) => {
               <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" /> ACTIVE
               </div>
-            ) : (pricing?.campaign_active || subscriptionStatus?.needs_subscription) ? (
+            ) : (getSaleInfo().isActive || subscriptionStatus?.needs_subscription) ? (
               <div className="absolute top-4 right-4 bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                🔥 {pricing?.campaign_active ? 'LIMITED OFFER' : 'SPECIAL DEAL'}
+                🔥 {getSaleInfo().isActive ? 'LIMITED OFFER' : 'SPECIAL DEAL'}
               </div>
             ) : (
               <div className="absolute top-4 right-4 bg-gradient-to-r from-violet-500 to-purple-500 text-white px-3 py-1 rounded-full text-xs font-bold">
@@ -389,22 +408,22 @@ const SubscriptionPage = ({ user }) => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="text-center">
-                {/* Dynamic Pricing from Backend - Only show campaign when ACTUALLY active */}
-                {pricing?.campaign_active ? (
+                {/* Dynamic Pricing - Use sale offer when active */}
+                {getSaleInfo().isActive ? (
                   <>
                     <div className="flex items-center justify-center gap-2 mb-2">
-                      <span className="text-2xl text-gray-400 line-through">{pricing?.regular_price_display || '₹1999'}</span>
+                      <span className="text-2xl text-gray-400 line-through">{getSaleInfo().originalPriceDisplay}</span>
                       <span className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                        {pricing?.campaign_discount_percent || 10}% OFF
+                        {getSaleInfo().discountPercent}% OFF
                       </span>
                     </div>
                     <p className="text-6xl font-black bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-                      {pricing?.campaign_price_display || '₹1799'}
+                      {getSaleInfo().salePriceDisplay}
                     </p>
-                    <p className="text-gray-500">per year • Just ₹{Math.round((pricing?.campaign_price || 1799) / 12)}/month!</p>
+                    <p className="text-gray-500">per year • Just ₹{Math.round(getSaleInfo().salePrice / 12)}/month!</p>
                     <div className="mt-2 p-2 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200">
                       <p className="text-sm text-red-700 font-medium">
-                        🎉 {pricing?.campaign_name || 'Special Offer'} - Save ₹{(pricing?.regular_price || 1999) - (pricing?.campaign_price || 1799)}!
+                        🎉 {getSaleInfo().campaignName} - Save ₹{getSaleInfo().savings}!
                       </p>
                     </div>
                   </>
@@ -439,7 +458,16 @@ const SubscriptionPage = ({ user }) => {
               </div>
 
               <ul className="space-y-3">
-                {['Unlimited Bills Forever', 'All Premium Features', 'Priority 24/7 Support', 'Advanced AI Analytics', 'Multi-Device Access', 'Custom Integrations'].map((item, i) => (
+                {[
+                  'Unlimited Bills Forever',
+                  'All Premium Features Included',
+                  'Priority 24/7 WhatsApp Support',
+                  'Advanced AI Analytics & Insights',
+                  'Multi-Device Access & Cloud Sync',
+                  'Custom Integrations & API Access',
+                  '6 Professional Print Themes',
+                  'WhatsApp Bill Sharing'
+                ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-violet-600" />
                     <span className="font-medium">{item}</span>
@@ -459,14 +487,14 @@ const SubscriptionPage = ({ user }) => {
                 </div>
               ) : (
                 <Button onClick={handleSubscribe} disabled={loading}
-                  className={`w-full h-14 text-lg font-bold shadow-lg ${
-                    (pricing?.campaign_active || subscriptionStatus?.needs_subscription)
-                      ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600' 
+                  className={`w-full h-14 text-lg font-bold shadow-lg transform transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+                    (getSaleInfo().isActive || subscriptionStatus?.needs_subscription)
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 animate-pulse' 
                       : 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700'
                   }`}>
-                  <Rocket className="w-5 h-5 mr-2" />
-                  {loading ? 'Processing...' : pricing?.campaign_active
-                      ? `🎉 Get ${pricing?.campaign_price_display || '₹1799'}/Year Deal Now!`
+                  <Rocket className="w-5 h-5 mr-2 animate-bounce" />
+                  {loading ? 'Processing...' : getSaleInfo().isActive
+                      ? `🎉 Get ${getSaleInfo().salePriceDisplay}/Year Deal Now!`
                       : subscriptionStatus?.needs_subscription
                         ? `🎁 Get ${pricing?.trial_expired_discount || 10}% OFF - ${pricing?.trial_expired_price_display || '₹1799'}/year`
                         : `Subscribe Now - ${pricing?.regular_price_display || '₹1999'}/year`}

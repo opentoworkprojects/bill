@@ -389,12 +389,14 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
     return () => clearInterval(timer);
   }, [saleOffer]);
 
-  // Get dynamic values from saleOffer and pricing
+  // Get dynamic values from saleOffer (priority) or pricing
   const offerTitle = saleOffer?.title || 'Special Offer';
   const offerSubtitle = saleOffer?.subtitle || 'Limited time deal!';
-  const discountText = saleOffer?.discount_text || (pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '');
-  const campaignPrice = pricing?.campaign_price_display || '₹1799';
-  const regularPrice = pricing?.regular_price_display || '₹1999';
+  const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 10;
+  const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
+  // Use sale offer prices if available, otherwise fall back to pricing
+  const salePrice = saleOffer?.sale_price ? `₹${saleOffer.sale_price}` : (pricing?.campaign_price_display || '₹1799');
+  const originalPrice = saleOffer?.original_price ? `₹${saleOffer.original_price}` : (pricing?.regular_price_display || '₹1999');
   const bgColor = saleOffer?.bg_color || 'from-red-500 via-orange-500 to-yellow-500';
 
   return (
@@ -440,12 +442,12 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="text-center">
                   <div className="text-sm text-white/70 line-through">Regular Price</div>
-                  <div className="text-2xl font-bold text-white/70">{regularPrice}/year</div>
+                  <div className="text-2xl font-bold text-white/70">{originalPrice}/year</div>
                 </div>
                 <ArrowRight className="w-8 h-8 text-yellow-200 animate-pulse hidden sm:block" />
                 <div className="text-center bg-white/20 backdrop-blur rounded-xl p-4">
                   <div className="text-sm text-yellow-200 font-bold">Special Price</div>
-                  <div className="text-5xl font-black text-white">{campaignPrice}</div>
+                  <div className="text-5xl font-black text-white">{salePrice}</div>
                   <div className="text-sm text-white/80">per year</div>
                 </div>
               </div>
@@ -465,7 +467,7 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
                 onClick={() => navigate("/login")}
               >
                 <Gift className="w-5 h-5 mr-2" />
-                Get {campaignPrice}/Year Deal Now
+                Get {salePrice}/Year Deal Now
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               
@@ -519,7 +521,7 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Gift className="w-5 h-5 text-red-500" />
-                    What You Get for {campaignPrice}/Year
+                    What You Get for {salePrice}/Year
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3">
@@ -577,10 +579,11 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
     return () => clearInterval(timer);
   }, [saleOffer]);
 
-  // Get dynamic values
-  const campaignPrice = pricing?.campaign_price_display || '₹1799';
-  const regularPrice = pricing?.regular_price_display || '₹1999';
-  const discountText = saleOffer?.discount_text || (pricing?.campaign_discount_percent ? `${pricing?.campaign_discount_percent}% OFF` : '');
+  // Get dynamic values - use sale offer prices if available
+  const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 10;
+  const salePrice = saleOffer?.sale_price ? `₹${saleOffer.sale_price}` : (pricing?.campaign_price_display || '₹1799');
+  const originalPrice = saleOffer?.original_price ? `₹${saleOffer.original_price}` : (pricing?.regular_price_display || '₹1999');
+  const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   const badgeText = saleOffer?.badge_text || 'SPECIAL OFFER';
   const bgColor = saleOffer?.bg_color || 'from-orange-500 via-red-500 to-pink-500';
   
@@ -613,10 +616,10 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
           
           {/* Price highlight */}
           <div className="flex items-center gap-2">
-            <span className="text-sm md:text-base line-through opacity-70">{regularPrice}/year</span>
+            <span className="text-sm md:text-base line-through opacity-70">{originalPrice}/year</span>
             <div className="relative">
               <span className="text-2xl md:text-3xl font-black animate-pulse-glow px-3 py-1 bg-white/20 rounded-lg">
-                {campaignPrice}/year
+                {salePrice}/year
               </span>
               {discountText && (
                 <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full animate-bounce">
@@ -840,10 +843,26 @@ const LandingPage = () => {
 
   // Dynamic pricing plans based on API data
   const getPricingPlans = () => {
-    // Only show promo pricing when campaign is ACTUALLY active (not just saleOffer enabled)
-    const isPromoActive = pricing?.campaign_active === true;
-    const currentPrice = isPromoActive ? (pricing?.campaign_price_display || '₹1799') : (pricing?.regular_price_display || '₹1999');
-    const discountPercent = pricing?.campaign_discount_percent || 10;
+    // Priority: Sale offer from super admin > Pricing campaign
+    const isSaleActive = saleOffer?.enabled === true;
+    const isPricingCampaignActive = pricing?.campaign_active === true;
+    const isPromoActive = isSaleActive || isPricingCampaignActive;
+    
+    // Get pricing from sale offer if active, otherwise from pricing endpoint
+    let currentPrice, originalPrice, discountPercent;
+    if (isSaleActive) {
+      currentPrice = `₹${saleOffer.sale_price || 1799}`;
+      originalPrice = `₹${saleOffer.original_price || 1999}`;
+      discountPercent = saleOffer.discount_percent || 10;
+    } else if (isPricingCampaignActive) {
+      currentPrice = pricing?.campaign_price_display || '₹1799';
+      originalPrice = pricing?.regular_price_display || '₹1999';
+      discountPercent = pricing?.campaign_discount_percent || 10;
+    } else {
+      currentPrice = pricing?.regular_price_display || '₹1999';
+      originalPrice = null;
+      discountPercent = 0;
+    }
     
     return [
       {
@@ -865,7 +884,7 @@ const LandingPage = () => {
         name: isPromoActive ? "Special Offer" : "Premium",
         price: currentPrice,
         period: "per year",
-        originalPrice: isPromoActive ? (pricing?.regular_price_display || '₹1999') : null,
+        originalPrice: isPromoActive ? originalPrice : null,
         badge: isPromoActive ? `${discountPercent}% OFF` : null,
         features: [
           "Unlimited bills forever",
@@ -1871,7 +1890,7 @@ const LandingPage = () => {
                     {plan.originalPrice && (
                       <div className="flex items-center justify-center gap-2 mb-1">
                         <span className="text-xl text-gray-400 line-through">{plan.originalPrice}</span>
-                        <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-bold">50% OFF</span>
+                        <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-bold">{plan.badge}</span>
                       </div>
                     )}
                     <span className="text-5xl font-bold">{plan.price}</span>
