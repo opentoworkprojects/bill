@@ -89,7 +89,8 @@ const OrdersPage = ({ user }) => {
     card_amount: 0,
     upi_amount: 0,
     credit_amount: 0,
-    use_split_payment: false
+    use_split_payment: false,
+    tax_rate: 5 // Tax rate for this order
   });
   const [editItems, setEditItems] = useState([]);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState({ open: false, order: null });
@@ -363,7 +364,9 @@ const OrdersPage = ({ user }) => {
       card_amount: order.card_amount || 0,
       upi_amount: order.upi_amount || 0,
       credit_amount: order.credit_amount || 0,
-      use_split_payment: hasSplitPayment || order.payment_method === 'split'
+      use_split_payment: hasSplitPayment || order.payment_method === 'split',
+      // Use order's stored tax_rate, fallback to calculating from tax/subtotal, then settings
+      tax_rate: order.tax_rate ?? (order.subtotal > 0 && order.tax !== undefined ? Math.round((order.tax / order.subtotal) * 100 * 100) / 100 : (businessSettings?.tax_rate ?? 5))
     });
     setActionMenuOpen(null);
   };
@@ -383,7 +386,9 @@ const OrdersPage = ({ user }) => {
 
     try {
       const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const taxRate = (businessSettings?.tax_rate ?? 5) / 100;
+      // Use the tax_rate from the edit modal (can be changed by user)
+      const orderTaxRate = editOrderModal.tax_rate ?? editOrderModal.order?.tax_rate ?? businessSettings?.tax_rate ?? 5;
+      const taxRate = orderTaxRate / 100;
       const tax = subtotal * taxRate;
       const total = subtotal + tax;
 
@@ -427,6 +432,7 @@ const OrdersPage = ({ user }) => {
         items: editItems,
         subtotal,
         tax,
+        tax_rate: orderTaxRate, // Store the tax rate used
         total,
         customer_name: editOrderModal.customer_name || '',
         customer_phone: editOrderModal.customer_phone || '',
@@ -454,7 +460,8 @@ const OrdersPage = ({ user }) => {
         card_amount: 0,
         upi_amount: 0,
         credit_amount: 0,
-        use_split_payment: false
+        use_split_payment: false,
+        tax_rate: 5
       });
       setEditItems([]);
       await fetchOrders();
@@ -1084,7 +1091,7 @@ const OrdersPage = ({ user }) => {
                         <span className="font-medium">₹{order.subtotal.toFixed(0)}</span>
                       </div>
                       <div className="flex justify-between text-[10px] sm:text-xs text-gray-400">
-                        <span>Tax (5%):</span>
+                        <span>Tax ({order.tax_rate ?? (order.subtotal > 0 ? Math.round((order.tax / order.subtotal) * 100) : 5)}%):</span>
                         <span>₹{order.tax.toFixed(0)}</span>
                       </div>
                       <div className="flex justify-between text-base sm:text-lg font-bold pt-1.5 border-t border-dashed border-gray-200">
@@ -1666,7 +1673,7 @@ const OrdersPage = ({ user }) => {
                     <Label className="text-xs font-medium">Payment</Label>
                     <button
                       onClick={() => {
-                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
                         if (editOrderModal.use_split_payment) {
                           setEditOrderModal({ ...editOrderModal, use_split_payment: false, payment_method: 'cash', payment_received: total, balance_amount: 0, cash_amount: 0, card_amount: 0, upi_amount: 0, credit_amount: 0, is_credit: false });
                         } else {
@@ -1685,7 +1692,7 @@ const OrdersPage = ({ user }) => {
                         <button
                           key={method}
                           onClick={() => {
-                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
                             setEditOrderModal({ ...editOrderModal, payment_method: method, is_credit: method === 'credit', payment_received: method === 'credit' ? 0 : total, balance_amount: method === 'credit' ? total : 0 });
                           }}
                           className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium ${
@@ -1724,7 +1731,7 @@ const OrdersPage = ({ user }) => {
                         ))}
                       </div>
                       {(() => {
-                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
                         const paid = (parseFloat(editOrderModal.cash_amount) || 0) + (parseFloat(editOrderModal.card_amount) || 0) + (parseFloat(editOrderModal.upi_amount) || 0);
                         const credit = parseFloat(editOrderModal.credit_amount) || 0;
                         const remaining = total - paid - credit;
@@ -1742,7 +1749,7 @@ const OrdersPage = ({ user }) => {
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
-                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
                             const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
                             if (remaining > 0) setEditOrderModal({ ...editOrderModal, cash_amount: (parseFloat(editOrderModal.cash_amount) || 0) + remaining });
                           }}
@@ -1752,7 +1759,7 @@ const OrdersPage = ({ user }) => {
                         </button>
                         <button
                           onClick={() => {
-                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05;
+                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
                             const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
                             if (remaining > 0) setEditOrderModal({ ...editOrderModal, credit_amount: (parseFloat(editOrderModal.credit_amount) || 0) + remaining, is_credit: true });
                           }}
@@ -1809,13 +1816,28 @@ const OrdersPage = ({ user }) => {
 
               {/* Footer - Fixed */}
               <div className="border-t bg-white p-3 flex-shrink-0">
+                {/* Tax Rate Selector */}
+                <div className="flex items-center justify-between mb-2 pb-2 border-b">
+                  <span className="text-[10px] text-gray-500">Tax Rate:</span>
+                  <select
+                    value={editOrderModal.tax_rate}
+                    onChange={(e) => setEditOrderModal({ ...editOrderModal, tax_rate: Number(e.target.value) })}
+                    className="text-xs px-2 py-1 border rounded bg-gray-50"
+                  >
+                    <option value="0">No Tax (0%)</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                    <option value="28">28%</option>
+                  </select>
+                </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-400">{editItems.reduce((sum, item) => sum + item.quantity, 0)} items</p>
-                    <p className="text-lg font-bold text-blue-600">₹{(editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 1.05).toFixed(0)}</p>
+                    <p className="text-[10px] text-gray-400">{editItems.reduce((sum, item) => sum + item.quantity, 0)} items • Tax {editOrderModal.tax_rate}%</p>
+                    <p className="text-lg font-bold text-blue-600">₹{(editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100)).toFixed(0)}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0 }); setEditItems([]); }}>
+                    <Button variant="outline" size="sm" onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0, tax_rate: 5 }); setEditItems([]); }}>
                       Cancel
                     </Button>
                     <Button size="sm" onClick={handleUpdateOrder} className="bg-blue-600 px-5" disabled={editItems.length === 0}>

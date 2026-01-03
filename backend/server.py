@@ -508,6 +508,7 @@ class Order(BaseModel):
     items: List[OrderItem]
     subtotal: float
     tax: float
+    tax_rate: float = 5.0  # Store the tax rate used for this order
     discount: float = 0
     total: float
     status: str = "pending"
@@ -3302,6 +3303,7 @@ async def create_order(
         items=[item.model_dump() for item in order_data.items],
         subtotal=subtotal,
         tax=tax,
+        tax_rate=tax_rate_setting if tax_rate_setting is not None else 5.0,  # Store the tax rate used
         total=total,
         waiter_id=current_user["id"],
         waiter_name=current_user["username"],
@@ -5125,6 +5127,7 @@ async def create_customer_order(order_data: CustomerOrderCreate):
         items=[item.model_dump() for item in order_data.items],
         subtotal=subtotal,
         tax=tax,
+        tax_rate=tax_rate_setting if tax_rate_setting is not None else 5.0,  # Store the tax rate used
         total=total,
         waiter_id=order_data.org_id,  # Use org_id as waiter for self-orders
         waiter_name="Self-Order",

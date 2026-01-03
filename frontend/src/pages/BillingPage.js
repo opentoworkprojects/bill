@@ -315,13 +315,16 @@ const BillingPage = ({ user }) => {
     return symbols[businessSettings?.currency || 'INR'] || '₹';
   };
 
-  // Get effective tax rate (custom or from order or from settings)
+  // Get effective tax rate (custom or from order's stored tax_rate or from settings)
   const getEffectiveTaxRate = () => {
     if (customTaxRate !== null) return customTaxRate;
-    // Calculate tax rate from order if tax exists
+    // Use the tax_rate stored with the order (not recalculated from settings)
+    if (order && order.tax_rate !== undefined) {
+      return order.tax_rate;
+    }
+    // Fallback: Calculate from order's tax/subtotal for old orders without tax_rate field
     if (order && order.subtotal > 0 && order.tax !== undefined) {
       const orderTaxRate = (order.tax / order.subtotal) * 100;
-      // Round to avoid floating point issues
       return Math.round(orderTaxRate * 100) / 100;
     }
     return businessSettings?.tax_rate ?? 0;
@@ -646,7 +649,7 @@ const BillingPage = ({ user }) => {
                 <div className="flex items-center gap-2">
                   <span>Tax ({getEffectiveTaxRate()}%):</span>
                   <select
-                    value={customTaxRate !== null ? customTaxRate : (businessSettings?.tax_rate ?? 5)}
+                    value={customTaxRate !== null ? customTaxRate : (order?.tax_rate ?? businessSettings?.tax_rate ?? 5)}
                     onChange={(e) => setCustomTaxRate(Number(e.target.value))}
                     className="bg-white/20 text-white text-xs px-2 py-1 rounded border border-white/30"
                   >
