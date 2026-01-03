@@ -2495,10 +2495,10 @@ async def get_razorpay_settings(current_user: dict = Depends(get_current_user)):
     }
 
 
-# Subscription - ₹999/year with 7-day free trial
-# NEW YEAR CAMPAIGN: ₹599/year (40% OFF) - January 1, 2026 ONLY
-SUBSCRIPTION_PRICE_PAISE = 99900  # ₹999 in paise (regular price)
-NEW_YEAR_PRICE_PAISE = 59900  # ₹599 in paise (New Year price - 40% off)
+# Subscription - ₹1999/year with 7-day free trial (default)
+# Pricing is now dynamic from Super Admin panel
+SUBSCRIPTION_PRICE_PAISE = 199900  # ₹1999 in paise (default regular price)
+NEW_YEAR_PRICE_PAISE = 179900  # ₹1799 in paise (default campaign price - 10% off)
 NEW_YEAR_END_DATE = datetime(2026, 1, 1, 23, 59, 59, tzinfo=timezone.utc)
 TRIAL_DAYS = 7
 SUBSCRIPTION_DAYS = 365
@@ -2520,35 +2520,81 @@ ACTIVE_CAMPAIGNS = {
     }
 }
 
-def get_current_subscription_price():
-    """Get current subscription price based on active campaigns"""
+async def get_current_subscription_price():
+    """Get current subscription price based on database settings and active campaigns"""
     now = datetime.now(timezone.utc)
     
-    # Check if New Year campaign is active
-    if now <= NEW_YEAR_END_DATE:
+    # Fetch pricing from database
+    pricing_doc = await db.site_settings.find_one({"type": "pricing"})
+    
+    if pricing_doc:
+        regular_price = pricing_doc.get("regular_price", 1999)
+        campaign_price = pricing_doc.get("campaign_price", 1799)
+        campaign_active = pricing_doc.get("campaign_active", False)
+        campaign_name = pricing_doc.get("campaign_name", "")
+        campaign_discount = pricing_doc.get("campaign_discount_percent", 10)
+        trial_expired_discount = pricing_doc.get("trial_expired_discount", 10)
+        
+        # Check campaign dates
+        if campaign_active:
+            start_date = pricing_doc.get("campaign_start_date")
+            end_date = pricing_doc.get("campaign_end_date")
+            if start_date and end_date:
+                try:
+                    start = datetime.fromisoformat(start_date)
+                    end = datetime.fromisoformat(end_date)
+                    if start.tzinfo is None:
+                        start = start.replace(tzinfo=timezone.utc)
+                    if end.tzinfo is None:
+                        end = end.replace(tzinfo=timezone.utc)
+                    campaign_active = start <= now <= end
+                except:
+                    pass
+        
+        if campaign_active:
+            return {
+                "price_paise": campaign_price * 100,
+                "original_price_paise": regular_price * 100,
+                "price_display": f"₹{campaign_price}",
+                "original_price_display": f"₹{regular_price}",
+                "discount_percent": campaign_discount,
+                "campaign_name": campaign_name or "Special Offer",
+                "campaign_active": True,
+                "campaign_ends": end_date if end_date else None,
+                "badge": f"🎉 {campaign_discount}% OFF!",
+                "trial_expired_discount": trial_expired_discount,
+                "trial_expired_price_paise": int(regular_price * (100 - trial_expired_discount) / 100) * 100
+            }
+        
+        # Regular pricing with trial expired discount info
+        trial_expired_price = int(regular_price * (100 - trial_expired_discount) / 100)
         return {
-            "price_paise": NEW_YEAR_PRICE_PAISE,
-            "original_price_paise": SUBSCRIPTION_PRICE_PAISE,
-            "price_display": "₹599",
-            "original_price_display": "₹999",
-            "discount_percent": 40,
-            "campaign_name": "New Year Special",
-            "campaign_active": True,
-            "campaign_ends": NEW_YEAR_END_DATE.isoformat(),
-            "badge": "🎉 40% OFF - New Year Day Only!"
+            "price_paise": regular_price * 100,
+            "original_price_paise": regular_price * 100,
+            "price_display": f"₹{regular_price}",
+            "original_price_display": f"₹{regular_price}",
+            "discount_percent": 0,
+            "campaign_name": None,
+            "campaign_active": False,
+            "campaign_ends": None,
+            "badge": None,
+            "trial_expired_discount": trial_expired_discount,
+            "trial_expired_price_paise": trial_expired_price * 100
         }
     
-    # Regular pricing
+    # Default pricing if no database entry
     return {
         "price_paise": SUBSCRIPTION_PRICE_PAISE,
         "original_price_paise": SUBSCRIPTION_PRICE_PAISE,
-        "price_display": "₹999",
-        "original_price_display": "₹999",
+        "price_display": "₹1999",
+        "original_price_display": "₹1999",
         "discount_percent": 0,
         "campaign_name": None,
         "campaign_active": False,
         "campaign_ends": None,
-        "badge": None
+        "badge": None,
+        "trial_expired_discount": 10,
+        "trial_expired_price_paise": 179900
     }
 
 
@@ -2566,7 +2612,7 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
     trial_days_left = max(0, (trial_end - datetime.now(timezone.utc)).days) if trial_end else 0
     
     # Get current pricing (with campaign if active)
-    pricing = get_current_subscription_price()
+    pricing = await get_current_subscription_price()
     
     return {
         "subscription_active": current_user.get("subscription_active", False),
@@ -2610,7 +2656,7 @@ async def start_trial(current_user: dict = Depends(get_current_user)):
 @api_router.get("/subscription/pricing")
 async def get_subscription_pricing():
     """Get current subscription pricing (public endpoint - no auth required)"""
-    pricing = get_current_subscription_price()
+    pricing = await get_current_subscription_price()
     
     # Calculate time remaining for campaign
     time_remaining = None
@@ -2699,9 +2745,9 @@ async def create_subscription_order(
     DEFAULT_RAZORPAY_KEY_ID = "rzp_live_RmGqVf5JPGOT6G"
     DEFAULT_RAZORPAY_KEY_SECRET = "SKYS5tgjwU3H3Pf2ch3ZFtuH"
     
-    # Get current campaign pricing
-    pricing = get_current_subscription_price()
-    base_price = pricing["price_paise"]  # This will be ₹9 (900 paise) during campaign
+    # Get current campaign pricing from database
+    pricing = await get_current_subscription_price()
+    base_price = pricing["price_paise"]  # Dynamic price from Super Admin
     original_price = pricing["original_price_paise"]
     
     # Calculate price with coupon if provided (on top of campaign price)
@@ -2779,7 +2825,7 @@ async def verify_subscription_payment(
     razorpay_key_secret = os.environ.get("RAZORPAY_KEY_SECRET") or DEFAULT_RAZORPAY_KEY_SECRET
     
     # Get current campaign pricing for recording
-    pricing = get_current_subscription_price()
+    pricing = await get_current_subscription_price()
     
     try:
         razorpay_client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
