@@ -311,15 +311,16 @@ const HelpPage = ({ user }) => {
             </CardContent>
           </Card>
           
-          {/* <Card className="border-0 shadow-lg">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => window.open('https://wa.me/918310832669?text=Hi, I need help with BillByteKOT', '_blank')}>
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Phone className="w-6 h-6 text-green-600" />
+                <MessageCircle className="w-6 h-6 text-green-600" />
               </div>
-              <h3 className="font-bold mb-1">Phone Support</h3>
-              <p className="text-sm text-gray-600">+91-8310832669</p>
+              <h3 className="font-bold mb-1">WhatsApp Support</h3>
+              <p className="text-sm text-gray-600">+91 83108 32669</p>
+              <p className="text-xs text-green-600 mt-1">Click to chat →</p>
             </CardContent>
-          </Card> */}
+          </Card>
           
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6 text-center">
