@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -7,7 +7,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, ArrowLeft, Check, Plus, Minus, Trash2 } from 'lucide-react';
+import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, ArrowLeft, Check, Plus, Minus, Trash2, Search } from 'lucide-react';
 import { printReceipt } from '../utils/printUtils';
 
 const BillingPage = ({ user }) => {
@@ -21,15 +21,33 @@ const BillingPage = ({ user }) => {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percent'
+  const [discountValue, setDiscountValue] = useState('');
   const [customTaxRate, setCustomTaxRate] = useState(null);
   const [manualItemName, setManualItemName] = useState('');
   const [manualItemPrice, setManualItemPrice] = useState('');
   const [orderItems, setOrderItems] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const [menuSearch, setMenuSearch] = useState('');
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     fetchOrder();
     fetchBusinessSettings();
+    fetchMenuItems();
   }, [orderId]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowMenuDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchOrder = async () => {
     try {
@@ -38,6 +56,12 @@ const BillingPage = ({ user }) => {
       setOrderItems(response.data.items || []);
       if (response.data.customer_phone) {
         setWhatsappPhone(response.data.customer_phone);
+      }
+      // Load existing discount
+      if (response.data.discount || response.data.discount_amount) {
+        setDiscount(response.data.discount || response.data.discount_amount || 0);
+        setDiscountType(response.data.discount_type || 'amount');
+        setDiscountValue(response.data.discount_value || response.data.discount || '');
       }
     } catch (error) {
       toast.error('Failed to fetch order');
@@ -51,6 +75,16 @@ const BillingPage = ({ user }) => {
       setBusinessSettings(response.data.business_settings);
     } catch (error) {
       console.error('Failed to fetch business settings', error);
+    }
+  };
+
+  const fetchMenuItems = async () => {
+    try {
+      const response = await axios.get(`${API}/menu`);
+      const items = Array.isArray(response.data) ? response.data : [];
+      setMenuItems(items.filter(item => item.available));
+    } catch (error) {
+      console.error('Failed to fetch menu items', error);
     }
   };
 
@@ -72,13 +106,45 @@ const BillingPage = ({ user }) => {
     return orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   };
 
+  const calculateDiscountAmount = () => {
+    const subtotal = calculateSubtotal();
+    const value = parseFloat(discountValue) || 0;
+    if (discountType === 'percent') {
+      return (subtotal * value) / 100;
+    }
+    return value;
+  };
+
   const calculateTax = () => {
     const subtotal = calculateSubtotal();
-    return (subtotal * getEffectiveTaxRate()) / 100;
+    const discountAmt = calculateDiscountAmount();
+    const taxableAmount = subtotal - discountAmt;
+    return (taxableAmount * getEffectiveTaxRate()) / 100;
   };
 
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax() - discount;
+    return calculateSubtotal() + calculateTax() - calculateDiscountAmount();
+  };
+
+  // Add menu item from dropdown
+  const handleAddMenuItem = (menuItem) => {
+    const existingIndex = orderItems.findIndex(item => item.menu_item_id === menuItem.id);
+    if (existingIndex !== -1) {
+      const updated = [...orderItems];
+      updated[existingIndex].quantity += 1;
+      setOrderItems(updated);
+    } else {
+      setOrderItems([...orderItems, {
+        menu_item_id: menuItem.id,
+        name: menuItem.name,
+        price: menuItem.price,
+        quantity: 1,
+        notes: ''
+      }]);
+    }
+    setShowMenuDropdown(false);
+    setMenuSearch('');
+    toast.success(`Added: ${menuItem.name}`);
   };
 
   // Manual item functions
@@ -133,23 +199,27 @@ const BillingPage = ({ user }) => {
     
     try {
       const subtotal = calculateSubtotal();
+      const discountAmt = calculateDiscountAmount();
       const tax = calculateTax();
       const total = calculateTotal();
       
       await axios.put(`${API}/orders/${orderId}`, {
         items: orderItems,
-        subtotal,
+        subtotal: subtotal - discountAmt, // Store subtotal after discount
         tax,
         tax_rate: getEffectiveTaxRate(),
         total,
-        discount: discount
+        discount: discountAmt,
+        discount_type: discountType,
+        discount_value: parseFloat(discountValue) || 0,
+        discount_amount: discountAmt
       });
       
       // Update local order state
       setOrder(prev => ({
         ...prev,
         items: orderItems,
-        subtotal,
+        subtotal: subtotal - discountAmt,
         tax,
         total
       }));
@@ -198,7 +268,10 @@ const BillingPage = ({ user }) => {
       await axios.put(`${API}/orders/${orderId}`, { 
         status: 'completed',
         payment_method: paymentMethod,
-        discount: discount,
+        discount: calculateDiscountAmount(),
+        discount_type: discountType,
+        discount_value: parseFloat(discountValue) || 0,
+        discount_amount: calculateDiscountAmount(),
         total: calculateTotal()
       });
       
@@ -207,14 +280,16 @@ const BillingPage = ({ user }) => {
       await releaseTable();
       
       // Use updated order for printing - include discount
+      const discountAmt = calculateDiscountAmount();
       const updatedOrder = { 
         ...order, 
         items: orderItems, 
         subtotal: calculateSubtotal(), 
         tax: calculateTax(), 
         total: calculateTotal(),
-        discount: discount,
-        discount_amount: discount
+        discount: discountAmt,
+        discount_amount: discountAmt,
+        tax_rate: getEffectiveTaxRate()
       };
       printReceipt(updatedOrder, businessSettings);
     } catch (error) {
@@ -368,29 +443,71 @@ const BillingPage = ({ user }) => {
         {/* Order Items */}
         <Card className="mb-4 border-0 shadow-lg">
           <CardContent className="p-4">
-            {/* Manual Item Entry */}
-            <div className="flex gap-2 mb-3 pb-3 border-b border-dashed">
-              <Input
-                placeholder="Item name"
-                value={manualItemName}
-                onChange={(e) => setManualItemName(e.target.value)}
-                className="flex-1 h-9 text-sm"
-              />
-              <Input
-                type="number"
-                placeholder="₹"
-                value={manualItemPrice}
-                onChange={(e) => setManualItemPrice(e.target.value)}
-                className="w-20 h-9 text-sm"
-                min="0"
-              />
-              <Button 
-                size="sm" 
-                onClick={handleAddManualItem}
-                className="h-9 px-3 bg-green-600 hover:bg-green-700"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
+            {/* Add Item Section */}
+            <div className="mb-3 pb-3 border-b border-dashed">
+              {/* Menu Item Search/Dropdown */}
+              <div className="relative mb-2" ref={dropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search menu items..."
+                    value={menuSearch}
+                    onChange={(e) => {
+                      setMenuSearch(e.target.value);
+                      setShowMenuDropdown(true);
+                    }}
+                    onFocus={() => setShowMenuDropdown(true)}
+                    className="pl-9 h-9 text-sm"
+                  />
+                </div>
+                
+                {/* Menu Dropdown */}
+                {showMenuDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {menuItems
+                      .filter(item => item.name.toLowerCase().includes(menuSearch.toLowerCase()))
+                      .slice(0, 10)
+                      .map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => handleAddMenuItem(item)}
+                          className="w-full px-3 py-2 text-left hover:bg-violet-50 flex justify-between items-center text-sm border-b last:border-b-0"
+                        >
+                          <span className="font-medium">{item.name}</span>
+                          <span className="text-violet-600 font-bold">{currency}{item.price}</span>
+                        </button>
+                      ))}
+                    {menuItems.filter(item => item.name.toLowerCase().includes(menuSearch.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-gray-500 text-sm">No items found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Manual Item Entry */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Custom item name"
+                  value={manualItemName}
+                  onChange={(e) => setManualItemName(e.target.value)}
+                  className="flex-1 h-9 text-sm"
+                />
+                <Input
+                  type="number"
+                  placeholder="₹"
+                  value={manualItemPrice}
+                  onChange={(e) => setManualItemPrice(e.target.value)}
+                  className="w-20 h-9 text-sm"
+                  min="0"
+                />
+                <Button 
+                  size="sm" 
+                  onClick={handleAddManualItem}
+                  className="h-9 px-3 bg-green-600 hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
             
             <div className="space-y-3">
@@ -435,6 +552,12 @@ const BillingPage = ({ user }) => {
                 <span>Subtotal</span>
                 <span>{currency}{calculateSubtotal().toFixed(0)}</span>
               </div>
+              {calculateDiscountAmount() > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>
+                  <span>-{currency}{calculateDiscountAmount().toFixed(0)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center text-gray-600">
                 <div className="flex items-center gap-2">
                   <span>Tax</span>
@@ -452,12 +575,6 @@ const BillingPage = ({ user }) => {
                 </div>
                 <span>{currency}{calculateTax().toFixed(0)}</span>
               </div>
-              {discount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
-                  <span>-{currency}{discount.toFixed(0)}</span>
-                </div>
-              )}
               <div className="flex justify-between text-xl font-bold pt-2 border-t">
                 <span>Total</span>
                 <span className="text-violet-600">{currency}{calculateTotal().toFixed(0)}</span>
@@ -466,16 +583,58 @@ const BillingPage = ({ user }) => {
           </CardContent>
         </Card>
 
-        {/* Quick Discount */}
+        {/* Discount Section */}
         <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">Quick Discount</p>
+          <p className="text-sm text-gray-500 mb-2">Discount</p>
+          
+          {/* Custom Discount Input */}
+          <div className="flex gap-2 mb-2">
+            <select
+              value={discountType}
+              onChange={(e) => {
+                setDiscountType(e.target.value);
+                setDiscountValue('');
+              }}
+              className="h-10 px-3 border rounded-lg bg-white text-sm font-medium"
+            >
+              <option value="amount">₹ Amount</option>
+              <option value="percent">% Percent</option>
+            </select>
+            <Input
+              type="number"
+              placeholder={discountType === 'percent' ? 'Enter %' : 'Enter ₹'}
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
+              className="flex-1 h-10"
+              min="0"
+              max={discountType === 'percent' ? 100 : undefined}
+            />
+            {discountValue && (
+              <button
+                onClick={() => setDiscountValue('')}
+                className="h-10 px-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm font-medium"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          
+          {/* Quick Discount Buttons */}
           <div className="flex gap-2">
             {[0, 5, 10, 15, 20].map(pct => (
               <button
                 key={pct}
-                onClick={() => setDiscount(pct === 0 ? 0 : (calculateSubtotal() * pct) / 100)}
+                onClick={() => {
+                  if (pct === 0) {
+                    setDiscountValue('');
+                    setDiscountType('amount');
+                  } else {
+                    setDiscountType('percent');
+                    setDiscountValue(pct.toString());
+                  }
+                }}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  (pct === 0 && discount === 0) || (pct > 0 && Math.round((discount / calculateSubtotal()) * 100) === pct)
+                  (pct === 0 && !discountValue) || (discountType === 'percent' && discountValue === pct.toString())
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-100 hover:bg-gray-200'
                 }`}
@@ -484,6 +643,13 @@ const BillingPage = ({ user }) => {
               </button>
             ))}
           </div>
+          
+          {/* Show calculated discount */}
+          {calculateDiscountAmount() > 0 && (
+            <p className="text-sm text-green-600 mt-2 text-center font-medium">
+              Discount: -{currency}{calculateDiscountAmount().toFixed(0)}
+            </p>
+          )}
         </div>
 
         {/* Payment Methods */}
@@ -542,14 +708,16 @@ const BillingPage = ({ user }) => {
           <Button
             variant="outline"
             onClick={() => {
+              const discountAmt = calculateDiscountAmount();
               const updatedOrder = { 
                 ...order, 
                 items: orderItems, 
                 subtotal: calculateSubtotal(), 
                 tax: calculateTax(), 
                 total: calculateTotal(),
-                discount: discount,
-                discount_amount: discount
+                discount: discountAmt,
+                discount_amount: discountAmt,
+                tax_rate: getEffectiveTaxRate()
               };
               printReceipt(updatedOrder, businessSettings);
             }}
