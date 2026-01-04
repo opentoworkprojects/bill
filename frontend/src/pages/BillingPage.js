@@ -423,7 +423,7 @@ const BillingPage = ({ user }) => {
 
   return (
     <Layout user={user}>
-      <div className="max-w-md mx-auto pb-6">
+      <div className="max-w-6xl mx-auto pb-6 px-2 lg:px-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button 
@@ -440,8 +440,12 @@ const BillingPage = ({ user }) => {
           </div>
         </div>
 
-        {/* Order Items */}
-        <Card className="mb-4 border-0 shadow-lg">
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Column - Items */}
+          <div>
+            {/* Order Items */}
+            <Card className="border-0 shadow-lg h-fit">
           <CardContent className="p-4">
             {/* Add Item Section */}
             <div className="mb-3 pb-3 border-b border-dashed">
@@ -457,21 +461,21 @@ const BillingPage = ({ user }) => {
                       setShowMenuDropdown(true);
                     }}
                     onFocus={() => setShowMenuDropdown(true)}
-                    className="pl-9 h-9 text-sm"
+                    className="pl-9 h-10 text-sm"
                   />
                 </div>
                 
                 {/* Menu Dropdown */}
                 {showMenuDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {menuItems
                       .filter(item => item.name.toLowerCase().includes(menuSearch.toLowerCase()))
-                      .slice(0, 10)
+                      .slice(0, 15)
                       .map(item => (
                         <button
                           key={item.id}
                           onClick={() => handleAddMenuItem(item)}
-                          className="w-full px-3 py-2 text-left hover:bg-violet-50 flex justify-between items-center text-sm border-b last:border-b-0"
+                          className="w-full px-3 py-2.5 text-left hover:bg-violet-50 flex justify-between items-center text-sm border-b last:border-b-0"
                         >
                           <span className="font-medium">{item.name}</span>
                           <span className="text-violet-600 font-bold">{currency}{item.price}</span>
@@ -490,50 +494,51 @@ const BillingPage = ({ user }) => {
                   placeholder="Custom item name"
                   value={manualItemName}
                   onChange={(e) => setManualItemName(e.target.value)}
-                  className="flex-1 h-9 text-sm"
+                  className="flex-1 h-10 text-sm"
                 />
                 <Input
                   type="number"
                   placeholder="₹"
                   value={manualItemPrice}
                   onChange={(e) => setManualItemPrice(e.target.value)}
-                  className="w-20 h-9 text-sm"
+                  className="w-24 h-10 text-sm"
                   min="0"
                 />
                 <Button 
                   size="sm" 
                   onClick={handleAddManualItem}
-                  className="h-9 px-3 bg-green-600 hover:bg-green-700"
+                  className="h-10 px-4 bg-green-600 hover:bg-green-700"
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
             </div>
             
-            <div className="space-y-3">
+            {/* Items List - Scrollable */}
+            <div className="space-y-3 max-h-[40vh] lg:max-h-[50vh] overflow-y-auto pr-1">
               {orderItems.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 flex-1">
-                    <div className="flex items-center gap-1">
+                <div key={idx} className="flex justify-between items-center py-1">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button 
                         onClick={() => handleItemQuantityChange(idx, -1)}
-                        className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded flex items-center justify-center text-sm"
+                        className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded flex items-center justify-center"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="w-7 h-7 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-sm font-bold">
+                      <span className="w-8 h-8 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-sm font-bold">
                         {item.quantity}
                       </span>
                       <button 
                         onClick={() => handleItemQuantityChange(idx, 1)}
-                        className="w-6 h-6 bg-violet-600 hover:bg-violet-700 text-white rounded flex items-center justify-center text-sm"
+                        className="w-7 h-7 bg-violet-600 hover:bg-violet-700 text-white rounded flex items-center justify-center"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
                     <span className="font-medium text-sm truncate">{item.name}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className="font-semibold">{currency}{(item.price * item.quantity).toFixed(0)}</span>
                     <button 
                       onClick={() => handleRemoveItem(idx)}
@@ -582,13 +587,17 @@ const BillingPage = ({ user }) => {
             </div>
           </CardContent>
         </Card>
+          </div>
 
-        {/* Discount Section */}
-        <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">Discount</p>
+          {/* Right Column - Payment & Actions */}
+          <div className="space-y-4">
+            {/* Discount Section */}
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Discount</p>
           
           {/* Custom Discount Input */}
-          <div className="flex gap-2 mb-2">
+          <div className="flex gap-2 mb-3">
             <select
               value={discountType}
               onChange={(e) => {
@@ -633,7 +642,7 @@ const BillingPage = ({ user }) => {
                     setDiscountValue(pct.toString());
                   }
                 }}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   (pct === 0 && !discountValue) || (discountType === 'percent' && discountValue === pct.toString())
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-100 hover:bg-gray-200'
@@ -646,16 +655,18 @@ const BillingPage = ({ user }) => {
           
           {/* Show calculated discount */}
           {calculateDiscountAmount() > 0 && (
-            <p className="text-sm text-green-600 mt-2 text-center font-medium">
+            <p className="text-sm text-green-600 mt-3 text-center font-medium">
               Discount: -{currency}{calculateDiscountAmount().toFixed(0)}
             </p>
           )}
-        </div>
+              </CardContent>
+            </Card>
 
         {/* Payment Methods */}
-        <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">Payment Method</p>
-          <div className="grid grid-cols-3 gap-2">
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Payment Method</p>
+          <div className="grid grid-cols-3 gap-3">
             {[
               { id: 'cash', icon: Wallet, label: 'Cash', color: 'green' },
               { id: 'card', icon: CreditCard, label: 'Card', color: 'blue' },
@@ -678,7 +689,8 @@ const BillingPage = ({ user }) => {
               </button>
             ))}
           </div>
-        </div>
+              </CardContent>
+            </Card>
 
         {/* Pay Button */}
         {!paymentCompleted ? (
@@ -704,7 +716,7 @@ const BillingPage = ({ user }) => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -749,11 +761,13 @@ const BillingPage = ({ user }) => {
           <Button
             variant="ghost"
             onClick={() => navigate('/orders')}
-            className="w-full mt-4"
+            className="w-full"
           >
             ← Back to Orders
           </Button>
         )}
+          </div>
+        </div>
 
         {/* WhatsApp Modal */}
         {showWhatsappModal && (
