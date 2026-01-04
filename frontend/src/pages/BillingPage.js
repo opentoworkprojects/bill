@@ -100,10 +100,25 @@ const BillingPage = ({ user }) => {
   const calculateDiscountAmount = () => {
     const subtotal = calculateSubtotal();
     const value = parseFloat(discountValue) || 0;
-    return discountType === 'percent' ? (subtotal * value) / 100 : value;
+    if (value <= 0) return 0;
+    if (discountType === 'percent') {
+      const pct = Math.min(value, 100); // Cap at 100%
+      return (subtotal * pct) / 100;
+    }
+    return Math.min(value, subtotal); // Cap discount at subtotal
   };
-  const calculateTax = () => ((calculateSubtotal() - calculateDiscountAmount()) * getEffectiveTaxRate()) / 100;
-  const calculateTotal = () => calculateSubtotal() + calculateTax() - calculateDiscountAmount();
+  const calculateTax = () => {
+    const subtotal = calculateSubtotal();
+    const discount = calculateDiscountAmount();
+    const taxableAmount = Math.max(0, subtotal - discount);
+    return (taxableAmount * getEffectiveTaxRate()) / 100;
+  };
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    const discount = calculateDiscountAmount();
+    const tax = calculateTax();
+    return Math.max(0, subtotal - discount + tax);
+  };
 
   const handleAddMenuItem = (menuItem) => {
     const existingIndex = orderItems.findIndex(item => item.menu_item_id === menuItem.id);
@@ -222,78 +237,173 @@ const BillingPage = ({ user }) => {
     try {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      const currency = getCurrencySymbol();
       const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
+      const invoiceNo = order.invoice_number || order.id.slice(0, 8).toUpperCase();
+      const subtotal = calculateSubtotal();
+      const tax = calculateTax();
+      const discount = calculateDiscountAmount();
+      const total = calculateTotal();
+      const taxRate = getEffectiveTaxRate();
+      
+      // Use "Rs." for PDF to avoid encoding issues
+      const rs = 'Rs.';
+      
+      // ===== HEADER =====
       doc.setFillColor(124, 58, 237);
-      doc.rect(0, 0, 210, 40, 'F');
+      doc.rect(0, 0, 210, 45, 'F');
+      
+      // Restaurant Name
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
+      doc.setFontSize(24);
       doc.setFont(undefined, 'bold');
-      doc.text(restaurantName, 15, 20);
+      doc.text(restaurantName, 20, 22);
+      
+      // Invoice label
+      doc.setFontSize(12);
+      doc.text('TAX INVOICE', 190, 15, { align: 'right' });
+      doc.setFontSize(14);
+      doc.text(`#${invoiceNo}`, 190, 28, { align: 'right' });
+      
+      // Table/Counter badge
+      if (order.table_number) {
+        doc.setFontSize(10);
+        doc.text(`Table ${order.table_number}`, 190, 38, { align: 'right' });
+      }
+      
+      // ===== BUSINESS & ORDER INFO =====
+      let y = 58;
+      doc.setTextColor(80, 80, 80);
       doc.setFontSize(10);
-      doc.text('INVOICE', 195, 15, { align: 'right' });
-      doc.text(`#${order.invoice_number || order.id.slice(0, 8).toUpperCase()}`, 195, 25, { align: 'right' });
-      let y = 55;
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(9);
-      doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 15, y);
-      doc.text(`Time: ${new Date(order.created_at).toLocaleTimeString()}`, 100, y);
-      if (order.table_number) doc.text(`Table: ${order.table_number}`, 160, y);
-      y += 8;
-      if (order.customer_name) { doc.text(`Customer: ${order.customer_name}`, 15, y); y += 6; }
-      if (businessSettings?.address) { doc.text(businessSettings.address, 15, y); y += 6; }
-      if (businessSettings?.gstin) { doc.text(`GSTIN: ${businessSettings.gstin}`, 15, y); y += 6; }
-      y += 5;
-      doc.setFillColor(245, 245, 250);
-      doc.rect(15, y - 5, 180, 10, 'F');
-      doc.setFont(undefined, 'bold');
-      doc.text('Item', 20, y);
-      doc.text('Qty', 120, y, { align: 'center' });
-      doc.text('Price', 150, y, { align: 'right' });
-      doc.text('Total', 190, y, { align: 'right' });
-      y += 8;
       doc.setFont(undefined, 'normal');
-      orderItems.forEach(item => {
-        doc.text(item.name.substring(0, 30), 20, y);
-        doc.text(item.quantity.toString(), 120, y, { align: 'center' });
-        doc.text(`${currency}${item.price}`, 150, y, { align: 'right' });
-        doc.text(`${currency}${(item.quantity * item.price).toFixed(2)}`, 190, y, { align: 'right' });
-        y += 7;
+      
+      // Left side - Business info
+      if (businessSettings?.address) {
+        doc.text(businessSettings.address, 20, y);
+        y += 5;
+      }
+      if (businessSettings?.phone) {
+        doc.text(`Phone: ${businessSettings.phone}`, 20, y);
+        y += 5;
+      }
+      if (businessSettings?.gstin) {
+        doc.setFont(undefined, 'bold');
+        doc.text(`GSTIN: ${businessSettings.gstin}`, 20, y);
+        doc.setFont(undefined, 'normal');
+      }
+      
+      // Right side - Date/Time
+      doc.text(`Date: ${new Date(order.created_at).toLocaleDateString('en-IN')}`, 190, 58, { align: 'right' });
+      doc.text(`Time: ${new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, 190, 64, { align: 'right' });
+      
+      if (order.customer_name) {
+        doc.text(`Customer: ${order.customer_name}`, 190, 70, { align: 'right' });
+      }
+      
+      // ===== ITEMS TABLE =====
+      y = 85;
+      
+      // Table Header
+      doc.setFillColor(248, 250, 252);
+      doc.rect(15, y - 6, 180, 12, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.line(15, y + 6, 195, y + 6);
+      
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('ITEM', 20, y);
+      doc.text('QTY', 115, y, { align: 'center' });
+      doc.text('RATE', 145, y, { align: 'right' });
+      doc.text('AMOUNT', 188, y, { align: 'right' });
+      
+      // Table Rows
+      y += 14;
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(10);
+      
+      orderItems.forEach((item, index) => {
+        // Alternate row background
+        if (index % 2 === 0) {
+          doc.setFillColor(252, 252, 254);
+          doc.rect(15, y - 5, 180, 10, 'F');
+        }
+        
+        doc.setTextColor(40, 40, 40);
+        doc.text(item.name.length > 35 ? item.name.substring(0, 35) + '...' : item.name, 20, y);
+        doc.text(item.quantity.toString(), 115, y, { align: 'center' });
+        doc.text(`${rs}${item.price.toFixed(2)}`, 145, y, { align: 'right' });
+        doc.setFont(undefined, 'bold');
+        doc.text(`${rs}${(item.quantity * item.price).toFixed(2)}`, 188, y, { align: 'right' });
+        doc.setFont(undefined, 'normal');
+        y += 10;
       });
+      
+      // ===== TOTALS SECTION =====
       y += 5;
-      doc.line(15, y, 195, y);
-      y += 8;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(120, y, 195, y);
+      y += 10;
+      
+      // Subtotal
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
       doc.text('Subtotal:', 140, y);
-      doc.text(`${currency}${calculateSubtotal().toFixed(2)}`, 190, y, { align: 'right' });
-      y += 6;
-      doc.text(`Tax (${getEffectiveTaxRate()}%):`, 140, y);
-      doc.text(`${currency}${calculateTax().toFixed(2)}`, 190, y, { align: 'right' });
-      const discAmt = calculateDiscountAmount();
-      if (discAmt > 0) {
-        y += 6;
+      doc.text(`${rs}${subtotal.toFixed(2)}`, 188, y, { align: 'right' });
+      
+      // Tax
+      y += 8;
+      doc.text(`Tax (${taxRate}%):`, 140, y);
+      doc.text(`${rs}${tax.toFixed(2)}`, 188, y, { align: 'right' });
+      
+      // Discount (if any)
+      if (discount > 0) {
+        y += 8;
         doc.setTextColor(34, 197, 94);
         doc.text('Discount:', 140, y);
-        doc.text(`-${currency}${discAmt.toFixed(2)}`, 190, y, { align: 'right' });
-        doc.setTextColor(50, 50, 50);
+        doc.text(`-${rs}${discount.toFixed(2)}`, 188, y, { align: 'right' });
       }
-      y += 8;
+      
+      // Total Box
+      y += 12;
       doc.setFillColor(124, 58, 237);
-      doc.rect(130, y - 5, 65, 12, 'F');
+      doc.roundedRect(120, y - 6, 75, 14, 2, 2, 'F');
       doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
-      doc.setFontSize(11);
-      doc.text('TOTAL:', 135, y + 2);
-      doc.text(`${currency}${calculateTotal().toFixed(2)}`, 190, y + 2, { align: 'right' });
-      doc.setTextColor(100, 100, 100);
-      doc.setFontSize(9);
+      doc.text('TOTAL:', 125, y + 2);
+      doc.text(`${rs}${total.toFixed(2)}`, 190, y + 2, { align: 'right' });
+      
+      // ===== PAYMENT INFO =====
+      if (paymentCompleted || order.status === 'completed') {
+        y += 20;
+        doc.setFillColor(34, 197, 94);
+        doc.roundedRect(15, y - 4, 50, 10, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text('PAID', 40, y + 2, { align: 'center' });
+        
+        doc.setTextColor(80, 80, 80);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Payment: ${(order.payment_method || paymentMethod || 'Cash').toUpperCase()}`, 70, y + 2);
+      }
+      
+      // ===== FOOTER =====
+      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      doc.text('Thank you for your visit!', 105, 270, { align: 'center' });
-      doc.setFontSize(7);
-      doc.text('Generated by BillByteKOT • billbytekot.in', 105, 280, { align: 'center' });
-      doc.save(`Invoice-${order.invoice_number || order.id.slice(0, 8)}.pdf`);
+      doc.text('Thank you for your business!', 105, 265, { align: 'center' });
+      
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Generated by BillByteKOT', 105, 275, { align: 'center' });
+      doc.text('www.billbytekot.in', 105, 280, { align: 'center' });
+      
+      // Save
+      doc.save(`Invoice-${invoiceNo}.pdf`);
       toast.success('Invoice downloaded!');
     } catch (error) {
-      toast.error('Failed to download');
+      console.error('PDF Error:', error);
+      toast.error('Failed to download PDF');
     }
   };
 
@@ -372,22 +482,70 @@ const BillingPage = ({ user }) => {
                 </div>
               ))}
             </div>
-            <div className="border-t pt-2 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{currency}{calculateSubtotal().toFixed(0)}</span></div>
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-1">
-                  <span className="text-gray-500">Disc</span>
-                  <select value={discountType} onChange={(e) => { setDiscountType(e.target.value); setDiscountValue(''); }} className="text-xs px-1 border rounded"><option value="amount">₹</option><option value="percent">%</option></select>
-                  <input type="number" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} className="w-10 text-xs px-1 border rounded text-center" />
-                  {[5, 10, 15].map(p => (<button key={p} onClick={() => { setDiscountType('percent'); setDiscountValue(p.toString()); }} className={`px-1.5 py-0.5 rounded text-xs ${discountType === 'percent' && discountValue === p.toString() ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>{p}%</button>))}
+            <div className="border-t pt-2 space-y-2 text-sm">
+              {/* Subtotal Row */}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Subtotal</span>
+                <span className="font-medium">{currency}{calculateSubtotal().toFixed(0)}</span>
+              </div>
+              
+              {/* Discount Row - Better Layout */}
+              <div className="bg-gray-50 rounded-lg p-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-gray-500">Discount</span>
+                  <span className="text-green-600 font-medium">{discountAmt > 0 ? `-${currency}${discountAmt.toFixed(0)}` : '—'}</span>
                 </div>
-                <span className="text-green-600">{discountAmt > 0 ? `-${currency}${discountAmt.toFixed(0)}` : '-'}</span>
+                <div className="flex items-center gap-1.5">
+                  <select value={discountType} onChange={(e) => { setDiscountType(e.target.value); setDiscountValue(''); }} className="h-8 px-2 text-sm border rounded-lg bg-white">
+                    <option value="amount">₹</option>
+                    <option value="percent">%</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    value={discountValue} 
+                    onChange={(e) => setDiscountValue(e.target.value)} 
+                    placeholder="0"
+                    className="w-16 h-8 px-2 text-sm border rounded-lg text-center" 
+                    min="0"
+                    max={discountType === 'percent' ? 100 : undefined}
+                  />
+                  <div className="flex gap-1 flex-1 justify-end">
+                    {[5, 10, 15].map(p => (
+                      <button 
+                        key={p} 
+                        onClick={() => { setDiscountType('percent'); setDiscountValue(p.toString()); }} 
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium ${discountType === 'percent' && discountValue === p.toString() ? 'bg-green-500 text-white' : 'bg-white border'}`}
+                      >
+                        {p}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+              
+              {/* Tax Row */}
               <div className="flex justify-between items-center">
-                <div className="flex items-center gap-1"><span className="text-gray-500">Tax</span><select value={customTaxRate !== null ? customTaxRate : getEffectiveTaxRate()} onChange={(e) => setCustomTaxRate(Number(e.target.value))} className="text-xs px-1 border rounded"><option value="0">0%</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div>
-                <span>{currency}{calculateTax().toFixed(0)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Tax</span>
+                  <select 
+                    value={customTaxRate !== null ? customTaxRate : getEffectiveTaxRate()} 
+                    onChange={(e) => setCustomTaxRate(Number(e.target.value))} 
+                    className="h-7 px-2 text-xs border rounded-lg bg-white"
+                  >
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                  </select>
+                </div>
+                <span className="font-medium">{currency}{calculateTax().toFixed(0)}</span>
               </div>
-              <div className="flex justify-between text-lg font-bold pt-1 border-t"><span>Total</span><span className="text-violet-600">{currency}{calculateTotal().toFixed(0)}</span></div>
+              
+              {/* Total Row */}
+              <div className="flex justify-between text-xl font-bold pt-2 border-t">
+                <span>Total</span>
+                <span className="text-violet-600">{currency}{calculateTotal().toFixed(0)}</span>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-2 mt-3">
               {[{ id: 'cash', icon: Wallet, label: 'Cash', color: '#22c55e' }, { id: 'card', icon: CreditCard, label: 'Card', color: '#3b82f6' }, { id: 'upi', icon: Smartphone, label: 'UPI', color: '#8b5cf6' }].map(m => (
