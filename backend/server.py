@@ -4271,15 +4271,24 @@ async def sales_forecast(current_user: dict = Depends(get_current_user)):
 @api_router.get("/reports/daily")
 async def daily_report(current_user: dict = Depends(get_current_user)):
     user_org_id = get_secure_org_id(current_user)
-    today = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    
+    # Use IST (Indian Standard Time) for "today" calculation
+    # IST is UTC+5:30
+    from datetime import timedelta
+    IST = timezone(timedelta(hours=5, minutes=30))
+    
+    # Get current time in IST and find start of today in IST
+    now_ist = datetime.now(IST)
+    today_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Convert to UTC for database query
+    today_utc = today_ist.astimezone(timezone.utc)
     
     # Optimized: Use database query instead of filtering in Python
     today_orders = await db.orders.find({
         "status": "completed",
         "organization_id": user_org_id,
-        "created_at": {"$gte": today.isoformat()}
+        "created_at": {"$gte": today_utc.isoformat()}
     }, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
     # Use aggregation for better performance
@@ -4288,7 +4297,7 @@ async def daily_report(current_user: dict = Depends(get_current_user)):
             "$match": {
                 "status": "completed",
                 "organization_id": user_org_id,
-                "created_at": {"$gte": today.isoformat()}
+                "created_at": {"$gte": today_utc.isoformat()}
             }
         },
         {
@@ -4311,7 +4320,7 @@ async def daily_report(current_user: dict = Depends(get_current_user)):
         total_sales = 0
 
     return {
-        "date": today.isoformat(),
+        "date": today_ist.isoformat(),
         "total_orders": total_orders,
         "total_sales": total_sales,
         "orders": today_orders,
