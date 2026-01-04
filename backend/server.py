@@ -8589,8 +8589,6 @@ async def get_public_pricing():
     }
 
 
-# Include all API routes
-app.include_router(api_router)
 
 # Include super admin routes and set database
 set_super_admin_db(db)
@@ -9444,6 +9442,9 @@ async def get_push_history(username: str, password: str, limit: int = 50):
     
     return {"notifications": notifications}
 
+
+# Include all API routes (must be after all route definitions)
+app.include_router(api_router)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
