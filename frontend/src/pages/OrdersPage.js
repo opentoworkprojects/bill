@@ -395,9 +395,18 @@ const OrdersPage = ({ user }) => {
         }
         return businessSettings?.tax_rate ?? 5;
       })(),
-      // Discount fields - load discount_value if exists, otherwise load discount_amount as amount type
+      // Discount fields - load properly based on what was saved
+      // If discount_value exists, use it with its type
+      // Otherwise, load discount_amount as 'amount' type
       discount_type: order.discount_type || 'amount',
-      discount_value: order.discount_value || order.discount_amount || order.discount || 0,
+      discount_value: (() => {
+        // If discount_value was saved (the input value), use it
+        if (order.discount_value !== undefined && order.discount_value !== null && order.discount_value > 0) {
+          return order.discount_value;
+        }
+        // Otherwise use the calculated discount amount
+        return order.discount_amount || order.discount || 0;
+      })(),
       // Manual item entry
       manual_item_name: '',
       manual_item_price: ''

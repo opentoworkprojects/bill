@@ -3539,7 +3539,14 @@ async def update_order(
     # For completed orders, only allow updating payment-related fields
     if existing_order.get("status") == "completed":
         # Allow updating: is_credit, payment_method, payment_received, balance_amount, customer_name, customer_phone
-        allowed_fields = ["is_credit", "payment_method", "payment_received", "balance_amount", "customer_name", "customer_phone"]
+        # Also allow discount and tax updates
+        allowed_fields = [
+            "is_credit", "payment_method", "payment_received", "balance_amount", 
+            "customer_name", "customer_phone",
+            "cash_amount", "card_amount", "upi_amount", "credit_amount",
+            "discount", "discount_type", "discount_value", "discount_amount",
+            "tax", "tax_rate", "subtotal", "total", "items"
+        ]
         update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
         
         for field in allowed_fields:
@@ -3570,6 +3577,7 @@ async def update_order(
         "items": order_data.get("items", existing_order["items"]),
         "subtotal": order_data.get("subtotal", existing_order["subtotal"]),
         "tax": order_data.get("tax", existing_order["tax"]),
+        "tax_rate": order_data.get("tax_rate", existing_order.get("tax_rate")),
         "total": order_data.get("total", existing_order["total"]),
         "customer_name": order_data.get("customer_name", existing_order.get("customer_name", "")),
         "customer_phone": order_data.get("customer_phone", existing_order.get("customer_phone", "")),
@@ -3577,6 +3585,16 @@ async def update_order(
         "is_credit": order_data.get("is_credit", existing_order.get("is_credit", False)),
         "payment_received": order_data.get("payment_received", existing_order.get("payment_received", 0)),
         "balance_amount": order_data.get("balance_amount", existing_order.get("balance_amount", 0)),
+        # Split payment fields
+        "cash_amount": order_data.get("cash_amount", existing_order.get("cash_amount", 0)),
+        "card_amount": order_data.get("card_amount", existing_order.get("card_amount", 0)),
+        "upi_amount": order_data.get("upi_amount", existing_order.get("upi_amount", 0)),
+        "credit_amount": order_data.get("credit_amount", existing_order.get("credit_amount", 0)),
+        # Discount fields
+        "discount": order_data.get("discount", existing_order.get("discount", 0)),
+        "discount_type": order_data.get("discount_type", existing_order.get("discount_type", "amount")),
+        "discount_value": order_data.get("discount_value", existing_order.get("discount_value", 0)),
+        "discount_amount": order_data.get("discount_amount", existing_order.get("discount_amount", 0)),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
