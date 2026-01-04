@@ -806,6 +806,7 @@ function App() {
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/menu/:orgId" element={<PublicMenuPage />} />
           <Route path="/download" element={<DownloadPage />} />
+          <Route path="/downloads" element={<DownloadPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/contact" element={<ContactPage />} />

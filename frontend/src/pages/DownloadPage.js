@@ -1,4 +1,7 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { API } from "../App";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { toast } from "sonner";
@@ -14,10 +17,36 @@ import {
   Globe,
   Bell,
   Smartphone,
+  Loader2,
 } from "lucide-react";
 
 const DownloadPage = () => {
   const navigate = useNavigate();
+  const [appVersions, setAppVersions] = useState({ android: null, windows: null });
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(null);
+
+  useEffect(() => {
+    fetchAppVersions();
+  }, []);
+
+  const fetchAppVersions = async () => {
+    try {
+      const [androidRes, windowsRes] = await Promise.allSettled([
+        axios.get(`${API}/app/latest/android`),
+        axios.get(`${API}/app/latest/windows`)
+      ]);
+      
+      setAppVersions({
+        android: androidRes.status === 'fulfilled' ? androidRes.value.data : null,
+        windows: windowsRes.status === 'fulfilled' ? windowsRes.value.data : null
+      });
+    } catch (error) {
+      console.error('Failed to fetch app versions', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Detect user's operating system
   const getOS = () => {
@@ -33,29 +62,35 @@ const DownloadPage = () => {
   const os = getOS();
   const isMobile = os === "android" || os === "ios";
 
-  // Download URLs
-  const windowsFileId = "1SILwfrO_f73ujof-x-PcTgJaJv2yHW_E";
-  const downloadUrls = {
-    windows: `https://drive.usercontent.google.com/download?id=${windowsFileId}&export=download&authuser=0&confirm=t`,
-    mac: "web",
-    linux: "web",
-    android: "https://play.google.com/store/apps/details?id=in.billbytekot.twa",
-  };
-
   const handleDownload = (platform) => {
     if (platform === "windows") {
-      // Download Windows app from Google Drive
-      const link = document.createElement('a');
-      link.href = downloadUrls.windows;
-      link.download = "BillByteKOT-Setup.exe";
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("Downloading BillByteKOT for Windows...");
+      if (appVersions.windows?.download_url) {
+        setDownloading('windows');
+        let downloadUrl = appVersions.windows.download_url;
+        if (downloadUrl.startsWith('/api/')) {
+          const backendUrl = API.replace('/api', '');
+          downloadUrl = backendUrl + downloadUrl;
+        }
+        window.location.href = downloadUrl;
+        toast.success("Downloading BillByteKOT for Windows...");
+        setTimeout(() => setDownloading(null), 3000);
+      } else {
+        toast.error("Windows app not available yet");
+      }
     } else if (platform === "android") {
-      window.open(downloadUrls.android, '_blank');
-      toast.success("Opening Google Play Store...");
+      if (appVersions.android?.download_url) {
+        setDownloading('android');
+        let downloadUrl = appVersions.android.download_url;
+        if (downloadUrl.startsWith('/api/')) {
+          const backendUrl = API.replace('/api', '');
+          downloadUrl = backendUrl + downloadUrl;
+        }
+        window.location.href = downloadUrl;
+        toast.success("Downloading BillByteKOT for Android...");
+        setTimeout(() => setDownloading(null), 3000);
+      } else {
+        toast.error("Android app not available yet");
+      }
     } else {
       // For Mac/Linux, show instructions to use web app
       toast.info("Use the web app for best experience! Click 'Get Started' to begin.", {
@@ -135,11 +170,18 @@ const DownloadPage = () => {
                 <Button
                   className="w-full bg-blue-600 hover:bg-blue-700"
                   onClick={() => handleDownload("windows")}
+                  disabled={downloading === 'windows' || !appVersions.windows}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download for Windows
+                  {downloading === 'windows' ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {appVersions.windows ? 'Download for Windows' : 'Coming Soon'}
                 </Button>
-                <p className="text-xs text-gray-400 mt-2">~80 MB • Installer</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  {appVersions.windows ? `v${appVersions.windows.version} • ${appVersions.windows.file_size || '~100 MB'}` : 'Not available yet'}
+                </p>
               </CardContent>
             </Card>
 
@@ -229,7 +271,10 @@ const DownloadPage = () => {
 
           {/* Version Info */}
           <div className="text-center text-gray-500 text-sm">
-            <p>Version 1.0.0 • Released November 2024</p>
+            <p>
+              {appVersions.windows ? `Windows v${appVersions.windows.version}` : 'Windows coming soon'}
+              {appVersions.android ? ` • Android v${appVersions.android.version}` : ''}
+            </p>
             <p className="mt-1">Connects to billbytekot.in • Auto-updates enabled</p>
           </div>
         </div>

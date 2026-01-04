@@ -153,15 +153,9 @@ const DesktopDownloadSection = () => {
   
   const handleDownloadWindows = () => {
     if (appVersions.windows?.download_url) {
-      // Handle both relative and absolute URLs
-      let downloadUrl = appVersions.windows.download_url;
-      if (downloadUrl.startsWith('/api/')) {
-        // Relative URL - prepend backend URL
-        const backendUrl = API.replace('/api', '');
-        downloadUrl = backendUrl + downloadUrl;
-      }
-      window.open(downloadUrl, '_blank');
-      toast.success("Downloading BillByteKOT for Windows...");
+      // Navigate to downloads page for better UX
+      navigate('/downloads');
+      toast.success("Opening downloads page...");
     } else {
       toast.error("Windows app not available yet");
     }
@@ -169,15 +163,9 @@ const DesktopDownloadSection = () => {
   
   const handleDownloadAndroid = () => {
     if (appVersions.android?.download_url) {
-      // Handle both relative and absolute URLs
-      let downloadUrl = appVersions.android.download_url;
-      if (downloadUrl.startsWith('/api/')) {
-        // Relative URL - prepend backend URL
-        const backendUrl = API.replace('/api', '');
-        downloadUrl = backendUrl + downloadUrl;
-      }
-      window.open(downloadUrl, '_blank');
-      toast.success("Downloading BillByteKOT for Android...");
+      // Navigate to downloads page for better UX
+      navigate('/downloads');
+      toast.success("Opening downloads page...");
     } else {
       toast.error("Android app not available yet");
     }
