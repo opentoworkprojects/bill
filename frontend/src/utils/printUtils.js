@@ -239,10 +239,12 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   html += `<div class="total-row"><span>Sub Total</span><span>${totalItems}</span><span>-</span><span>${displaySubtotal.toFixed(2)}</span></div>`;
   if (discount > 0) html += `<div class="total-row small" style="color:#22c55e"><span>Discount</span><span></span><span></span><span>-${discount.toFixed(2)}</span></div>`;
   
-  // Calculate tax rate from stored values
-  const taxableAmount = displaySubtotal - discount;
-  const taxRate = taxableAmount > 0 ? ((tax / taxableAmount) * 100).toFixed(1) : '0.0';
-  if (tax > 0) html += `<div class="total-row small"><span>Tax (${taxRate}%)</span><span></span><span></span><span>${tax.toFixed(2)}</span></div>`;
+  // Show tax if tax > 0 OR if tax_rate > 0 (even if tax amount is 0)
+  const taxRate = order.tax_rate || (subtotal > 0 && tax > 0 ? ((tax / subtotal) * 100) : 0);
+  if (tax > 0 || taxRate > 0) {
+    const displayTaxRate = taxRate > 0 ? taxRate.toFixed(1) : '0.0';
+    html += `<div class="total-row small"><span>Tax (${displayTaxRate}%)</span><span></span><span></span><span>${tax.toFixed(2)}</span></div>`;
+  }
   
   html += '<div class="double-line"></div>';
   html += `<div class="total-row grand-total"><span>TOTAL DUE</span><span>${total.toFixed(2)}</span></div>`;
@@ -349,10 +351,11 @@ export const generatePlainTextReceipt = (order, businessOverride = null) => {
   r += `Sub Total       ${items.toString().padStart(3)}     -  ${displaySub.toFixed(2).padStart(8)}\n`;
   if (discount > 0) r += `Discount                      -${discount.toFixed(2).padStart(8)}\n`;
   
-  // Calculate tax rate
-  const taxableAmount = displaySub - discount;
-  const taxRate = taxableAmount > 0 ? ((tax / taxableAmount) * 100).toFixed(0) : '0';
-  if (tax > 0) r += `Tax (${taxRate}%)                       ${tax.toFixed(2).padStart(8)}\n`;
+  // Show tax if tax > 0 OR if tax_rate > 0
+  const taxRate = order.tax_rate || (sub > 0 && tax > 0 ? ((tax / sub) * 100) : 0);
+  if (tax > 0 || taxRate > 0) {
+    r += `Tax (${taxRate.toFixed(0)}%)                       ${tax.toFixed(2).padStart(8)}\n`;
+  }
   r += dsep + '\n' + `TOTAL DUE                      ${tot.toFixed(2).padStart(8)}\n` + dsep + '\n';
   
   // Payment details

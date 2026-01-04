@@ -386,11 +386,18 @@ const OrdersPage = ({ user }) => {
       upi_amount: order.upi_amount || 0,
       credit_amount: order.credit_amount || 0,
       use_split_payment: hasSplitPayment || order.payment_method === 'split',
-      // Use order's stored tax_rate, fallback to calculating from tax/subtotal, then settings
-      tax_rate: order.tax_rate ?? (order.subtotal > 0 && order.tax !== undefined ? Math.round((order.tax / order.subtotal) * 100 * 100) / 100 : (businessSettings?.tax_rate ?? 5)),
-      // Discount fields
+      // Use order's stored tax_rate, fallback to business settings
+      // If order has tax > 0 but no tax_rate, calculate it from tax/subtotal
+      tax_rate: (() => {
+        if (order.tax_rate !== undefined && order.tax_rate !== null) return order.tax_rate;
+        if (order.tax > 0 && order.subtotal > 0) {
+          return Math.round((order.tax / order.subtotal) * 100);
+        }
+        return businessSettings?.tax_rate ?? 5;
+      })(),
+      // Discount fields - load discount_value if exists, otherwise load discount_amount as amount type
       discount_type: order.discount_type || 'amount',
-      discount_value: order.discount_value || 0,
+      discount_value: order.discount_value || order.discount_amount || order.discount || 0,
       // Manual item entry
       manual_item_name: '',
       manual_item_price: ''
@@ -1619,8 +1626,22 @@ const OrdersPage = ({ user }) => {
                 <div className="border-t pt-3 sm:pt-4 space-y-1 sm:space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
-                    <span className="font-medium">₹{(viewOrderModal.order?.subtotal || 0).toFixed(0)}</span>
+                    <span className="font-medium">₹{(() => {
+                      const order = viewOrderModal.order;
+                      const discount = order?.discount || order?.discount_amount || 0;
+                      // If discount exists, calculate original subtotal from items
+                      if (discount > 0 && order?.items) {
+                        return order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(0);
+                      }
+                      return (order?.subtotal || 0).toFixed(0);
+                    })()}</span>
                   </div>
+                  {(viewOrderModal.order?.discount > 0 || viewOrderModal.order?.discount_amount > 0) && (
+                    <div className="flex justify-between text-xs sm:text-sm text-green-600">
+                      <span>Discount:</span>
+                      <span className="font-medium">-₹{(viewOrderModal.order?.discount || viewOrderModal.order?.discount_amount || 0).toFixed(0)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs sm:text-sm text-gray-600">
                     <span>Tax:</span>
                     <span>₹{(viewOrderModal.order?.tax || 0).toFixed(0)}</span>
