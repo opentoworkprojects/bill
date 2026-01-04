@@ -109,11 +109,14 @@ const OrdersPage = ({ user }) => {
     if (!dateString) return false;
     const orderDate = new Date(dateString);
     const now = new Date();
-    // Convert to IST (UTC+5:30)
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const orderIST = new Date(orderDate.getTime() + istOffset);
-    const nowIST = new Date(now.getTime() + istOffset);
-    return orderIST.toDateString() === nowIST.toDateString();
+    
+    // Get IST date strings for comparison
+    // IST is UTC+5:30, so we use 'Asia/Kolkata' timezone
+    const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const orderDateIST = orderDate.toLocaleDateString('en-CA', options); // YYYY-MM-DD format
+    const todayIST = now.toLocaleDateString('en-CA', options);
+    
+    return orderDateIST === todayIST;
   };
 
   // Get unique categories from menu items
