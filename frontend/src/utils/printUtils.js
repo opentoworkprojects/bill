@@ -228,10 +228,21 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   html += '<div class="separator"></div>';
   
   const subtotal = order.subtotal || 0, tax = order.tax || 0, total = order.total || 0;
+  const discount = order.discount || order.discount_amount || 0;
   const totalItems = (order.items || []).reduce((s, i) => s + i.quantity, 0);
   
-  html += `<div class="total-row"><span>Sub Total</span><span>${totalItems}</span><span>-</span><span>${subtotal.toFixed(2)}</span></div>`;
-  if (tax > 0) html += `<div class="total-row small"><span>Tax (${subtotal > 0 ? ((tax / subtotal) * 100).toFixed(1) : '5.0'}%)</span><span></span><span></span><span>${tax.toFixed(2)}</span></div>`;
+  // Calculate items total from items array (original subtotal before discount)
+  const itemsTotal = (order.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
+  // Use items total if discount exists, otherwise use stored subtotal
+  const displaySubtotal = discount > 0 ? itemsTotal : subtotal;
+  
+  html += `<div class="total-row"><span>Sub Total</span><span>${totalItems}</span><span>-</span><span>${displaySubtotal.toFixed(2)}</span></div>`;
+  if (discount > 0) html += `<div class="total-row small" style="color:#22c55e"><span>Discount</span><span></span><span></span><span>-${discount.toFixed(2)}</span></div>`;
+  
+  // Calculate tax rate from stored values
+  const taxableAmount = displaySubtotal - discount;
+  const taxRate = taxableAmount > 0 ? ((tax / taxableAmount) * 100).toFixed(1) : '0.0';
+  if (tax > 0) html += `<div class="total-row small"><span>Tax (${taxRate}%)</span><span></span><span></span><span>${tax.toFixed(2)}</span></div>`;
   
   html += '<div class="double-line"></div>';
   html += `<div class="total-row grand-total"><span>TOTAL DUE</span><span>${total.toFixed(2)}</span></div>`;
@@ -327,9 +338,21 @@ export const generatePlainTextReceipt = (order, businessOverride = null) => {
   
   r += sep + '\n';
   const sub = order.subtotal || 0, tax = order.tax || 0, tot = order.total || 0;
+  const discount = order.discount || order.discount_amount || 0;
   const items = (order.items || []).reduce((s, i) => s + i.quantity, 0);
-  r += `Sub Total       ${items.toString().padStart(3)}     -  ${sub.toFixed(2).padStart(8)}\n`;
-  if (tax > 0) r += `Tax (5%)                       ${tax.toFixed(2).padStart(8)}\n`;
+  
+  // Calculate items total from items array (original subtotal before discount)
+  const itemsTotal = (order.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
+  // Use items total if discount exists, otherwise use stored subtotal
+  const displaySub = discount > 0 ? itemsTotal : sub;
+  
+  r += `Sub Total       ${items.toString().padStart(3)}     -  ${displaySub.toFixed(2).padStart(8)}\n`;
+  if (discount > 0) r += `Discount                      -${discount.toFixed(2).padStart(8)}\n`;
+  
+  // Calculate tax rate
+  const taxableAmount = displaySub - discount;
+  const taxRate = taxableAmount > 0 ? ((tax / taxableAmount) * 100).toFixed(0) : '0';
+  if (tax > 0) r += `Tax (${taxRate}%)                       ${tax.toFixed(2).padStart(8)}\n`;
   r += dsep + '\n' + `TOTAL DUE                      ${tot.toFixed(2).padStart(8)}\n` + dsep + '\n';
   
   // Payment details

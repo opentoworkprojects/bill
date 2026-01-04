@@ -206,8 +206,16 @@ const BillingPage = ({ user }) => {
       setPaymentCompleted(true);
       await releaseTable();
       
-      // Use updated order for printing
-      const updatedOrder = { ...order, items: orderItems, subtotal: calculateSubtotal(), tax: calculateTax(), total: calculateTotal() };
+      // Use updated order for printing - include discount
+      const updatedOrder = { 
+        ...order, 
+        items: orderItems, 
+        subtotal: calculateSubtotal(), 
+        tax: calculateTax(), 
+        total: calculateTotal(),
+        discount: discount,
+        discount_amount: discount
+      };
       printReceipt(updatedOrder, businessSettings);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Payment failed');
@@ -534,7 +542,15 @@ const BillingPage = ({ user }) => {
           <Button
             variant="outline"
             onClick={() => {
-              const updatedOrder = { ...order, items: orderItems, subtotal: calculateSubtotal(), tax: calculateTax(), total: calculateTotal() };
+              const updatedOrder = { 
+                ...order, 
+                items: orderItems, 
+                subtotal: calculateSubtotal(), 
+                tax: calculateTax(), 
+                total: calculateTotal(),
+                discount: discount,
+                discount_amount: discount
+              };
               printReceipt(updatedOrder, businessSettings);
             }}
             className="flex-1 h-12"

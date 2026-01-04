@@ -533,6 +533,7 @@ const OrdersPage = ({ user }) => {
         upi_amount: upiAmount,
         credit_amount: creditAmount,
         // Discount fields
+        discount: discountAmount,
         discount_type: editOrderModal.discount_type || 'amount',
         discount_value: discountValue,
         discount_amount: discountAmount
