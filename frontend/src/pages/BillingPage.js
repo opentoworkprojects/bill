@@ -7,7 +7,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, ArrowLeft, Check } from 'lucide-react';
+import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, ArrowLeft, Check, Plus, Minus, Trash2 } from 'lucide-react';
 import { printReceipt } from '../utils/printUtils';
 
 const BillingPage = ({ user }) => {
@@ -22,6 +22,9 @@ const BillingPage = ({ user }) => {
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [customTaxRate, setCustomTaxRate] = useState(null);
+  const [manualItemName, setManualItemName] = useState('');
+  const [manualItemPrice, setManualItemPrice] = useState('');
+  const [orderItems, setOrderItems] = useState([]);
 
   useEffect(() => {
     fetchOrder();
@@ -32,6 +35,7 @@ const BillingPage = ({ user }) => {
     try {
       const response = await axios.get(`${API}/orders/${orderId}`);
       setOrder(response.data);
+      setOrderItems(response.data.items || []);
       if (response.data.customer_phone) {
         setWhatsappPhone(response.data.customer_phone);
       }
@@ -64,15 +68,98 @@ const BillingPage = ({ user }) => {
     return businessSettings?.tax_rate ?? 5;
   };
 
+  const calculateSubtotal = () => {
+    return orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  };
+
   const calculateTax = () => {
-    if (!order) return 0;
-    if (customTaxRate === null && order.tax !== undefined) return order.tax;
-    return (order.subtotal * getEffectiveTaxRate()) / 100;
+    const subtotal = calculateSubtotal();
+    return (subtotal * getEffectiveTaxRate()) / 100;
   };
 
   const calculateTotal = () => {
-    if (!order) return 0;
-    return order.subtotal + calculateTax() - discount;
+    return calculateSubtotal() + calculateTax() - discount;
+  };
+
+  // Manual item functions
+  const handleAddManualItem = () => {
+    const name = manualItemName.trim();
+    const price = parseFloat(manualItemPrice) || 0;
+    
+    if (!name) {
+      toast.error('Enter item name');
+      return;
+    }
+    if (price <= 0) {
+      toast.error('Enter valid price');
+      return;
+    }
+    
+    setOrderItems([...orderItems, {
+      menu_item_id: `manual_${Date.now()}`,
+      name: name,
+      price: price,
+      quantity: 1,
+      notes: 'Manual entry'
+    }]);
+    
+    setManualItemName('');
+    setManualItemPrice('');
+    toast.success(`Added: ${name}`);
+  };
+
+  const handleItemQuantityChange = (index, delta) => {
+    const updated = [...orderItems];
+    const newQty = updated[index].quantity + delta;
+    if (newQty < 1) {
+      // Remove item if quantity goes to 0
+      updated.splice(index, 1);
+    } else {
+      updated[index].quantity = newQty;
+    }
+    setOrderItems(updated);
+  };
+
+  const handleRemoveItem = (index) => {
+    setOrderItems(orderItems.filter((_, i) => i !== index));
+  };
+
+  // Update order with new items before payment
+  const updateOrderItems = async () => {
+    if (orderItems.length === 0) {
+      toast.error('Order must have at least one item');
+      return false;
+    }
+    
+    try {
+      const subtotal = calculateSubtotal();
+      const tax = calculateTax();
+      const total = calculateTotal();
+      
+      await axios.put(`${API}/orders/${orderId}`, {
+        items: orderItems,
+        subtotal,
+        tax,
+        tax_rate: getEffectiveTaxRate(),
+        total,
+        discount: discount
+      });
+      
+      // Update local order state
+      setOrder(prev => ({
+        ...prev,
+        items: orderItems,
+        subtotal,
+        tax,
+        total
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to update order items:', error);
+      toast.error('Failed to update order');
+      return false;
+    }
   };
 
   const releaseTable = async () => {
@@ -95,6 +182,11 @@ const BillingPage = ({ user }) => {
 
   const handlePayment = async () => {
     if (!order) return;
+    
+    // First update order items if changed
+    const updated = await updateOrderItems();
+    if (!updated) return;
+    
     setLoading(true);
     try {
       await axios.post(`${API}/payments/create-order`, {
@@ -113,7 +205,10 @@ const BillingPage = ({ user }) => {
       toast.success('Payment completed!');
       setPaymentCompleted(true);
       await releaseTable();
-      printReceipt(order, businessSettings);
+      
+      // Use updated order for printing
+      const updatedOrder = { ...order, items: orderItems, subtotal: calculateSubtotal(), tax: calculateTax(), total: calculateTotal() };
+      printReceipt(updatedOrder, businessSettings);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Payment failed');
     } finally {
@@ -182,7 +277,7 @@ const BillingPage = ({ user }) => {
       
       // Items
       doc.setFont(undefined, 'normal');
-      order.items.forEach(item => {
+      orderItems.forEach(item => {
         doc.text(item.name.substring(0, 30), 20, y);
         doc.text(item.quantity.toString(), 120, y, { align: 'center' });
         doc.text(`${currency}${item.price}`, 150, y, { align: 'right' });
@@ -195,7 +290,7 @@ const BillingPage = ({ user }) => {
       doc.line(15, y, 195, y);
       y += 8;
       doc.text('Subtotal:', 140, y);
-      doc.text(`${currency}${order.subtotal.toFixed(2)}`, 190, y, { align: 'right' });
+      doc.text(`${currency}${calculateSubtotal().toFixed(2)}`, 190, y, { align: 'right' });
       y += 6;
       doc.text(`Tax (${getEffectiveTaxRate()}%):`, 140, y);
       doc.text(`${currency}${calculateTax().toFixed(2)}`, 190, y, { align: 'right' });
@@ -265,16 +360,63 @@ const BillingPage = ({ user }) => {
         {/* Order Items */}
         <Card className="mb-4 border-0 shadow-lg">
           <CardContent className="p-4">
+            {/* Manual Item Entry */}
+            <div className="flex gap-2 mb-3 pb-3 border-b border-dashed">
+              <Input
+                placeholder="Item name"
+                value={manualItemName}
+                onChange={(e) => setManualItemName(e.target.value)}
+                className="flex-1 h-9 text-sm"
+              />
+              <Input
+                type="number"
+                placeholder="₹"
+                value={manualItemPrice}
+                onChange={(e) => setManualItemPrice(e.target.value)}
+                className="w-20 h-9 text-sm"
+                min="0"
+              />
+              <Button 
+                size="sm" 
+                onClick={handleAddManualItem}
+                className="h-9 px-3 bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            
             <div className="space-y-3">
-              {order.items.map((item, idx) => (
+              {orderItems.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <span className="w-7 h-7 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-sm font-bold">
-                      {item.quantity}
-                    </span>
-                    <span className="font-medium">{item.name}</span>
+                  <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleItemQuantityChange(idx, -1)}
+                        className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded flex items-center justify-center text-sm"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="w-7 h-7 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-sm font-bold">
+                        {item.quantity}
+                      </span>
+                      <button 
+                        onClick={() => handleItemQuantityChange(idx, 1)}
+                        className="w-6 h-6 bg-violet-600 hover:bg-violet-700 text-white rounded flex items-center justify-center text-sm"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <span className="font-medium text-sm truncate">{item.name}</span>
                   </div>
-                  <span className="font-semibold">{currency}{(item.price * item.quantity).toFixed(0)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{currency}{(item.price * item.quantity).toFixed(0)}</span>
+                    <button 
+                      onClick={() => handleRemoveItem(idx)}
+                      className="text-red-400 hover:text-red-600 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -283,7 +425,7 @@ const BillingPage = ({ user }) => {
             <div className="mt-4 pt-4 border-t border-dashed space-y-2">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>
-                <span>{currency}{order.subtotal.toFixed(0)}</span>
+                <span>{currency}{calculateSubtotal().toFixed(0)}</span>
               </div>
               <div className="flex justify-between items-center text-gray-600">
                 <div className="flex items-center gap-2">
@@ -323,9 +465,9 @@ const BillingPage = ({ user }) => {
             {[0, 5, 10, 15, 20].map(pct => (
               <button
                 key={pct}
-                onClick={() => setDiscount(pct === 0 ? 0 : (order.subtotal * pct) / 100)}
+                onClick={() => setDiscount(pct === 0 ? 0 : (calculateSubtotal() * pct) / 100)}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  (pct === 0 && discount === 0) || (pct > 0 && Math.round((discount / order.subtotal) * 100) === pct)
+                  (pct === 0 && discount === 0) || (pct > 0 && Math.round((discount / calculateSubtotal()) * 100) === pct)
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-100 hover:bg-gray-200'
                 }`}
@@ -391,7 +533,10 @@ const BillingPage = ({ user }) => {
         <div className="flex gap-2 mt-4">
           <Button
             variant="outline"
-            onClick={() => printReceipt(order, businessSettings)}
+            onClick={() => {
+              const updatedOrder = { ...order, items: orderItems, subtotal: calculateSubtotal(), tax: calculateTax(), total: calculateTotal() };
+              printReceipt(updatedOrder, businessSettings);
+            }}
             className="flex-1 h-12"
           >
             <Printer className="w-4 h-4 mr-2" />

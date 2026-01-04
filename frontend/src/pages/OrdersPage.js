@@ -474,16 +474,32 @@ const OrdersPage = ({ user }) => {
         upiAmount = parseFloat(editOrderModal.upi_amount) || 0;
         creditAmount = parseFloat(editOrderModal.credit_amount) || 0;
         
+        // Calculate what's been entered
+        const totalEntered = cashAmount + cardAmount + upiAmount + creditAmount;
+        
+        // If total entered doesn't match bill total, auto-adjust
+        // This handles cases where discount was added after payment amounts were set
+        if (Math.abs(totalEntered - total) > 0.01) {
+          // Auto-adjust: put the difference in cash (or reduce cash if discount added)
+          const difference = total - (cardAmount + upiAmount + creditAmount);
+          if (difference >= 0) {
+            cashAmount = difference;
+          } else {
+            // If other payments exceed total, reduce credit first, then others
+            const excess = -difference;
+            if (creditAmount >= excess) {
+              creditAmount -= excess;
+            } else {
+              // Just set cash to 0 and let user fix
+              cashAmount = 0;
+              toast.info('Payment amounts adjusted. Please verify split amounts.');
+            }
+          }
+        }
+        
         paymentReceived = cashAmount + cardAmount + upiAmount;
         balanceAmount = creditAmount;
         isCredit = creditAmount > 0;
-        
-        // Validate total matches
-        const totalPaid = paymentReceived + creditAmount;
-        if (Math.abs(totalPaid - total) > 0.01) {
-          toast.error(`Payment total (₹${totalPaid.toFixed(2)}) doesn't match bill total (₹${total.toFixed(2)})`);
-          return;
-        }
         
         paymentMethod = 'split';
       } else {
@@ -1753,11 +1769,15 @@ const OrdersPage = ({ user }) => {
                     <Label className="text-xs font-medium">Payment</Label>
                     <button
                       onClick={() => {
-                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
+                        const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const discountValue = parseFloat(editOrderModal.discount_value) || 0;
+                        const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
+                        const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
+                        const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
                         if (editOrderModal.use_split_payment) {
                           setEditOrderModal({ ...editOrderModal, use_split_payment: false, payment_method: 'cash', payment_received: total, balance_amount: 0, cash_amount: 0, card_amount: 0, upi_amount: 0, credit_amount: 0, is_credit: false });
                         } else {
-                          setEditOrderModal({ ...editOrderModal, use_split_payment: true, payment_method: 'split', cash_amount: 0, card_amount: 0, upi_amount: 0, credit_amount: 0 });
+                          setEditOrderModal({ ...editOrderModal, use_split_payment: true, payment_method: 'split', cash_amount: total, card_amount: 0, upi_amount: 0, credit_amount: 0 });
                         }
                       }}
                       className={`px-2 py-1 rounded-full text-[10px] font-medium ${editOrderModal.use_split_payment ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-purple-100'}`}
@@ -1772,7 +1792,11 @@ const OrdersPage = ({ user }) => {
                         <button
                           key={method}
                           onClick={() => {
-                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
+                            const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                            const discountValue = parseFloat(editOrderModal.discount_value) || 0;
+                            const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
+                            const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
+                            const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
                             setEditOrderModal({ ...editOrderModal, payment_method: method, is_credit: method === 'credit', payment_received: method === 'credit' ? 0 : total, balance_amount: method === 'credit' ? total : 0 });
                           }}
                           className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium ${
@@ -1811,7 +1835,11 @@ const OrdersPage = ({ user }) => {
                         ))}
                       </div>
                       {(() => {
-                        const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
+                        const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const discountValue = parseFloat(editOrderModal.discount_value) || 0;
+                        const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
+                        const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
+                        const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
                         const paid = (parseFloat(editOrderModal.cash_amount) || 0) + (parseFloat(editOrderModal.card_amount) || 0) + (parseFloat(editOrderModal.upi_amount) || 0);
                         const credit = parseFloat(editOrderModal.credit_amount) || 0;
                         const remaining = total - paid - credit;
@@ -1829,7 +1857,11 @@ const OrdersPage = ({ user }) => {
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
-                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
+                            const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                            const discountValue = parseFloat(editOrderModal.discount_value) || 0;
+                            const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
+                            const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
+                            const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
                             const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
                             if (remaining > 0) setEditOrderModal({ ...editOrderModal, cash_amount: (parseFloat(editOrderModal.cash_amount) || 0) + remaining });
                           }}
@@ -1839,7 +1871,11 @@ const OrdersPage = ({ user }) => {
                         </button>
                         <button
                           onClick={() => {
-                            const total = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * (1 + (editOrderModal.tax_rate || 0) / 100);
+                            const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                            const discountValue = parseFloat(editOrderModal.discount_value) || 0;
+                            const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
+                            const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
+                            const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
                             const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
                             if (remaining > 0) setEditOrderModal({ ...editOrderModal, credit_amount: (parseFloat(editOrderModal.credit_amount) || 0) + remaining, is_credit: true });
                           }}
