@@ -20,8 +20,8 @@
     "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\billbytekot\\android.keystore",
     "alias": "android"
   },
-  "appVersionName": "25",
-  "appVersionCode": 25,
+  "appVersionName": "28",
+  "appVersionCode": 28,
   "shortcuts": [
     {
       "name": "New Order",
@@ -47,7 +47,7 @@
   "fallbackType": "customtabs",
   "features": {
     "playBilling": {
-      "enabled": true
+      "enabled": false
     },
     "locationDelegation": {
       "enabled": true
@@ -69,5 +69,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "navigate-existing",
   "displayOverride": [],
-  "appVersion": "25"
+  "appVersion": "28"
 }
