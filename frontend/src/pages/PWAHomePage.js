@@ -5,19 +5,18 @@ import { API } from '../App';
 import { 
   Utensils, ChefHat, Receipt, BarChart3,
   CheckCircle, ArrowRight, Star, Sparkles,
-  Zap, Shield, Clock, Flame, Play
+  Zap, Shield, Clock, Flame, Play, Timer,
+  MessageCircle
 } from 'lucide-react';
 
 const PWAHomePage = () => {
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [pricing, setPricing] = useState({
-    basePrice: 1999,
-    salePrice: null,
-    discount: null,
-    badge: null
-  });
+  const [saleOffer, setSaleOffer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  // Support WhatsApp number
+  const SUPPORT_WHATSAPP = '918310832669';
 
   useEffect(() => {
     // Check if running as PWA/TWA (standalone mode) or mobile app
@@ -39,9 +38,48 @@ const PWAHomePage = () => {
       return;
     }
     
-    fetchPricing();
+    fetchSaleOffer();
     setIsChecking(false);
   }, [navigate]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!saleOffer?.enabled) return;
+    
+    let endDateStr = saleOffer.valid_until || saleOffer.end_date;
+    if (!endDateStr) return;
+    
+    // If it's just a date (YYYY-MM-DD), add end of day time
+    if (endDateStr.length === 10) {
+      endDateStr = endDateStr + 'T23:59:59';
+    }
+    
+    const calculateTimeLeft = () => {
+      const end = new Date(endDateStr);
+      const now = new Date();
+      const diff = end - now;
+      
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return false;
+      }
+      
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000)
+      });
+      return true;
+    };
+    
+    calculateTimeLeft();
+    const timer = setInterval(() => {
+      if (!calculateTimeLeft()) clearInterval(timer);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [saleOffer]);
 
   // Auto slide
   useEffect(() => {
@@ -51,33 +89,16 @@ const PWAHomePage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchPricing = async () => {
+  const fetchSaleOffer = async () => {
     try {
-      const saleRes = await axios.get(`${API}/sale-offer`).catch(() => null);
+      const saleRes = await axios.get(`${API}/sale-offer`).catch(() => ({ data: { enabled: false } }));
+      
       if (saleRes?.data?.enabled) {
-        const sale = saleRes.data;
-        const endDate = sale.end_date ? new Date(sale.end_date) : null;
-        if (!endDate || endDate > new Date()) {
-          setPricing({
-            basePrice: sale.original_price || 1999,
-            salePrice: sale.sale_price,
-            discount: sale.discount_percent,
-            badge: sale.badge
-          });
-          return;
-        }
+        setSaleOffer(saleRes.data);
       }
-      const pricingRes = await axios.get(`${API}/pricing`).catch(() => null);
-      if (pricingRes?.data?.campaign_enabled) {
-        const p = pricingRes.data;
-        setPricing({
-          basePrice: p.base_price || 1999,
-          salePrice: p.campaign_price,
-          discount: Math.round(((p.base_price - p.campaign_price) / p.base_price) * 100),
-          badge: p.campaign_badge
-        });
-      }
-    } catch (e) {}
+    } catch (e) {
+      console.log('Failed to fetch sale offer');
+    }
   };
 
   if (isChecking) {
@@ -94,40 +115,57 @@ const PWAHomePage = () => {
     { icon: BarChart3, title: 'Live Reports', desc: 'Track sales, inventory & staff performance', color: 'from-emerald-500 to-green-600' },
   ];
 
-  const hasDiscount = pricing.salePrice && pricing.salePrice < pricing.basePrice;
-  const displayPrice = pricing.salePrice || pricing.basePrice;
+  const hasDiscount = saleOffer?.enabled && saleOffer?.sale_price && saleOffer?.original_price && saleOffer.sale_price < saleOffer.original_price;
+  const displayPrice = saleOffer?.sale_price || saleOffer?.original_price || 1999;
+  const originalPrice = saleOffer?.original_price || 1999;
+  const discountPercent = saleOffer?.discount_percent || (hasDiscount ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100) : 0);
+  const hasTimer = timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0;
+
+  const handleWhatsAppClick = () => {
+    window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=Hi, I'm interested in BillByteKOT app!`, '_blank');
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Top Section - Purple Gradient */}
-      <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 px-6 pt-12 pb-16 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700 px-6 pt-10 pb-16 relative overflow-hidden">
         {/* Decorative circles */}
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
         
         {/* Logo */}
-        <div className="flex items-center gap-3 mb-10 relative z-10">
-          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-xl">
-            <Utensils className="w-7 h-7 text-violet-600" />
+        <div className="flex items-center justify-between mb-8 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xl">
+              <Utensils className="w-6 h-6 text-violet-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white tracking-tight">BillByteKOT</h1>
+              <p className="text-violet-200 text-xs">Restaurant Management</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">BillByteKOT</h1>
-            <p className="text-violet-200 text-sm">Restaurant Management</p>
-          </div>
+          
+          {/* WhatsApp Contact Button */}
+          <button
+            onClick={handleWhatsAppClick}
+            className="w-11 h-11 bg-green-500 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+          >
+            <MessageCircle className="w-5 h-5 text-white fill-white" />
+          </button>
         </div>
 
         {/* Feature Carousel */}
         <div className="relative z-10">
-          <div className="bg-white/15 backdrop-blur-sm rounded-3xl p-6 border border-white/20">
+          <div className="bg-white/15 backdrop-blur-sm rounded-3xl p-5 border border-white/20">
             <div className="flex items-center gap-4 mb-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${slides[currentSlide].color} rounded-2xl flex items-center justify-center shadow-lg`}>
+              <div className={`w-14 h-14 bg-gradient-to-br ${slides[currentSlide].color} rounded-2xl flex items-center justify-center shadow-lg`}>
                 {(() => {
                   const Icon = slides[currentSlide].icon;
-                  return <Icon className="w-8 h-8 text-white" />;
+                  return <Icon className="w-7 h-7 text-white" />;
                 })()}
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">{slides[currentSlide].title}</h3>
+                <h3 className="text-lg font-bold text-white">{slides[currentSlide].title}</h3>
                 <p className="text-violet-200 text-sm">{slides[currentSlide].desc}</p>
               </div>
             </div>
@@ -146,7 +184,7 @@ const PWAHomePage = () => {
         </div>
 
         {/* Rating */}
-        <div className="flex items-center justify-center gap-2 mt-6 relative z-10">
+        <div className="flex items-center justify-center gap-2 mt-5 relative z-10">
           <div className="flex">
             {[1,2,3,4,5].map(i => (
               <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
@@ -157,25 +195,87 @@ const PWAHomePage = () => {
       </div>
 
       {/* Bottom Section - White */}
-      <div className="flex-1 px-6 -mt-6 relative z-20">
-        <div className="bg-white rounded-t-3xl shadow-2xl pt-6 pb-8 px-1">
+      <div className="flex-1 px-5 -mt-6 relative z-20">
+        <div className="bg-white rounded-t-3xl shadow-2xl pt-5 pb-8 px-1">
           
-          {/* Sale Banner */}
+          {/* Sale Banner with Full Details */}
           {hasDiscount && (
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-3 mb-5 mx-1 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-yellow-300" />
-                <span className="text-white font-bold">{pricing.badge || `${pricing.discount}% OFF`}</span>
+            <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-2xl p-4 mb-5 mx-1 relative overflow-hidden">
+              {/* Animated background */}
+              <div className="absolute inset-0 opacity-20">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="absolute w-2 h-2 bg-white rounded-full animate-ping" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 2}s` }} />
+                ))}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-orange-200 line-through text-sm">₹{pricing.basePrice}</span>
-                <span className="text-white font-bold text-lg">₹{displayPrice}/yr</span>
+              
+              <div className="relative z-10">
+                {/* Sale Title */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Flame className="w-5 h-5 text-yellow-300 animate-pulse" />
+                  <span className="text-white font-bold text-lg">
+                    {saleOffer?.title || saleOffer?.badge_text || `${discountPercent}% OFF`}
+                  </span>
+                </div>
+                
+                {/* Subtitle */}
+                {saleOffer?.subtitle && (
+                  <p className="text-orange-100 text-sm mb-3">{saleOffer.subtitle}</p>
+                )}
+                
+                {/* Price Display */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-orange-200 line-through text-lg">₹{originalPrice}</span>
+                  <span className="text-white font-black text-3xl">₹{displayPrice}</span>
+                  <span className="text-orange-100 text-sm">/year</span>
+                  <span className="bg-yellow-400 text-black px-2 py-0.5 rounded-full text-xs font-bold ml-auto">
+                    SAVE ₹{originalPrice - displayPrice}
+                  </span>
+                </div>
+                
+                {/* Countdown Timer */}
+                {hasTimer && (
+                  <div className="bg-black/30 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Timer className="w-4 h-4 text-yellow-300" />
+                      <span className="text-white/90 text-xs font-medium">Offer ends in:</span>
+                    </div>
+                    <div className="flex gap-2 justify-center">
+                      {[
+                        { val: timeLeft.days, label: 'Days' },
+                        { val: timeLeft.hours, label: 'Hrs' },
+                        { val: timeLeft.minutes, label: 'Min' },
+                        { val: timeLeft.seconds, label: 'Sec' }
+                      ].map((item, i) => (
+                        <div key={i} className="bg-white/20 rounded-lg px-3 py-2 text-center min-w-[50px]">
+                          <span className="text-white font-bold text-xl block">{String(item.val).padStart(2, '0')}</span>
+                          <span className="text-white/70 text-[10px]">{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* No Sale - Show Regular Price */}
+          {!hasDiscount && (
+            <div className="bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl p-4 mb-5 mx-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-violet-200 text-sm">Starting at just</p>
+                  <p className="text-white font-black text-2xl">₹{originalPrice}<span className="text-lg font-normal">/year</span></p>
+                </div>
+                <div className="bg-white/20 rounded-xl px-3 py-2 text-center">
+                  <p className="text-white/80 text-xs">Only</p>
+                  <p className="text-white font-bold">₹{Math.round(originalPrice/365)}/day</p>
+                </div>
               </div>
             </div>
           )}
 
           {/* Features List */}
-          <div className="space-y-3 mb-6 px-1">
+          <div className="space-y-3 mb-5 px-1">
             {[
               { icon: Zap, text: 'Setup in 2 minutes' },
               { icon: Shield, text: 'Secure cloud backup' },
@@ -186,7 +286,7 @@ const PWAHomePage = () => {
                 <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
                   <item.icon className="w-4 h-4 text-violet-600" />
                 </div>
-                <span className="text-gray-700 font-medium">{item.text}</span>
+                <span className="text-gray-700 font-medium text-sm">{item.text}</span>
                 <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
               </div>
             ))}
@@ -211,8 +311,19 @@ const PWAHomePage = () => {
             </button>
           </div>
 
+          {/* WhatsApp Contact */}
+          <div className="mt-5 px-1">
+            <button
+              onClick={handleWhatsAppClick}
+              className="w-full bg-green-50 border border-green-200 text-green-700 py-3 rounded-xl font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            >
+              <MessageCircle className="w-5 h-5 text-green-600" />
+              Chat with us on WhatsApp
+            </button>
+          </div>
+
           {/* Footer */}
-          <p className="text-center text-gray-400 text-xs mt-6 px-4">
+          <p className="text-center text-gray-400 text-xs mt-5 px-4">
             By continuing, you agree to our Terms & Privacy Policy
           </p>
         </div>
