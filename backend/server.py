@@ -8731,22 +8731,11 @@ async def upload_app_file(
 async def download_app_file(file_id: str):
     """Download app file by ID - Public endpoint for app downloads"""
     import base64
+    from fastapi.responses import StreamingResponse
     
     file_doc = await db.app_files.find_one({"id": file_id})
     if not file_doc:
         raise HTTPException(status_code=404, detail="File not found")
-    
-    if file_doc.get("chunked"):
-        # Reassemble chunks
-        chunks = await db.app_file_chunks.find(
-            {"file_id": file_id}
-        ).sort("chunk_index", 1).to_list(1000)
-        
-        content = b""
-        for chunk in chunks:
-            content += base64.b64decode(chunk["data"])
-    else:
-        content = base64.b64decode(file_doc["data"])
     
     # Determine content type
     content_type = file_doc.get("content_type", "application/octet-stream")
@@ -8755,12 +8744,35 @@ async def download_app_file(file_id: str):
     elif file_doc["filename"].endswith(".exe"):
         content_type = "application/x-msdownload"
     
-    return Response(
-        content=content,
+    original_filename = file_doc.get('original_filename', file_doc['filename'])
+    file_size = file_doc.get("size", 0)
+    
+    async def generate_chunks():
+        """Stream file content in chunks to avoid memory issues"""
+        if file_doc.get("chunked"):
+            # Stream chunks one at a time
+            chunk_count = file_doc.get("chunk_count", 0)
+            for i in range(chunk_count):
+                chunk_doc = await db.app_file_chunks.find_one({
+                    "file_id": file_id,
+                    "chunk_index": i
+                })
+                if chunk_doc:
+                    yield base64.b64decode(chunk_doc["data"])
+        else:
+            # Single chunk - yield all at once
+            yield base64.b64decode(file_doc["data"])
+    
+    headers = {
+        "Content-Disposition": f"attachment; filename={original_filename}",
+        "Content-Length": str(file_size),
+        "Accept-Ranges": "bytes"
+    }
+    
+    return StreamingResponse(
+        generate_chunks(),
         media_type=content_type,
-        headers={
-            "Content-Disposition": f"attachment; filename={file_doc.get('original_filename', file_doc['filename'])}"
-        }
+        headers=headers
     )
 
 
