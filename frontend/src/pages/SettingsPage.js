@@ -1186,6 +1186,37 @@ const SettingsPage = ({ user }) => {
                   </div>
                 </div>
               </div>
+              
+              {/* Customer Prompt Setting - Only show when KOT is disabled */}
+              {!businessSettings.kot_mode_enabled && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Ask for Customer Name</p>
+                      <p className="text-xs text-gray-500">Show customer name prompt when creating new orders</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const currentSetting = localStorage.getItem('skipCustomerPrompt') === 'true';
+                        localStorage.setItem('skipCustomerPrompt', currentSetting ? 'false' : 'true');
+                        toast.success(currentSetting ? 'Customer prompt enabled' : 'Customer prompt disabled');
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        localStorage.getItem('skipCustomerPrompt') !== 'true' ? 'bg-green-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          localStorage.getItem('skipCustomerPrompt') !== 'true' ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2">
+                    When disabled, orders will be created as "Cash Sale" without asking for customer details.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
