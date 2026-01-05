@@ -1288,35 +1288,64 @@ const OrdersPage = ({ user }) => {
                         {config.label}
                       </span>
                       {['admin', 'cashier'].includes(user?.role) && (
-                        <div className="relative">
-                          <button
-                            onClick={() => setActionMenuOpen(actionMenuOpen === order.id ? null : order.id)}
-                            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center"
-                          >
-                            <MoreVertical className="w-4 h-4 text-gray-400" />
-                          </button>
-                          {actionMenuOpen === order.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActionMenuOpen(null)} />
-                              <div className="absolute right-0 top-10 z-20 w-36 bg-white rounded-xl shadow-lg border py-1">
-                                <button onClick={() => handleEditOrder(order)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                                  <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit
-                                </button>
-                                <button onClick={() => { setCancelConfirmModal({ open: true, order }); setActionMenuOpen(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-orange-600">
-                                  <Ban className="w-3.5 h-3.5" /> Cancel
-                                </button>
-                                {user?.role === 'admin' && (
-                                  <button onClick={() => { setDeleteConfirmModal({ open: true, order }); setActionMenuOpen(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                  </button>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        <button
+                          onClick={() => setActionMenuOpen(actionMenuOpen === order.id ? null : order.id)}
+                          className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+                        >
+                          <MoreVertical className="w-4 h-4 text-gray-400" />
+                        </button>
                       )}
                     </div>
                   </div>
+                  
+                  {/* Bottom Sheet Action Menu for Active Orders */}
+                  {actionMenuOpen === order.id && ['admin', 'cashier'].includes(user?.role) && (
+                    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setActionMenuOpen(null)}>
+                      <div 
+                        className="w-full bg-white rounded-t-2xl overflow-hidden animate-in slide-in-from-bottom duration-200 pb-safe"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Handle */}
+                        <div className="flex justify-center py-2">
+                          <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+                        </div>
+                        {/* Header */}
+                        <div className="px-4 pb-3 border-b">
+                          <h3 className="font-bold text-gray-800">Order #{order.id.slice(0, 6)}</h3>
+                          <p className="text-sm text-gray-500">Select an action</p>
+                        </div>
+                        {/* Actions */}
+                        <div className="py-2">
+                          <button onClick={() => handleEditOrder(order)} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                              <Edit className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <span className="font-medium text-gray-800">Edit Order</span>
+                          </button>
+                          <button onClick={() => { setCancelConfirmModal({ open: true, order }); setActionMenuOpen(null); }} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                              <Ban className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <span className="font-medium text-orange-600">Cancel Order</span>
+                          </button>
+                          {user?.role === 'admin' && (
+                            <button onClick={() => { setDeleteConfirmModal({ open: true, order }); setActionMenuOpen(null); }} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                              </div>
+                              <span className="font-medium text-red-600">Delete Order</span>
+                            </button>
+                          )}
+                        </div>
+                        {/* Cancel Button */}
+                        <div className="px-4 pb-4">
+                          <button onClick={() => setActionMenuOpen(null)} className="w-full py-3 bg-gray-100 rounded-xl font-medium text-gray-600">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Customer Info */}
                   {order.customer_name && (
@@ -1422,47 +1451,91 @@ const OrdersPage = ({ user }) => {
                         {isCancelled ? 'Cancelled' : 'Paid'}
                       </span>
                       {['admin', 'cashier'].includes(user?.role) && (
-                        <div className="relative">
-                          <button onClick={() => setActionMenuOpen(actionMenuOpen === order.id ? null : order.id)} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
-                            <MoreVertical className="w-4 h-4 text-gray-400" />
-                          </button>
-                          {actionMenuOpen === order.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActionMenuOpen(null)} />
-                              <div className="absolute right-0 top-10 z-20 w-36 bg-white rounded-xl shadow-lg border py-1">
-                                <button onClick={() => handleViewOrder(order)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                                  <Eye className="w-3.5 h-3.5 text-gray-500" /> View
-                                </button>
-                                {isCompleted && (
-                                  <button onClick={() => handleEditOrder(order)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                                    <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit
-                                  </button>
-                                )}
-                                <button onClick={() => handlePrintReceipt(order)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                                  <Receipt className="w-3.5 h-3.5 text-gray-500" /> Print
-                                </button>
-                                {isCompleted && !hasCredit && (
-                                  <button onClick={() => handleMarkAsCredit(order)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-orange-600">
-                                    <Wallet className="w-3.5 h-3.5" /> Mark Credit
-                                  </button>
-                                )}
-                                {isCompleted && hasCredit && (
-                                  <button onClick={() => handleMarkAsPaid(order)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600">
-                                    <DollarSign className="w-3.5 h-3.5" /> Mark Paid
-                                  </button>
-                                )}
-                                {user?.role === 'admin' && (
-                                  <button onClick={() => { setDeleteConfirmModal({ open: true, order }); setActionMenuOpen(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                  </button>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        <button onClick={() => setActionMenuOpen(actionMenuOpen === order.id ? null : order.id)} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
+                          <MoreVertical className="w-4 h-4 text-gray-400" />
+                        </button>
                       )}
                     </div>
                   </div>
+                  
+                  {/* Bottom Sheet Action Menu for Today's Bills */}
+                  {actionMenuOpen === order.id && ['admin', 'cashier'].includes(user?.role) && (
+                    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setActionMenuOpen(null)}>
+                      <div 
+                        className="w-full bg-white rounded-t-2xl overflow-hidden animate-in slide-in-from-bottom duration-200 pb-safe"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Handle */}
+                        <div className="flex justify-center py-2">
+                          <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+                        </div>
+                        {/* Header */}
+                        <div className="px-4 pb-3 border-b">
+                          <h3 className="font-bold text-gray-800">Order #{order.id.slice(0, 6)}</h3>
+                          <p className="text-sm text-gray-500">₹{order.total.toFixed(0)} • {isCancelled ? 'Cancelled' : hasCredit ? 'Credit' : 'Paid'}</p>
+                        </div>
+                        {/* Actions - Scrollable */}
+                        <div className="py-2 max-h-[50vh] overflow-y-auto">
+                          <button onClick={() => handleViewOrder(order)} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                              <Eye className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="font-medium text-gray-800">View Details</span>
+                          </button>
+                          {isCompleted && (
+                            <button onClick={() => handleEditOrder(order)} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <Edit className="w-5 h-5 text-blue-600" />
+                              </div>
+                              <span className="font-medium text-gray-800">Edit Order</span>
+                            </button>
+                          )}
+                          <button onClick={() => handlePrintReceipt(order)} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                            <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center">
+                              <Receipt className="w-5 h-5 text-violet-600" />
+                            </div>
+                            <span className="font-medium text-gray-800">Print Receipt</span>
+                          </button>
+                          <button onClick={() => { setWhatsappModal({ open: true, orderId: order.id, customerName: order.customer_name || '' }); setWhatsappPhone(order.customer_phone || ''); setActionMenuOpen(null); }} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                              <MessageCircle className="w-5 h-5 text-green-600" />
+                            </div>
+                            <span className="font-medium text-gray-800">Share via WhatsApp</span>
+                          </button>
+                          {isCompleted && !hasCredit && (
+                            <button onClick={() => handleMarkAsCredit(order)} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                                <Wallet className="w-5 h-5 text-orange-600" />
+                              </div>
+                              <span className="font-medium text-orange-600">Mark as Credit</span>
+                            </button>
+                          )}
+                          {isCompleted && hasCredit && (
+                            <button onClick={() => handleMarkAsPaid(order)} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                <DollarSign className="w-5 h-5 text-green-600" />
+                              </div>
+                              <span className="font-medium text-green-600">Mark as Paid</span>
+                            </button>
+                          )}
+                          {user?.role === 'admin' && (
+                            <button onClick={() => { setDeleteConfirmModal({ open: true, order }); setActionMenuOpen(null); }} className="w-full px-4 py-4 text-left active:bg-gray-100 flex items-center gap-3 border-b border-gray-100">
+                              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                              </div>
+                              <span className="font-medium text-red-600">Delete Order</span>
+                            </button>
+                          )}
+                        </div>
+                        {/* Cancel Button */}
+                        <div className="px-4 pb-4">
+                          <button onClick={() => setActionMenuOpen(null)} className="w-full py-3 bg-gray-100 rounded-xl font-medium text-gray-600">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Customer */}
                   {order.customer_name && (

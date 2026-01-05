@@ -443,33 +443,74 @@ const BillingPage = ({ user }) => {
                 <div className="relative flex-1">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input 
-                    placeholder="Search or add item..." 
+                    placeholder="Search item... (Enter to add)" 
                     value={searchQuery} 
                     onChange={(e) => { setSearchQuery(e.target.value); setShowMenuDropdown(true); }} 
-                    onFocus={() => setShowMenuDropdown(true)} 
-                    className="pl-8 h-9 text-sm" 
+                    onFocus={() => setShowMenuDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && hasMatches) {
+                        e.preventDefault();
+                        handleAddMenuItem(filteredMenuItems[0]);
+                      }
+                    }}
+                    className="pl-8 h-10 text-base" 
                   />
                 </div>
                 {!hasMatches && searchQuery.trim() && (
                   <>
-                    <Input type="number" placeholder="₹" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} className="w-16 h-9 text-sm" ref={priceInputRef} />
-                    <Button size="sm" onClick={handleAddCustomItem} className="h-9 px-2 bg-green-600"><Plus className="w-4 h-4" /></Button>
+                    <Input type="number" placeholder="₹" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} className="w-16 h-10 text-base" ref={priceInputRef} />
+                    <Button size="sm" onClick={handleAddCustomItem} className="h-10 px-3 bg-green-600"><Plus className="w-4 h-4" /></Button>
                   </>
                 )}
               </div>
-              {showMenuDropdown && searchQuery.trim() && (
-                <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                  {hasMatches ? (
-                    filteredMenuItems.slice(0, 8).map(item => (
-                      <button key={item.id} onClick={() => handleAddMenuItem(item)} className="w-full px-3 py-2 text-left hover:bg-violet-50 flex justify-between text-sm border-b last:border-0">
-                        <span className="truncate">{item.name}</span><span className="text-violet-600 font-semibold">{currency}{item.price}</span>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-3 py-2 text-gray-500 text-sm">
-                      No match found. Enter price to add "<span className="font-medium text-gray-700">{searchQuery}</span>" as custom item.
-                    </div>
-                  )}
+              
+              {/* Fixed Position Dropdown for Mobile - Ensures it's always clickable */}
+              {showMenuDropdown && searchQuery.trim() && hasMatches && (
+                <div className="fixed inset-x-0 top-auto bottom-0 z-[100] bg-white border-t-2 border-violet-300 shadow-2xl rounded-t-2xl max-h-[50vh] overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                  {/* Header with close */}
+                  <div className="sticky top-0 bg-violet-600 text-white px-4 py-3 flex justify-between items-center">
+                    <span className="font-bold">Select Item ({filteredMenuItems.length} found)</span>
+                    <button 
+                      onClick={() => setShowMenuDropdown(false)}
+                      className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {/* Items List */}
+                  <div className="overflow-y-auto max-h-[40vh]">
+                    {filteredMenuItems.slice(0, 10).map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        className={`px-4 py-4 flex justify-between items-center border-b border-gray-100 active:bg-violet-100 ${index === 0 ? 'bg-violet-50' : ''}`}
+                        onClick={() => handleAddMenuItem(item)}
+                        onTouchEnd={(e) => { e.preventDefault(); handleAddMenuItem(item); }}
+                      >
+                        <div className="flex items-center gap-3">
+                          {index === 0 && <span className="text-xs bg-violet-600 text-white px-2 py-0.5 rounded">⏎</span>}
+                          <span className={`font-medium ${index === 0 ? 'text-violet-700' : 'text-gray-800'}`}>{item.name}</span>
+                        </div>
+                        <span className="text-violet-600 font-bold text-lg">{currency}{item.price}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Backdrop when dropdown is open */}
+              {showMenuDropdown && searchQuery.trim() && hasMatches && (
+                <div 
+                  className="fixed inset-0 bg-black/30 z-[99]" 
+                  onClick={() => setShowMenuDropdown(false)}
+                />
+              )}
+              
+              {/* No match message */}
+              {showMenuDropdown && searchQuery.trim() && !hasMatches && (
+                <div className="absolute z-20 w-full mt-1 bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-orange-700 text-sm">
+                    No match. Enter price → <span className="font-bold">{searchQuery}</span>
+                  </p>
                 </div>
               )}
             </div>
@@ -611,10 +652,16 @@ const BillingPage = ({ user }) => {
                 )}
               </div>
               {showMenuDropdown && searchQuery.trim() && (
-                <div className="absolute z-20 w-full mt-1 bg-white border rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                <div className="absolute z-20 w-full mt-1 bg-white border rounded-xl shadow-2xl max-h-80 overflow-y-auto" style={{ touchAction: 'pan-y' }}>
                   {hasMatches ? (
                     filteredMenuItems.slice(0, 12).map(item => (
-                      <button key={item.id} onClick={() => handleAddMenuItem(item)} className="w-full px-4 py-3 text-left hover:bg-violet-50 flex justify-between items-center text-lg border-b last:border-0">
+                      <button 
+                        key={item.id} 
+                        onClick={() => handleAddMenuItem(item)} 
+                        onTouchEnd={(e) => { e.preventDefault(); handleAddMenuItem(item); }}
+                        className="w-full px-4 py-4 text-left hover:bg-violet-50 active:bg-violet-100 flex justify-between items-center text-lg border-b last:border-0 cursor-pointer select-none"
+                        style={{ touchAction: 'manipulation' }}
+                      >
                         <span className="font-medium">{item.name}</span><span className="text-violet-600 font-bold">{currency}{item.price}</span>
                       </button>
                     ))
