@@ -786,7 +786,7 @@ const LandingPage = () => {
       icon: Smartphone,
       title: "Mobile & PWA Ready",
       description:
-        "Works on any device. Install as Android app from Play Store",
+        "Works on any device. Download Android app now via Early Access!",
       color: "from-purple-500 to-pink-600",
     },
     {
@@ -1197,6 +1197,278 @@ const LandingPage = () => {
                 <DollarSign className="w-8 h-8 text-pink-600 mb-2" />
                 <span className="text-sm font-medium text-gray-900 text-center">View Pricing</span>
               </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Mobile App Showcase Section - Attract Mobile Users */}
+      <section className="py-16 bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 overflow-hidden">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full mb-4">
+                <Smartphone className="w-4 h-4 text-green-400" />
+                <span className="text-sm font-medium text-green-400">Available on Early Access</span>
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-3" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                Beautiful on Every Device
+              </h2>
+              <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+                Experience seamless restaurant management on your phone. Fast, intuitive, and designed for busy restaurants.
+              </p>
+            </div>
+
+            {/* Mobile Screenshots Showcase */}
+            <div className="relative">
+              {/* Floating glow effects */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-violet-500/30 rounded-full blur-3xl"></div>
+              
+              <div className="relative flex justify-center items-end gap-4 md:gap-8">
+                {/* Left Phone - Orders Page */}
+                <div className="relative w-48 md:w-64 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+                  <div className="bg-gray-900 rounded-[2rem] p-2 shadow-2xl">
+                    <div className="bg-white rounded-[1.5rem] overflow-hidden">
+                      {/* Mock Orders Screen */}
+                      <div className="bg-white">
+                        {/* Header */}
+                        <div className="bg-violet-600 px-3 py-2 flex items-center justify-between">
+                          <span className="text-white font-bold text-sm">BillByteKOT AI</span>
+                          <span className="bg-violet-500 text-white text-[10px] px-2 py-0.5 rounded">admin</span>
+                        </div>
+                        {/* Content */}
+                        <div className="p-2 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-sm">Orders</span>
+                            <span className="bg-violet-600 text-white text-[10px] px-2 py-1 rounded">+ New</span>
+                          </div>
+                          {/* Tabs */}
+                          <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg">
+                            <span className="flex-1 bg-white text-[9px] text-center py-1 rounded font-medium shadow-sm">Active Orders</span>
+                            <span className="flex-1 text-[9px] text-center py-1 text-gray-500">Today's Bills</span>
+                          </div>
+                          {/* Order Cards */}
+                          <div className="space-y-2">
+                            <div className="bg-white border rounded-xl p-2 shadow-sm">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="w-6 h-6 bg-amber-500 rounded-lg flex items-center justify-center text-white text-[10px]">⏳</span>
+                                <div>
+                                  <p className="text-[10px] font-bold">#58bc32</p>
+                                  <p className="text-[8px] text-gray-500">Counter • 12:18 am</p>
+                                </div>
+                                <span className="ml-auto bg-amber-100 text-amber-700 text-[8px] px-1.5 py-0.5 rounded-full">Pending</span>
+                              </div>
+                              <div className="text-[9px] space-y-0.5 text-gray-600">
+                                <div className="flex justify-between"><span>1 Samosa</span><span>₹66</span></div>
+                                <div className="flex justify-between"><span>2 Margherita Pizza</span><span>₹598</span></div>
+                              </div>
+                              <div className="flex justify-between items-center mt-1 pt-1 border-t">
+                                <span className="text-[9px] text-gray-500">Total</span>
+                                <span className="text-sm font-bold text-violet-600">₹16079</span>
+                              </div>
+                              <div className="flex gap-1 mt-1">
+                                <span className="flex-1 bg-amber-500 text-white text-[8px] py-1 rounded-lg text-center">Start Cooking</span>
+                                <span className="bg-gray-100 text-[8px] px-2 py-1 rounded-lg">KOT</span>
+                                <span className="flex-1 bg-violet-600 text-white text-[8px] py-1 rounded-lg text-center">Bill & Pay</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Bottom Nav */}
+                        <div className="flex justify-around py-2 border-t bg-white">
+                          {['🏠', '🍽️', '📋', '🪑', '•••'].map((icon, i) => (
+                            <span key={i} className={`text-sm ${i === 2 ? 'text-violet-600' : 'text-gray-400'}`}>{icon}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Label */}
+                  <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur px-3 py-1 rounded-full">
+                    <span className="text-white text-xs font-medium">Orders Management</span>
+                  </div>
+                </div>
+
+                {/* Center Phone - Menu Selection (Featured) */}
+                <div className="relative w-56 md:w-72 z-10 transform hover:scale-105 transition-transform duration-500">
+                  <div className="bg-gray-900 rounded-[2.5rem] p-2 shadow-2xl ring-4 ring-violet-500/50">
+                    <div className="bg-white rounded-[2rem] overflow-hidden">
+                      {/* Mock Menu Screen */}
+                      <div className="bg-white">
+                        {/* Header */}
+                        <div className="bg-violet-600 px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white">←</span>
+                              <div>
+                                <p className="text-white font-bold text-sm">Add Items</p>
+                                <p className="text-white/70 text-[10px]">Counter Order</p>
+                              </div>
+                            </div>
+                            <span className="bg-white text-violet-600 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">🛒 3</span>
+                          </div>
+                        </div>
+                        {/* Search */}
+                        <div className="px-3 py-2 bg-white">
+                          <div className="bg-gray-100 rounded-full px-3 py-1.5 flex items-center gap-2">
+                            <span className="text-gray-400 text-xs">🔍</span>
+                            <span className="text-gray-400 text-xs">Search items...</span>
+                          </div>
+                        </div>
+                        {/* Categories */}
+                        <div className="px-3 flex gap-1 overflow-x-auto pb-2">
+                          {['🍽️ All', 'Snacks', 'Pizza', 'Burger'].map((cat, i) => (
+                            <span key={i} className={`text-[9px] px-2 py-1 rounded-full whitespace-nowrap ${i === 0 ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{cat}</span>
+                          ))}
+                        </div>
+                        {/* Menu Items Grid */}
+                        <div className="px-3 py-2 grid grid-cols-3 gap-2">
+                          {[
+                            { name: 'Samosa', price: '₹66', emoji: '🥟', color: 'bg-amber-50', qty: 0 },
+                            { name: 'Pizza', price: '₹299', emoji: '🍕', color: 'bg-orange-50', qty: 1 },
+                            { name: 'Paneer', price: '₹5000', emoji: '🍛', color: 'bg-yellow-50', qty: 1 },
+                            { name: 'Burger', price: '₹199', emoji: '🍔', color: 'bg-lime-50', qty: 0 },
+                            { name: 'Coke', price: '₹50', emoji: '🥤', color: 'bg-red-50', qty: 0 },
+                            { name: 'Samosa', price: '₹100', emoji: '🍟', color: 'bg-amber-50', qty: 0 },
+                          ].map((item, i) => (
+                            <div key={i} className="flex flex-col items-center">
+                              <div className={`relative w-12 h-12 ${item.color} rounded-full flex items-center justify-center text-xl ${item.qty > 0 ? 'ring-2 ring-violet-500' : ''}`}>
+                                {item.emoji}
+                                {item.qty > 0 && (
+                                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-600 text-white rounded-full text-[8px] flex items-center justify-center font-bold">{item.qty}</span>
+                                )}
+                                {item.qty === 0 && (
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-violet-600 text-white rounded-full text-[10px] flex items-center justify-center">+</span>
+                                )}
+                              </div>
+                              <p className="text-[8px] text-gray-600 mt-0.5 text-center truncate w-full">{item.name}</p>
+                              <p className="text-[9px] font-bold text-violet-600">{item.price}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Cart Bar */}
+                        <div className="mx-2 mb-2 bg-violet-600 rounded-xl p-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-white">
+                            <span className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-xs">🛒</span>
+                            <div>
+                              <p className="text-[8px] text-violet-200">3 items</p>
+                              <p className="text-sm font-bold">₹10299</p>
+                            </div>
+                          </div>
+                          <span className="bg-white text-violet-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">✓ Create</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Featured Badge */}
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-1 rounded-full shadow-lg">
+                    <span className="text-white text-xs font-bold">✨ Quick Menu Selection</span>
+                  </div>
+                  {/* Label */}
+                  <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur px-3 py-1 rounded-full">
+                    <span className="text-white text-xs font-medium">Round Plate Menu</span>
+                  </div>
+                </div>
+
+                {/* Right Phone - Dashboard */}
+                <div className="relative w-48 md:w-64 transform rotate-6 hover:rotate-0 transition-transform duration-500">
+                  <div className="bg-gray-900 rounded-[2rem] p-2 shadow-2xl">
+                    <div className="bg-white rounded-[1.5rem] overflow-hidden">
+                      {/* Mock Dashboard Screen */}
+                      <div className="bg-gradient-to-br from-violet-600 to-purple-700">
+                        {/* Header */}
+                        <div className="px-3 py-2 flex items-center justify-between">
+                          <span className="text-white font-bold text-sm">Dashboard</span>
+                          <span className="w-6 h-6 bg-white/20 rounded-full"></span>
+                        </div>
+                        {/* Stats */}
+                        <div className="px-3 pb-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-white/10 rounded-xl p-2">
+                              <p className="text-white/70 text-[8px]">Today's Sales</p>
+                              <p className="text-white font-bold text-sm">₹24,500</p>
+                            </div>
+                            <div className="bg-white/10 rounded-xl p-2">
+                              <p className="text-white/70 text-[8px]">Orders</p>
+                              <p className="text-white font-bold text-sm">47</p>
+                            </div>
+                          </div>
+                          <div className="bg-white/10 rounded-xl p-2">
+                            <p className="text-white/70 text-[8px] mb-1">Quick Actions</p>
+                            <div className="grid grid-cols-4 gap-1">
+                              {['📝', '🍽️', '🪑', '📊'].map((icon, i) => (
+                                <div key={i} className="bg-white/20 rounded-lg p-1.5 text-center text-sm">{icon}</div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="bg-white/10 rounded-xl p-2">
+                            <div className="flex justify-between items-center mb-1">
+                              <p className="text-white/70 text-[8px]">Active Orders</p>
+                              <span className="bg-orange-500 text-white text-[7px] px-1.5 py-0.5 rounded-full">3 pending</span>
+                            </div>
+                            <div className="space-y-1">
+                              {[1, 2].map((_, i) => (
+                                <div key={i} className="bg-white/10 rounded-lg p-1.5 flex justify-between items-center">
+                                  <div>
+                                    <p className="text-white text-[9px] font-medium">Table {i + 1}</p>
+                                    <p className="text-white/60 text-[7px]">2 items</p>
+                                  </div>
+                                  <span className="text-white text-[9px]">₹450</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Label */}
+                  <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur px-3 py-1 rounded-full">
+                    <span className="text-white text-xs font-medium">Live Dashboard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-16">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-green-500 to-emerald-500 h-14 px-8 text-lg hover-lift"
+                onClick={() => navigate("/download")}
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Download Android App
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-14 px-8 text-lg border-white/30 text-white hover:bg-white/10 hover-lift"
+                onClick={handleGetStarted}
+              >
+                <Globe className="w-5 h-5 mr-2" />
+                Try Web App Free
+              </Button>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="flex flex-wrap justify-center gap-6 mt-8">
+              <div className="flex items-center gap-2 text-white/70">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-sm">Works Offline</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/70">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-sm">Thermal Printing</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/70">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-sm">WhatsApp Integration</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/70">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-sm">Multi-Staff Support</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1962,7 +2234,7 @@ const LandingPage = () => {
               },
               {
                 q: "Can I use BillByteKOT AI on mobile?",
-                a: "Yes! It works on any device. Join our early access program to get the Android app from Google Play Store when it launches!",
+                a: "Yes! It works on any device. Download our Android app now through Early Access - available for direct download!",
               },
               {
                 q: "What's included in the Premium plan?",
@@ -2150,8 +2422,8 @@ const LandingPage = () => {
                         <CheckCircle className="w-5 h-5 text-green-600" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-gray-900">Coming Soon</p>
-                        <p className="text-[10px] text-gray-500">Play Store</p>
+                        <p className="text-xs font-bold text-gray-900">Early Access</p>
+                        <p className="text-[10px] text-gray-500">Download Now</p>
                       </div>
                     </div>
                   </div>

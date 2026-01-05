@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign } from 'lucide-react';
+import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
@@ -1035,210 +1035,187 @@ const OrdersPage = ({ user }) => {
           </div>
           {['admin', 'waiter', 'cashier'].includes(user?.role) && (
             <>
-              {/* Quick New Order Button - When KOT disabled */}
-              {businessSettings?.kot_mode_enabled === false ? (
-                <>
-                  <Button 
-                    onClick={() => {
-                      if (skipCustomerPrompt) {
-                        // Skip dialog, go directly to menu with "Cash Sale"
-                        setFormData({ table_id: '', customer_name: '', customer_phone: '' });
-                        setShowMenuPage(true);
-                      } else {
-                        setDialogOpen(true);
-                      }
-                    }}
-                    className="bg-violet-600 hover:bg-violet-700 text-sm sm:text-base" 
-                    data-testid="create-order-button"
-                  >
-                    <Plus className="w-4 h-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">New Order</span>
-                    <span className="sm:hidden">New</span>
-                  </Button>
-                  
-                  {/* Customer Details Dialog - Modern Design */}
-                  {dialogOpen && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-                        {/* Header with Icon */}
-                        <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-5 text-center relative">
-                          <button 
-                            onClick={() => { setDialogOpen(false); resetForm(); }}
-                            className="absolute top-3 right-3 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
-                            <ShoppingCart className="w-8 h-8 text-violet-600" />
-                          </div>
-                          <h2 className="text-xl font-bold text-white">New Order</h2>
-                          <p className="text-violet-200 text-sm mt-1">Add customer details or skip</p>
-                        </div>
-                        
-                        {/* Form */}
-                        <div className="p-5 space-y-4">
-                          {/* Customer Name */}
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                              <span className="w-6 h-6 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 text-xs">👤</span>
-                              Customer Name
-                            </label>
-                            <Input
-                              value={formData.customer_name}
-                              onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                              placeholder="Enter name or leave blank"
-                              className="mt-2 h-12 text-base rounded-xl border-gray-200 focus:border-violet-400 focus:ring-violet-400"
-                              autoFocus
-                            />
-                          </div>
-                          
-                          {/* Phone */}
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                              <span className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs">📱</span>
-                              Phone Number
-                            </label>
-                            <Input
-                              value={formData.customer_phone}
-                              onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                              placeholder="+91 9876543210"
-                              className="mt-2 h-12 text-base rounded-xl border-gray-200 focus:border-violet-400 focus:ring-violet-400"
-                            />
-                          </div>
-                          
-                          {/* Don't ask again */}
-                          <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={skipCustomerPrompt}
-                              onChange={(e) => {
-                                setSkipCustomerPrompt(e.target.checked);
-                                localStorage.setItem('skipCustomerPrompt', e.target.checked ? 'true' : 'false');
-                              }}
-                              className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                            />
-                            <div>
-                              <p className="text-sm font-medium text-gray-700">Skip this next time</p>
-                              <p className="text-xs text-gray-500">Go directly to menu</p>
-                            </div>
-                          </label>
-                        </div>
-                        
-                        {/* Buttons */}
-                        <div className="p-5 pt-0 flex gap-3">
-                          <button 
-                            onClick={() => { setDialogOpen(false); resetForm(); }}
-                            className="flex-1 h-12 border-2 border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setDialogOpen(false);
-                              setShowMenuPage(true);
-                            }}
-                            className="flex-1 h-12 bg-violet-600 hover:bg-violet-700 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-colors"
-                          >
-                            {formData.customer_name ? (
-                              <>Continue <span className="text-lg">→</span></>
-                            ) : (
-                              <>💵 Cash Sale</>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* KOT Mode Enabled - Show table selection dialog */
-                <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-violet-600 hover:bg-violet-700 text-sm sm:text-base" data-testid="create-order-button">
-                      <Plus className="w-4 h-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">New Order</span>
-                      <span className="sm:hidden">New</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md w-[95vw] p-0" data-testid="order-dialog">
-                    <DialogHeader className="p-4 sm:p-6 pb-2 sm:pb-4 border-b bg-violet-600 text-white rounded-t-lg">
-                      <DialogTitle className="text-lg sm:text-xl">New Order</DialogTitle>
-                    </DialogHeader>
-                    
-                    {/* Customer Details Form */}
-                    <div className="p-4 sm:p-6 space-y-4">
-                      {/* Table Selection */}
-                      <div>
-                        <Label className="text-sm font-medium">Select Table *</Label>
-                        <select
-                          className="w-full px-3 py-3 text-base border-2 rounded-xl mt-2 bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-                          value={formData.table_id}
-                          onChange={(e) => setFormData({ ...formData, table_id: e.target.value })}
-                          data-testid="order-table-select"
-                        >
-                          <option value="">Choose a table...</option>
-                          {availableTables.map(table => (
-                            <option key={table.id} value={table.id}>Table {table.table_number} (Seats {table.capacity})</option>
-                          ))}
-                        </select>
-                        {availableTables.length === 0 && (
-                          <p className="text-xs text-orange-600 mt-1">No tables available. All tables are occupied.</p>
+              {/* New Order Button - Unified for both KOT modes */}
+              <Button 
+                onClick={() => {
+                  // KOT disabled + skip prompt = go directly to menu
+                  if (businessSettings?.kot_mode_enabled === false && skipCustomerPrompt) {
+                    setFormData({ table_id: '', customer_name: '', customer_phone: '' });
+                    setShowMenuPage(true);
+                  } else {
+                    setDialogOpen(true);
+                  }
+                }}
+                className="bg-violet-600 hover:bg-violet-700 text-sm sm:text-base" 
+                data-testid="create-order-button"
+              >
+                <Plus className="w-4 h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">New Order</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+              
+              {/* Unified New Order Dialog - Works for both KOT enabled/disabled */}
+              {dialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                    {/* Header with Icon */}
+                    <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-5 text-center relative">
+                      <button 
+                        onClick={() => { setDialogOpen(false); resetForm(); }}
+                        className="absolute top-3 right-3 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
+                        {businessSettings?.kot_mode_enabled !== false ? (
+                          <Receipt className="w-8 h-8 text-violet-600" />
+                        ) : (
+                          <ShoppingCart className="w-8 h-8 text-violet-600" />
                         )}
                       </div>
+                      <h2 className="text-xl font-bold text-white">New Order</h2>
+                      <p className="text-violet-200 text-sm mt-1">
+                        {businessSettings?.kot_mode_enabled !== false 
+                          ? 'Select table & add customer info' 
+                          : 'Add customer details or skip'}
+                      </p>
+                    </div>
+                    
+                    {/* Form */}
+                    <div className="p-5 space-y-4">
+                      {/* Table Selection - Only show when KOT is enabled */}
+                      {businessSettings?.kot_mode_enabled !== false && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                            <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs">🪑</span>
+                            Select Table <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <select
+                              className="w-full px-4 py-3 text-base border-2 rounded-xl bg-white appearance-none cursor-pointer focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all"
+                              value={formData.table_id}
+                              onChange={(e) => setFormData({ ...formData, table_id: e.target.value })}
+                              data-testid="order-table-select"
+                            >
+                              <option value="">Choose a table...</option>
+                              {availableTables.map(table => (
+                                <option key={table.id} value={table.id}>
+                                  Table {table.table_number} ({table.capacity} seats)
+                                </option>
+                              ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+                          {availableTables.length === 0 && (
+                            <div className="flex items-center gap-2 mt-2 p-2 bg-orange-50 rounded-lg">
+                              <span className="text-orange-500">⚠️</span>
+                              <p className="text-xs text-orange-600">No tables available. All tables are occupied.</p>
+                            </div>
+                          )}
+                          {availableTables.length > 0 && (
+                            <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                              {availableTables.length} table{availableTables.length > 1 ? 's' : ''} available
+                            </p>
+                          )}
+                        </div>
+                      )}
                       
                       {/* Customer Name */}
                       <div>
-                        <Label className="text-sm font-medium">Customer Name</Label>
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <span className="w-6 h-6 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 text-xs">👤</span>
+                          Customer Name
+                        </label>
                         <Input
                           value={formData.customer_name}
                           onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                          placeholder="Enter customer name"
-                          className="mt-2 h-12 text-base"
+                          placeholder={businessSettings?.kot_mode_enabled !== false ? "Enter customer name (optional)" : "Enter name or leave blank"}
+                          className="mt-2 h-12 text-base rounded-xl border-gray-200 focus:border-violet-400 focus:ring-violet-400"
+                          autoFocus={businessSettings?.kot_mode_enabled === false}
                         />
                       </div>
                       
                       {/* Phone */}
                       <div>
-                        <Label className="text-sm font-medium">Phone (for WhatsApp updates)</Label>
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <span className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs">📱</span>
+                          Phone Number
+                          <span className="text-xs text-gray-400 font-normal">(for WhatsApp)</span>
+                        </label>
                         <Input
                           value={formData.customer_phone}
                           onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
                           placeholder="+91 9876543210"
-                          className="mt-2 h-12 text-base"
+                          className="mt-2 h-12 text-base rounded-xl border-gray-200 focus:border-violet-400 focus:ring-violet-400"
                         />
                       </div>
                       
-                      {/* Next Button */}
-                      <div className="pt-4 flex gap-3">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => { setDialogOpen(false); resetForm(); }}
-                          className="flex-1 h-12"
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          onClick={() => {
-                            if (!formData.table_id) {
-                              toast.error('Please select a table');
-                              return;
-                            }
-                            setDialogOpen(false);
-                            setShowMenuPage(true);
-                          }}
-                          className="flex-1 h-12 bg-violet-600 hover:bg-violet-700 text-base font-semibold"
-                        >
-                          Next: Add Items →
-                        </Button>
-                      </div>
+                      {/* Don't ask again - Only show when KOT is disabled */}
+                      {businessSettings?.kot_mode_enabled === false && (
+                        <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={skipCustomerPrompt}
+                            onChange={(e) => {
+                              setSkipCustomerPrompt(e.target.checked);
+                              localStorage.setItem('skipCustomerPrompt', e.target.checked ? 'true' : 'false');
+                            }}
+                            className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Skip this next time</p>
+                            <p className="text-xs text-gray-500">Go directly to menu</p>
+                          </div>
+                        </label>
+                      )}
                     </div>
-                  </DialogContent>
-                </Dialog>
+                    
+                    {/* Buttons */}
+                    <div className="p-5 pt-0 flex gap-3">
+                      <button 
+                        onClick={() => { setDialogOpen(false); resetForm(); }}
+                        className="flex-1 h-12 border-2 border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={() => {
+                          // KOT enabled - require table selection
+                          if (businessSettings?.kot_mode_enabled !== false && !formData.table_id) {
+                            toast.error('Please select a table');
+                            return;
+                          }
+                          setDialogOpen(false);
+                          setShowMenuPage(true);
+                        }}
+                        className="flex-1 h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/25"
+                      >
+                        {businessSettings?.kot_mode_enabled !== false ? (
+                          <>
+                            Next: Add Items
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        ) : formData.customer_name ? (
+                          <>
+                            Continue
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        ) : (
+                          <>💵 Cash Sale</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </>
           )}
         </div>
-
         {/* Tabs for Active Orders and Today's Bills */}
         <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-xl">
           <button
