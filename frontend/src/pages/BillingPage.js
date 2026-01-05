@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -87,38 +87,41 @@ const BillingPage = ({ user }) => {
     return symbols[businessSettings?.currency || 'INR'] || '₹';
   };
 
-  const getEffectiveTaxRate = () => {
+  // Memoized calculations to prevent unnecessary recalculations
+  const subtotal = useMemo(() => orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [orderItems]);
+  
+  const discountAmount = useMemo(() => {
+    const value = parseFloat(discountValue) || 0;
+    if (value <= 0) return 0;
+    if (discountType === 'percent') {
+      const pct = Math.min(value, 100);
+      return (subtotal * pct) / 100;
+    }
+    return Math.min(value, subtotal);
+  }, [subtotal, discountValue, discountType]);
+
+  const effectiveTaxRate = useMemo(() => {
     if (customTaxRate !== null) return customTaxRate;
     if (order?.tax_rate !== undefined) return order.tax_rate;
     if (order?.subtotal > 0 && order?.tax !== undefined) {
       return Math.round((order.tax / order.subtotal) * 100 * 100) / 100;
     }
     return businessSettings?.tax_rate ?? 5;
-  };
+  }, [customTaxRate, order, businessSettings]);
 
-  const calculateSubtotal = () => orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const calculateDiscountAmount = () => {
-    const subtotal = calculateSubtotal();
-    const value = parseFloat(discountValue) || 0;
-    if (value <= 0) return 0;
-    if (discountType === 'percent') {
-      const pct = Math.min(value, 100); // Cap at 100%
-      return (subtotal * pct) / 100;
-    }
-    return Math.min(value, subtotal); // Cap discount at subtotal
-  };
-  const calculateTax = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscountAmount();
-    const taxableAmount = Math.max(0, subtotal - discount);
-    return (taxableAmount * getEffectiveTaxRate()) / 100;
-  };
-  const calculateTotal = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscountAmount();
-    const tax = calculateTax();
-    return Math.max(0, subtotal - discount + tax);
-  };
+  const tax = useMemo(() => {
+    const taxableAmount = Math.max(0, subtotal - discountAmount);
+    return (taxableAmount * effectiveTaxRate) / 100;
+  }, [subtotal, discountAmount, effectiveTaxRate]);
+
+  const total = useMemo(() => Math.max(0, subtotal - discountAmount + tax), [subtotal, discountAmount, tax]);
+
+  // Keep old function names for compatibility but use memoized values
+  const calculateSubtotal = useCallback(() => subtotal, [subtotal]);
+  const calculateDiscountAmount = useCallback(() => discountAmount, [discountAmount]);
+  const calculateTax = useCallback(() => tax, [tax]);
+  const calculateTotal = useCallback(() => total, [total]);
+  const getEffectiveTaxRate = useCallback(() => effectiveTaxRate, [effectiveTaxRate]);
 
   const handleAddMenuItem = (menuItem) => {
     const existingIndex = orderItems.findIndex(item => item.menu_item_id === menuItem.id);
