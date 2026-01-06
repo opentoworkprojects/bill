@@ -1590,233 +1590,40 @@ const LandingPage = () => {
         <SaleBanner position="side" />
       )}
 
-      {/* SEO Content Section - Comprehensive Restaurant Billing Software Guide */}
-      <section className="py-16 bg-gradient-to-br from-gray-50 to-white">
+      {/* Quick Links Section */}
+      <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            {/* Main SEO Heading */}
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                Best Restaurant Billing Software in India 2025
-              </h2>
-              <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-                BillByteKOT is the #1 rated restaurant POS software trusted by 500+ restaurants across India. 
-                Better features than Petpooja at just ₹1999/year!
-              </p>
-            </div>
-
-            {/* SEO Rich Content Grid */}
-            <div className="grid md:grid-cols-2 gap-8 mb-12">
-              {/* Why BillByteKOT */}
-              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">🏆</span>
-                  Why Choose BillByteKOT Over Petpooja?
-                </h3>
-                <ul className="space-y-3 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span><strong>50% Lower Cost:</strong> ₹1999/year vs Petpooja's higher pricing</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span><strong>AI-Powered:</strong> Smart recommendations increase sales by 25%</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span><strong>6 Receipt Themes:</strong> More customization than any competitor</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span><strong>Offline Mode:</strong> Works without internet - Petpooja doesn't!</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span><strong>WhatsApp Integration:</strong> Send bills directly to customers</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Restaurant Types */}
-              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">🍽️</span>
-                  Perfect For All Restaurant Types
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                  {[
-                    "Fine Dining Restaurants",
-                    "Casual Dining",
-                    "Cafes & Coffee Shops",
-                    "Cloud Kitchens",
-                    "Food Trucks",
-                    "QSR & Fast Food",
-                    "Bars & Pubs",
-                    "Bakeries",
-                    "Sweet Shops",
-                    "Dhabas",
-                    "Canteens",
-                    "Food Courts",
-                    "Ice Cream Parlors",
-                    "Juice Bars",
-                    "Pizza Shops",
-                    "Multi-Outlet Chains"
-                  ].map((type, i) => (
-                    <div key={i} className="flex items-center gap-1 p-1">
-                      <span className="text-violet-500">✓</span>
-                      <span>{type}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* City-wise SEO Content */}
-            <div className="bg-gradient-to-r from-violet-50 to-purple-50 p-6 rounded-2xl mb-12">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
-                🇮🇳 Available Across All Major Cities in India
-              </h3>
-              <p className="text-gray-600 text-center mb-4">
-                BillByteKOT restaurant billing software is used by restaurants in:
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {[
-                  "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", 
-                  "Kolkata", "Pune", "Ahmedabad", "Jaipur", "Lucknow",
-                  "Chandigarh", "Indore", "Bhopal", "Nagpur", "Surat",
-                  "Kochi", "Coimbatore", "Vizag", "Goa", "Noida", "Gurgaon"
-                ].map((city, i) => (
-                  <span key={i} className="px-3 py-1 bg-white rounded-full text-sm text-gray-700 shadow-sm">
-                    {city}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Feature Comparison Table */}
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-12 overflow-x-auto">
-              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">
-                📊 BillByteKOT vs Other Restaurant Software Comparison
-              </h3>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-3 px-2">Feature</th>
-                    <th className="text-center py-3 px-2 bg-violet-50 text-violet-700">BillByteKOT</th>
-                    <th className="text-center py-3 px-2">Petpooja</th>
-                    <th className="text-center py-3 px-2">POSist</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-700">
-                  <tr className="border-b">
-                    <td className="py-2 px-2">Annual Price</td>
-                    <td className="text-center py-2 px-2 bg-violet-50 font-bold text-green-600">₹1999</td>
-                    <td className="text-center py-2 px-2">₹12000+</td>
-                    <td className="text-center py-2 px-2">₹15000+</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 px-2">Free Trial</td>
-                    <td className="text-center py-2 px-2 bg-violet-50">✅ 7 Days</td>
-                    <td className="text-center py-2 px-2">❌ Demo Only</td>
-                    <td className="text-center py-2 px-2">❌ Demo Only</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 px-2">AI Recommendations</td>
-                    <td className="text-center py-2 px-2 bg-violet-50">✅ GPT-4</td>
-                    <td className="text-center py-2 px-2">❌</td>
-                    <td className="text-center py-2 px-2">❌</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 px-2">Receipt Themes</td>
-                    <td className="text-center py-2 px-2 bg-violet-50 font-bold">6 Themes</td>
-                    <td className="text-center py-2 px-2">2 Themes</td>
-                    <td className="text-center py-2 px-2">3 Themes</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 px-2">WhatsApp Integration</td>
-                    <td className="text-center py-2 px-2 bg-violet-50">✅ Cloud API</td>
-                    <td className="text-center py-2 px-2">✅ Basic</td>
-                    <td className="text-center py-2 px-2">✅ Basic</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 px-2">Offline Mode</td>
-                    <td className="text-center py-2 px-2 bg-violet-50">✅ Full</td>
-                    <td className="text-center py-2 px-2">❌</td>
-                    <td className="text-center py-2 px-2">⚠️ Limited</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 px-2">Desktop App</td>
-                    <td className="text-center py-2 px-2 bg-violet-50">✅ Windows</td>
-                    <td className="text-center py-2 px-2">❌ Web Only</td>
-                    <td className="text-center py-2 px-2">❌ Web Only</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-2">GST Compliant</td>
-                    <td className="text-center py-2 px-2 bg-violet-50">✅</td>
-                    <td className="text-center py-2 px-2">✅</td>
-                    <td className="text-center py-2 px-2">✅</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Keywords Cloud for SEO */}
-            <div className="text-center mb-12">
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">Popular Searches</h3>
-              <div className="flex flex-wrap justify-center gap-2 text-sm">
-                {[
-                  "restaurant billing software",
-                  "restaurant POS India",
-                  "KOT software",
-                  "petpooja alternative",
-                  "best restaurant software 2025",
-                  "thermal printer billing",
-                  "GST billing software",
-                  "WhatsApp billing",
-                  "restaurant management system",
-                  "cafe billing software",
-                  "hotel billing software",
-                  "free restaurant software",
-                  "cloud kitchen software",
-                  "food delivery software"
-                ].map((keyword, i) => (
-                  <span key={i} className="px-3 py-1 bg-gray-100 rounded-full text-gray-600 hover:bg-violet-100 hover:text-violet-700 transition-colors cursor-default">
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            </div>
-
+          <div className="max-w-4xl mx-auto">
             {/* Related Resources */}
-            <div className="p-6 bg-gray-50 rounded-2xl">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Related Resources</h3>
+            <div className="p-6 bg-white rounded-2xl shadow-lg">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Quick Links</h3>
               <div className="grid md:grid-cols-2 gap-4">
-                <a href="/blog" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <a href="/blog" className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:shadow-md transition-shadow">
                   <Package className="w-6 h-6 text-violet-600 flex-shrink-0" />
                   <div>
                     <div className="font-semibold text-gray-900">Restaurant Management Blog</div>
                     <div className="text-sm text-gray-600">Tips & guides for restaurants</div>
                   </div>
                 </a>
-                <a href="/download" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <a href="/download" className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:shadow-md transition-shadow">
                   <Download className="w-6 h-6 text-blue-600 flex-shrink-0" />
                   <div>
                     <div className="font-semibold text-gray-900">Download Desktop App</div>
                     <div className="text-sm text-gray-600">Windows & Android Apps</div>
                   </div>
                 </a>
-                <a href="https://wa.me/918310832669" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <a href="https://wa.me/918310832669" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:shadow-md transition-shadow">
                   <MessageCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                   <div>
                     <div className="font-semibold text-gray-900">WhatsApp Support</div>
                     <div className="text-sm text-gray-600">Chat with us 24/7</div>
                   </div>
                 </a>
-                <a href="/privacy" className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
+                <a href="/blog/billbytekot-vs-petpooja-comparison" className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:shadow-md transition-shadow">
                   <Shield className="w-6 h-6 text-purple-600 flex-shrink-0" />
                   <div>
-                    <div className="font-semibold text-gray-900">Privacy & Security</div>
-                    <div className="text-sm text-gray-600">Bank-grade encryption</div>
+                    <div className="font-semibold text-gray-900">Compare with Competitors</div>
+                    <div className="text-sm text-gray-600">See how we stack up</div>
                   </div>
                 </a>
               </div>
@@ -1837,16 +1644,7 @@ const LandingPage = () => {
                 className="h-12 px-6"
                 onClick={() => navigate("/pricing")}
               >
-                View Pricing - ₹1999/Year
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-12 px-6"
-                onClick={() => window.open("https://wa.me/918310832669", "_blank")}
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                WhatsApp Demo
+                View Pricing
               </Button>
             </div>
           </div>
