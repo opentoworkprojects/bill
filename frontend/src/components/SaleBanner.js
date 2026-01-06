@@ -292,6 +292,66 @@ const SaleBanner = ({ position = 'top' }) => {
     );
   }
 
+  // Floating Side Banner (Right side of screen)
+  if (position === 'side') {
+    return (
+      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 hidden sm:block">
+        <div className={`${currentTheme.bg} ${currentTheme.text} rounded-l-2xl shadow-2xl overflow-hidden ${currentTheme.animate ? 'animate-pulse' : ''}`}>
+          {/* Close button */}
+          <button 
+            onClick={() => setDismissed(true)} 
+            className="absolute top-2 left-2 bg-white/20 hover:bg-white/30 rounded-full p-1 transition-colors z-10"
+          >
+            <X className="w-3 h-3" />
+          </button>
+          
+          {/* Vertical content */}
+          <div className="p-3 flex flex-col items-center gap-2 min-w-[70px]">
+            {/* Icon */}
+            <div className={`${currentTheme.accent} p-2 rounded-xl`}>
+              <IconComponent className="w-5 h-5" />
+            </div>
+            
+            {/* Discount */}
+            <div className="text-center">
+              <p className="text-2xl font-black leading-none">{saleData.discount_percent || 20}%</p>
+              <p className="text-xs font-bold opacity-80">OFF</p>
+            </div>
+            
+            {/* Divider */}
+            <div className="w-8 h-px bg-white/30"></div>
+            
+            {/* Price */}
+            <div className="text-center">
+              <p className="text-xs line-through opacity-50">₹{saleData.original_price || 1999}</p>
+              <p className="text-lg font-black">₹{saleData.sale_price || 1799}</p>
+            </div>
+            
+            {/* Timer (compact) */}
+            {timeLeft && (
+              <div className="text-center">
+                <div className="flex gap-1 text-xs font-mono">
+                  <span className="bg-white/20 px-1 rounded">{String(timeLeft.hours).padStart(2, '0')}</span>
+                  <span>:</span>
+                  <span className="bg-white/20 px-1 rounded">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                </div>
+                <p className="text-[8px] opacity-60 mt-0.5">left</p>
+              </div>
+            )}
+            
+            {/* CTA Button */}
+            <button 
+              onClick={() => navigate('/login')}
+              className={`${currentTheme.accent} px-3 py-2 rounded-lg text-xs font-bold hover:scale-105 transition-transform whitespace-nowrap`}
+            >
+              Grab →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Inline CTA Banner
   if (position === 'inline') {
     return (
