@@ -1763,8 +1763,7 @@ const SuperAdminPage = () => {
                 <p>Dashboard data not available for your access level</p>
               </CardContent>
             </Card>
-          )
-          </div>
+          )}
         )}
 
         {/* Users Tab */}
