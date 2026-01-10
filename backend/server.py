@@ -3769,6 +3769,18 @@ async def update_order(
         except Exception as e:
             print(f"⚠️ Cache invalidation error: {e}")
         
+        # Clear table if payment is fully completed (no balance remaining)
+        if update_data.get("balance_amount", 0) <= 0 and not update_data.get("is_credit", False):
+            try:
+                # Free up the table
+                await db.tables.update_one(
+                    {"id": existing_order.get("table_id"), "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table freed for completed payment: {existing_order.get('table_id')}")
+            except Exception as e:
+                print(f"⚠️ Table clearing error: {e}")
+        
         return {"message": "Order payment details updated successfully"}
     
     # For non-completed orders, allow full editing
@@ -3809,6 +3821,20 @@ async def update_order(
         print(f"🗑️ Cache invalidated for order update {order_id}")
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
+    
+    # Clear table if payment is fully completed (no balance remaining)
+    if (update_data.get("balance_amount", 0) <= 0 and 
+        not update_data.get("is_credit", False) and 
+        update_data.get("payment_received", 0) > 0):
+        try:
+            # Free up the table
+            await db.tables.update_one(
+                {"id": existing_order.get("table_id"), "organization_id": user_org_id},
+                {"$set": {"status": "available", "current_order_id": None}}
+            )
+            print(f"🍽️ Table freed for completed payment: {existing_order.get('table_id')}")
+        except Exception as e:
+            print(f"⚠️ Table clearing error: {e}")
     
     return {"message": "Order updated successfully"}
 
@@ -4560,17 +4586,28 @@ async def daily_report(current_user: dict = Depends(get_current_user)):
     today_utc = today_ist.astimezone(timezone.utc)
     
     # Optimized: Use database query instead of filtering in Python
+    # Include all orders from today that have been paid (not just completed)
     today_orders = await db.orders.find({
-        "status": "completed",
+        "$or": [
+            {"status": "completed"},
+            {"status": "paid"},
+            {"payment_received": {"$gt": 0}},  # Any order with payment received
+            {"is_credit": False, "total": {"$gt": 0}}  # Non-credit orders
+        ],
         "organization_id": user_org_id,
         "created_at": {"$gte": today_utc.isoformat()}
     }, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
-    # Use aggregation for better performance
+    # Use aggregation for better performance - include paid orders
     pipeline = [
         {
             "$match": {
-                "status": "completed",
+                "$or": [
+                    {"status": "completed"},
+                    {"status": "paid"},
+                    {"payment_received": {"$gt": 0}},
+                    {"is_credit": False, "total": {"$gt": 0}}
+                ],
                 "organization_id": user_org_id,
                 "created_at": {"$gte": today_utc.isoformat()}
             }

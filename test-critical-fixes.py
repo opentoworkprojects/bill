@@ -241,7 +241,10 @@ def main():
         print("\n🚀 Next Steps:")
         print("1. Start the backend server: cd backend && python server.py")
         print("2. Test the frontend application")
-        print("3. Verify all three original issues are resolved")
+        print("3. Use super admin credentials:")
+        print("   - Username: shiva123")
+        print("   - Password: shiv")
+        print("4. Verify all three original issues are resolved")
         
     else:
         print(f"\n⚠️  {total - passed} issues still need attention")

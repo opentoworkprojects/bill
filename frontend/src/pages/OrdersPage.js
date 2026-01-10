@@ -119,16 +119,29 @@ const OrdersPage = ({ user }) => {
   // Helper function to check if order is from today (using IST timezone)
   const isToday = (dateString) => {
     if (!dateString) return false;
-    const orderDate = new Date(dateString);
-    const now = new Date();
     
-    // Get IST date strings for comparison
-    // IST is UTC+5:30, so we use 'Asia/Kolkata' timezone
-    const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' };
-    const orderDateIST = orderDate.toLocaleDateString('en-CA', options); // YYYY-MM-DD format
-    const todayIST = now.toLocaleDateString('en-CA', options);
-    
-    return orderDateIST === todayIST;
+    try {
+      const orderDate = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(orderDate.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return false;
+      }
+      
+      const now = new Date();
+      
+      // Get IST date strings for comparison
+      // IST is UTC+5:30, so we use 'Asia/Kolkata' timezone
+      const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' };
+      const orderDateIST = orderDate.toLocaleDateString('en-CA', options); // YYYY-MM-DD format
+      const todayIST = now.toLocaleDateString('en-CA', options);
+      
+      return orderDateIST === todayIST;
+    } catch (error) {
+      console.warn('Error checking if date is today:', error, dateString);
+      return false;
+    }
   };
 
   // Get unique categories from menu items
@@ -154,22 +167,50 @@ const OrdersPage = ({ user }) => {
 
   const loadInitialData = async () => {
     try {
-      // Load all data in parallel for faster initial load
-      const [ordersRes, tablesRes, menuRes, settingsRes] = await Promise.all([
+      // Load critical data first (orders and tables), then secondary data
+      const [ordersRes, tablesRes] = await Promise.all([
         axios.get(`${API}/orders`).catch(() => ({ data: [] })),
-        axios.get(`${API}/tables`).catch(() => ({ data: [] })),
-        axios.get(`${API}/menu`).catch(() => ({ data: [] })),
-        axios.get(`${API}/business/settings`).catch(() => ({ data: { business_settings: {} } }))
+        axios.get(`${API}/tables`).catch(() => ({ data: [] }))
       ]);
       
+      // Process orders data
       const ordersData = Array.isArray(ordersRes.data) ? ordersRes.data : [];
-      setOrders(ordersData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
-      setTables(Array.isArray(tablesRes.data) ? tablesRes.data : []);
-      const items = Array.isArray(menuRes.data) ? menuRes.data : [];
-      setMenuItems(items.filter(item => item.available));
-      setBusinessSettings(settingsRes.data.business_settings || {});
+      const validOrders = ordersData.filter(order => {
+        return order && order.id && order.created_at && order.status && typeof order.total === 'number';
+      }).map(order => ({
+        ...order,
+        customer_name: order.customer_name || '',
+        table_number: order.table_number || 0,
+        payment_method: order.payment_method || 'cash',
+        created_at: order.created_at || new Date().toISOString()
+      }));
+      
+      // Process tables data
+      const tablesData = Array.isArray(tablesRes.data) ? tablesRes.data : [];
+      const validTables = tablesData.filter(table => {
+        return table && table.id && typeof table.table_number === 'number';
+      });
+      
+      setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      setTables(validTables);
+      
+      // Load secondary data in background
+      Promise.all([
+        axios.get(`${API}/menu`).catch(() => ({ data: [] })),
+        axios.get(`${API}/business/settings`).catch(() => ({ data: { business_settings: {} } }))
+      ]).then(([menuRes, settingsRes]) => {
+        const items = Array.isArray(menuRes.data) ? menuRes.data : [];
+        setMenuItems(items.filter(item => item.available));
+        setBusinessSettings(settingsRes.data.business_settings || {});
+      });
+      
     } catch (error) {
       console.error('Failed to load initial data', error);
+      // Set empty defaults to prevent crashes
+      setOrders([]);
+      setTables([]);
+      setMenuItems([]);
+      setBusinessSettings({});
     } finally {
       setLoading(false);
     }
@@ -179,20 +220,64 @@ const OrdersPage = ({ user }) => {
     try {
       const response = await axios.get(`${API}/orders`);
       const ordersData = Array.isArray(response.data) ? response.data : [];
-      setOrders(ordersData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      
+      // Validate and clean order data
+      const validOrders = ordersData.filter(order => {
+        // Ensure order has required fields
+        return order && 
+               order.id && 
+               order.created_at && 
+               order.status && 
+               typeof order.total === 'number' &&
+               Array.isArray(order.items);
+      }).map(order => ({
+        ...order,
+        // Ensure all required fields have default values
+        customer_name: order.customer_name || '',
+        table_number: order.table_number || 0,
+        payment_method: order.payment_method || 'cash',
+        payment_received: order.payment_received || 0,
+        balance_amount: order.balance_amount || 0,
+        is_credit: order.is_credit || false,
+        // Ensure date is valid
+        created_at: order.created_at || new Date().toISOString()
+      }));
+      
+      setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
     } catch (error) {
       console.error('Failed to fetch orders', error);
       setOrders([]);
+      // Show user-friendly error
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+      } else if (error.response?.status >= 500) {
+        toast.error('Server error. Please try again later.');
+      }
     }
   };
 
   const fetchTables = async () => {
     try {
       const response = await axios.get(`${API}/tables`);
-      setTables(Array.isArray(response.data) ? response.data : []);
+      const tablesData = Array.isArray(response.data) ? response.data : [];
+      
+      // Validate and clean table data
+      const validTables = tablesData.filter(table => {
+        return table && table.id && typeof table.table_number === 'number';
+      }).map(table => ({
+        ...table,
+        status: table.status || 'available',
+        capacity: table.capacity || 4,
+        current_order_id: table.current_order_id || null
+      }));
+      
+      setTables(validTables);
     } catch (error) {
       console.error('Failed to fetch tables', error);
       setTables([]);
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+      }
     }
   };
 
@@ -1290,7 +1375,16 @@ const OrdersPage = ({ user }) => {
                       <div>
                         <p className="font-bold text-gray-800">#{order.id.slice(0, 6)}</p>
                         <p className="text-xs text-gray-500">
-                          {order.table_number > 0 ? `Table ${order.table_number}` : 'Counter'} • {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          {order.table_number > 0 ? `Table ${order.table_number}` : 'Counter'} • {
+                            (() => {
+                              try {
+                                return new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                              } catch (e) {
+                                console.warn('Invalid date for order:', order.id, order.created_at);
+                                return 'Invalid time';
+                              }
+                            })()
+                          }
                         </p>
                       </div>
                     </div>
@@ -1384,7 +1478,16 @@ const OrdersPage = ({ user }) => {
                     {/* Total */}
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-dashed border-gray-200">
                       <span className="text-gray-500 text-sm">Total</span>
-                      <span className="text-xl font-bold text-violet-600">₹{order.total.toFixed(0)}</span>
+                      <span className="text-xl font-bold text-violet-600">₹{
+                        (() => {
+                          try {
+                            return (order.total || 0).toFixed(0);
+                          } catch (e) {
+                            console.warn('Invalid total for order:', order.id, order.total);
+                            return '0';
+                          }
+                        })()
+                      }</span>
                     </div>
                   </div>
                   
@@ -1445,7 +1548,16 @@ const OrdersPage = ({ user }) => {
                       <div>
                         <p className="font-bold text-gray-800">#{order.id.slice(0, 6)}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          {
+                            (() => {
+                              try {
+                                return new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                              } catch (e) {
+                                console.warn('Invalid date for order:', order.id, order.created_at);
+                                return 'Invalid time';
+                              }
+                            })()
+                          }
                           {order.payment_method && !isCancelled && (
                             <span className="ml-1">• {order.payment_method === 'split' ? 'Split' : order.payment_method}</span>
                           )}
@@ -1566,7 +1678,16 @@ const OrdersPage = ({ user }) => {
                         <span>{order.items.length} item{order.items.length > 1 ? 's' : ''}</span>
                       </div>
                       <span className={`text-xl font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-violet-600'}`}>
-                        ₹{order.total.toFixed(0)}
+                        ₹{
+                          (() => {
+                            try {
+                              return (order.total || 0).toFixed(0);
+                            } catch (e) {
+                              console.warn('Invalid total for order:', order.id, order.total);
+                              return '0';
+                            }
+                          })()
+                        }
                       </span>
                     </div>
                     
