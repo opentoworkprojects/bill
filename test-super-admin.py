@@ -10,8 +10,8 @@ import sys
 def test_super_admin_login():
     """Test super admin login with correct credentials"""
     
-    # Use the Render environment credentials
-    username = "shiva123"
+    # Use the correct credentials from .env file
+    username = "shiv@123"
     password = "shiv"
     
     print(f"🔐 Testing super admin login...")

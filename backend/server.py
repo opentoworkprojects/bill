@@ -3717,6 +3717,17 @@ async def update_order(
             {"$set": update_data}
         )
         
+        # Clear table when order is completed
+        if existing_order.get("table_id") and existing_order.get("table_id") != "counter":
+            try:
+                await db.tables.update_one(
+                    {"id": existing_order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared for completed order {order_id}")
+            except Exception as e:
+                print(f"⚠️ Table clearing error: {e}")
+        
         # Invalidate cache for completed order update
         try:
             cached_service = get_cached_order_service()
@@ -3725,7 +3736,7 @@ async def update_order(
         except Exception as e:
             print(f"⚠️ Cache invalidation error: {e}")
         
-        return {"message": "Order completed successfully"}
+        return {"message": "Order completed and table cleared successfully"}
     
     # For completed orders, only allow updating payment-related fields
     if existing_order.get("status") == "completed":

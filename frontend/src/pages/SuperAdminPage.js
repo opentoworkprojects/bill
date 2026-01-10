@@ -352,9 +352,10 @@ const SuperAdminPage = () => {
     setLoading(true);
     
     try {
-      // First try super admin login
+      // First try super admin login with timeout
       const response = await axios.get(`${API}/super-admin/dashboard`, {
-        params: credentials
+        params: credentials,
+        timeout: 30000 // 30 second timeout
       });
       setDashboard(response.data);
       setUserType('super-admin');
@@ -362,11 +363,22 @@ const SuperAdminPage = () => {
       toast.success('Super Admin access granted');
       fetchAllData();
     } catch (superAdminError) {
+      console.error('Super admin login error:', superAdminError);
+      
+      // Check if it's a timeout or network error
+      if (superAdminError.code === 'ECONNABORTED' || superAdminError.message?.includes('timeout')) {
+        toast.error('Login timeout. Server might be slow. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
       // If super admin fails, try team member login
       try {
         const teamResponse = await axios.post(`${API}/team/login`, {
           username: credentials.username,
           password: credentials.password
+        }, {
+          timeout: 15000 // 15 second timeout for team login
         });
         
         setTeamToken(teamResponse.data.token);
@@ -380,7 +392,18 @@ const SuperAdminPage = () => {
         toast.success(`Welcome ${teamResponse.data.user.full_name || teamResponse.data.user.username}!`);
         fetchTeamData(teamResponse.data.token, teamResponse.data.user);
       } catch (teamError) {
-        toast.error('Invalid credentials');
+        console.error('Team login error:', teamError);
+        
+        // Provide specific error messages
+        if (teamError.response?.status === 403) {
+          toast.error('Invalid credentials');
+        } else if (teamError.code === 'ECONNABORTED' || teamError.message?.includes('timeout')) {
+          toast.error('Login timeout. Please check your connection and try again.');
+        } else if (teamError.response?.status >= 500) {
+          toast.error('Server error. Please try again later.');
+        } else {
+          toast.error('Login failed. Please check your credentials.');
+        }
       }
     } finally {
       setLoading(false);
@@ -398,70 +421,82 @@ const SuperAdminPage = () => {
 
   const fetchAllData = async () => {
     try {
-      // Fetch users
-      const usersRes = await axios.get(`${API}/super-admin/users`, {
-        params: credentials
+      // Fetch dashboard data first (this is now optimized and fast)
+      const dashboardRes = await axios.get(`${API}/super-admin/dashboard`, {
+        params: credentials,
+        timeout: 15000 // 15 second timeout
       });
-      setUsers(usersRes.data.users);
+      setDashboard(dashboardRes.data);
+      
+      // Set initial data from dashboard response
+      setUsers(dashboardRes.data.users || []);
+      setTickets(dashboardRes.data.tickets || []);
+      
+      // Fetch additional data in background (non-blocking)
+      Promise.all([
+        // Fetch leads
+        axios.get(`${API}/super-admin/leads`, {
+          params: credentials,
+          timeout: 10000
+        }).then(res => {
+          setLeads(res.data.leads || []);
+          setLeadsStats(res.data.stats);
+        }).catch(e => console.warn('Failed to fetch leads:', e)),
 
-      // Fetch tickets
-      const ticketsRes = await axios.get(`${API}/super-admin/tickets`, {
-        params: credentials
-      });
-      setTickets(ticketsRes.data.tickets);
+        // Fetch team members
+        axios.get(`${API}/super-admin/team`, {
+          params: credentials,
+          timeout: 10000
+        }).then(res => {
+          setTeamMembers(res.data.members || []);
+          setTeamStats(res.data.stats);
+        }).catch(e => console.warn('Failed to fetch team:', e)),
 
-      // Fetch leads
-      const leadsRes = await axios.get(`${API}/super-admin/leads`, {
-        params: credentials
-      });
-      setLeads(leadsRes.data.leads);
-      setLeadsStats(leadsRes.data.stats);
+        // Fetch analytics
+        axios.get(`${API}/super-admin/analytics`, {
+          params: { ...credentials, days: 30 },
+          timeout: 10000
+        }).then(res => {
+          setAnalytics(res.data);
+        }).catch(e => console.warn('Failed to fetch analytics:', e)),
 
-      // Fetch team members
-      const teamRes = await axios.get(`${API}/super-admin/team`, {
-        params: credentials
-      });
-      setTeamMembers(teamRes.data.members);
-      setTeamStats(teamRes.data.stats);
-
-      // Fetch analytics
-      const analyticsRes = await axios.get(`${API}/super-admin/analytics`, {
-        params: { ...credentials, days: 30 }
-      });
-      setAnalytics(analyticsRes.data);
-
-      // Fetch app versions
-      const appVersionsRes = await axios.get(`${API}/super-admin/app-versions`, {
-        params: credentials
-      });
-      setAppVersions(appVersionsRes.data.versions || []);
+        // Fetch app versions
+        axios.get(`${API}/super-admin/app-versions`, {
+          params: credentials,
+          timeout: 10000
+        }).then(res => {
+          setAppVersions(res.data.versions || []);
+        }).catch(e => console.warn('Failed to fetch app versions:', e))
+      ]);
 
       // Fetch sale/offer settings
       try {
         const saleOfferRes = await axios.get(`${API}/super-admin/sale-offer`, {
-          params: credentials
+          params: credentials,
+          timeout: 5000
         });
         if (saleOfferRes.data) {
-          // Merge with default state to ensure all fields exist
           setSaleOffer(prev => ({...prev, ...saleOfferRes.data}));
         }
       } catch (e) {
-        // Sale offer not configured yet
+        console.warn('Failed to fetch sale offer:', e);
       }
 
       // Fetch pricing settings
       try {
         const pricingRes = await axios.get(`${API}/super-admin/pricing`, {
-          params: credentials
+          params: credentials,
+          timeout: 5000
         });
         if (pricingRes.data) {
           setPricing(pricingRes.data);
         }
       } catch (e) {
-        // Pricing not configured yet
+        console.warn('Failed to fetch pricing:', e);
       }
     } catch (error) {
-      console.error('Failed to fetch data', error);
+      console.error('Failed to fetch dashboard data', error);
+      toast.error('Failed to load dashboard. Please try again.');
     }
   };
 
@@ -1204,8 +1239,27 @@ const SuperAdminPage = () => {
                 className="w-full bg-purple-600 hover:bg-purple-700"
                 disabled={loading}
               >
-                {loading ? 'Authenticating...' : 'Login'}
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    Authenticating...
+                  </div>
+                ) : 'Login'}
               </Button>
+              
+              {loading && (
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-2 border-gray-600 text-gray-300 hover:bg-gray-800"
+                  onClick={() => {
+                    setLoading(false);
+                    toast.info('Login cancelled');
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>

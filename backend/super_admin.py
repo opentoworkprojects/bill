@@ -38,54 +38,107 @@ async def get_super_admin_dashboard(
     username: str = Query(...),
     password: str = Query(...)
 ):
-    """Get complete system overview"""
+    """Get complete system overview - OPTIMIZED for speed"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
     db = get_db()
     
     try:
-        # Get all users
-        users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
-        
-        # Get all tickets (handle if collection doesn't exist)
-        try:
-            tickets = await db.support_tickets.find({}, {"_id": 0}).to_list(1000)
-        except Exception:
-            tickets = []
-        
-        # Get all orders (last 30 days)
+        # Use aggregation pipelines for fast statistics instead of loading all data
         thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        
+        # Get user statistics using aggregation (much faster)
+        user_stats_pipeline = [
+            {
+                "$group": {
+                    "_id": None,
+                    "total_users": {"$sum": 1},
+                    "active_subscriptions": {
+                        "$sum": {"$cond": [{"$eq": ["$subscription_active", True]}, 1, 0]}
+                    },
+                    "trial_users": {
+                        "$sum": {"$cond": [{"$eq": ["$subscription_active", False]}, 1, 0]}
+                    },
+                    "total_revenue": {"$sum": "$bill_count"}
+                }
+            }
+        ]
+        
+        user_stats_result = await db.users.aggregate(user_stats_pipeline).to_list(1)
+        user_stats = user_stats_result[0] if user_stats_result else {
+            "total_users": 0, "active_subscriptions": 0, "trial_users": 0, "total_revenue": 0
+        }
+        
+        # Get order statistics using aggregation (much faster)
+        order_stats_pipeline = [
+            {"$match": {"created_at": {"$gte": thirty_days_ago}}},
+            {
+                "$group": {
+                    "_id": None,
+                    "total_orders_30d": {"$sum": 1}
+                }
+            }
+        ]
+        
+        order_stats_result = await db.orders.aggregate(order_stats_pipeline).to_list(1)
+        order_stats = order_stats_result[0] if order_stats_result else {"total_orders_30d": 0}
+        
+        # Get ticket statistics using aggregation (much faster)
+        try:
+            ticket_stats_pipeline = [
+                {
+                    "$group": {
+                        "_id": "$status",
+                        "count": {"$sum": 1}
+                    }
+                }
+            ]
+            
+            ticket_stats_result = await db.support_tickets.aggregate(ticket_stats_pipeline).to_list(10)
+            ticket_counts = {item["_id"]: item["count"] for item in ticket_stats_result}
+            
+            open_tickets = ticket_counts.get("open", 0)
+            pending_tickets = ticket_counts.get("pending", 0)
+            resolved_tickets = ticket_counts.get("resolved", 0)
+        except Exception:
+            open_tickets = pending_tickets = resolved_tickets = 0
+        
+        # Get only recent users (last 50) instead of all users
+        recent_users = await db.users.find(
+            {}, 
+            {"_id": 0, "password": 0}
+        ).sort("created_at", -1).limit(50).to_list(50)
+        
+        # Get only recent tickets (last 20) instead of all tickets
+        try:
+            recent_tickets = await db.support_tickets.find(
+                {}, 
+                {"_id": 0}
+            ).sort("created_at", -1).limit(20).to_list(20)
+        except Exception:
+            recent_tickets = []
+        
+        # Get only recent orders (last 20) instead of 10,000
         recent_orders = await db.orders.find(
             {"created_at": {"$gte": thirty_days_ago}},
             {"_id": 0}
-        ).to_list(10000)
-        
-        # Calculate statistics
-        total_users = len(users)
-        active_subscriptions = sum(1 for u in users if u.get("subscription_active"))
-        trial_users = sum(1 for u in users if not u.get("subscription_active"))
-        total_revenue = sum(u.get("bill_count", 0) for u in users)
-        
-        # Ticket statistics
-        open_tickets = sum(1 for t in tickets if t.get("status") == "open")
-        pending_tickets = sum(1 for t in tickets if t.get("status") == "pending")
-        resolved_tickets = sum(1 for t in tickets if t.get("status") == "resolved")
+        ).sort("created_at", -1).limit(20).to_list(20)
         
         return {
             "overview": {
-                "total_users": total_users,
-                "active_subscriptions": active_subscriptions,
-                "trial_users": trial_users,
-                "total_revenue": total_revenue,
-                "total_orders_30d": len(recent_orders),
+                "total_users": user_stats.get("total_users", 0),
+                "active_subscriptions": user_stats.get("active_subscriptions", 0),
+                "trial_users": user_stats.get("trial_users", 0),
+                "total_revenue": user_stats.get("total_revenue", 0),
+                "total_orders_30d": order_stats.get("total_orders_30d", 0),
                 "open_tickets": open_tickets,
                 "pending_tickets": pending_tickets,
                 "resolved_tickets": resolved_tickets
             },
-            "users": users,
-            "tickets": tickets,
-            "recent_orders": recent_orders[:100]
+            "users": recent_users,  # Only recent 50 users
+            "tickets": recent_tickets,  # Only recent 20 tickets
+            "recent_orders": recent_orders  # Only recent 20 orders
         }
     except Exception as e:
         # Log the error and return a safe response

@@ -1325,7 +1325,7 @@ const OrdersPage = ({ user }) => {
             <Clock className="w-4 h-4" />
             Active Orders
             <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'active' ? 'bg-violet-100 text-violet-700' : 'bg-gray-200'}`}>
-              {orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length}
+              {loading ? '...' : orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length}
             </span>
           </button>
           <button
@@ -1339,13 +1339,41 @@ const OrdersPage = ({ user }) => {
             <CheckCircle className="w-4 h-4" />
             Today's Bills
             <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'history' ? 'bg-violet-100 text-violet-700' : 'bg-gray-200'}`}>
-              {orders.filter(o => ['completed', 'cancelled'].includes(o.status) && isToday(o.created_at)).length}
+              {loading ? '...' : orders.filter(o => ['completed', 'cancelled'].includes(o.status) && isToday(o.created_at)).length}
             </span>
           </button>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm animate-pulse">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                    <div>
+                      <div className="w-20 h-4 bg-gray-200 rounded mb-1"></div>
+                      <div className="w-32 h-3 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="w-16 h-6 bg-gray-200 rounded-full"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="w-full h-3 bg-gray-200 rounded"></div>
+                  <div className="w-3/4 h-3 bg-gray-200 rounded"></div>
+                </div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                  <div className="w-16 h-4 bg-gray-200 rounded"></div>
+                  <div className="w-20 h-6 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Active Orders Tab */}
-        {activeTab === 'active' && (
+        {!loading && activeTab === 'active' && (
           <div className="space-y-3">
             {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
@@ -1521,7 +1549,7 @@ const OrdersPage = ({ user }) => {
         )}
 
         {/* Today's Bills Tab */}
-        {activeTab === 'history' && (
+        {!loading && activeTab === 'history' && (
           <div className="space-y-3">
             {orders.filter(order => ['completed', 'cancelled'].includes(order.status) && isToday(order.created_at)).length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">

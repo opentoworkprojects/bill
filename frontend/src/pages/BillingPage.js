@@ -215,17 +215,56 @@ const BillingPage = ({ user }) => {
     if (!updated) return;
     setLoading(true);
     try {
-      await axios.post(`${API}/payments/create-order`, { order_id: orderId, amount: calculateTotal(), payment_method: paymentMethod });
-      await axios.put(`${API}/orders/${orderId}`, {
-        status: 'completed', payment_method: paymentMethod, discount: calculateDiscountAmount(),
-        discount_type: discountType, discount_value: parseFloat(discountValue) || 0, discount_amount: calculateDiscountAmount(), total: calculateTotal()
+      // Create payment record
+      await axios.post(`${API}/payments/create-order`, { 
+        order_id: orderId, 
+        amount: calculateTotal(), 
+        payment_method: paymentMethod 
       });
+      
+      // Update order with completed status and payment details
+      await axios.put(`${API}/orders/${orderId}`, {
+        status: 'completed',
+        payment_method: paymentMethod,
+        payment_received: calculateTotal(),
+        balance_amount: 0,
+        is_credit: false,
+        discount: calculateDiscountAmount(),
+        discount_type: discountType,
+        discount_value: parseFloat(discountValue) || 0,
+        discount_amount: calculateDiscountAmount(),
+        total: calculateTotal(),
+        updated_at: new Date().toISOString(),
+        // Ensure items are included for proper order completion
+        items: orderItems,
+        subtotal: calculateSubtotal() - calculateDiscountAmount(),
+        tax: calculateTax(),
+        tax_rate: getEffectiveTaxRate()
+      });
+      
       toast.success('Payment completed!');
       setPaymentCompleted(true);
+      
+      // Release table (backend should also do this, but frontend ensures it)
       await releaseTable();
+      
+      // Print receipt
       const discountAmt = calculateDiscountAmount();
-      printReceipt({ ...order, items: orderItems, subtotal: calculateSubtotal(), tax: calculateTax(), total: calculateTotal(), discount: discountAmt, discount_amount: discountAmt, tax_rate: getEffectiveTaxRate() }, businessSettings);
+      printReceipt({ 
+        ...order, 
+        items: orderItems, 
+        subtotal: calculateSubtotal(), 
+        tax: calculateTax(), 
+        total: calculateTotal(), 
+        discount: discountAmt, 
+        discount_amount: discountAmt, 
+        tax_rate: getEffectiveTaxRate(),
+        status: 'completed',
+        payment_method: paymentMethod
+      }, businessSettings);
+      
     } catch (error) {
+      console.error('Payment error:', error);
       toast.error(error.response?.data?.detail || 'Payment failed');
     } finally {
       setLoading(false);
