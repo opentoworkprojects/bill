@@ -403,6 +403,7 @@ class BusinessSettings(BaseModel):
     fssai: Optional[str] = None
     currency: str = "INR"
     tax_rate: float = 5.0
+
     receipt_theme: str = "classic"
     logo_url: Optional[str] = None
     website: Optional[str] = None
@@ -3434,17 +3435,110 @@ async def create_order(
     tax_rate_setting = business.get("tax_rate")
     tax_rate = (tax_rate_setting if tax_rate_setting is not None else 5.0) / 100
     kot_mode_enabled = business.get("kot_mode_enabled", True)
+    
+    # Use default values for table when KOT is disabled
+    table_id = order_data.table_id or "counter"
+    table_number = order_data.table_number or 0
 
+    # ORDER CONSOLIDATION LOGIC - Check for existing pending orders on the same table
+    if kot_mode_enabled and table_id != "counter":
+        try:
+            # Check for existing pending/preparing orders on this table
+            existing_order = await db.orders.find_one({
+                "organization_id": user_org_id,
+                "table_id": table_id,
+                "status": {"$in": ["pending", "preparing"]},
+                "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}  # Only check last 2 hours
+            })
+            
+            if existing_order:
+                print(f"🔄 Found existing order {existing_order['id']} for table {table_number}, consolidating items...")
+                
+                # Consolidate items - merge with existing order
+                existing_items = existing_order.get("items", [])
+                new_items = [item.model_dump() for item in order_data.items]
+                
+                # Merge items by menu_item_id
+                consolidated_items = {}
+                
+                # Add existing items
+                for item in existing_items:
+                    key = item.get("menu_item_id", item.get("name", "unknown"))
+                    if key in consolidated_items:
+                        consolidated_items[key]["quantity"] += item["quantity"]
+                    else:
+                        consolidated_items[key] = item.copy()
+                
+                # Add new items
+                for item in new_items:
+                    key = item.get("menu_item_id", item.get("name", "unknown"))
+                    if key in consolidated_items:
+                        consolidated_items[key]["quantity"] += item["quantity"]
+                    else:
+                        consolidated_items[key] = item.copy()
+                
+                # Convert back to list
+                final_items = list(consolidated_items.values())
+                
+                # Recalculate totals
+                subtotal = sum(item["price"] * item["quantity"] for item in final_items)
+                tax = subtotal * tax_rate
+                total = subtotal + tax
+                
+                # Update existing order with consolidated items
+                await db.orders.update_one(
+                    {"id": existing_order["id"]},
+                    {
+                        "$set": {
+                            "items": final_items,
+                            "subtotal": subtotal,
+                            "tax": tax,
+                            "total": total,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                            # Update customer info if provided
+                            "customer_name": order_data.customer_name or existing_order.get("customer_name", ""),
+                            "customer_phone": order_data.customer_phone or existing_order.get("customer_phone", "")
+                        }
+                    }
+                )
+                
+                # Invalidate Redis cache
+                try:
+                    cached_service = get_cached_order_service()
+                    await cached_service.invalidate_order_caches(user_org_id, existing_order["id"])
+                    print(f"🗑️ Cache invalidated for consolidated order {existing_order['id']}")
+                except Exception as e:
+                    print(f"⚠️ Cache invalidation error: {e}")
+                
+                # Return the updated order
+                updated_order = await db.orders.find_one({"id": existing_order["id"]}, {"_id": 0})
+                
+                # Generate WhatsApp notification if enabled
+                whatsapp_link = None
+                frontend_url = order_data.frontend_origin or ""
+                if order_data.customer_phone and business.get("whatsapp_auto_notify"):
+                    message = get_status_message("pending", updated_order, business, frontend_url)
+                    whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
+                
+                print(f"✅ Order consolidated successfully: {existing_order['id']} (Table {table_number})")
+                return {
+                    **updated_order,
+                    "whatsapp_link": whatsapp_link,
+                    "consolidated": True,
+                    "message": f"Items added to existing order for Table {table_number}"
+                }
+                
+        except Exception as e:
+            print(f"⚠️ Order consolidation check failed: {e}, creating new order...")
+            # If consolidation fails, continue with creating new order
+
+    # CREATE NEW ORDER (original logic)
     subtotal = sum(item.price * item.quantity for item in order_data.items)
     tax = subtotal * tax_rate
     total = subtotal + tax
     
     # Generate tracking token for customer live tracking
     tracking_token = str(uuid.uuid4())[:12]
-    
-    # Use default values for table when KOT is disabled
-    table_id = order_data.table_id or "counter"
-    table_number = order_data.table_number or 0
 
     # Get next invoice number for the organization
     invoice_number = await get_next_invoice_number(user_org_id)
@@ -3489,6 +3583,14 @@ async def create_order(
             {"id": table_id, "organization_id": user_org_id},
             {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
         )
+        
+        # Invalidate tables cache
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_table_caches(user_org_id)
+            print(f"🗑️ Tables cache invalidated for table update")
+        except Exception as e:
+            print(f"⚠️ Tables cache invalidation error: {e}")
     
     # Generate WhatsApp notification if enabled and phone provided
     whatsapp_link = None
@@ -3497,6 +3599,7 @@ async def create_order(
         message = get_status_message("pending", doc, business, frontend_url)
         whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
 
+    print(f"✅ New order created successfully: {order_obj.id} (Table {table_number})")
     return {
         **order_obj.model_dump(),
         "whatsapp_link": whatsapp_link,
@@ -3625,12 +3728,21 @@ async def update_order_status(
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
 
-    order = await db.orders.find_one(
-        {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
-    )
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+    # Try to get order from cache first, then fallback to MongoDB
+    try:
+        cached_service = get_cached_order_service()
+        order = await cached_service.get_order_by_id(order_id, user_org_id, use_cache=True)
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+    except Exception as e:
+        print(f"⚠️ Cache error getting order {order_id}: {e}")
+        order = await db.orders.find_one(
+            {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
+        )
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
 
+    # Update order status in MongoDB
     await db.orders.update_one(
         {"id": order_id, "organization_id": user_org_id},
         {
@@ -3645,10 +3757,16 @@ async def update_order_status(
     try:
         cached_service = get_cached_order_service()
         await cached_service.invalidate_order_caches(user_org_id, order_id)
+        
+        # Also invalidate table cache if status affects table
+        if status == "completed":
+            await cached_service.invalidate_table_caches(user_org_id)
+        
         print(f"🗑️ Cache invalidated for order status update {order_id} -> {status}")
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
 
+    # Update table status if order is completed
     if status == "completed":
         await db.tables.update_one(
             {"id": order["table_id"], "organization_id": user_org_id},
@@ -6403,6 +6521,11 @@ async def startup_validation():
     try:
         await init_redis_cache(db)
         print("✅ Redis cache initialized for fast order handling")
+        
+        # Set Redis cache for super admin after initialization
+        from redis_cache import redis_cache
+        set_super_admin_cache(redis_cache)
+        print("✅ Super admin Redis cache configured")
     except Exception as e:
         print(f"⚠️ Redis cache initialization failed: {e}")
         print("📝 Continuing without Redis cache (MongoDB only)")
@@ -8944,7 +9067,7 @@ async def get_public_pricing():
 
 # Include super admin routes and set database
 set_super_admin_db(db)
-set_super_admin_cache(redis_cache)
+# Redis cache will be set during startup in lifespan
 app.include_router(super_admin_router)
 
 # Include monitoring routes

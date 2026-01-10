@@ -113,6 +113,7 @@ const OrdersPage = ({ user }) => {
   // Tab state for Active Orders vs Today's Bills
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
   const dataLoadedRef = useRef(false);
 
@@ -216,7 +217,9 @@ const OrdersPage = ({ user }) => {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (showLoader = false) => {
+    if (showLoader) setRefreshing(true);
+    
     try {
       const response = await axios.get(`${API}/orders`);
       const ordersData = Array.isArray(response.data) ? response.data : [];
@@ -244,6 +247,10 @@ const OrdersPage = ({ user }) => {
       }));
       
       setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      
+      if (showLoader) {
+        toast.success('Orders refreshed successfully');
+      }
     } catch (error) {
       console.error('Failed to fetch orders', error);
       setOrders([]);
@@ -252,8 +259,17 @@ const OrdersPage = ({ user }) => {
         toast.error('Session expired. Please login again.');
       } else if (error.response?.status >= 500) {
         toast.error('Server error. Please try again later.');
+      } else if (showLoader) {
+        toast.error('Failed to refresh orders');
       }
+    } finally {
+      if (showLoader) setRefreshing(false);
     }
+  };
+
+  const handleForceRefresh = () => {
+    fetchOrders(true);
+    fetchTables();
   };
 
   const fetchTables = async () => {
@@ -1129,9 +1145,31 @@ const OrdersPage = ({ user }) => {
             <h1 className="text-2xl sm:text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Orders</h1>
             <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage restaurant orders</p>
           </div>
-          {['admin', 'waiter', 'cashier'].includes(user?.role) && (
-            <>
-              {/* New Order Button - Unified for both KOT modes */}
+          <div className="flex items-center gap-2">
+            {/* Force Refresh Button */}
+            <Button 
+              onClick={handleForceRefresh}
+              disabled={refreshing}
+              variant="outline"
+              size="sm"
+              className="text-sm"
+            >
+              {refreshing ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full mr-2"></div>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="w-4 h-4 mr-2 rotate-45" />
+                  Refresh
+                </>
+              )}
+            </Button>
+            
+            {['admin', 'waiter', 'cashier'].includes(user?.role) && (
+              <>
+                {/* New Order Button - Unified for both KOT modes */}
               <Button 
                 onClick={() => {
                   // KOT disabled + skip prompt = go directly to menu
