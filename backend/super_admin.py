@@ -1,6 +1,7 @@
 """
 Super Admin Panel - Site Owner Only
 Monitor all users, subscriptions, tickets, and system health
+Enhanced with Redis caching for optimal performance
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -14,19 +15,29 @@ super_admin_router = APIRouter(prefix="/api/super-admin", tags=["Super Admin"])
 SUPER_ADMIN_USERNAME = os.getenv("SUPER_ADMIN_USERNAME", "superadmin")
 SUPER_ADMIN_PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "change-this-password-123")
 
-# Database reference - will be set by server.py
+# Database and cache references - will be set by server.py
 _db = None
+_redis_cache = None
 
 def set_database(database):
     """Set the database reference from server.py"""
     global _db
     _db = database
 
+def set_redis_cache(redis_cache):
+    """Set the Redis cache reference from server.py"""
+    global _redis_cache
+    _redis_cache = redis_cache
+
 def get_db():
     """Get the database reference"""
     if _db is None:
         raise HTTPException(status_code=500, detail="Database not initialized")
     return _db
+
+def get_cache():
+    """Get the Redis cache reference"""
+    return _redis_cache  # Can be None if Redis is not available
 
 def verify_super_admin(username: str, password: str) -> bool:
     """Verify super admin credentials"""
@@ -55,13 +66,23 @@ async def get_super_admin_dashboard(
     username: str = Query(...),
     password: str = Query(...)
 ):
-    """Get basic dashboard stats only - MINIMAL queries for free tier"""
+    """Get basic dashboard stats only - MINIMAL queries for free tier with Redis caching"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
     db = get_db()
+    cache = get_cache()
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_dashboard = await cache.get_super_admin_dashboard()
+        if cached_dashboard:
+            print("🚀 Returning cached dashboard data")
+            return cached_dashboard
     
     try:
+        print("📊 Generating fresh dashboard data from MongoDB")
+        
         # ONLY get basic counts - no data loading
         # Use count_documents which is much faster than aggregation
         total_users = await db.users.count_documents({})
@@ -78,7 +99,7 @@ async def get_super_admin_dashboard(
         except Exception:
             open_tickets = pending_tickets = 0
         
-        return {
+        dashboard_data = {
             "overview": {
                 "total_users": total_users,
                 "active_subscriptions": active_subscriptions,
@@ -91,8 +112,17 @@ async def get_super_admin_dashboard(
             # NO DATA ARRAYS - load separately when needed
             "users": [],
             "tickets": [],
-            "recent_orders": []
+            "recent_orders": [],
+            "cached_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        # Cache the dashboard data for 5 minutes
+        if cache and cache.is_connected():
+            await cache.set_super_admin_dashboard(dashboard_data, ttl=300)
+            print("💾 Cached dashboard data for 5 minutes")
+        
+        return dashboard_data
+        
     except Exception as e:
         print(f"Super admin dashboard error: {e}")
         # Return minimal safe response even if DB fails
@@ -108,7 +138,8 @@ async def get_super_admin_dashboard(
             },
             "users": [],
             "tickets": [],
-            "recent_orders": []
+            "recent_orders": [],
+            "error": "Database temporarily unavailable"
         }
 
 
@@ -119,14 +150,24 @@ async def get_all_users(
     skip: int = Query(0),
     limit: int = Query(50)  # Reduced from 100 to 50 for free tier
 ):
-    """Get users with pagination - FREE TIER OPTIMIZED"""
+    """Get users with pagination - FREE TIER OPTIMIZED with Redis caching"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
     db = get_db()
+    cache = get_cache()
     
     # Limit maximum to 50 for free tier
     limit = min(limit, 50)
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_users = await cache.get_super_admin_users(skip, limit)
+        if cached_users:
+            print(f"🚀 Returning cached users data (skip={skip}, limit={limit})")
+            return cached_users
+    
+    print(f"📊 Fetching users from MongoDB (skip={skip}, limit={limit})")
     
     users = await db.users.find(
         {},
@@ -136,12 +177,20 @@ async def get_all_users(
     # Get total count separately (faster)
     total = await db.users.count_documents({})
     
-    return {
+    users_data = {
         "users": users,
         "total": total,
         "skip": skip,
-        "limit": limit
+        "limit": limit,
+        "cached_at": datetime.now(timezone.utc).isoformat()
     }
+    
+    # Cache the users data for 3 minutes
+    if cache and cache.is_connected():
+        await cache.set_super_admin_users(users_data, skip, limit, ttl=180)
+        print("💾 Cached users data for 3 minutes")
+    
+    return users_data
 
 
 @super_admin_router.get("/tickets/recent")
@@ -150,14 +199,24 @@ async def get_recent_tickets(
     password: str = Query(...),
     limit: int = Query(20)  # Small limit for free tier
 ):
-    """Get recent tickets only - FREE TIER OPTIMIZED"""
+    """Get recent tickets only - FREE TIER OPTIMIZED with Redis caching"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
     db = get_db()
+    cache = get_cache()
     
     # Limit to 20 for free tier
     limit = min(limit, 20)
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_tickets = await cache.get_super_admin_tickets(limit)
+        if cached_tickets:
+            print(f"🚀 Returning cached tickets data (limit={limit})")
+            return cached_tickets
+    
+    print(f"📊 Fetching tickets from MongoDB (limit={limit})")
     
     try:
         tickets = await db.support_tickets.find(
@@ -165,14 +224,24 @@ async def get_recent_tickets(
             {"_id": 0}
         ).sort("created_at", -1).limit(limit).to_list(limit)
         
-        return {
+        tickets_data = {
             "tickets": tickets,
-            "total": len(tickets)
+            "total": len(tickets),
+            "cached_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        # Cache the tickets data for 2 minutes
+        if cache and cache.is_connected():
+            await cache.set_super_admin_tickets(tickets_data, limit, ttl=120)
+            print("💾 Cached tickets data for 2 minutes")
+        
+        return tickets_data
+        
     except Exception:
         return {
             "tickets": [],
-            "total": 0
+            "total": 0,
+            "error": "Tickets collection not available"
         }
 
 
@@ -183,15 +252,25 @@ async def get_recent_orders(
     days: int = Query(7),  # Reduced from 30 to 7 days
     limit: int = Query(20)  # Small limit for free tier
 ):
-    """Get recent orders only - FREE TIER OPTIMIZED"""
+    """Get recent orders only - FREE TIER OPTIMIZED with Redis caching"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
     db = get_db()
+    cache = get_cache()
     
     # Limit to 20 for free tier
     limit = min(limit, 20)
     days = min(days, 30)  # Max 30 days
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_orders = await cache.get_super_admin_orders(days, limit)
+        if cached_orders:
+            print(f"🚀 Returning cached orders data (days={days}, limit={limit})")
+            return cached_orders
+    
+    print(f"📊 Fetching orders from MongoDB (days={days}, limit={limit})")
     
     days_ago = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     
@@ -200,11 +279,19 @@ async def get_recent_orders(
         {"_id": 0}
     ).sort("created_at", -1).limit(limit).to_list(limit)
     
-    return {
+    orders_data = {
         "orders": orders,
         "total": len(orders),
-        "days": days
+        "days": days,
+        "cached_at": datetime.now(timezone.utc).isoformat()
     }
+    
+    # Cache the orders data for 3 minutes
+    if cache and cache.is_connected():
+        await cache.set_super_admin_orders(orders_data, days, limit, ttl=180)
+        print("💾 Cached orders data for 3 minutes")
+    
+    return orders_data
 
 
 @super_admin_router.get("/users/{user_id}")
@@ -437,11 +524,21 @@ async def get_analytics(
     password: str = Query(...),
     days: int = Query(30)
 ):
-    """Get system analytics"""
+    """Get system analytics with Redis caching"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
     db = get_db()
+    cache = get_cache()
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_analytics = await cache.get_super_admin_analytics(days)
+        if cached_analytics:
+            print(f"🚀 Returning cached analytics data (days={days})")
+            return cached_analytics
+    
+    print(f"📊 Generating analytics from MongoDB (days={days})")
     
     start_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     
@@ -456,27 +553,41 @@ async def get_analytics(
     })
     
     # New tickets
-    new_tickets = await db.support_tickets.count_documents({
-        "created_at": {"$gte": start_date}
-    })
+    try:
+        new_tickets = await db.support_tickets.count_documents({
+            "created_at": {"$gte": start_date}
+        })
+    except Exception:
+        new_tickets = 0
     
-    # Active users (users with orders in period)
-    active_users_pipeline = [
-        {"$match": {"created_at": {"$gte": start_date}}},
-        {"$group": {"_id": "$organization_id"}},
-        {"$count": "total"}
-    ]
-    active_users_result = await db.orders.aggregate(active_users_pipeline).to_list(1)
-    active_users = active_users_result[0]["total"] if active_users_result else 0
+    # Active users (users with orders in period) - simplified for free tier
+    try:
+        active_users_pipeline = [
+            {"$match": {"created_at": {"$gte": start_date}}},
+            {"$group": {"_id": "$organization_id"}},
+            {"$count": "total"}
+        ]
+        active_users_result = await db.orders.aggregate(active_users_pipeline).to_list(1)
+        active_users = active_users_result[0]["total"] if active_users_result else 0
+    except Exception:
+        active_users = 0
     
-    return {
+    analytics_data = {
         "period_days": days,
         "new_users": new_users,
         "new_orders": new_orders,
         "new_tickets": new_tickets,
         "active_users": active_users,
-        "start_date": start_date
+        "start_date": start_date,
+        "cached_at": datetime.now(timezone.utc).isoformat()
     }
+    
+    # Cache the analytics data for 15 minutes
+    if cache and cache.is_connected():
+        await cache.set_super_admin_analytics(analytics_data, days, ttl=900)
+        print("💾 Cached analytics data for 15 minutes")
+    
+    return analytics_data
 
 
 # ============ CAMPAIGN MANAGEMENT ============
@@ -696,6 +807,180 @@ async def get_campaign_stats(
         "by_campaign": campaign_stats,
         "early_adopter_active": datetime.now(timezone.utc) <= datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
     }
+
+
+# ============ CACHE MANAGEMENT ============
+
+@super_admin_router.post("/cache/invalidate")
+async def invalidate_cache(
+    username: str = Query(...),
+    password: str = Query(...),
+    cache_type: str = Query("all")  # all, dashboard, users, tickets, orders, leads, team, analytics
+):
+    """Invalidate super admin caches for fresh data"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    cache = get_cache()
+    
+    if not cache or not cache.is_connected():
+        return {
+            "message": "Redis cache not available",
+            "cache_type": cache_type,
+            "invalidated": False
+        }
+    
+    success = await cache.invalidate_super_admin_cache(cache_type)
+    
+    return {
+        "message": f"Cache invalidation {'successful' if success else 'failed'}",
+        "cache_type": cache_type,
+        "invalidated": success,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+@super_admin_router.get("/cache/status")
+async def get_cache_status(
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Get Redis cache connection status"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    cache = get_cache()
+    
+    if not cache:
+        return {
+            "connected": False,
+            "message": "Redis cache not initialized",
+            "performance_mode": "MongoDB only"
+        }
+    
+    is_connected = cache.is_connected()
+    
+    return {
+        "connected": is_connected,
+        "message": "Redis cache available" if is_connected else "Redis cache disconnected",
+        "performance_mode": "Redis + MongoDB" if is_connected else "MongoDB only",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+# ============ LEADS MANAGEMENT ============
+
+@super_admin_router.get("/leads")
+async def get_all_leads(
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Get all leads with Redis caching"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    db = get_db()
+    cache = get_cache()
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_leads = await cache.get_super_admin_leads()
+        if cached_leads:
+            print("🚀 Returning cached leads data")
+            return cached_leads
+    
+    print("📊 Fetching leads from MongoDB")
+    
+    try:
+        # Get leads from contact forms or lead collection
+        leads = await db.leads.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        
+        # Calculate stats
+        stats = {
+            "new": len([l for l in leads if l.get("status") == "new"]),
+            "contacted": len([l for l in leads if l.get("status") == "contacted"]),
+            "converted": len([l for l in leads if l.get("status") == "converted"]),
+            "total": len(leads)
+        }
+        
+        leads_data = {
+            "leads": leads,
+            "stats": stats,
+            "cached_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Cache the leads data for 5 minutes
+        if cache and cache.is_connected():
+            await cache.set_super_admin_leads(leads_data, ttl=300)
+            print("💾 Cached leads data for 5 minutes")
+        
+        return leads_data
+        
+    except Exception as e:
+        print(f"Error fetching leads: {e}")
+        return {
+            "leads": [],
+            "stats": {"new": 0, "contacted": 0, "converted": 0, "total": 0},
+            "error": "Leads collection not available"
+        }
+
+
+@super_admin_router.get("/team")
+async def get_team_members(
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Get team members with Redis caching"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    db = get_db()
+    cache = get_cache()
+    
+    # Try Redis cache first
+    if cache and cache.is_connected():
+        cached_team = await cache.get_super_admin_team()
+        if cached_team:
+            print("🚀 Returning cached team data")
+            return cached_team
+    
+    print("📊 Fetching team members from MongoDB")
+    
+    try:
+        # Get team members
+        members = await db.team_members.find({}, {"_id": 0, "password": 0}).sort("created_at", -1).to_list(100)
+        
+        # Calculate stats
+        stats = {
+            "total": len(members),
+            "active": len([m for m in members if m.get("active", True)]),
+            "roles": {}
+        }
+        
+        for member in members:
+            role = member.get("role", "unknown")
+            stats["roles"][role] = stats["roles"].get(role, 0) + 1
+        
+        team_data = {
+            "members": members,
+            "stats": stats,
+            "cached_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Cache the team data for 10 minutes
+        if cache and cache.is_connected():
+            await cache.set_super_admin_team(team_data, ttl=600)
+            print("💾 Cached team data for 10 minutes")
+        
+        return team_data
+        
+    except Exception as e:
+        print(f"Error fetching team: {e}")
+        return {
+            "members": [],
+            "stats": {"total": 0, "active": 0, "roles": {}},
+            "error": "Team collection not available"
+        }
 
 
 # ============ SALE/OFFER MANAGEMENT ============

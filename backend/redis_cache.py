@@ -512,6 +512,362 @@ class RedisCache:
             print(f"❌ Redis delete reports error: {e}")
             return False
     
+    # ============ SUPER ADMIN CACHE ============
+    
+    async def get_super_admin_dashboard(self) -> Optional[Dict]:
+        """Get cached super admin dashboard data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = "super_admin:dashboard"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                dashboard = json.loads(cached_data)
+                print("🚀 Cache HIT: super admin dashboard")
+                return dashboard
+            else:
+                print("💾 Cache MISS: super admin dashboard")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin dashboard error: {e}")
+            return None
+    
+    async def set_super_admin_dashboard(self, dashboard: Dict, ttl: int = 300):
+        """Cache super admin dashboard (5 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = "super_admin:dashboard"
+            await self.redis.setex(cache_key, ttl, json.dumps(dashboard))
+            print(f"💾 Cached super admin dashboard (TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin dashboard error: {e}")
+            return False
+    
+    async def get_super_admin_users(self, skip: int = 0, limit: int = 50) -> Optional[Dict]:
+        """Get cached super admin users data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = f"super_admin:users:{skip}:{limit}"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                users_data = json.loads(cached_data)
+                print(f"🚀 Cache HIT: super admin users (skip={skip}, limit={limit})")
+                return users_data
+            else:
+                print(f"💾 Cache MISS: super admin users (skip={skip}, limit={limit})")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin users error: {e}")
+            return None
+    
+    async def set_super_admin_users(self, users_data: Dict, skip: int = 0, limit: int = 50, ttl: int = 180):
+        """Cache super admin users data (3 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = f"super_admin:users:{skip}:{limit}"
+            
+            # Convert datetime objects to ISO strings
+            users_copy = users_data.copy()
+            if 'users' in users_copy:
+                for user in users_copy['users']:
+                    if isinstance(user.get('created_at'), datetime):
+                        user['created_at'] = user['created_at'].isoformat()
+                    if isinstance(user.get('subscription_expires_at'), datetime):
+                        user['subscription_expires_at'] = user['subscription_expires_at'].isoformat()
+                    if isinstance(user.get('subscription_started_at'), datetime):
+                        user['subscription_started_at'] = user['subscription_started_at'].isoformat()
+            
+            await self.redis.setex(cache_key, ttl, json.dumps(users_copy))
+            print(f"💾 Cached super admin users (skip={skip}, limit={limit}, TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin users error: {e}")
+            return False
+    
+    async def get_super_admin_tickets(self, limit: int = 20) -> Optional[Dict]:
+        """Get cached super admin tickets data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = f"super_admin:tickets:{limit}"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                tickets_data = json.loads(cached_data)
+                print(f"🚀 Cache HIT: super admin tickets (limit={limit})")
+                return tickets_data
+            else:
+                print(f"💾 Cache MISS: super admin tickets (limit={limit})")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin tickets error: {e}")
+            return None
+    
+    async def set_super_admin_tickets(self, tickets_data: Dict, limit: int = 20, ttl: int = 120):
+        """Cache super admin tickets data (2 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = f"super_admin:tickets:{limit}"
+            
+            # Convert datetime objects to ISO strings
+            tickets_copy = tickets_data.copy()
+            if 'tickets' in tickets_copy:
+                for ticket in tickets_copy['tickets']:
+                    if isinstance(ticket.get('created_at'), datetime):
+                        ticket['created_at'] = ticket['created_at'].isoformat()
+                    if isinstance(ticket.get('updated_at'), datetime):
+                        ticket['updated_at'] = ticket['updated_at'].isoformat()
+            
+            await self.redis.setex(cache_key, ttl, json.dumps(tickets_copy))
+            print(f"💾 Cached super admin tickets (limit={limit}, TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin tickets error: {e}")
+            return False
+    
+    async def get_super_admin_orders(self, days: int = 7, limit: int = 20) -> Optional[Dict]:
+        """Get cached super admin orders data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = f"super_admin:orders:{days}:{limit}"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                orders_data = json.loads(cached_data)
+                print(f"🚀 Cache HIT: super admin orders (days={days}, limit={limit})")
+                return orders_data
+            else:
+                print(f"💾 Cache MISS: super admin orders (days={days}, limit={limit})")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin orders error: {e}")
+            return None
+    
+    async def set_super_admin_orders(self, orders_data: Dict, days: int = 7, limit: int = 20, ttl: int = 180):
+        """Cache super admin orders data (3 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = f"super_admin:orders:{days}:{limit}"
+            
+            # Convert datetime objects to ISO strings
+            orders_copy = orders_data.copy()
+            if 'orders' in orders_copy:
+                for order in orders_copy['orders']:
+                    if isinstance(order.get('created_at'), datetime):
+                        order['created_at'] = order['created_at'].isoformat()
+                    if isinstance(order.get('updated_at'), datetime):
+                        order['updated_at'] = order['updated_at'].isoformat()
+            
+            await self.redis.setex(cache_key, ttl, json.dumps(orders_copy))
+            print(f"💾 Cached super admin orders (days={days}, limit={limit}, TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin orders error: {e}")
+            return False
+    
+    async def get_super_admin_leads(self) -> Optional[Dict]:
+        """Get cached super admin leads data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = "super_admin:leads"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                leads_data = json.loads(cached_data)
+                print("🚀 Cache HIT: super admin leads")
+                return leads_data
+            else:
+                print("💾 Cache MISS: super admin leads")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin leads error: {e}")
+            return None
+    
+    async def set_super_admin_leads(self, leads_data: Dict, ttl: int = 300):
+        """Cache super admin leads data (5 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = "super_admin:leads"
+            
+            # Convert datetime objects to ISO strings
+            leads_copy = leads_data.copy()
+            if 'leads' in leads_copy:
+                for lead in leads_copy['leads']:
+                    if isinstance(lead.get('created_at'), datetime):
+                        lead['created_at'] = lead['created_at'].isoformat()
+                    if isinstance(lead.get('timestamp'), datetime):
+                        lead['timestamp'] = lead['timestamp'].isoformat()
+            
+            await self.redis.setex(cache_key, ttl, json.dumps(leads_copy))
+            print(f"💾 Cached super admin leads (TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin leads error: {e}")
+            return False
+    
+    async def get_super_admin_team(self) -> Optional[Dict]:
+        """Get cached super admin team data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = "super_admin:team"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                team_data = json.loads(cached_data)
+                print("🚀 Cache HIT: super admin team")
+                return team_data
+            else:
+                print("💾 Cache MISS: super admin team")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin team error: {e}")
+            return None
+    
+    async def set_super_admin_team(self, team_data: Dict, ttl: int = 600):
+        """Cache super admin team data (10 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = "super_admin:team"
+            
+            # Convert datetime objects to ISO strings
+            team_copy = team_data.copy()
+            if 'members' in team_copy:
+                for member in team_copy['members']:
+                    if isinstance(member.get('created_at'), datetime):
+                        member['created_at'] = member['created_at'].isoformat()
+                    if isinstance(member.get('last_login'), datetime):
+                        member['last_login'] = member['last_login'].isoformat()
+            
+            await self.redis.setex(cache_key, ttl, json.dumps(team_copy))
+            print(f"💾 Cached super admin team (TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin team error: {e}")
+            return False
+    
+    async def get_super_admin_analytics(self, days: int = 30) -> Optional[Dict]:
+        """Get cached super admin analytics data"""
+        if not self.is_connected():
+            return None
+            
+        try:
+            cache_key = f"super_admin:analytics:{days}"
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data:
+                analytics_data = json.loads(cached_data)
+                print(f"🚀 Cache HIT: super admin analytics (days={days})")
+                return analytics_data
+            else:
+                print(f"💾 Cache MISS: super admin analytics (days={days})")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Redis get super admin analytics error: {e}")
+            return None
+    
+    async def set_super_admin_analytics(self, analytics_data: Dict, days: int = 30, ttl: int = 900):
+        """Cache super admin analytics data (15 min TTL)"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            cache_key = f"super_admin:analytics:{days}"
+            await self.redis.setex(cache_key, ttl, json.dumps(analytics_data))
+            print(f"💾 Cached super admin analytics (days={days}, TTL: {ttl}s)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis set super admin analytics error: {e}")
+            return False
+    
+    async def invalidate_super_admin_cache(self, cache_type: str = "all"):
+        """Invalidate super admin caches"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            if cache_type == "all":
+                # Delete all super admin caches
+                pattern = "super_admin:*"
+                keys = await self.redis.keys(pattern)
+                if keys:
+                    await self.redis.delete(*keys)
+                    print(f"🗑️ Invalidated {len(keys)} super admin caches")
+            else:
+                # Delete specific cache type
+                if cache_type == "dashboard":
+                    await self.redis.delete("super_admin:dashboard")
+                elif cache_type == "users":
+                    pattern = "super_admin:users:*"
+                    keys = await self.redis.keys(pattern)
+                    if keys:
+                        await self.redis.delete(*keys)
+                elif cache_type == "tickets":
+                    pattern = "super_admin:tickets:*"
+                    keys = await self.redis.keys(pattern)
+                    if keys:
+                        await self.redis.delete(*keys)
+                elif cache_type == "orders":
+                    pattern = "super_admin:orders:*"
+                    keys = await self.redis.keys(pattern)
+                    if keys:
+                        await self.redis.delete(*keys)
+                elif cache_type == "leads":
+                    await self.redis.delete("super_admin:leads")
+                elif cache_type == "team":
+                    await self.redis.delete("super_admin:team")
+                elif cache_type == "analytics":
+                    pattern = "super_admin:analytics:*"
+                    keys = await self.redis.keys(pattern)
+                    if keys:
+                        await self.redis.delete(*keys)
+                
+                print(f"🗑️ Invalidated super admin {cache_type} cache")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Redis invalidate super admin cache error: {e}")
+            return False
+
     # ============ RATE LIMITING ============
     
     async def check_rate_limit(self, key: str, limit: int, window: int) -> bool:

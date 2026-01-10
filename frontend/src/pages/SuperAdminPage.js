@@ -30,6 +30,13 @@ const SuperAdminPage = () => {
   const [teamStats, setTeamStats] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState(null);
   const [showCreateLead, setShowCreateLead] = useState(false);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -392,6 +399,9 @@ const SuperAdminPage = () => {
         
         // Step 4: Load additional data in background (non-blocking)
         loadAdditionalDataInBackground();
+        
+        // Step 5: Check cache status
+        checkCacheStatus();
       }
     } catch (superAdminError) {
       console.error('Super admin login error:', superAdminError);
@@ -462,6 +472,8 @@ const SuperAdminPage = () => {
   };
 
   const loadUsersData = async () => {
+    if (loadingUsers) return; // Prevent duplicate calls
+    setLoadingUsers(true);
     try {
       const response = await axios.get(`${API}/super-admin/users`, {
         params: { ...credentials, limit: 20 }, // Small limit
@@ -470,10 +482,15 @@ const SuperAdminPage = () => {
       setUsers(response.data.users || []);
     } catch (error) {
       console.warn('Failed to load users:', error);
+      toast.error('Failed to load users data');
+    } finally {
+      setLoadingUsers(false);
     }
   };
 
   const loadTicketsData = async () => {
+    if (loadingTickets) return; // Prevent duplicate calls
+    setLoadingTickets(true);
     try {
       const response = await axios.get(`${API}/super-admin/tickets/recent`, {
         params: { ...credentials, limit: 10 }, // Small limit
@@ -482,10 +499,15 @@ const SuperAdminPage = () => {
       setTickets(response.data.tickets || []);
     } catch (error) {
       console.warn('Failed to load tickets:', error);
+      toast.error('Failed to load tickets data');
+    } finally {
+      setLoadingTickets(false);
     }
   };
 
   const loadOrdersData = async () => {
+    if (loadingOrders) return; // Prevent duplicate calls
+    setLoadingOrders(true);
     try {
       const response = await axios.get(`${API}/super-admin/orders/recent`, {
         params: { ...credentials, days: 7, limit: 10 }, // Small limits
@@ -498,23 +520,183 @@ const SuperAdminPage = () => {
       }));
     } catch (error) {
       console.warn('Failed to load orders:', error);
+      toast.error('Failed to load orders data');
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const loadLeadsData = async () => {
+    if (loadingLeads) return; // Prevent duplicate calls
+    setLoadingLeads(true);
+    try {
+      const response = await axios.get(`${API}/super-admin/leads`, {
+        params: credentials,
+        timeout: 10000
+      });
+      setLeads(response.data.leads || []);
+      setLeadsStats(response.data.stats);
+    } catch (error) {
+      console.warn('Failed to load leads:', error);
+      toast.error('Failed to load leads data');
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  const loadTeamData = async () => {
+    if (loadingTeam) return; // Prevent duplicate calls
+    setLoadingTeam(true);
+    try {
+      const response = await axios.get(`${API}/super-admin/team`, {
+        params: credentials,
+        timeout: 10000
+      });
+      setTeamMembers(response.data.members || []);
+      setTeamStats(response.data.stats);
+    } catch (error) {
+      console.warn('Failed to load team:', error);
+      toast.error('Failed to load team data');
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  const loadAnalyticsData = async () => {
+    if (loadingAnalytics) return; // Prevent duplicate calls
+    setLoadingAnalytics(true);
+    try {
+      const response = await axios.get(`${API}/super-admin/analytics`, {
+        params: { ...credentials, days: 30 },
+        timeout: 10000
+      });
+      setAnalytics(response.data);
+    } catch (error) {
+      console.warn('Failed to load analytics:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setLoadingAnalytics(false);
     }
   };
 
   const loadOtherData = async () => {
-    // Load non-critical data
-    Promise.all([
-      // Fetch leads
-      axios.get(`${API}/super-admin/leads`, {
+    // Load non-critical data with enhanced error handling
+    const loadPromises = [
+      loadLeadsData(),
+      loadTeamData(),
+      loadAnalyticsData()
+    ];
+
+    // Load app versions and other settings
+    try {
+      const appVersionsResponse = await axios.get(`${API}/super-admin/app-versions`, {
         params: credentials,
         timeout: 10000
-      }).then(res => {
-        setLeads(res.data.leads || []);
-        setLeadsStats(res.data.stats);
-      }).catch(e => console.warn('Failed to fetch leads:', e)),
+      });
+      setAppVersions(appVersionsResponse.data.versions || []);
+    } catch (error) {
+      console.warn('Failed to fetch app versions:', error);
+    }
 
-      // Fetch other data...
-    ]);
+    // Fetch sale/offer settings
+    try {
+      const saleOfferRes = await axios.get(`${API}/super-admin/sale-offer`, {
+        params: credentials,
+        timeout: 5000
+      });
+      if (saleOfferRes.data) {
+        setSaleOffer(prev => ({...prev, ...saleOfferRes.data}));
+      }
+    } catch (error) {
+      console.warn('Failed to fetch sale offer:', error);
+    }
+
+    // Fetch pricing settings
+    try {
+      const pricingRes = await axios.get(`${API}/super-admin/pricing`, {
+        params: credentials,
+        timeout: 5000
+      });
+      if (pricingRes.data) {
+        setPricing(pricingRes.data);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch pricing:', error);
+    }
+
+    // Wait for all critical data to load
+    await Promise.allSettled(loadPromises);
+  };
+
+  // Check cache status
+  const checkCacheStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/super-admin/cache/status`, {
+        params: credentials,
+        timeout: 5000
+      });
+      setCacheStatus(response.data);
+    } catch (error) {
+      console.warn('Failed to check cache status:', error);
+      setCacheStatus({ connected: false, performance_mode: "MongoDB only" });
+    }
+  };
+
+  // Invalidate cache
+  const invalidateCache = async (cacheType = 'all') => {
+    try {
+      const response = await axios.post(`${API}/super-admin/cache/invalidate`, {}, {
+        params: { ...credentials, cache_type: cacheType },
+        timeout: 5000
+      });
+      
+      if (response.data.invalidated) {
+        toast.success(`${cacheType} cache invalidated successfully`);
+        // Refresh current tab data
+        handleTabChange(activeTab);
+      } else {
+        toast.info('Cache invalidation not available (Redis not connected)');
+      }
+    } catch (error) {
+      console.warn('Failed to invalidate cache:', error);
+      toast.error('Failed to invalidate cache');
+    }
+  };
+
+  // Handle tab change and load data accordingly
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    
+    // Load data for the selected tab if not already loaded
+    switch (tab) {
+      case 'users':
+        if (users.length === 0 && !loadingUsers) {
+          loadUsersData();
+        }
+        break;
+      case 'tickets':
+        if (tickets.length === 0 && !loadingTickets) {
+          loadTicketsData();
+        }
+        break;
+      case 'leads':
+        if (leads.length === 0 && !loadingLeads) {
+          loadLeadsData();
+        }
+        break;
+      case 'team':
+        if (teamMembers.length === 0 && !loadingTeam) {
+          loadTeamData();
+        }
+        break;
+      case 'analytics':
+        if (!analytics && !loadingAnalytics) {
+          loadAnalyticsData();
+        }
+        break;
+      default:
+        break;
+    }
   };
 
   const getAvailableTabsForUser = (user) => {
@@ -1383,10 +1565,24 @@ const SuperAdminPage = () => {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
               <Shield className="w-8 h-8 text-purple-600" />
               {userType === 'super-admin' ? 'Ops Controls' : 'Team Panel'}
+              {cacheStatus && (
+                <span className={`ml-3 px-2 py-1 rounded text-xs ${
+                  cacheStatus.connected 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {cacheStatus.performance_mode}
+                </span>
+              )}
             </h1>
             <p className="text-gray-600">
               {userType === 'super-admin' ? (
-                'Site Owner Dashboard'
+                <span className="flex items-center gap-2">
+                  Site Owner Dashboard
+                  {cacheStatus && cacheStatus.connected && (
+                    <span className="text-green-600 text-sm">⚡ Redis Accelerated</span>
+                  )}
+                </span>
               ) : (
                 <span className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-xs ${
@@ -1406,18 +1602,31 @@ const SuperAdminPage = () => {
               )}
             </p>
           </div>
-          <Button 
-            onClick={() => {
-              setAuthenticated(false);
-              setUserType(null);
-              setTeamUser(null);
-              setTeamToken(null);
-              setCredentials({ username: '', password: '' });
-            }}
-            variant="outline"
-          >
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            {userType === 'super-admin' && cacheStatus && (
+              <Button
+                onClick={() => invalidateCache('all')}
+                variant="outline"
+                size="sm"
+                title="Clear all caches for fresh data"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Clear Cache
+              </Button>
+            )}
+            <Button 
+              onClick={() => {
+                setAuthenticated(false);
+                setUserType(null);
+                setTeamUser(null);
+                setTeamToken(null);
+                setCredentials({ username: '', password: '' });
+              }}
+              variant="outline"
+            >
+              Logout
+            </Button>
+          </div>
         </div>
 
         {/* Tabs - Show based on permissions */}
@@ -1425,7 +1634,7 @@ const SuperAdminPage = () => {
           {getAvailableTabs().map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`px-4 py-2 font-medium capitalize whitespace-nowrap ${
                 activeTab === tab
                   ? 'border-b-2 border-purple-600 text-purple-600'
@@ -1505,27 +1714,65 @@ const SuperAdminPage = () => {
         {activeTab === 'users' && hasPermission('users') && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                All Users & Subscription Management
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  All Users & Subscription Management
+                </CardTitle>
+                <Button
+                  onClick={loadUsersData}
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingUsers}
+                >
+                  {loadingUsers ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                      Loading...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </div>
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-2">Username</th>
-                      <th className="text-left p-2">Email</th>
-                      <th className="text-left p-2">Role</th>
-                      <th className="text-left p-2">Subscription Status</th>
-                      <th className="text-left p-2">Expires</th>
-                      <th className="text-left p-2">Trial</th>
-                      <th className="text-left p-2">Bills</th>
-                      <th className="text-left p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              {loadingUsers ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading users data...</p>
+                    <p className="text-sm text-gray-500 mt-1">This may take a few seconds</p>
+                  </div>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-600 mb-2">No users data available</p>
+                  <Button onClick={loadUsersData} variant="outline" size="sm">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Loading Again
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-2">Username</th>
+                        <th className="text-left p-2">Email</th>
+                        <th className="text-left p-2">Role</th>
+                        <th className="text-left p-2">Subscription Status</th>
+                        <th className="text-left p-2">Expires</th>
+                        <th className="text-left p-2">Trial</th>
+                        <th className="text-left p-2">Bills</th>
+                        <th className="text-left p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                     {users.map(user => (
                       <tr key={user.id} className="border-b hover:bg-gray-50">
                         <td className="p-2 font-medium">{user.username}</td>
@@ -1730,8 +1977,11 @@ const SuperAdminPage = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Lead Management</CardTitle>
-                  {leadsStats && (
+                  <CardTitle className="flex items-center gap-2">
+                    <UserPlus className="w-5 h-5" />
+                    Lead Management
+                  </CardTitle>
+                  {leadsStats && !loadingLeads && (
                     <div className="flex gap-4 mt-2 text-sm">
                       <span className="text-blue-600">New: {leadsStats.new}</span>
                       <span className="text-yellow-600">Contacted: {leadsStats.contacted}</span>
@@ -1739,27 +1989,66 @@ const SuperAdminPage = () => {
                     </div>
                   )}
                 </div>
-                <Button onClick={() => setShowCreateLead(true)}>
-                  + Add Lead
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={loadLeadsData}
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingLeads}
+                  >
+                    {loadingLeads ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                        Loading...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                      </div>
+                    )}
+                  </Button>
+                  <Button onClick={() => setShowCreateLead(true)}>
+                    + Add Lead
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">Name</th>
-                      <th className="text-left p-2">Email</th>
-                      <th className="text-left p-2">Phone</th>
-                      <th className="text-left p-2">Business</th>
-                      <th className="text-left p-2">Source</th>
-                      <th className="text-left p-2">Date</th>
-                      <th className="text-left p-2">Status</th>
-                      <th className="text-left p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              {loadingLeads ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading leads data...</p>
+                    <p className="text-sm text-gray-500 mt-1">This may take a few seconds</p>
+                  </div>
+                </div>
+              ) : leads.length === 0 ? (
+                <div className="text-center py-12">
+                  <UserPlus className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-600 mb-2">No leads data available</p>
+                  <p className="text-sm text-gray-500 mb-4">Leads will appear here when visitors fill the "Get Started" form.</p>
+                  <Button onClick={loadLeadsData} variant="outline" size="sm">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Loading Again
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Name</th>
+                        <th className="text-left p-2">Email</th>
+                        <th className="text-left p-2">Phone</th>
+                        <th className="text-left p-2">Business</th>
+                        <th className="text-left p-2">Source</th>
+                        <th className="text-left p-2">Date</th>
+                        <th className="text-left p-2">Status</th>
+                        <th className="text-left p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                     {leads.map(lead => (
                       <tr key={lead.timestamp} className="border-b hover:bg-gray-50">
                         <td className="p-2 font-medium">{lead.name}</td>
@@ -1817,10 +2106,52 @@ const SuperAdminPage = () => {
         {activeTab === 'tickets' && hasPermission('tickets') && (
           <Card>
             <CardHeader>
-              <CardTitle>Support Tickets</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Ticket className="w-5 h-5" />
+                  Support Tickets
+                </CardTitle>
+                <Button
+                  onClick={loadTicketsData}
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingTickets}
+                >
+                  {loadingTickets ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                      Loading...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </div>
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              {loadingTickets ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading tickets data...</p>
+                    <p className="text-sm text-gray-500 mt-1">This may take a few seconds</p>
+                  </div>
+                </div>
+              ) : tickets.length === 0 ? (
+                <div className="text-center py-12">
+                  <Ticket className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-600 mb-2">No support tickets available</p>
+                  <p className="text-sm text-gray-500 mb-4">Tickets will appear here when users submit support requests.</p>
+                  <Button onClick={loadTicketsData} variant="outline" size="sm">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Loading Again
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
                 {tickets.map(ticket => (
                   <div key={ticket.id} className="border rounded-lg p-4 bg-white shadow-sm">
                     <div className="flex items-start justify-between mb-3">

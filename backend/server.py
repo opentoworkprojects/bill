@@ -33,7 +33,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service
 
 # Import super admin router
-from super_admin import super_admin_router, set_database as set_super_admin_db
+from super_admin import super_admin_router, set_database as set_super_admin_db, set_redis_cache as set_super_admin_cache
 
 # Import monitoring system
 from monitoring import init_monitoring, collect_metrics_task, monitoring_router
@@ -8944,6 +8944,7 @@ async def get_public_pricing():
 
 # Include super admin routes and set database
 set_super_admin_db(db)
+set_super_admin_cache(redis_cache)
 app.include_router(super_admin_router)
 
 # Include monitoring routes
