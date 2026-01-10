@@ -44,15 +44,13 @@ const ReportsPage = ({ user }) => {
   const [categoryAnalysis, setCategoryAnalysis] = useState([]);
   const [forecast, setForecast] = useState(null);
   const [dateRange, setDateRange] = useState({
-    start_date: new Date(new Date().setDate(new Date().getDate() - 7))
-      .toISOString()
-      .split("T")[0],
-    end_date: new Date().toISOString().split("T")[0],
+    start_date: new Date().toISOString().split("T")[0], // Today's date
+    end_date: new Date().toISOString().split("T")[0],   // Today's date
   });
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [activePreset, setActivePreset] = useState('week');
+  const [activePreset, setActivePreset] = useState('today'); // Default to today
 
   // Quick date presets
   const datePresets = useMemo(() => ({

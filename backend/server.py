@@ -156,7 +156,6 @@ api_router = APIRouter(prefix="/api")
 
 # In-memory cache for frequently accessed data
 from functools import lru_cache
-from time import time
 import threading
 
 # Simple cache with thread-safe operations
@@ -174,7 +173,7 @@ def cache_response(ttl_seconds=60):
         async def wrapper(*args, **kwargs):
             # Create cache key from function name and args
             cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
-            current_time = time()
+            current_time = time.time()
             
             # Check if cached and not expired
             with _cache_lock:
@@ -195,7 +194,7 @@ def cache_response(ttl_seconds=60):
 
 def clear_expired_cache():
     """Clear expired cache entries to free memory"""
-    current_time = time()
+    current_time = time.time()
     with _cache_lock:
         expired_keys = [k for k, v in _cache_ttl.items() if current_time >= v]
         for key in expired_keys:
@@ -3481,6 +3480,8 @@ async def create_order(
         print(f"🗑️ Cache invalidated for new order {order_obj.id}")
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
+        # If Redis is not available, that's okay - MongoDB will handle the queries
+        pass
     
     # Only update table status if KOT mode is enabled and table exists
     if kot_mode_enabled and table_id != "counter":
@@ -3522,24 +3523,31 @@ async def get_orders(
     try:
         # Use Redis-cached order service for active orders (no status filter or status != completed/cancelled)
         if not status or status not in ["completed", "cancelled"]:
-            cached_service = get_cached_order_service()
-            
-            if not status:
-                # Get all active orders (fast Redis cache)
-                orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
-                print(f"🚀 Returned {len(orders)} active orders (Redis cached)")
-                return orders
-            else:
-                # Get active orders and filter by status
-                active_orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
-                filtered_orders = [order for order in active_orders if order.get("status") == status]
-                print(f"🚀 Returned {len(filtered_orders)} orders with status '{status}' (Redis cached)")
-                return filtered_orders
+            try:
+                cached_service = get_cached_order_service()
+                
+                if not status:
+                    # Get all active orders (fast Redis cache)
+                    orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
+                    print(f"🚀 Returned {len(orders)} active orders (Redis cached)")
+                    return orders
+                else:
+                    # Get active orders and filter by status
+                    active_orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
+                    filtered_orders = [order for order in active_orders if order.get("status") == status]
+                    print(f"🚀 Returned {len(filtered_orders)} orders with status '{status}' (Redis cached)")
+                    return filtered_orders
+            except Exception as cache_error:
+                print(f"❌ Redis cache error: {cache_error}, falling back to MongoDB")
+                # Fall through to MongoDB query
         
-        # For completed/cancelled orders, query MongoDB directly (less frequent)
+        # For completed/cancelled orders, or if Redis fails, query MongoDB directly
         query = {"organization_id": user_org_id}
         if status:
             query["status"] = status
+        elif not status:
+            # If no status specified and Redis failed, get active orders from MongoDB
+            query["status"] = {"$nin": ["completed", "cancelled"]}
 
         orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
         
@@ -3555,7 +3563,7 @@ async def get_orders(
         
     except Exception as e:
         print(f"❌ Error fetching orders: {e}")
-        # Fallback to direct MongoDB query
+        # Final fallback to basic MongoDB query
         query = {"organization_id": user_org_id}
         if status:
             query["status"] = status
@@ -3568,7 +3576,7 @@ async def get_orders(
             if isinstance(order["updated_at"], str):
                 order["updated_at"] = datetime.fromisoformat(order["updated_at"])
         
-        print(f"📊 Fallback: Returned {len(orders)} orders from MongoDB")
+        print(f"📊 Final fallback: Returned {len(orders)} orders from MongoDB")
         return orders
 
 

@@ -141,6 +141,17 @@ const OrdersPage = ({ user }) => {
     }
   }, []);
 
+  // Add real-time polling for active orders (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (activeTab === 'active') {
+        fetchOrders(); // Refresh orders when viewing active tab
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
   const loadInitialData = async () => {
     try {
       // Load all data in parallel for faster initial load
