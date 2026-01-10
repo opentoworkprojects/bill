@@ -25,10 +25,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showNotification: (title, body) => ipcRenderer.send('show-notification', { title, body }),
   
   // Printing - Silent (direct to printer, no dialog)
-  printReceipt: (content) => ipcRenderer.send('print-receipt', content),
+  printReceipt: (content, options) => ipcRenderer.send('print-receipt', content, options),
   
   // Printing - With dialog (user can choose printer)
-  printReceiptWithDialog: (content) => ipcRenderer.send('print-receipt-dialog', content),
+  printReceiptWithDialog: (content, options) => ipcRenderer.send('print-receipt-dialog', content, options),
   
   // Get available printers
   getPrinters: () => ipcRenderer.invoke('get-printers'),

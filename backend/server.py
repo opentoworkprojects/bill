@@ -1,3 +1,4 @@
+
 import base64
 import json
 import logging
@@ -24,6 +25,9 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+
+# Import Redis cache service
+from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service
 
 # Import super admin router
 from super_admin import super_admin_router, set_database as set_super_admin_db
@@ -3374,6 +3378,14 @@ async def create_order(
 
     await db.orders.insert_one(doc)
     
+    # Invalidate Redis cache for active orders
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_order_caches(user_org_id, order_obj.id)
+        print(f"🗑️ Cache invalidated for new order {order_obj.id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
+    
     # Only update table status if KOT mode is enabled and table exists
     if kot_mode_enabled and table_id != "counter":
         await db.tables.update_one(
@@ -3408,20 +3420,60 @@ async def get_orders(
         print(f"🚨 SECURITY ALERT: User {current_user.get('email')} attempted to fetch orders without organization_id!")
         raise HTTPException(status_code=403, detail="Organization not configured. Contact support.")
 
-    query = {"organization_id": user_org_id}
-    if status:
-        query["status"] = status
-
     # Security log
-    print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching orders with query: {query}")
+    print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching orders with status: {status}")
 
-    orders = await db.orders.find(query, {"_id": 0}).to_list(1000)
-    for order in orders:
-        if isinstance(order["created_at"], str):
-            order["created_at"] = datetime.fromisoformat(order["created_at"])
-        if isinstance(order["updated_at"], str):
-            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-    return orders
+    try:
+        # Use Redis-cached order service for active orders (no status filter or status != completed/cancelled)
+        if not status or status not in ["completed", "cancelled"]:
+            cached_service = get_cached_order_service()
+            
+            if not status:
+                # Get all active orders (fast Redis cache)
+                orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
+                print(f"🚀 Returned {len(orders)} active orders (Redis cached)")
+                return orders
+            else:
+                # Get active orders and filter by status
+                active_orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
+                filtered_orders = [order for order in active_orders if order.get("status") == status]
+                print(f"🚀 Returned {len(filtered_orders)} orders with status '{status}' (Redis cached)")
+                return filtered_orders
+        
+        # For completed/cancelled orders, query MongoDB directly (less frequent)
+        query = {"organization_id": user_org_id}
+        if status:
+            query["status"] = status
+
+        orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
+        
+        # Convert datetime objects
+        for order in orders:
+            if isinstance(order["created_at"], str):
+                order["created_at"] = datetime.fromisoformat(order["created_at"])
+            if isinstance(order["updated_at"], str):
+                order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+        
+        print(f"📊 Returned {len(orders)} orders from MongoDB (status: {status})")
+        return orders
+        
+    except Exception as e:
+        print(f"❌ Error fetching orders: {e}")
+        # Fallback to direct MongoDB query
+        query = {"organization_id": user_org_id}
+        if status:
+            query["status"] = status
+
+        orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
+        
+        for order in orders:
+            if isinstance(order["created_at"], str):
+                order["created_at"] = datetime.fromisoformat(order["created_at"])
+            if isinstance(order["updated_at"], str):
+                order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+        
+        print(f"📊 Fallback: Returned {len(orders)} orders from MongoDB")
+        return orders
 
 
 @api_router.get("/orders/{order_id}", response_model=Order)
@@ -3429,16 +3481,34 @@ async def get_order(order_id: str, current_user: dict = Depends(get_current_user
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
 
-    order = await db.orders.find_one(
-        {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
-    )
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    if isinstance(order["created_at"], str):
-        order["created_at"] = datetime.fromisoformat(order["created_at"])
-    if isinstance(order["updated_at"], str):
-        order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-    return order
+    try:
+        # Try Redis cache first
+        cached_service = get_cached_order_service()
+        order = await cached_service.get_order_by_id(order_id, user_org_id, use_cache=True)
+        
+        if order:
+            print(f"🚀 Order {order_id} retrieved from cache")
+            return order
+        else:
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+    except Exception as e:
+        print(f"❌ Cache error for order {order_id}: {e}")
+        # Fallback to direct MongoDB query
+        order = await db.orders.find_one(
+            {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
+        )
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Convert datetime objects
+        if isinstance(order["created_at"], str):
+            order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order["updated_at"], str):
+            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+        
+        print(f"📊 Order {order_id} retrieved from MongoDB (fallback)")
+        return order
 
 
 @api_router.put("/orders/{order_id}/status")
@@ -3466,6 +3536,14 @@ async def update_order_status(
             }
         },
     )
+
+    # Invalidate Redis cache for this order and active orders list
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_order_caches(user_org_id, order_id)
+        print(f"🗑️ Cache invalidated for order status update {order_id} -> {status}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
 
     if status == "completed":
         await db.tables.update_one(
@@ -3534,6 +3612,15 @@ async def update_order(
             {"id": order_id, "organization_id": user_org_id},
             {"$set": update_data}
         )
+        
+        # Invalidate cache for completed order update
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_order_caches(user_org_id, order_id)
+            print(f"🗑️ Cache invalidated for completed order update {order_id}")
+        except Exception as e:
+            print(f"⚠️ Cache invalidation error: {e}")
+        
         return {"message": "Order completed successfully"}
     
     # For completed orders, only allow updating payment-related fields
@@ -3570,6 +3657,14 @@ async def update_order(
             {"$set": update_data}
         )
         
+        # Invalidate cache for payment update
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_order_caches(user_org_id, order_id)
+            print(f"🗑️ Cache invalidated for payment update {order_id}")
+        except Exception as e:
+            print(f"⚠️ Cache invalidation error: {e}")
+        
         return {"message": "Order payment details updated successfully"}
     
     # For non-completed orders, allow full editing
@@ -3603,6 +3698,14 @@ async def update_order(
         {"$set": update_data}
     )
     
+    # Invalidate cache for order update
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_order_caches(user_org_id, order_id)
+        print(f"🗑️ Cache invalidated for order update {order_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
+    
     return {"message": "Order updated successfully"}
 
 
@@ -3634,6 +3737,14 @@ async def cancel_order(
             }
         }
     )
+    
+    # Invalidate cache for cancelled order
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_order_caches(user_org_id, order_id)
+        print(f"🗑️ Cache invalidated for cancelled order {order_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
     
     # Release table if order had one
     if order.get("table_id"):
@@ -3674,6 +3785,14 @@ async def delete_order(
     await db.orders.delete_one(
         {"id": order_id, "organization_id": user_org_id}
     )
+    
+    # Invalidate cache for deleted order
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_order_caches(user_org_id, order_id)
+        print(f"🗑️ Cache invalidated for deleted order {order_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
     
     return {"message": "Order deleted successfully"}
 
@@ -6127,6 +6246,14 @@ async def startup_validation():
         print("🔄 Server will continue running with degraded functionality")
 
     print(f"🚀 Server starting on port {os.getenv('PORT', '5000')}")
+    
+    # Initialize Redis cache for orders
+    try:
+        await init_redis_cache(db)
+        print("✅ Redis cache initialized for fast order handling")
+    except Exception as e:
+        print(f"⚠️ Redis cache initialization failed: {e}")
+        print("📝 Continuing without Redis cache (MongoDB only)")
     
     # Start background cache cleanup task
     asyncio.create_task(periodic_cache_cleanup())
@@ -9521,7 +9648,15 @@ app.include_router(api_router)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    # Cleanup Redis cache
+    try:
+        await cleanup_redis_cache()
+    except Exception as e:
+        print(f"⚠️ Redis cleanup error: {e}")
+    
+    # Close MongoDB client
     client.close()
+    print("🔌 Database connections closed")
 
 if __name__ == "__main__":
     import uvicorn

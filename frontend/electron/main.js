@@ -270,7 +270,7 @@ ipcMain.on('show-notification', (event, { title, body }) => {
 });
 
 // Handle print request - SILENT PRINT (direct to default printer)
-ipcMain.on('print-receipt', (event, content) => {
+ipcMain.on('print-receipt', (event, content, options = {}) => {
   const printWindow = new BrowserWindow({ 
     show: false,
     webPreferences: {
@@ -279,27 +279,66 @@ ipcMain.on('print-receipt', (event, content) => {
     }
   });
   
+  // Get paper width from options or default to 80mm
+  const paperWidth = options.paperWidth || '80mm';
+  const fontSize = paperWidth === '58mm' ? '11px' : '13px';
+  
+  // Use the same styles as web version for consistency
+  const printStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: ${paperWidth} auto; margin: 0; }
+    @media print { 
+      html, body { 
+        width: ${paperWidth}; 
+        margin: 0 !important; 
+        padding: 0 !important; 
+        -webkit-print-color-adjust: exact !important; 
+      } 
+    }
+    body { 
+      font-family: 'Courier New', monospace; 
+      font-size: ${fontSize}; 
+      font-weight: 600; 
+      line-height: 1.4; 
+      width: ${paperWidth}; 
+      padding: 3mm; 
+      background: #fff; 
+      color: #000; 
+    }
+    .center { text-align: center; }
+    .bold { font-weight: 900 !important; }
+    .large { font-size: 1.3em; font-weight: 900; }
+    .small { font-size: 0.9em; }
+    .xsmall { font-size: 0.8em; }
+    .separator { border-top: 1px dashed #000; margin: 2mm 0; }
+    .double-line { border-top: 2px solid #000; margin: 2mm 0; }
+    .dotted-line { border-top: 1px dotted #000; margin: 2mm 0; }
+    .item-row { display: flex; justify-content: space-between; margin: 1mm 0; font-weight: 600; }
+    .total-row { display: flex; justify-content: space-between; font-weight: 700; margin: 1mm 0; }
+    .grand-total { font-size: 1.4em; font-weight: 900; margin: 2mm 0; }
+    .header-logo { font-size: 1.5em; font-weight: 900; margin-bottom: 1mm; }
+    .bill-info { display: flex; justify-content: space-between; font-size: 0.95em; margin: 1mm 0; }
+    .table-header { display: flex; justify-content: space-between; font-weight: 900; border-bottom: 1px solid #000; padding-bottom: 1mm; margin-bottom: 1mm; }
+    .footer { margin-top: 3mm; font-size: 0.9em; }
+    .mb-1 { margin-bottom: 1mm; }
+    .mt-1 { margin-top: 1mm; }
+    .kot-item { font-size: 1.2em; font-weight: 900; margin: 2mm 0; padding: 2mm; border: 2px solid #000; }
+    .kot-note { background: #000; color: #fff; padding: 2mm; margin: 1mm 0 2mm 3mm; font-weight: 900; }
+  `;
+  
   // Create proper HTML document for printing
   const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        @page { size: 80mm auto; margin: 0; }
-        body {
-          font-family: 'Courier New', monospace;
-          font-size: 12px;
-          font-weight: 600;
-          line-height: 1.4;
-          width: 80mm;
-          padding: 3mm;
-          -webkit-print-color-adjust: exact;
-        }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Print Receipt</title>
+      <style>${printStyles}</style>
     </head>
-    <body>${content}</body>
+    <body>
+      <div class="receipt">${content}</div>
+    </body>
     </html>
   `;
   
@@ -354,7 +393,7 @@ ipcMain.on('print-receipt', (event, content) => {
 });
 
 // Handle print with dialog (for when user wants to choose printer)
-ipcMain.on('print-receipt-dialog', (event, content) => {
+ipcMain.on('print-receipt-dialog', (event, content, options = {}) => {
   const printWindow = new BrowserWindow({ 
     show: false,
     webPreferences: {
@@ -363,25 +402,65 @@ ipcMain.on('print-receipt-dialog', (event, content) => {
     }
   });
   
+  // Get paper width from options or default to 80mm
+  const paperWidth = options.paperWidth || '80mm';
+  const fontSize = paperWidth === '58mm' ? '11px' : '13px';
+  
+  // Use the same styles as web version for consistency
+  const printStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: ${paperWidth} auto; margin: 0; }
+    @media print { 
+      html, body { 
+        width: ${paperWidth}; 
+        margin: 0 !important; 
+        padding: 0 !important; 
+        -webkit-print-color-adjust: exact !important; 
+      } 
+    }
+    body { 
+      font-family: 'Courier New', monospace; 
+      font-size: ${fontSize}; 
+      font-weight: 600; 
+      line-height: 1.4; 
+      width: ${paperWidth}; 
+      padding: 3mm; 
+      background: #fff; 
+      color: #000; 
+    }
+    .center { text-align: center; }
+    .bold { font-weight: 900 !important; }
+    .large { font-size: 1.3em; font-weight: 900; }
+    .small { font-size: 0.9em; }
+    .xsmall { font-size: 0.8em; }
+    .separator { border-top: 1px dashed #000; margin: 2mm 0; }
+    .double-line { border-top: 2px solid #000; margin: 2mm 0; }
+    .dotted-line { border-top: 1px dotted #000; margin: 2mm 0; }
+    .item-row { display: flex; justify-content: space-between; margin: 1mm 0; font-weight: 600; }
+    .total-row { display: flex; justify-content: space-between; font-weight: 700; margin: 1mm 0; }
+    .grand-total { font-size: 1.4em; font-weight: 900; margin: 2mm 0; }
+    .header-logo { font-size: 1.5em; font-weight: 900; margin-bottom: 1mm; }
+    .bill-info { display: flex; justify-content: space-between; font-size: 0.95em; margin: 1mm 0; }
+    .table-header { display: flex; justify-content: space-between; font-weight: 900; border-bottom: 1px solid #000; padding-bottom: 1mm; margin-bottom: 1mm; }
+    .footer { margin-top: 3mm; font-size: 0.9em; }
+    .mb-1 { margin-bottom: 1mm; }
+    .mt-1 { margin-top: 1mm; }
+    .kot-item { font-size: 1.2em; font-weight: 900; margin: 2mm 0; padding: 2mm; border: 2px solid #000; }
+    .kot-note { background: #000; color: #fff; padding: 2mm; margin: 1mm 0 2mm 3mm; font-weight: 900; }
+  `;
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        @page { size: 80mm auto; margin: 0; }
-        body {
-          font-family: 'Courier New', monospace;
-          font-size: 12px;
-          font-weight: 600;
-          line-height: 1.4;
-          width: 80mm;
-          padding: 3mm;
-        }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Print Receipt</title>
+      <style>${printStyles}</style>
     </head>
-    <body>${content}</body>
+    <body>
+      <div class="receipt">${content}</div>
+    </body>
     </html>
   `;
   

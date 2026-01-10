@@ -183,7 +183,13 @@ const getPrintStyles = (width) => `
 
 export const printThermal = (htmlContent, paperWidth = '80mm') => {
   if (isElectron() && window.electronAPI?.printReceipt) {
-    try { window.electronAPI.printReceipt(htmlContent); toast.success('Printing...'); return true; } catch (e) {}
+    try { 
+      window.electronAPI.printReceipt(htmlContent, { paperWidth }); 
+      toast.success('Printing...'); 
+      return true; 
+    } catch (e) {
+      console.error('Electron print error:', e);
+    }
   }
   
   const printWindow = window.open('', '_blank', 'width=400,height=600');
@@ -402,8 +408,12 @@ export const shareReceipt = async (order, businessOverride = null) => {
 };
 
 export const smartPrint = async (order, businessOverride = null) => {
+  const settings = getPrintSettings();
+  
   if (isElectron() && window.electronAPI?.printReceipt) {
-    window.electronAPI.printReceipt(generateReceiptHTML(order, businessOverride));
+    window.electronAPI.printReceipt(generateReceiptHTML(order, businessOverride), { 
+      paperWidth: settings.paper_width 
+    });
     toast.success('Printing...');
     return true;
   }
@@ -414,7 +424,7 @@ export const smartPrint = async (order, businessOverride = null) => {
   
   if (isMobile()) return await showMobilePrintOptions(order, businessOverride);
   
-  return printThermal(generateReceiptHTML(order, businessOverride), getPrintSettings().paper_width);
+  return printThermal(generateReceiptHTML(order, businessOverride), settings.paper_width);
 };
 
 const showMobilePrintOptions = (order, businessOverride) => new Promise((resolve) => {
@@ -453,6 +463,8 @@ const showMobilePrintOptions = (order, businessOverride) => new Promise((resolve
 
 export const printReceipt = async (order, businessOverride = null) => {
   try {
+    const settings = getPrintSettings();
+    
     // Try Bluetooth direct print first (no dialog)
     if (isBluetoothPrinterConnected()) {
       try {
@@ -465,8 +477,8 @@ export const printReceipt = async (order, businessOverride = null) => {
       }
     }
     
-    // Fallback to window print
-    return printThermal(generateReceiptHTML(order, businessOverride), getPrintSettings().paper_width);
+    // Fallback to window print with correct settings
+    return printThermal(generateReceiptHTML(order, businessOverride), settings.paper_width);
   } catch (e) { 
     toast.error('Print failed'); 
     return false; 
@@ -475,6 +487,8 @@ export const printReceipt = async (order, businessOverride = null) => {
 
 export const printKOT = async (order, businessOverride = null) => {
   try {
+    const settings = getPrintSettings();
+    
     // Try Bluetooth direct print first (no dialog)
     if (isBluetoothPrinterConnected()) {
       try {
@@ -487,8 +501,8 @@ export const printKOT = async (order, businessOverride = null) => {
       }
     }
     
-    // Fallback to window print
-    return printThermal(generateKOTHTML(order, businessOverride), getPrintSettings().paper_width);
+    // Fallback to window print with correct settings
+    return printThermal(generateKOTHTML(order, businessOverride), settings.paper_width);
   } catch (e) { 
     toast.error('Print failed'); 
     return false; 
@@ -505,12 +519,18 @@ export const printDocument = (content, title = 'Print') => {
 };
 
 export const silentPrint = (html, paperWidth = '80mm') => {
-  if (isElectron() && window.electronAPI?.printReceipt) { window.electronAPI.printReceipt(html); return true; }
+  if (isElectron() && window.electronAPI?.printReceipt) { 
+    window.electronAPI.printReceipt(html, { paperWidth }); 
+    return true; 
+  }
   return printThermal(html, paperWidth);
 };
 
 export const printWithDialog = (html, paperWidth = '80mm') => {
-  if (isElectron() && window.electronAPI?.printReceiptWithDialog) { window.electronAPI.printReceiptWithDialog(html); return true; }
+  if (isElectron() && window.electronAPI?.printReceiptWithDialog) { 
+    window.electronAPI.printReceiptWithDialog(html, { paperWidth }); 
+    return true; 
+  }
   return printThermal(html, paperWidth);
 };
 
