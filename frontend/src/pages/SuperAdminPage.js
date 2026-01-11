@@ -601,6 +601,7 @@ const SuperAdminPage = () => {
                 </CardContent>
               </Card>
             </div>
+<<<<<<< HEAD
 
             {/* Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -665,6 +666,16 @@ const SuperAdminPage = () => {
                 </CardContent>
               </Card>
             </div>
+=======
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-gray-500">
+                <Lock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>Dashboard data not available for your access level</p>
+              </CardContent>
+            </Card>
+          )
+>>>>>>> parent of 72f1b80 (Update SuperAdminPage.js)
           </div>
         )}
 
