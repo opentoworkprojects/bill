@@ -32,9 +32,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # Import Redis cache service
 from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service
 
-# Import super admin router
-from super_admin import super_admin_router, set_database as set_super_admin_db, set_redis_cache as set_super_admin_cache
-
 # Import monitoring system
 from monitoring import init_monitoring, collect_metrics_task, monitoring_router
 
@@ -64,6 +61,9 @@ except Exception:
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
+
+# Import super admin router AFTER loading .env
+from super_admin import super_admin_router, set_database as set_super_admin_db, set_redis_cache as set_super_admin_cache
 
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv(
