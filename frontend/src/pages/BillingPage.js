@@ -92,11 +92,46 @@ const BillingPage = ({ user }) => {
 
   const fetchMenuItems = async () => {
     try {
-      const response = await axios.get(`${API}/menu`);
+      console.log('Fetching menu items...');
+      
+      // Check if user is authenticated
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+      
+      const response = await axios.get(`${API}/menu`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       const items = Array.isArray(response.data) ? response.data : [];
-      setMenuItems(items.filter(item => item.available));
+      const availableItems = items.filter(item => item.available);
+      
+      console.log('Menu fetch successful:', availableItems.length, 'available items out of', items.length, 'total');
+      setMenuItems(availableItems);
+      
+      if (availableItems.length === 0) {
+        console.warn('No available menu items found');
+        toast.warning('No menu items available. Please add menu items first.');
+      }
+      
     } catch (error) {
       console.error('Failed to fetch menu items', error);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      if (error.response?.status === 401) {
+        toast.error('Authentication required. Please login again.');
+      } else if (error.response?.status === 403) {
+        toast.error('Not authorized to view menu items.');
+      } else {
+        toast.error('Failed to load menu items. Please refresh the page.');
+      }
+      
+      setMenuItems([]);
     }
   };
 

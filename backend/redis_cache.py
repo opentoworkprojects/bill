@@ -794,6 +794,162 @@ class CachedOrderService:
             print(f"❌ MongoDB error in get_tables: {db_error}")
             # Return empty list rather than crash
             return []
+    
+    async def get_menu_items(self, org_id: str, use_cache: bool = True) -> List[Dict]:
+        """Get menu items with Redis caching and robust fallback"""
+        
+        # Try cache first if enabled and Redis is connected
+        if use_cache and self.cache.is_connected():
+            try:
+                cache_key = f"menu_items:{org_id}"
+                cached_data = await self.cache.get(cache_key)
+                
+                if cached_data:
+                    menu_items = json.loads(cached_data)
+                    print(f"🚀 Cache HIT: {len(menu_items)} menu items for org {org_id}")
+                    return menu_items
+                else:
+                    print(f"💾 Cache MISS: menu items for org {org_id}")
+            except Exception as cache_error:
+                print(f"❌ Redis cache error: {cache_error}, falling back to MongoDB")
+        
+        # Fallback to MongoDB
+        print(f"📊 Fetching menu items from MongoDB for org {org_id}")
+        
+        try:
+            # Query menu items for the organization
+            query = {"organization_id": org_id}
+            
+            menu_items = await self.db.menu_items.find(
+                query, 
+                {"_id": 0}
+            ).sort("name", 1).to_list(1000)
+            
+            # Convert datetime objects for consistency
+            for item in menu_items:
+                try:
+                    if isinstance(item.get("created_at"), str):
+                        item["created_at"] = datetime.fromisoformat(item["created_at"])
+                except Exception as dt_error:
+                    # If datetime conversion fails, leave as string
+                    print(f"⚠️ Datetime conversion error for menu item {item.get('id', 'unknown')}: {dt_error}")
+                    pass
+            
+            # Try to cache the results if Redis is available
+            if use_cache and self.cache.is_connected():
+                try:
+                    cache_key = f"menu_items:{org_id}"
+                    # Convert datetime objects to strings for JSON serialization
+                    cache_items = []
+                    for item in menu_items:
+                        cache_item = item.copy()
+                        if isinstance(cache_item.get("created_at"), datetime):
+                            cache_item["created_at"] = cache_item["created_at"].isoformat()
+                        cache_items.append(cache_item)
+                    
+                    await self.cache.setex(cache_key, 600, json.dumps(cache_items))  # 10 min cache
+                    print(f"💾 Cached {len(menu_items)} menu items for org {org_id}")
+                except Exception as cache_set_error:
+                    print(f"⚠️ Failed to cache menu items: {cache_set_error}")
+            
+            print(f"📊 Found {len(menu_items)} menu items for org {org_id}")
+            return menu_items
+            
+        except Exception as db_error:
+            print(f"❌ MongoDB error in get_menu_items: {db_error}")
+            # Return empty list rather than crash
+            return []
+    
+    async def invalidate_menu_caches(self, org_id: str):
+        """Invalidate menu item caches when menu changes"""
+        
+        if self.cache.is_connected():
+            try:
+                cache_key = f"menu_items:{org_id}"
+                await self.cache.delete(cache_key)
+                print(f"🗑️ Menu cache invalidated for org {org_id}")
+            except Exception as cache_error:
+                print(f"⚠️ Failed to invalidate menu cache: {cache_error}")
+        else:
+            print(f"⚠️ Redis not connected, skipping menu cache invalidation for org {org_id}")
+    
+    async def get_inventory_items(self, org_id: str, use_cache: bool = True) -> List[Dict]:
+        """Get inventory items with Redis caching and robust fallback"""
+        
+        # Try cache first if enabled and Redis is connected
+        if use_cache and self.cache.is_connected():
+            try:
+                cache_key = f"inventory:{org_id}"
+                cached_data = await self.cache.get(cache_key)
+                
+                if cached_data:
+                    inventory_items = json.loads(cached_data)
+                    print(f"🚀 Cache HIT: {len(inventory_items)} inventory items for org {org_id}")
+                    return inventory_items
+                else:
+                    print(f"💾 Cache MISS: inventory items for org {org_id}")
+            except Exception as cache_error:
+                print(f"❌ Redis cache error: {cache_error}, falling back to MongoDB")
+        
+        # Fallback to MongoDB
+        print(f"📊 Fetching inventory items from MongoDB for org {org_id}")
+        
+        try:
+            # Query inventory items for the organization
+            query = {"organization_id": org_id}
+            
+            inventory_items = await self.db.inventory.find(
+                query, 
+                {"_id": 0}
+            ).sort("name", 1).to_list(1000)
+            
+            # Convert datetime objects for consistency
+            for item in inventory_items:
+                try:
+                    if isinstance(item.get("last_updated"), str):
+                        item["last_updated"] = datetime.fromisoformat(item["last_updated"])
+                except Exception as dt_error:
+                    # If datetime conversion fails, leave as string
+                    print(f"⚠️ Datetime conversion error for inventory item {item.get('id', 'unknown')}: {dt_error}")
+                    pass
+            
+            # Try to cache the results if Redis is available
+            if use_cache and self.cache.is_connected():
+                try:
+                    cache_key = f"inventory:{org_id}"
+                    # Convert datetime objects to strings for JSON serialization
+                    cache_items = []
+                    for item in inventory_items:
+                        cache_item = item.copy()
+                        if isinstance(cache_item.get("last_updated"), datetime):
+                            cache_item["last_updated"] = cache_item["last_updated"].isoformat()
+                        cache_items.append(cache_item)
+                    
+                    await self.cache.setex(cache_key, 300, json.dumps(cache_items))  # 5 min cache
+                    print(f"💾 Cached {len(inventory_items)} inventory items for org {org_id}")
+                except Exception as cache_set_error:
+                    print(f"⚠️ Failed to cache inventory items: {cache_set_error}")
+            
+            print(f"📊 Found {len(inventory_items)} inventory items for org {org_id}")
+            return inventory_items
+            
+        except Exception as db_error:
+            print(f"❌ MongoDB error in get_inventory_items: {db_error}")
+            # Return empty list rather than crash
+            return []
+    
+    async def invalidate_inventory_caches(self, org_id: str):
+        """Invalidate inventory caches when inventory changes"""
+        
+        if self.cache.is_connected():
+            try:
+                cache_key = f"inventory:{org_id}"
+                await self.cache.delete(cache_key)
+                print(f"🗑️ Inventory cache invalidated for org {org_id}")
+            except Exception as cache_error:
+                print(f"⚠️ Failed to invalidate inventory cache: {cache_error}")
+        else:
+            print(f"⚠️ Redis not connected, skipping inventory cache invalidation for org {org_id}")
 
 # Global cache instance
 redis_cache = RedisCache()

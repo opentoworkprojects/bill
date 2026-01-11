@@ -3211,6 +3211,15 @@ async def update_menu_item(
     )
     if isinstance(updated["created_at"], str):
         updated["created_at"] = datetime.fromisoformat(updated["created_at"])
+    
+    # Invalidate menu cache
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_menu_caches(user_org_id)
+        print(f"🗑️ Menu cache invalidated for updated item {item_id}")
+    except Exception as e:
+        print(f"⚠️ Menu cache invalidation error: {e}")
+    
     return updated
 
 
@@ -3229,6 +3238,15 @@ async def delete_menu_item(
     )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
+    
+    # Invalidate menu cache
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_menu_caches(user_org_id)
+        print(f"🗑️ Menu cache invalidated for deleted item {item_id}")
+    except Exception as e:
+        print(f"⚠️ Menu cache invalidation error: {e}")
+    
     return {"message": "Item deleted"}
 
 
@@ -4354,6 +4372,16 @@ async def create_inventory_item(
     doc = inv_obj.model_dump()
     doc["last_updated"] = doc["last_updated"].isoformat()
     await db.inventory.insert_one(doc)
+    
+    # Invalidate related caches
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_inventory_caches(user_org_id)
+        await cached_service.invalidate_menu_caches(user_org_id)
+        print(f"🗑️ Inventory and menu caches invalidated for new item {inv_obj.id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
+    
     return inv_obj
 
 
@@ -4362,16 +4390,26 @@ async def get_inventory(current_user: dict = Depends(get_current_user)):
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
 
-    # Optimized query with projection to reduce data transfer
-    items = await db.inventory.find(
-        {"organization_id": user_org_id}, 
-        {"_id": 0}
-    ).sort("name", 1).to_list(1000)  # Sort by name for consistent ordering
-    
-    for item in items:
-        if isinstance(item["last_updated"], str):
-            item["last_updated"] = datetime.fromisoformat(item["last_updated"])
-    return items
+    try:
+        # Use Redis-cached service for inventory items
+        cached_service = get_cached_order_service()
+        items = await cached_service.get_inventory_items(user_org_id, use_cache=True)
+        print(f"🚀 Returned {len(items)} inventory items (Redis cached)")
+        return items
+        
+    except Exception as e:
+        print(f"❌ Error fetching inventory from cache: {e}")
+        # Fallback to direct MongoDB query
+        items = await db.inventory.find(
+            {"organization_id": user_org_id}, 
+            {"_id": 0}
+        ).sort("name", 1).to_list(1000)  # Sort by name for consistent ordering
+        
+        for item in items:
+            if isinstance(item["last_updated"], str):
+                item["last_updated"] = datetime.fromisoformat(item["last_updated"])
+        print(f"📊 Fallback: Returned {len(items)} inventory items from MongoDB")
+        return items
 
 
 @api_router.put("/inventory/{item_id}", response_model=InventoryItem)
@@ -4397,6 +4435,16 @@ async def update_inventory_item(
     )
     if isinstance(updated["last_updated"], str):
         updated["last_updated"] = datetime.fromisoformat(updated["last_updated"])
+    
+    # Invalidate related caches
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_inventory_caches(user_org_id)
+        await cached_service.invalidate_menu_caches(user_org_id)
+        print(f"🗑️ Inventory and menu caches invalidated for updated item {item_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
+    
     return updated
 
 
@@ -4437,6 +4485,15 @@ async def delete_inventory_item(
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
+    
+    # Invalidate related caches
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_inventory_caches(user_org_id)
+        await cached_service.invalidate_menu_caches(user_org_id)
+        print(f"🗑️ Inventory and menu caches invalidated for deleted item {item_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
     
     return {"message": "Item deleted successfully"}
 

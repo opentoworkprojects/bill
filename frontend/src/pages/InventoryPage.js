@@ -95,7 +95,19 @@ const InventoryPage = ({ user }) => {
     try {
       console.log('Fetching inventory...');
       setLoading(true); setError(null);
-      const response = await axios.get(`${API}/inventory`);
+      
+      // Check if user is authenticated
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required. Please login again.');
+      }
+      
+      const response = await axios.get(`${API}/inventory`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       console.log('Inventory fetch successful:', response.data.length, 'items');
       setInventory(response.data);
       return response.data;
@@ -103,10 +115,29 @@ const InventoryPage = ({ user }) => {
       console.error('Inventory fetch error:', error);
       console.error('Error status:', error.response?.status);
       console.error('Error data:', error.response?.data);
-      setError(error.response?.data?.detail || error.message);
-      toast.error('Failed to fetch inventory');
+      
+      let errorMessage = 'Failed to fetch inventory';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please login again.';
+        // Optionally redirect to login
+        // window.location.href = '/login';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to view inventory.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
       return [];
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const fetchLowStock = async () => {
@@ -173,6 +204,13 @@ const InventoryPage = ({ user }) => {
     }
 
     try {
+      // Check authentication
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required. Please login again.');
+        return;
+      }
+
       // Prepare data with proper type conversion
       const submitData = {
         name: formData.name.trim(),
@@ -196,32 +234,53 @@ const InventoryPage = ({ user }) => {
 
       console.log('Submitting data:', submitData);
 
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+
       if (editingItem) {
-        const response = await axios.put(`${API}/inventory/${editingItem.id}`, submitData);
+        const response = await axios.put(`${API}/inventory/${editingItem.id}`, submitData, config);
         console.log('Update response:', response.data);
-        toast.success('Inventory item updated!');
+        toast.success('Inventory item updated successfully!');
       } else {
-        const response = await axios.post(`${API}/inventory`, submitData);
+        const response = await axios.post(`${API}/inventory`, submitData, config);
         console.log('Create response:', response.data);
-        toast.success('Inventory item created!');
+        toast.success('Inventory item created successfully!');
       }
+      
       setDialogOpen(false);
       const updatedInventory = await fetchInventory();
       const lowStockItems = updatedInventory.filter(item => item.quantity <= item.min_quantity);
       setLowStock(lowStockItems);
       resetForm();
+      
     } catch (error) { 
       console.error('Inventory save error:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
       
+      let errorMessage = 'Failed to save inventory item';
+      
       if (error.response?.status === 401) {
-        toast.error('Authentication required. Please login again.');
+        errorMessage = 'Authentication required. Please login again.';
       } else if (error.response?.status === 403) {
-        toast.error('Not authorized to perform this action.');
-      } else {
-        toast.error(error.response?.data?.detail || error.response?.data?.message || 'Failed to save inventory item'); 
+        errorMessage = 'Not authorized to perform this action. Check your user role.';
+      } else if (error.response?.status === 422) {
+        errorMessage = 'Invalid data provided. Please check all fields.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      toast.error(errorMessage);
     }
   };
 
