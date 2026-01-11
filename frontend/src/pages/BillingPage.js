@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search } from 'lucide-react';
@@ -296,6 +297,8 @@ const BillingPage = ({ user }) => {
     
     setLoading(true);
     try {
+      console.log('Processing payment:', { total, received, balance, isCredit });
+      
       // Create payment record
       await axios.post(`${API}/payments/create-order`, { 
         order_id: orderId, 
@@ -338,6 +341,8 @@ const BillingPage = ({ user }) => {
         paymentData.credit_amount = balance;
       }
       
+      console.log('Updating order with payment data:', paymentData);
+      
       // Update order with payment details
       await axios.put(`${API}/orders/${orderId}`, paymentData);
       
@@ -375,38 +380,69 @@ const BillingPage = ({ user }) => {
         receiptData.credit_amount = balance;
       }
 
+      console.log('Printing receipt with data:', receiptData);
       printReceipt(receiptData, businessSettings);
       
     } catch (error) {
       console.error('Payment error:', error);
-      toast.error(error.response?.data?.detail || 'Payment failed');
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to process payment.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Order not found. Please refresh and try again.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const handlePayment = async () => {
-    if (!order) return;
-    const updated = await updateOrderItems();
-    if (!updated) return;
-    
-    const total = calculateTotal();
-    const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
-    const balance = Math.max(0, total - received);
-    const isCredit = balance > 0;
-    
-    if ((showReceivedAmount || splitPayment) && received <= 0) {
-      toast.error('Please enter a valid received amount');
-      return;
-    }
+    try {
+      if (!order) {
+        toast.error('Order not found');
+        return;
+      }
+      
+      const updated = await updateOrderItems();
+      if (!updated) return;
+      
+      const total = calculateTotal();
+      const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
+      const balance = Math.max(0, total - received);
+      const isCredit = balance > 0;
+      
+      if ((showReceivedAmount || splitPayment) && received <= 0) {
+        toast.error('Please enter a valid received amount');
+        return;
+      }
 
-    // Check if partial payment and customer info is missing
-    if (isCredit && (!customerName || !customerPhone)) {
-      setShowCustomerModal(true);
-      return;
+      // Check if partial payment and customer info is missing
+      if (isCredit && (!customerName || !customerPhone)) {
+        setShowCustomerModal(true);
+        return;
+      }
+      
+      await processPayment();
+    } catch (error) {
+      console.error('Error in handlePayment:', error);
+      toast.error('Payment processing failed. Please try again.');
+      setLoading(false);
     }
-    
-    await processPayment();
   };
 
   const handleWhatsappShare = async () => {
@@ -1166,7 +1202,10 @@ const BillingPage = ({ user }) => {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold">Customer Information</h3>
-                <button onClick={() => setShowCustomerModal(false)}>
+                <button 
+                  onClick={() => setShowCustomerModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -1175,21 +1214,21 @@ const BillingPage = ({ user }) => {
               </p>
               <div className="space-y-4">
                 <div>
-                  <Label>Customer Name *</Label>
+                  <Label className="text-sm font-medium">Customer Name *</Label>
                   <Input 
                     placeholder="Enter customer name" 
                     value={customerName} 
                     onChange={(e) => setCustomerName(e.target.value)} 
-                    className="h-12 text-lg" 
+                    className="h-12 text-lg mt-1" 
                   />
                 </div>
                 <div>
-                  <Label>Phone Number *</Label>
+                  <Label className="text-sm font-medium">Phone Number *</Label>
                   <Input 
                     placeholder="+91 9876543210" 
                     value={customerPhone} 
                     onChange={(e) => setCustomerPhone(e.target.value)} 
-                    className="h-12 text-lg" 
+                    className="h-12 text-lg mt-1" 
                   />
                 </div>
               </div>
@@ -1203,21 +1242,32 @@ const BillingPage = ({ user }) => {
                 </Button>
                 <Button 
                   onClick={() => {
-                    if (!customerName.trim()) {
-                      toast.error('Please enter customer name');
-                      return;
+                    try {
+                      if (!customerName.trim()) {
+                        toast.error('Please enter customer name');
+                        return;
+                      }
+                      if (!customerPhone.trim()) {
+                        toast.error('Please enter phone number');
+                        return;
+                      }
+                      setShowCustomerModal(false);
+                      processPayment();
+                    } catch (error) {
+                      console.error('Error in customer modal:', error);
+                      toast.error('Error processing customer information');
                     }
-                    if (!customerPhone.trim()) {
-                      toast.error('Please enter phone number');
-                      return;
-                    }
-                    setShowCustomerModal(false);
-                    processPayment();
                   }}
                   className="flex-1 bg-violet-600 hover:bg-violet-700"
                   disabled={!customerName.trim() || !customerPhone.trim()}
                 >
                   Continue Payment
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
                 </Button>
               </div>
             </CardContent>

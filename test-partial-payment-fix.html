@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Partial Payment Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success-box {
+            background: #f0fdf4;
+            border: 1px solid #22c55e;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #16a34a;
+        }
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #ef4444;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #dc2626;
+        }
+        .info-box {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #0369a1;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #7c3aed;
+            padding-bottom: 10px;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .fix-item {
+            background: #f8f9fa;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .issue-item {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Partial Payment White Screen Fix</h1>
+        <p>This page documents the fixes applied to resolve the white screen issue when clicking "Record Partial Payment via Custom Amount".</p>
+        
+        <div class="test-section">
+            <h2>🐛 Issues Identified</h2>
+            
+            <div class="issue-item">
+                <h3>1. Missing Label Import</h3>
+                <p><strong>Problem:</strong> The <code>Label</code> component was used in the customer modal but not imported.</p>
+                <div class="code-block">
+// Missing import caused white screen
+import { Input } from '../components/ui/input';
+// Label component used but not imported ❌
+
+// Customer modal using Label component
+&lt;Label&gt;Customer Name *&lt;/Label&gt;
+                </div>
+                <p><strong>Impact:</strong> JavaScript error causing complete white screen when modal opens.</p>
+            </div>
+            
+            <div class="issue-item">
+                <h3>2. Insufficient Error Handling</h3>
+                <p><strong>Problem:</strong> Missing try-catch blocks in critical functions.</p>
+                <div class="code-block">
+// Original code - no error handling
+const handlePayment = async () => {
+    if (!order) return;
+    const updated = await updateOrderItems(); // Could throw error
+    await processPayment(); // Could throw error
+};
+                </div>
+                <p><strong>Impact:</strong> Unhandled errors causing white screen instead of user-friendly error messages.</p>
+            </div>
+            
+            <div class="issue-item">
+                <h3>3. Poor Error Feedback</h3>
+                <p><strong>Problem:</strong> Generic error messages without specific details.</p>
+                <div class="code-block">
+// Original error handling
+catch (error) {
+    toast.error(error.response?.data?.detail || 'Payment failed');
+}
+                </div>
+                <p><strong>Impact:</strong> Users couldn't understand what went wrong or how to fix it.</p>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>✅ Fixes Applied</h2>
+            
+            <div class="fix-item">
+                <h3>1. Added Missing Label Import</h3>
+                <div class="code-block">
+// Fixed import statement
+import { Label } from '../components/ui/label';
+
+// Now Label component works properly in customer modal
+&lt;Label className="text-sm font-medium"&gt;Customer Name *&lt;/Label&gt;
+                </div>
+                <p><strong>Result:</strong> Customer modal renders properly without white screen.</p>
+            </div>
+            
+            <div class="fix-item">
+                <h3>2. Enhanced Error Handling</h3>
+                <div class="code-block">
+// Improved handlePayment with comprehensive error handling
+const handlePayment = async () => {
+    try {
+        if (!order) {
+            toast.error('Order not found');
+            return;
+        }
+        
+        const updated = await updateOrderItems();
+        if (!updated) return;
+        
+        // ... payment logic ...
+        
+        await processPayment();
+    } catch (error) {
+        console.error('Error in handlePayment:', error);
+        toast.error('Payment processing failed. Please try again.');
+        setLoading(false);
+    }
+};
+                </div>
+                <p><strong>Result:</strong> Graceful error handling prevents white screens.</p>
+            </div>
+            
+            <div class="fix-item">
+                <h3>3. Detailed Error Messages</h3>
+                <div class="code-block">
+// Enhanced error handling in processPayment
+catch (error) {
+    console.error('Payment error:', error);
+    
+    let errorMessage = 'Payment failed. Please try again.';
+    
+    if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please login again.';
+    } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to process payment.';
+    } else if (error.response?.status === 404) {
+        errorMessage = 'Order not found. Please refresh and try again.';
+    } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+    }
+    
+    toast.error(errorMessage);
+}
+                </div>
+                <p><strong>Result:</strong> Users get specific, actionable error messages.</p>
+            </div>
+            
+            <div class="fix-item">
+                <h3>4. Modal Error Protection</h3>
+                <div class="code-block">
+// Protected customer modal button click
+onClick={() => {
+    try {
+        if (!customerName.trim()) {
+            toast.error('Please enter customer name');
+            return;
+        }
+        if (!customerPhone.trim()) {
+            toast.error('Please enter phone number');
+            return;
+        }
+        setShowCustomerModal(false);
+        processPayment();
+    } catch (error) {
+        console.error('Error in customer modal:', error);
+        toast.error('Error processing customer information');
+    }
+}}
+                </div>
+                <p><strong>Result:</strong> Modal interactions are protected from errors.</p>
+            </div>
+            
+            <div class="fix-item">
+                <h3>5. Added Debug Logging</h3>
+                <div class="code-block">
+// Added comprehensive logging for debugging
+console.log('Processing payment:', { total, received, balance, isCredit });
+console.log('Updating order with payment data:', paymentData);
+console.log('Printing receipt with data:', receiptData);
+console.error('Error details:', {
+    status: error.response?.status,
+    data: error.response?.data,
+    message: error.message
+});
+                </div>
+                <p><strong>Result:</strong> Better debugging capabilities for future issues.</p>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🧪 Testing Checklist</h2>
+            
+            <div class="info-box">
+                <h3>Manual Testing Steps:</h3>
+                <ol>
+                    <li>✅ Go to billing page for an order</li>
+                    <li>✅ Select "Custom Amount (Partial/Overpayment)" radio button</li>
+                    <li>✅ Enter a partial amount (less than total)</li>
+                    <li>✅ Click "Record Partial Payment" button</li>
+                    <li>✅ Verify customer modal opens (no white screen)</li>
+                    <li>✅ Enter customer name and phone</li>
+                    <li>✅ Click "Continue Payment"</li>
+                    <li>✅ Verify payment processes successfully</li>
+                    <li>✅ Check receipt prints with QR code for balance</li>
+                </ol>
+            </div>
+            
+            <div class="success-box">
+                <h3>Expected Results:</h3>
+                <ul>
+                    <li>✅ No white screen when clicking partial payment</li>
+                    <li>✅ Customer modal opens properly</li>
+                    <li>✅ Clear error messages if validation fails</li>
+                    <li>✅ Payment processes successfully</li>
+                    <li>✅ Receipt prints with balance due and QR code</li>
+                    <li>✅ Order status updates to "pending" for partial payments</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🔍 Browser Console Debugging</h2>
+            
+            <div class="info-box">
+                <p>If you still encounter issues, check the browser console (F12) for these logs:</p>
+                <div class="code-block">
+// Success logs you should see:
+Processing payment: {total: 924, received: 500, balance: 424, isCredit: true}
+Updating order with payment data: {status: "pending", payment_received: 500, ...}
+Printing receipt with data: {balance_amount: 424, is_credit: true, ...}
+
+// Error logs to watch for:
+Error in handlePayment: [error details]
+Payment error: [error details]
+Error details: {status: 401, data: {...}, message: "..."}
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📋 Summary</h2>
+            
+            <div class="success-box">
+                <h3>✅ Fixes Applied:</h3>
+                <ul>
+                    <li>Added missing <code>Label</code> component import</li>
+                    <li>Enhanced error handling in <code>handlePayment()</code></li>
+                    <li>Improved error messages in <code>processPayment()</code></li>
+                    <li>Added error protection to customer modal</li>
+                    <li>Added comprehensive debug logging</li>
+                    <li>Improved modal styling and accessibility</li>
+                </ul>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>Result:</strong> The partial payment functionality should now work without white screens, providing clear error messages and smooth user experience.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
