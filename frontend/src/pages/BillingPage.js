@@ -21,6 +21,9 @@ const BillingPage = ({ user }) => {
   const [cashAmount, setCashAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
   const [upiAmount, setUpiAmount] = useState('');
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [businessSettings, setBusinessSettings] = useState(null);
   const [showWhatsappModal, setShowWhatsappModal] = useState(false);
@@ -250,20 +253,11 @@ const BillingPage = ({ user }) => {
     }
   };
 
-  const handlePayment = async () => {
-    if (!order) return;
-    const updated = await updateOrderItems();
-    if (!updated) return;
-    
+  const processPayment = async () => {
     const total = calculateTotal();
     const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
     const balance = Math.max(0, total - received);
     const isCredit = balance > 0;
-    
-    if ((showReceivedAmount || splitPayment) && received <= 0) {
-      toast.error('Please enter a valid received amount');
-      return;
-    }
     
     setLoading(true);
     try {
@@ -293,6 +287,14 @@ const BillingPage = ({ user }) => {
         tax_rate: getEffectiveTaxRate()
       };
 
+      // Add customer info for partial payments
+      if (isCredit && customerName) {
+        paymentData.customer_name = customerName;
+      }
+      if (isCredit && customerPhone) {
+        paymentData.customer_phone = customerPhone;
+      }
+
       // Add split payment details if applicable
       if (splitPayment) {
         paymentData.cash_amount = parseFloat(cashAmount) || 0;
@@ -307,10 +309,8 @@ const BillingPage = ({ user }) => {
       toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
       setPaymentCompleted(true);
       
-      // Release table only if fully paid
-      if (!isCredit) {
-        await releaseTable();
-      }
+      // Release table for all payments (partial or full)
+      await releaseTable();
       
       // Print receipt
       const discountAmt = calculateDiscountAmount();
@@ -327,7 +327,9 @@ const BillingPage = ({ user }) => {
         payment_method: splitPayment ? 'split' : paymentMethod,
         payment_received: received,
         balance_amount: balance,
-        is_credit: isCredit
+        is_credit: isCredit,
+        customer_name: customerName || order.customer_name,
+        customer_phone: customerPhone || order.customer_phone
       };
 
       // Add split payment details to receipt
@@ -346,6 +348,30 @@ const BillingPage = ({ user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePayment = async () => {
+    if (!order) return;
+    const updated = await updateOrderItems();
+    if (!updated) return;
+    
+    const total = calculateTotal();
+    const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
+    const balance = Math.max(0, total - received);
+    const isCredit = balance > 0;
+    
+    if ((showReceivedAmount || splitPayment) && received <= 0) {
+      toast.error('Please enter a valid received amount');
+      return;
+    }
+
+    // Check if partial payment and customer info is missing
+    if (isCredit && (!customerName || !customerPhone)) {
+      setShowCustomerModal(true);
+      return;
+    }
+    
+    await processPayment();
   };
 
   const handleWhatsappShare = async () => {
@@ -1097,6 +1123,72 @@ const BillingPage = ({ user }) => {
           </div>
         </div>
       </div>
+
+      {/* Customer Info Modal for Partial Payments */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold">Customer Information</h3>
+                <button onClick={() => setShowCustomerModal(false)}>
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                For partial payments, please provide customer details:
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label>Customer Name *</Label>
+                  <Input 
+                    placeholder="Enter customer name" 
+                    value={customerName} 
+                    onChange={(e) => setCustomerName(e.target.value)} 
+                    className="h-12 text-lg" 
+                  />
+                </div>
+                <div>
+                  <Label>Phone Number *</Label>
+                  <Input 
+                    placeholder="+91 9876543210" 
+                    value={customerPhone} 
+                    onChange={(e) => setCustomerPhone(e.target.value)} 
+                    className="h-12 text-lg" 
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCustomerModal(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (!customerName.trim()) {
+                      toast.error('Please enter customer name');
+                      return;
+                    }
+                    if (!customerPhone.trim()) {
+                      toast.error('Please enter phone number');
+                      return;
+                    }
+                    setShowCustomerModal(false);
+                    processPayment();
+                  }}
+                  className="flex-1 bg-violet-600 hover:bg-violet-700"
+                  disabled={!customerName.trim() || !customerPhone.trim()}
+                >
+                  Continue Payment
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* WhatsApp Modal */}
       {showWhatsappModal && (

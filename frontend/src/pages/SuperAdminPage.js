@@ -210,33 +210,22 @@ const SuperAdminPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // First try super admin login
-      const response = await axios.get(`${API}/super-admin/dashboard`, {
+      // Try ops panel login
+      const response = await axios.get(`${API}/ops/auth/login`, {
         params: credentials
       });
-      setDashboard(response.data);
-      setUserType('super-admin');
-      setAuthenticated(true);
-      toast.success('Super Admin access granted');
-      fetchAllData();
-    } catch (superAdminError) {
-      // If super admin fails, try team member login
-      try {
-        const teamResponse = await axios.post(`${API}/team/login`, {
-          username: credentials.username,
-          password: credentials.password
-        });
-        setTeamToken(teamResponse.data.token);
-        setTeamUser(teamResponse.data.user);
-        setUserType('team');
+      
+      if (response.data.success) {
+        setUserType('super-admin');
         setAuthenticated(true);
-        const availableTabs = getAvailableTabsForUser(teamResponse.data.user);
-        setActiveTab(availableTabs[0] || 'tickets');
-        toast.success(`Welcome ${teamResponse.data.user.full_name || teamResponse.data.user.username}!`);
-        fetchTeamData(teamResponse.data.token, teamResponse.data.user);
-      } catch (teamError) {
+        toast.success('Ops Panel access granted');
+        fetchAllData();
+      } else {
         toast.error('Invalid credentials');
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Invalid credentials or server error');
     } finally {
       setLoading(false);
     }
@@ -253,31 +242,24 @@ const SuperAdminPage = () => {
 
   const fetchAllData = async () => {
     try {
-      // Fetch users
-      const usersRes = await axios.get(`${API}/super-admin/users`, {
+      // Fetch users using ops panel endpoint
+      const usersRes = await axios.get(`${API}/ops/users/search`, {
         params: credentials
       });
-      setUsers(usersRes.data.users);
+      setUsers(usersRes.data.users || []);
 
-      // Fetch tickets
-      const ticketsRes = await axios.get(`${API}/super-admin/tickets`, {
+      // Fetch dashboard data
+      const dashboardRes = await axios.get(`${API}/ops/dashboard/overview`, {
         params: credentials
       });
-      setTickets(ticketsRes.data.tickets);
+      setDashboard(dashboardRes.data);
 
-      // Fetch leads
-      const leadsRes = await axios.get(`${API}/super-admin/leads`, {
-        params: credentials
-      });
-      setLeads(leadsRes.data.leads);
-      setLeadsStats(leadsRes.data.stats);
-
-      // Fetch team members
-      const teamRes = await axios.get(`${API}/super-admin/team`, {
-        params: credentials
-      });
-      setTeamMembers(teamRes.data.members);
-      setTeamStats(teamRes.data.stats);
+      // For now, set empty arrays for features not yet implemented in ops panel
+      setTickets([]);
+      setLeads([]);
+      setLeadsStats(null);
+      setTeamMembers([]);
+      setTeamStats(null);
 
       // Fetch analytics
       const analyticsRes = await axios.get(`${API}/super-admin/analytics`, {

@@ -49,7 +49,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         border_style: ps.border_style || 'single',
         separator_style: ps.separator_style || 'dashes',
         footer_style: ps.footer_style || 'simple',
-        qr_code_enabled: ps.qr_code_enabled ?? false,
+        qr_code_enabled: ps.qr_code_enabled ?? true,
         auto_print: ps.auto_print ?? false,
         print_copies: Math.max(1, Math.min(5, ps.print_copies || 1)),
         kot_auto_print: ps.kot_auto_print ?? true,
@@ -81,7 +81,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         border_style: 'single',
         separator_style: 'dashes',
         footer_style: 'simple',
-        qr_code_enabled: false,
+        qr_code_enabled: true,
         auto_print: false,
         print_copies: 1,
         kot_auto_print: true,
@@ -163,16 +163,88 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     }
   };
 
-  const generatePreview = () => {
+  const generatePreview = async () => {
     try {
+      if (activeTab === 'receipt') {
+        // Use actual printUtils function for receipt preview
+        const sampleOrder = {
+          id: 'SAMPLE123',
+          invoice_number: 'ABC12345',
+          table_number: 5,
+          waiter_name: 'John Doe',
+          customer_name: 'Guest Customer',
+          customer_phone: '+91 9876543210',
+          created_at: new Date().toISOString(),
+          items: [
+            { name: 'Butter Chicken', quantity: 2, price: 350, notes: customization.show_item_notes ? 'Extra spicy' : '' },
+            { name: 'Garlic Naan', quantity: 1, price: 60, notes: '' },
+            { name: 'Jeera Rice', quantity: 2, price: 120, notes: customization.show_item_notes ? 'Less salt' : '' },
+          ],
+          subtotal: 880,
+          tax: 44,
+          tax_rate: 5,
+          total: 924,
+          discount: 0,
+          discount_amount: 0,
+          payment_method: 'cash',
+          payment_received: 500, // Partial payment to show QR code
+          balance_amount: 424,
+          is_credit: true,
+          status: 'pending'
+        };
+        
+        try {
+          // Import and use the actual print utility functions
+          const { generateReceiptHTML } = await import('../utils/printUtils');
+          const htmlContent = generateReceiptHTML(sampleOrder, businessSettings);
+          
+          // Convert HTML to plain text for preview
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = htmlContent;
+          const plainText = tempDiv.textContent || tempDiv.innerText || '';
+          setPreviewContent(plainText);
+        } catch (importError) {
+          console.warn('Could not import printUtils, using fallback preview:', importError);
+          setPreviewContent(generateReceiptPreview());
+        }
+      } else {
+        // Use actual printUtils function for KOT preview
+        const sampleKOTOrder = {
+          id: 'KOT001234',
+          table_number: 5,
+          waiter_name: 'John Doe',
+          customer_name: 'Guest Customer',
+          created_at: new Date().toISOString(),
+          priority: 'normal',
+          items: [
+            { name: 'BUTTER CHICKEN', quantity: 2, notes: customization.kot_highlight_notes ? 'Extra spicy' : '' },
+            { name: 'GARLIC NAAN', quantity: 1, notes: '' },
+            { name: 'JEERA RICE', quantity: 2, notes: customization.kot_highlight_notes ? 'Less salt' : '' },
+          ]
+        };
+        
+        try {
+          const { generateKOTHTML } = await import('../utils/printUtils');
+          const htmlContent = generateKOTHTML(sampleKOTOrder);
+          
+          // Convert HTML to plain text for preview
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = htmlContent;
+          const plainText = tempDiv.textContent || tempDiv.innerText || '';
+          setPreviewContent(plainText);
+        } catch (importError) {
+          console.warn('Could not import printUtils, using fallback preview:', importError);
+          setPreviewContent(generateKOTPreview());
+        }
+      }
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      // Fallback to the original preview generation
       if (activeTab === 'receipt') {
         setPreviewContent(generateReceiptPreview());
       } else {
         setPreviewContent(generateKOTPreview());
       }
-    } catch (error) {
-      console.error('Error generating preview:', error);
-      setPreviewContent('Error generating preview. Please check your settings.');
     }
   };
 
@@ -353,6 +425,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         font_size: customization.font_size || 'medium',
         header_style: customization.header_style || 'centered',
         show_logo: Boolean(customization.show_logo),
+        logo_size: customization.logo_size || 'medium',
         show_address: Boolean(customization.show_address),
         show_phone: Boolean(customization.show_phone),
         show_email: Boolean(customization.show_email),
@@ -490,7 +563,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       border_style: 'single',
       separator_style: 'dashes',
       footer_style: 'simple',
-      qr_code_enabled: false,
+      qr_code_enabled: true,
       auto_print: false,
       print_copies: 1,
       kot_auto_print: true,
@@ -948,10 +1021,10 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <ToggleSwitch 
-                    label="QR Code on Receipt" 
+                    label="QR Code for Unpaid Bills" 
                     checked={customization.qr_code_enabled}
                     onChange={(v) => updateCustomization({ qr_code_enabled: v })}
-                    description="Add QR code for payment/feedback"
+                    description="Add UPI payment QR code for unpaid/overdue bills"
                   />
                   <ToggleSwitch 
                     label="Auto Print After Payment" 
