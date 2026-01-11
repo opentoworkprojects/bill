@@ -195,14 +195,9 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         
         try {
           // Import and use the actual print utility functions
-          const { generateReceiptHTML } = await import('../utils/printUtils');
-          const htmlContent = generateReceiptHTML(sampleOrder, businessSettings);
-          
-          // Convert HTML to plain text for preview
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = htmlContent;
-          const plainText = tempDiv.textContent || tempDiv.innerText || '';
-          setPreviewContent(plainText);
+          const { generatePlainTextReceipt } = await import('../utils/printUtils');
+          const plainTextContent = generatePlainTextReceipt(sampleOrder, businessSettings);
+          setPreviewContent(plainTextContent);
         } catch (importError) {
           console.warn('Could not import printUtils, using fallback preview:', importError);
           setPreviewContent(generateReceiptPreview());
@@ -224,14 +219,9 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         };
         
         try {
-          const { generateKOTHTML } = await import('../utils/printUtils');
-          const htmlContent = generateKOTHTML(sampleKOTOrder);
-          
-          // Convert HTML to plain text for preview
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = htmlContent;
-          const plainText = tempDiv.textContent || tempDiv.innerText || '';
-          setPreviewContent(plainText);
+          const { generateKOTContent } = await import('../utils/printUtils');
+          const plainTextContent = generateKOTContent(sampleKOTOrder);
+          setPreviewContent(plainTextContent);
         } catch (importError) {
           console.warn('Could not import printUtils, using fallback preview:', importError);
           setPreviewContent(generateKOTPreview());
@@ -258,53 +248,58 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     const doubleSep = customization.border_style === 'double' ? '═'.repeat(width) : sep;
     
     const restaurantName = businessSettings?.restaurant_name || 'Your Restaurant';
-    const centeredName = restaurantName.length <= width ? 
-      restaurantName.padStart((width + restaurantName.length) / 2).padEnd(width) : 
-      restaurantName.substring(0, width);
+    const center = (text) => {
+      if (text.length >= width) return text.substring(0, width);
+      const padding = Math.floor((width - text.length) / 2);
+      return ' '.repeat(padding) + text + ' '.repeat(width - text.length - padding);
+    };
 
     let preview = '';
     
     // Header
     preview += doubleSep + '\n';
-    preview += centeredName + '\n';
+    preview += center(restaurantName) + '\n';
     
     if (customization.show_tagline && businessSettings?.tagline) {
-      const tagline = businessSettings.tagline;
-      preview += tagline.padStart((width + tagline.length) / 2).padEnd(width) + '\n';
+      preview += center(businessSettings.tagline) + '\n';
+    }
+    
+    if (customization.show_fssai && businessSettings?.fssai) {
+      preview += center(`FSSAI: ${businessSettings.fssai}`) + '\n';
     }
     
     preview += doubleSep + '\n';
     
     if (customization.show_address && businessSettings?.address) {
-      preview += businessSettings.address.substring(0, width) + '\n';
+      preview += center(businessSettings.address.substring(0, width)) + '\n';
     }
     if (customization.show_phone && businessSettings?.phone) {
-      preview += `Phone: ${businessSettings.phone}\n`;
+      preview += center(`Phone: ${businessSettings.phone}`) + '\n';
     }
     if (customization.show_email && businessSettings?.email) {
-      preview += `Email: ${businessSettings.email}\n`;
+      preview += center(`Email: ${businessSettings.email}`) + '\n';
     }
     if (customization.show_website && businessSettings?.website) {
-      preview += `Web: ${businessSettings.website}\n`;
+      preview += center(`Web: ${businessSettings.website}`) + '\n';
     }
     if (customization.show_gstin && businessSettings?.gstin) {
-      preview += `GSTIN: ${businessSettings.gstin}\n`;
-    }
-    if (customization.show_fssai && businessSettings?.fssai) {
-      preview += `FSSAI: ${businessSettings.fssai}\n`;
+      preview += center(`GSTIN: ${businessSettings.gstin}`) + '\n';
     }
     
     preview += sep + '\n';
+    preview += center('BILL') + '\n';
+    preview += sep + '\n';
     
     // Order details
+    const date = new Date();
     preview += `Bill #: ABC12345\n`;
     if (customization.show_table_number) preview += `Table: 5\n`;
     if (customization.show_waiter_name) preview += `Server: John Doe\n`;
     if (customization.show_customer_name) preview += `Customer: Guest\n`;
-    if (customization.show_order_time) preview += `Date: ${new Date().toLocaleString()}\n`;
+    if (customization.show_order_time) preview += `Date: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}\n`;
     
     preview += sep + '\n';
-    preview += 'ITEMS:\n';
+    preview += 'Item            Qty    Rate     Amt\n';
     preview += sep + '\n';
     
     // Sample items
@@ -315,15 +310,16 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     ];
     
     items.forEach(item => {
-      const itemLine = `${item.qty}x ${item.name}`;
-      const priceLine = `₹${(item.qty * item.price).toFixed(2)}`;
-      const spaces = width - itemLine.length - priceLine.length;
-      preview += itemLine + ' '.repeat(Math.max(1, spaces)) + priceLine + '\n';
+      const itemName = item.name.substring(0, 14).padEnd(14);
+      const qty = item.qty.toString().padStart(3);
+      const rate = item.price.toFixed(2).padStart(8);
+      const amt = (item.qty * item.price).toFixed(2).padStart(8);
+      preview += `${itemName} ${qty} ${rate} ${amt}\n`;
+      
+      if (customization.show_item_notes && item.name === 'Butter Chicken') {
+        preview += `   Note: Extra spicy\n`;
+      }
     });
-    
-    if (customization.show_item_notes) {
-      preview += `   Note: Extra spicy\n`;
-    }
     
     preview += sep + '\n';
     
@@ -331,21 +327,33 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     const subtotal = 880;
     const tax = 44;
     const total = 924;
+    const totalItems = items.reduce((s, i) => s + i.qty, 0);
     
-    preview += `Subtotal:${' '.repeat(width - 18)}₹${subtotal.toFixed(2)}\n`;
-    preview += `Tax (5%):${' '.repeat(width - 17)}₹${tax.toFixed(2)}\n`;
+    preview += `Sub Total       ${totalItems.toString().padStart(3)}     -  ${subtotal.toFixed(2).padStart(8)}\n`;
+    preview += `Tax (5%)                       ${tax.toFixed(2).padStart(8)}\n`;
     preview += doubleSep + '\n';
-    preview += `TOTAL:${' '.repeat(width - 15)}₹${total.toFixed(2)}\n`;
+    preview += `TOTAL DUE                      ${total.toFixed(2).padStart(8)}\n`;
     preview += doubleSep + '\n';
+    
+    // Payment details
+    preview += `Payment Mode:                      CASH\n`;
+    preview += `Amount Received:               ${500.00.toFixed(2).padStart(8)}\n`;
+    preview += `BALANCE DUE:                   ${424.00.toFixed(2).padStart(8)}\n`;
+    preview += sep + '\n';
+    
+    // QR Code section
+    if (customization.qr_code_enabled) {
+      preview += '\n' + center('SCAN TO PAY BALANCE') + '\n';
+      preview += center('[QR CODE FOR PAYMENT]') + '\n';
+      preview += center(`Balance Due: ₹424.00`) + '\n';
+      preview += sep + '\n';
+    }
     
     // Footer
     const footer = businessSettings?.footer_message || 'Thank you for dining with us!';
-    preview += '\n' + footer.padStart((width + footer.length) / 2).padEnd(width) + '\n';
-    
-    if (customization.qr_code_enabled) {
-      preview += '\n[QR Code for Payment/Feedback]\n';
-    }
-    
+    preview += '\n' + center(footer) + '\n';
+    preview += center('Bill generated by BillByteKOT') + '\n';
+    preview += center('(billbytekot.in)') + '\n';
     preview += doubleSep + '\n';
     
     return preview;
@@ -356,10 +364,17 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     const sep = '='.repeat(width);
     const dash = '-'.repeat(width);
     
+    const center = (text) => {
+      if (text.length >= width) return text.substring(0, width);
+      const padding = Math.floor((width - text.length) / 2);
+      return ' '.repeat(padding) + text + ' '.repeat(width - text.length - padding);
+    };
+    
     let preview = '';
     
     preview += sep + '\n';
-    preview += '*** KITCHEN ORDER TICKET ***'.padStart((width + 28) / 2).padEnd(width) + '\n';
+    preview += center('*** KOT ***') + '\n';
+    preview += center('KITCHEN ORDER TICKET') + '\n';
     preview += sep + '\n\n';
     
     preview += `ORDER #: KOT-001234\n`;
@@ -371,7 +386,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     preview += `PRIORITY: NORMAL\n`;
     
     preview += '\n' + dash + '\n';
-    preview += 'ITEMS TO PREPARE:\n';
+    preview += center('ITEMS TO PREPARE') + '\n';
     preview += dash + '\n\n';
     
     // Sample KOT items with large font simulation
@@ -383,18 +398,22 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
     
     items.forEach((item, idx) => {
       if (customization.kot_font_size === 'large') {
-        preview += `>>> ${item.qty}x ${item.name} <<<\n`;
+        preview += `>>> ${item.qty} × ${item.name} <<<\n`;
+      } else if (customization.kot_font_size === 'medium') {
+        preview += `>> ${item.qty} × ${item.name} <<\n`;
       } else {
-        preview += `${item.qty}x ${item.name}\n`;
+        preview += `${item.qty} × ${item.name}\n`;
       }
+      
       if (customization.kot_highlight_notes && item.notes) {
-        preview += `    *** ${item.notes} ***\n`;
+        preview += `    *** ${item.notes.toUpperCase()} ***\n`;
       }
+      
       if (idx < items.length - 1) preview += '\n';
     });
     
     preview += '\n' + dash + '\n';
-    preview += `TOTAL ITEMS: ${items.reduce((sum, i) => sum + i.qty, 0)}\n`;
+    preview += center(`TOTAL ITEMS: ${items.reduce((sum, i) => sum + i.qty, 0)}`) + '\n';
     preview += sep + '\n';
     
     return preview;

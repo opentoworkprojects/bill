@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Formatting Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .preview-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .preview-box {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .controls {
+            margin-bottom: 15px;
+        }
+        .controls button {
+            background: #7c3aed;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .controls button:hover {
+            background: #6d28d9;
+        }
+        .controls select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #7c3aed;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Print Formatting Test</h1>
+        <p>This page tests the print formatting to ensure previews show correctly formatted receipts instead of raw HTML/CSS.</p>
+        
+        <div class="preview-section">
+            <h2>📄 Receipt Preview</h2>
+            <div class="controls">
+                <select id="paperWidth">
+                    <option value="80mm">80mm Paper</option>
+                    <option value="58mm">58mm Paper</option>
+                </select>
+                <select id="fontSize">
+                    <option value="small">Small Font</option>
+                    <option value="medium" selected>Medium Font</option>
+                    <option value="large">Large Font</option>
+                </select>
+                <button onclick="generateReceiptPreview()">Generate Receipt</button>
+                <button onclick="testPrint('receipt')">Test Print</button>
+            </div>
+            <div id="receiptPreview" class="preview-box">Click "Generate Receipt" to see preview...</div>
+        </div>
+        
+        <div class="preview-section">
+            <h2>🍽️ KOT Preview</h2>
+            <div class="controls">
+                <select id="kotFontSize">
+                    <option value="small">Small Font</option>
+                    <option value="medium">Medium Font</option>
+                    <option value="large" selected>Large Font</option>
+                </select>
+                <button onclick="generateKOTPreview()">Generate KOT</button>
+                <button onclick="testPrint('kot')">Test Print</button>
+            </div>
+            <div id="kotPreview" class="preview-box">Click "Generate KOT" to see preview...</div>
+        </div>
+    </div>
+
+    <script>
+        // Sample business settings
+        const businessSettings = {
+            restaurant_name: 'Test Restaurant',
+            tagline: 'Delicious Food & Great Service',
+            address: '123 Main Street, City, State 12345',
+            phone: '+91 9876543210',
+            email: 'info@testrestaurant.com',
+            gstin: '12ABCDE3456F7G8',
+            fssai: '12345678901234',
+            footer_message: 'Thank you for dining with us!'
+        };
+
+        function generateReceiptPreview() {
+            const paperWidth = document.getElementById('paperWidth').value;
+            const fontSize = document.getElementById('fontSize').value;
+            
+            const width = paperWidth === '58mm' ? 32 : 48;
+            const sep = '-'.repeat(width);
+            const doubleSep = '='.repeat(width);
+            
+            const center = (text) => {
+                if (text.length >= width) return text.substring(0, width);
+                const padding = Math.floor((width - text.length) / 2);
+                return ' '.repeat(padding) + text + ' '.repeat(width - text.length - padding);
+            };
+
+            let preview = '';
+            
+            // Header
+            preview += doubleSep + '\\n';
+            preview += center(businessSettings.restaurant_name) + '\\n';
+            preview += center(businessSettings.tagline) + '\\n';
+            preview += center(`FSSAI: ${businessSettings.fssai}`) + '\\n';
+            preview += doubleSep + '\\n';
+            
+            preview += center(businessSettings.address) + '\\n';
+            preview += center(`Phone: ${businessSettings.phone}`) + '\\n';
+            preview += center(`Email: ${businessSettings.email}`) + '\\n';
+            preview += center(`GSTIN: ${businessSettings.gstin}`) + '\\n';
+            
+            preview += sep + '\\n';
+            preview += center('BILL') + '\\n';
+            preview += sep + '\\n';
+            
+            // Order details
+            const date = new Date();
+            preview += `Bill #: ABC12345\\n`;
+            preview += `Table: 5\\n`;
+            preview += `Server: John Doe\\n`;
+            preview += `Customer: Guest Customer\\n`;
+            preview += `Date: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}\\n`;
+            
+            preview += sep + '\\n';
+            preview += 'Item            Qty    Rate     Amt\\n';
+            preview += sep + '\\n';
+            
+            // Sample items
+            const items = [
+                { qty: 2, name: 'Butter Chicken', price: 350 },
+                { qty: 1, name: 'Garlic Naan', price: 60 },
+                { qty: 2, name: 'Jeera Rice', price: 120 },
+            ];
+            
+            items.forEach(item => {
+                const itemName = item.name.substring(0, 14).padEnd(14);
+                const qty = item.qty.toString().padStart(3);
+                const rate = item.price.toFixed(2).padStart(8);
+                const amt = (item.qty * item.price).toFixed(2).padStart(8);
+                preview += `${itemName} ${qty} ${rate} ${amt}\\n`;
+            });
+            
+            preview += `   Note: Extra spicy\\n`;
+            preview += sep + '\\n';
+            
+            // Totals
+            const subtotal = 880;
+            const tax = 44;
+            const total = 924;
+            const totalItems = items.reduce((s, i) => s + i.qty, 0);
+            
+            preview += `Sub Total       ${totalItems.toString().padStart(3)}     -  ${subtotal.toFixed(2).padStart(8)}\\n`;
+            preview += `Tax (5%)                       ${tax.toFixed(2).padStart(8)}\\n`;
+            preview += doubleSep + '\\n';
+            preview += `TOTAL DUE                      ${total.toFixed(2).padStart(8)}\\n`;
+            preview += doubleSep + '\\n';
+            
+            // Payment details
+            preview += `Payment Mode:                      CASH\\n`;
+            preview += `Amount Received:               ${500.00.toFixed(2).padStart(8)}\\n`;
+            preview += `BALANCE DUE:                   ${424.00.toFixed(2).padStart(8)}\\n`;
+            preview += sep + '\\n';
+            
+            // QR Code section
+            preview += '\\n' + center('SCAN TO PAY BALANCE') + '\\n';
+            preview += center('[QR CODE FOR PAYMENT]') + '\\n';
+            preview += center(`Balance Due: ₹424.00`) + '\\n';
+            preview += sep + '\\n';
+            
+            // Footer
+            preview += '\\n' + center(businessSettings.footer_message) + '\\n';
+            preview += center('Bill generated by BillByteKOT') + '\\n';
+            preview += center('(billbytekot.in)') + '\\n';
+            preview += doubleSep + '\\n';
+            
+            document.getElementById('receiptPreview').textContent = preview;
+            
+            // Apply font size
+            const previewElement = document.getElementById('receiptPreview');
+            previewElement.style.fontSize = fontSize === 'small' ? '10px' : fontSize === 'large' ? '14px' : '12px';
+        }
+
+        function generateKOTPreview() {
+            const kotFontSize = document.getElementById('kotFontSize').value;
+            const width = 48;
+            const sep = '='.repeat(width);
+            const dash = '-'.repeat(width);
+            
+            const center = (text) => {
+                if (text.length >= width) return text.substring(0, width);
+                const padding = Math.floor((width - text.length) / 2);
+                return ' '.repeat(padding) + text + ' '.repeat(width - text.length - padding);
+            };
+            
+            let preview = '';
+            
+            preview += sep + '\\n';
+            preview += center('*** KOT ***') + '\\n';
+            preview += center('KITCHEN ORDER TICKET') + '\\n';
+            preview += sep + '\\n\\n';
+            
+            preview += `ORDER #: KOT-001234\\n`;
+            preview += `TABLE: 5\\n`;
+            preview += `SERVER: John Doe\\n`;
+            preview += `TIME: ${new Date().toLocaleTimeString()}\\n`;
+            preview += `PRIORITY: NORMAL\\n`;
+            
+            preview += '\\n' + dash + '\\n';
+            preview += center('ITEMS TO PREPARE') + '\\n';
+            preview += dash + '\\n\\n';
+            
+            // Sample KOT items
+            const items = [
+                { qty: 2, name: 'BUTTER CHICKEN', notes: 'Extra spicy' },
+                { qty: 1, name: 'GARLIC NAAN', notes: '' },
+                { qty: 2, name: 'JEERA RICE', notes: 'Less salt' },
+            ];
+            
+            items.forEach((item, idx) => {
+                if (kotFontSize === 'large') {
+                    preview += `>>> ${item.qty} × ${item.name} <<<\\n`;
+                } else if (kotFontSize === 'medium') {
+                    preview += `>> ${item.qty} × ${item.name} <<\\n`;
+                } else {
+                    preview += `${item.qty} × ${item.name}\\n`;
+                }
+                
+                if (item.notes) {
+                    preview += `    *** ${item.notes.toUpperCase()} ***\\n`;
+                }
+                
+                if (idx < items.length - 1) preview += '\\n';
+            });
+            
+            preview += '\\n' + dash + '\\n';
+            preview += center(`TOTAL ITEMS: ${items.reduce((sum, i) => sum + i.qty, 0)}`) + '\\n';
+            preview += sep + '\\n';
+            
+            document.getElementById('kotPreview').textContent = preview;
+            
+            // Apply font size
+            const previewElement = document.getElementById('kotPreview');
+            previewElement.style.fontSize = kotFontSize === 'small' ? '10px' : kotFontSize === 'large' ? '14px' : '12px';
+        }
+
+        function testPrint(type) {
+            const content = type === 'receipt' 
+                ? document.getElementById('receiptPreview').textContent
+                : document.getElementById('kotPreview').textContent;
+            
+            if (!content || content.includes('Click')) {
+                alert('Please generate a preview first!');
+                return;
+            }
+            
+            const printWindow = window.open('', '_blank', 'width=400,height=600');
+            
+            if (!printWindow) {
+                alert('Unable to open print window. Please check your popup blocker settings.');
+                return;
+            }
+            
+            const fontSize = type === 'receipt' 
+                ? document.getElementById('fontSize').value
+                : document.getElementById('kotFontSize').value;
+            
+            const fontSizePx = fontSize === 'small' ? '10px' : fontSize === 'large' ? '14px' : '12px';
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <title>Test Print - ${type === 'receipt' ? 'Receipt' : 'KOT'}</title>
+                    <style>
+                      body {
+                        font-family: 'Courier New', Consolas, monospace;
+                        font-size: ${fontSizePx};
+                        line-height: 1.4;
+                        margin: 20px;
+                        background: white;
+                      }
+                      @media print {
+                        body { margin: 0; padding: 10px; }
+                        .no-print { display: none; }
+                      }
+                      .print-content {
+                        white-space: pre-wrap;
+                        font-family: inherit;
+                      }
+                      .print-actions {
+                        margin-top: 20px;
+                        text-align: center;
+                      }
+                      .print-btn {
+                        background: #7c3aed;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin: 0 5px;
+                        font-size: 14px;
+                      }
+                      .print-btn:hover {
+                        background: #6d28d9;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="print-content">${content}</div>
+                    <div class="print-actions no-print">
+                      <button class="print-btn" onclick="window.print()">Print</button>
+                      <button class="print-btn" onclick="window.close()">Close</button>
+                    </div>
+                  </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+        }
+
+        // Generate initial previews
+        window.onload = function() {
+            generateReceiptPreview();
+            generateKOTPreview();
+        };
+    </script>
+</body>
+</html>
