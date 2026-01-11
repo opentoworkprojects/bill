@@ -446,78 +446,128 @@ const TopBanner = () => {
         backgroundSize: '400% 400%',
         animation: 'gradient-x 3s ease infinite'
       }}>
+        {/* Animated fire background - pointer-events-none to not block clicks */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(25)].map((_, i) => (
+            <div key={i} className="absolute text-2xl animate-float opacity-60" style={{
+              left: `${Math.random() * 100}%`,
+              bottom: '-20px',
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 2}s`
+            }}>🔥</div>
+          ))}
+        </div>
+
         {/* Glowing orbs - pointer-events-none */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-20 h-20 bg-yellow-400 rounded-full filter blur-2xl opacity-30" />
-          <div className="absolute top-0 right-1/4 w-20 h-20 bg-orange-500 rounded-full filter blur-2xl opacity-30" />
+          <div className="absolute top-0 left-1/4 w-32 h-32 bg-yellow-400 rounded-full filter blur-3xl opacity-40 animate-pulse" />
+          <div className="absolute top-0 right-1/4 w-32 h-32 bg-orange-500 rounded-full filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '0.5s' }} />
+          <div className="absolute top-0 left-1/2 w-24 h-24 bg-red-500 rounded-full filter blur-2xl opacity-30 animate-ping" style={{ animationDuration: '2s' }} />
         </div>
-        
-        <div className="relative z-10 py-2 px-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+
+        {/* Sparkles - pointer-events-none */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(12)].map((_, i) => (
+            <Sparkles key={i} className="absolute w-5 h-5 text-yellow-200 animate-ping" style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 2}s`,
+              animationDuration: '1.5s'
+            }} />
+          ))}
+        </div>
+
+        <div className="relative z-10 py-4 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
             
             {/* Animated Badge */}
-            <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-400/50">
-              <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
-              <span className="font-black text-sm tracking-wide text-yellow-100">
-                {bannerData.badge_text || 'LIMITED TIME OFFER'}
+            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full border border-yellow-400/50 shadow-lg shadow-orange-500/30">
+              <Flame className="w-6 h-6 text-yellow-300 animate-pulse" />
+              <span className="font-black text-base sm:text-lg tracking-wide text-yellow-100 drop-shadow-lg">
+                {bannerData.badge_text || '🔥 EARLY ADOPTER SPECIAL'}
               </span>
-              <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
+              <Flame className="w-6 h-6 text-yellow-300 animate-pulse" />
             </div>
-            
-            {/* Price Display */}
-            <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm px-3 py-1 rounded-xl border border-white/20">
-              <span className="text-white/50 line-through text-sm">{originalPrice}/yr</span>
-              <ArrowRight className="w-4 h-4 text-yellow-300" />
-              <span className="text-2xl sm:text-3xl font-black text-yellow-200">{salePrice}</span>
-              <span className="text-yellow-200 text-sm">/year</span>
-              <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-2 py-0.5 rounded-lg font-black text-xs">
+
+            {/* MEGA Price Display */}
+            <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/20">
+              <div className="text-center">
+                <span className="text-white/50 line-through text-sm block">{originalPrice}/yr</span>
+              </div>
+              <ArrowRight className="w-5 h-5 text-yellow-300 animate-pulse" />
+              <div className="relative">
+                <span className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-100 to-yellow-300 drop-shadow-2xl" style={{
+                  textShadow: '0 0 30px rgba(255,255,0,0.5), 0 0 60px rgba(255,200,0,0.3)'
+                }}>
+                  {salePrice}
+                </span>
+                <span className="text-yellow-200 text-lg font-bold">/year</span>
+                {/* Glow effect */}
+                <div className="absolute inset-0 bg-yellow-400 filter blur-xl opacity-30 animate-pulse" />
+              </div>
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-3 py-1.5 rounded-xl font-black text-sm sm:text-base animate-bounce shadow-lg">
                 {discountPercent}% OFF
-              </span>
+              </div>
             </div>
-            
+
             {/* Countdown Timer */}
-            <div className="hidden md:flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-lg">
-              <Timer className="w-4 h-4 text-red-400" />
-              <div className="flex gap-0.5">
+            <div className="hidden md:flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-xl border border-red-400/30">
+              <Timer className="w-5 h-5 text-red-400 animate-pulse" />
+              <div className="flex gap-1">
                 {[
                   { val: timeLeft.days, label: 'd' },
                   { val: timeLeft.hours, label: 'h' },
                   { val: timeLeft.minutes, label: 'm' },
                   { val: timeLeft.seconds, label: 's' }
                 ].map((item, i) => (
-                  <div key={i} className="bg-red-600/80 px-1.5 py-0.5 rounded text-center min-w-[28px]">
-                    <span className="font-mono font-bold text-white text-sm">{String(item.val).padStart(2, '0')}</span>
-                    <span className="text-[9px] text-red-200">{item.label}</span>
+                  <div key={i} className="bg-red-600/80 px-2 py-1 rounded text-center min-w-[32px]">
+                    <span className="font-mono font-black text-white">{String(item.val).padStart(2, '0')}</span>
+                    <span className="text-[10px] text-red-200">{item.label}</span>
                   </div>
                 ))}
               </div>
             </div>
-            
-            {/* CTA Button */}
-            <button 
-              onClick={() => navigate('/login')} 
-              className="bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-4 py-1.5 rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-all flex items-center gap-1.5"
+
+            {/* MEGA CTA Button */}
+            <button
+              onClick={() => navigate('/login')}
+              className="relative bg-gradient-to-r from-yellow-400 via-yellow-300 to-orange-400 text-black px-6 sm:px-8 py-3 rounded-full font-black text-base sm:text-lg shadow-2xl shadow-yellow-500/50 hover:shadow-yellow-400/70 transform hover:scale-110 transition-all duration-300 group overflow-hidden border-2 border-yellow-200"
+              style={{
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }}
             >
-              <Zap className="w-4 h-4" />
-              {bannerData.cta_text || 'Grab This Deal Now!'}
-              <ArrowRight className="w-4 h-4" />
+              <span className="relative z-10 flex items-center gap-2">
+                <Rocket className="w-5 h-5 group-hover:animate-bounce" />
+                {bannerData.cta_text || `Grab ${salePrice} Deal NOW!`}
+                <Zap className="w-5 h-5 animate-pulse" />
+              </span>
+              {/* Shine effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
             </button>
-            
+
             {/* Close */}
-            <button onClick={() => setDismissed(true)} className="text-white/60 hover:text-white">
-              <X className="w-4 h-4" />
+            <button onClick={() => setDismissed(true)} className="text-white/60 hover:text-white hover:scale-125 transition-transform">
+              <X className="w-5 h-5" />
             </button>
           </div>
-          
-          {/* Scrolling urgency text */}
-          <div className="mt-1 overflow-hidden border-t border-white/10 pt-1">
-            <div className="animate-marquee whitespace-nowrap text-xs font-medium">
-              <span className="mx-4 text-yellow-200">🔥 {discountPercent}% OFF - JUST {salePrice}/YEAR</span>
-              <span className="mx-4 text-white">⚡ UNLIMITED BILLS FOREVER</span>
-              <span className="mx-4 text-yellow-200">💎 ALL PREMIUM FEATURES</span>
-              <span className="mx-4 text-white">📞 24/7 PRIORITY SUPPORT</span>
-              <span className="mx-4 text-yellow-200">⏰ LIMITED TIME ONLY</span>
-              <span className="mx-4 text-white">🚀 FIRST 1000 USERS</span>
+
+          {/* Scrolling urgency text - Enhanced */}
+          <div className="mt-2 overflow-hidden border-t border-white/10 pt-2">
+            <div className="animate-marquee whitespace-nowrap text-sm font-medium">
+              <span className="mx-6 text-yellow-200">🔥 LIMITED TIME ONLY</span>
+              <span className="mx-6 text-white">⚡ FIRST 1000 USERS</span>
+              <span className="mx-6 text-yellow-200">🎉 99% OFF - JUST {salePrice}/YEAR</span>
+              <span className="mx-6 text-white">🚀 UNLIMITED BILLS FOREVER</span>
+              <span className="mx-6 text-yellow-200">💎 ALL PREMIUM FEATURES</span>
+              <span className="mx-6 text-white">📞 24/7 PRIORITY SUPPORT</span>
+              <span className="mx-6 text-yellow-200">🔥 LIMITED TIME ONLY</span>
+              <span className="mx-6 text-white">⚡ FIRST 1000 USERS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
             </div>
           </div>
         </div>

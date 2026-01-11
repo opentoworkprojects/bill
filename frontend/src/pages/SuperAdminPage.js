@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import PromotionalBanner from '../components/PromotionalBanner';
 import { 
   Users, Ticket, TrendingUp, Shield, 
   CheckCircle, Clock, XCircle, UserPlus, Calendar, CreditCard,
@@ -950,7 +951,11 @@ const SuperAdminPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Promotional Banner - Fixed at top */}
+      <PromotionalBanner position="top" />
+      
+      <div className="p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
@@ -994,6 +999,9 @@ const SuperAdminPage = () => {
             Logout
           </Button>
         </div>
+
+        {/* Promotional Banner - Dynamic promotional content */}
+        <PromotionalBanner position="inline" />
 
         {/* Tabs - Show based on permissions */}
         <div className="mb-6 flex gap-2 border-b overflow-x-auto">
