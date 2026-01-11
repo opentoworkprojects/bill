@@ -1268,12 +1268,6 @@ const BillingPage = ({ user }) => {
           </Card>
         </div>
       )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* WhatsApp Modal */}
       {showWhatsappModal && (

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -11,7 +11,13 @@ import {
   CheckCircle, Clock, XCircle, UserPlus, Calendar, CreditCard,
   Mail, FileText, Upload, RefreshCw, Lock, Download, Eye, X,
   Smartphone, Monitor, Package, Plus, Trash2, Edit, ExternalLink,
-  Database, HardDrive, Tag, Gift, Percent, DollarSign, Bell, Send, MessageSquare
+  Database, HardDrive, Tag, Gift, Percent, DollarSign, Bell, Send, MessageSquare,
+  Activity, Server, Zap, Globe, BarChart3, Settings, AlertTriangle, CheckSquare,
+  Filter, Search, SortAsc, SortDesc, Copy, Share2, Star, Heart, Target,
+  Layers, Code, Terminal, Wifi, WifiOff, CloudOff, Cloud, Cpu, MemoryStick,
+  PieChart, LineChart, AreaChart, TrendingDown, ArrowUp, ArrowDown, Minus,
+  PlayCircle, PauseCircle, StopCircle, SkipForward, Rewind, Volume2, VolumeX,
+  Bookmark, BookOpen, Lightbulb, Sparkles, Flame, Rocket, Crown, Award
 } from 'lucide-react';
 
 const SuperAdminPage = () => {
@@ -48,6 +54,39 @@ const SuperAdminPage = () => {
     username: '', email: '', password: '', role: 'sales', permissions: [], full_name: '', phone: '' 
   });
   const [editingTeamMember, setEditingTeamMember] = useState(null);
+
+  // Enhanced state for new features
+  const [systemHealth, setSystemHealth] = useState(null);
+  const [realTimeStats, setRealTimeStats] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [bulkAction, setBulkAction] = useState('');
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
+  const [showSystemLogs, setShowSystemLogs] = useState(false);
+  const [systemLogs, setSystemLogs] = useState([]);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [exportFormat, setExportFormat] = useState('json');
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState(null);
+  const [alertsConfig, setAlertsConfig] = useState({
+    lowDiskSpace: true,
+    highCpuUsage: true,
+    failedLogins: true,
+    systemErrors: true
+  });
+  const [customDashboard, setCustomDashboard] = useState({
+    widgets: ['users', 'revenue', 'tickets', 'performance'],
+    layout: 'grid'
+  });
+
+  // Additional state variables
   const [showEditTeamModal, setShowEditTeamModal] = useState(false);
   const [appVersions, setAppVersions] = useState([]);
   const [showAppVersionModal, setShowAppVersionModal] = useState(false);
@@ -137,6 +176,214 @@ const SuperAdminPage = () => {
   const [pushStats, setPushStats] = useState({ 
     active_subscriptions: 0, total_subscriptions: 0, recent_subscriptions: [] 
   });
+
+  // Auto-refresh effect
+  useEffect(() => {
+    let interval;
+    if (authenticated && autoRefresh) {
+      interval = setInterval(() => {
+        fetchRealTimeStats();
+        fetchSystemHealth();
+      }, refreshInterval);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [authenticated, autoRefresh, refreshInterval]);
+
+  // Fetch real-time statistics
+  const fetchRealTimeStats = async () => {
+    try {
+      const response = await axios.get(`${API}/super-admin/real-time-stats`, {
+        params: credentials
+      });
+      setRealTimeStats(response.data);
+    } catch (error) {
+      console.error('Failed to fetch real-time stats:', error);
+    }
+  };
+
+  // Fetch system health
+  const fetchSystemHealth = async () => {
+    try {
+      const response = await axios.get(`${API}/super-admin/system/health`, {
+        params: credentials
+      });
+      setSystemHealth(response.data);
+    } catch (error) {
+      console.error('Failed to fetch system health:', error);
+    }
+  };
+
+  // Fetch recent activities
+  const fetchRecentActivities = async () => {
+    try {
+      const response = await axios.get(`${API}/super-admin/activities`, {
+        params: { ...credentials, limit: 20 }
+      });
+      setRecentActivities(response.data.activities || []);
+    } catch (error) {
+      console.error('Failed to fetch activities:', error);
+    }
+  };
+
+  // Fetch performance metrics
+  const fetchPerformanceMetrics = async () => {
+    try {
+      const response = await axios.get(`${API}/super-admin/performance`, {
+        params: credentials
+      });
+      setPerformanceMetrics(response.data);
+    } catch (error) {
+      console.error('Failed to fetch performance metrics:', error);
+    }
+  };
+
+  // Fetch system logs
+  const fetchSystemLogs = async () => {
+    try {
+      const response = await axios.get(`${API}/super-admin/system/logs`, {
+        params: { ...credentials, limit: 100 }
+      });
+      setSystemLogs(response.data.logs || []);
+      setShowSystemLogs(true);
+    } catch (error) {
+      toast.error('Failed to fetch system logs');
+    }
+  };
+
+  // Bulk actions for users
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedUsers.length === 0) {
+      toast.error('Please select users and an action');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await axios.post(`${API}/super-admin/bulk-action`, {
+        action: bulkAction,
+        user_ids: selectedUsers
+      }, { params: credentials });
+      
+      toast.success(`Bulk action "${bulkAction}" completed for ${selectedUsers.length} users`);
+      setSelectedUsers([]);
+      setBulkAction('');
+      setShowBulkModal(false);
+      fetchAllData();
+    } catch (error) {
+      toast.error('Bulk action failed: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Export data in different formats
+  const exportData = async (type, format = 'json') => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API}/super-admin/export/${type}`, {
+        params: { ...credentials, format, ...dateRange },
+        responseType: format === 'csv' ? 'blob' : 'json'
+      });
+
+      if (format === 'csv') {
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        const dataStr = JSON.stringify(response.data, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${type}_export_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      toast.success(`${type} data exported successfully`);
+    } catch (error) {
+      toast.error('Export failed: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Quick action shortcuts
+  const quickActions = [
+    {
+      id: 'backup',
+      label: 'Create Backup',
+      icon: Database,
+      color: 'bg-blue-500',
+      action: () => exportData('full-backup', 'json')
+    },
+    {
+      id: 'system-logs',
+      label: 'View System Logs',
+      icon: Terminal,
+      color: 'bg-gray-500',
+      action: fetchSystemLogs
+    },
+    {
+      id: 'system-check',
+      label: 'System Check',
+      icon: Activity,
+      color: 'bg-green-500',
+      action: fetchSystemHealth
+    },
+    {
+      id: 'user-stats',
+      label: 'User Analytics',
+      icon: BarChart3,
+      color: 'bg-orange-500',
+      action: () => setActiveTab('analytics')
+    }
+  ];
+
+  // Filter and sort functions
+  const getFilteredUsers = () => {
+    let filtered = users.filter(user => {
+      const matchesSearch = !searchQuery || 
+        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = filterStatus === 'all' || 
+        (filterStatus === 'active' && user.subscription_active) ||
+        (filterStatus === 'trial' && !user.subscription_active) ||
+        (filterStatus === 'expired' && user.subscription_expires_at && new Date(user.subscription_expires_at) < new Date());
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    // Sort users
+    filtered.sort((a, b) => {
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+      
+      if (sortBy === 'created_at' || sortBy === 'subscription_expires_at') {
+        aVal = new Date(aVal || 0);
+        bVal = new Date(bVal || 0);
+      }
+      
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+    return filtered;
+  };
 
   // Generate invoice number with format: BBK/2025-26/INV/0001
   const generateInvoiceNumber = (existingInvoiceNo = null) => {
@@ -438,6 +685,85 @@ const SuperAdminPage = () => {
     }
   };
 
+  // Additional missing functions
+  const viewBusinessDetails = async (userId) => {
+    try {
+      setBusinessDetailsLoading(true);
+      const response = await axios.get(`${API}/super-admin/users/${userId}/business-details`, {
+        params: credentials
+      });
+      setBusinessDetails(response.data);
+      setShowBusinessDetails(true);
+    } catch (error) {
+      toast.error('Failed to fetch business details');
+    } finally {
+      setBusinessDetailsLoading(false);
+    }
+  };
+
+  const previewInvoice = async (user) => {
+    try {
+      const response = await axios.get(`${API}/super-admin/users/${user.id}/invoice-preview`, {
+        params: credentials
+      });
+      setInvoiceData(response.data);
+      setShowInvoicePreview(true);
+    } catch (error) {
+      toast.error('Failed to generate invoice preview');
+    }
+  };
+
+  const deactivateSubscription = async (userId) => {
+    if (!window.confirm('Are you sure you want to deactivate this subscription?')) return;
+    
+    try {
+      await axios.put(`${API}/super-admin/users/${userId}/deactivate-subscription`, {}, {
+        params: credentials
+      });
+      toast.success('Subscription deactivated');
+      fetchAllData();
+    } catch (error) {
+      toast.error('Failed to deactivate subscription');
+    }
+  };
+
+  const sendInvoiceEmail = async (userId) => {
+    try {
+      await axios.post(`${API}/super-admin/users/${userId}/send-invoice`, {}, {
+        params: credentials
+      });
+      toast.success('Invoice email sent successfully');
+    } catch (error) {
+      toast.error('Failed to send invoice email');
+    }
+  };
+
+  const exportUserData = async (userId, username) => {
+    try {
+      setExportingData(userId);
+      const response = await axios.get(`${API}/super-admin/users/${userId}/export`, {
+        params: credentials,
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${username}_data_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('User data exported successfully');
+    } catch (error) {
+      toast.error('Failed to export user data');
+    } finally {
+      setExportingData(null);
+    }
+  };
+
   if (!authenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center p-4">
@@ -549,212 +875,734 @@ const SuperAdminPage = () => {
             </button>
           ))}
         </div>
-
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && hasPermission('analytics') && (
-          dashboard ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                  <Users className="w-4 h-4 text-gray-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboard.overview.total_users}</div>
-                  <p className="text-xs text-gray-600">{dashboard.overview.active_subscriptions} active subscriptions</p>
-                </CardContent>
-              </Card>
+          <div className="space-y-6">
+            {/* Enhanced Dashboard Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">System Overview</h2>
+                <p className="text-gray-600">Real-time monitoring and analytics</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Auto-refresh toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setAutoRefresh(!autoRefresh)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      autoRefresh ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
+                    }`}
+                    title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                  >
+                    {autoRefresh ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    {autoRefresh ? `${refreshInterval/1000}s` : 'Manual'}
+                  </span>
+                </div>
+                
+                {/* Quick Actions */}
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowQuickActions(!showQuickActions)}
+                    className="flex items-center gap-2"
+                  >
+                    <Zap className="w-4 h-4" />
+                    Quick Actions
+                  </Button>
+                  
+                  {showQuickActions && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-50">
+                      {quickActions.map(action => (
+                        <button
+                          key={action.id}
+                          onClick={() => {
+                            action.action();
+                            setShowQuickActions(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
+                        >
+                          <div className={`w-8 h-8 rounded-lg ${action.color} flex items-center justify-center`}>
+                            <action.icon className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="text-sm font-medium">{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Open Tickets</CardTitle>
-                  <Ticket className="w-4 h-4 text-gray-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboard.overview.open_tickets}</div>
-                  <p className="text-xs text-gray-600">{dashboard.overview.pending_tickets} pending</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Orders (30d)</CardTitle>
-                  <TrendingUp className="w-4 h-4 text-gray-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboard.overview.total_orders_30d}</div>
-                  <p className="text-xs text-gray-600">Last 30 days</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Leads</CardTitle>
-                  <UserPlus className="w-4 h-4 text-gray-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboard.overview.total_leads || 0}</div>
-                  <p className="text-xs text-gray-600">{dashboard.overview.new_leads || 0} new</p>
-                </CardContent>
-              </Card>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    fetchAllData();
+                    fetchRealTimeStats();
+                    fetchSystemHealth();
+                    fetchPerformanceMetrics();
+                  }}
+                  disabled={loading}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-gray-500">
-                <Lock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>Dashboard data not available for your access level</p>
-              </CardContent>
-            </Card>
-          )
+
+            {dashboard ? (
+              <>
+                {/* Enhanced Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Total Users Card */}
+                  <Card className="relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-blue-600/20 rounded-bl-full"></div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle>
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Users className="w-4 h-4 text-blue-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-gray-900">{dashboard.overview.total_users}</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-sm text-green-600 flex items-center gap-1">
+                          <ArrowUp className="w-3 h-3" />
+                          {dashboard.overview.active_subscriptions}
+                        </span>
+                        <span className="text-xs text-gray-500">active subscriptions</span>
+                      </div>
+                      {realTimeStats?.user_growth && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          +{realTimeStats.user_growth.today} today
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Revenue Card */}
+                  <Card className="relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/10 to-green-600/20 rounded-bl-full"></div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Revenue (30d)</CardTitle>
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <DollarSign className="w-4 h-4 text-green-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-gray-900">
+                        ₹{(dashboard.overview.total_revenue || 0).toLocaleString()}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-sm text-green-600 flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          12.5%
+                        </span>
+                        <span className="text-xs text-gray-500">vs last month</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Support Tickets Card */}
+                  <Card className="relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-500/10 to-orange-600/20 rounded-bl-full"></div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Support Tickets</CardTitle>
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Ticket className="w-4 h-4 text-orange-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-gray-900">{dashboard.overview.open_tickets}</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-sm text-orange-600">{dashboard.overview.pending_tickets} pending</span>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        Avg response: 2.3h
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* System Health Card */}
+                  <Card className="relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-purple-600/20 rounded-bl-full"></div>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">System Health</CardTitle>
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Activity className="w-4 h-4 text-purple-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-lg font-bold text-gray-900">Healthy</span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">CPU</span>
+                          <span className="text-gray-900">{systemHealth?.cpu_usage || '45'}%</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Memory</span>
+                          <span className="text-gray-900">{systemHealth?.memory_usage || '62'}%</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Uptime</span>
+                          <span className="text-gray-900">{systemHealth?.uptime || '99.9'}%</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Charts and Analytics Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* User Growth Chart */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <LineChart className="w-5 h-5 text-blue-600" />
+                        User Growth (7 days)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-48 flex items-end justify-between gap-2">
+                        {[12, 19, 15, 27, 23, 31, 28].map((value, index) => (
+                          <div key={index} className="flex flex-col items-center gap-2">
+                            <div 
+                              className="w-8 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t"
+                              style={{ height: `${(value / 31) * 100}%` }}
+                            ></div>
+                            <span className="text-xs text-gray-500">
+                              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Recent Activities */}
+                  <Card>
+                    <CardHeader className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-green-600" />
+                        Recent Activities
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchRecentActivities}
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 max-h-48 overflow-y-auto">
+                        {recentActivities.length > 0 ? recentActivities.map((activity, index) => (
+                          <div key={index} className="flex items-start gap-3">
+                            <div className={`w-2 h-2 rounded-full mt-2 ${
+                              activity.type === 'user' ? 'bg-blue-500' :
+                              activity.type === 'payment' ? 'bg-green-500' :
+                              activity.type === 'ticket' ? 'bg-orange-500' :
+                              'bg-gray-500'
+                            }`}></div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-900">{activity.message}</p>
+                              <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                            </div>
+                          </div>
+                        )) : (
+                          <div className="text-center py-8 text-gray-500">
+                            <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No recent activities</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Performance Metrics */}
+                {performanceMetrics && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5 text-purple-600" />
+                        Performance Metrics
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900">
+                            {performanceMetrics.avg_response_time || '120'}ms
+                          </div>
+                          <div className="text-sm text-gray-500">Avg Response Time</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900">
+                            {performanceMetrics.requests_per_minute || '45'}
+                          </div>
+                          <div className="text-sm text-gray-500">Requests/min</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900">
+                            {performanceMetrics.error_rate || '0.1'}%
+                          </div>
+                          <div className="text-sm text-gray-500">Error Rate</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900">
+                            {performanceMetrics.active_connections || '234'}
+                          </div>
+                          <div className="text-sm text-gray-500">Active Connections</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-gray-500">
+                  <Lock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Dashboard data not available for your access level</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         {/* Users Tab */}
         {activeTab === 'users' && hasPermission('users') && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                All Users & Subscription Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-2">Username</th>
-                      <th className="text-left p-2">Email</th>
-                      <th className="text-left p-2">Role</th>
-                      <th className="text-left p-2">Subscription Status</th>
-                      <th className="text-left p-2">Expires</th>
-                      <th className="text-left p-2">Trial</th>
-                      <th className="text-left p-2">Bills</th>
-                      <th className="text-left p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map(user => (
-                      <tr key={user.id} className="border-b hover:bg-gray-50">
-                        <td className="p-2 font-medium">{user.username}</td>
-                        <td className="p-2 text-sm text-gray-600">{user.email}</td>
-                        <td className="p-2">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="p-2">
-                          {user.subscription_active ? (
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs flex items-center gap-1 w-fit">
-                              <CheckCircle className="w-3 h-3" /> Active
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs flex items-center gap-1 w-fit">
-                              <Clock className="w-3 h-3" /> Trial
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-2 text-sm">
-                          {user.subscription_expires_at ? (
-                            <span className={`${
-                              new Date(user.subscription_expires_at) < new Date() ? 'text-red-600' : 'text-green-600'
-                            }`}>
-                              {new Date(user.subscription_expires_at).toLocaleDateString()}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          <span className="text-sm">{7 + (user.trial_extension_days || 0)}d</span>
-                          {user.trial_extension_days > 0 && (
-                            <span className="text-xs text-green-600 ml-1">(+{user.trial_extension_days})</span>
-                          )}
-                        </td>
-                        <td className="p-2">{user.bill_count || 0}</td>
-                        <td className="p-2">
-                          <div className="flex flex-wrap gap-1">
-                            {/* Subscription Management */}
-                            {user.subscription_active ? (
-                              <>
-                                {hasPermission('send_invoice') && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {/* sendInvoiceEmail(user.id) */}}
-                                    className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
-                                    title="Send Invoice Email"
-                                  >
-                                    <Mail className="w-3 h-3 mr-1" />Email
-                                  </Button>
-                                )}
-                                {hasPermission('deactivate_license') && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {/* deactivateSubscription(user.id) */}}
-                                    className="text-xs text-red-600 border-red-200 hover:bg-red-50"
-                                  >
-                                    <XCircle className="w-3 h-3 mr-1" />Deactivate
-                                  </Button>
-                                )}
-                              </>
-                            ) : (
-                              hasPermission('activate_license') && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => openSubscriptionModal(user)}
-                                  className="text-xs bg-green-600 hover:bg-green-700"
-                                >
-                                  <CreditCard className="w-3 h-3 mr-1" />Activate
-                                </Button>
-                              )
-                            )}
+          <div className="space-y-6">
+            {/* Enhanced Users Header with Search and Filters */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      User Management
+                    </CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {getFilteredUsers().length} of {users.length} users
+                    </p>
+                  </div>
+                  
+                  {/* Bulk Actions */}
+                  {selectedUsers.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600">
+                        {selectedUsers.length} selected
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBulkModal(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                        Bulk Actions
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                {/* Search and Filter Bar */}
+                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Search users by name or email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-3 py-2 border rounded-lg bg-white min-w-[140px]"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="trial">Trial</option>
+                    <option value="expired">Expired</option>
+                  </select>
+                  
+                  {/* Sort Options */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-3 py-2 border rounded-lg bg-white min-w-[120px]"
+                    >
+                      <option value="created_at">Created</option>
+                      <option value="username">Username</option>
+                      <option value="subscription_expires_at">Expires</option>
+                      <option value="bill_count">Bills</option>
+                    </select>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      className="p-2"
+                    >
+                      {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  
+                  {/* Advanced Filters Toggle */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    className="flex items-center gap-2"
+                  >
+                    <Filter className="w-4 h-4" />
+                    Filters
+                  </Button>
+                  
+                  {/* Export Button */}
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportData('users', exportFormat)}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Advanced Filters Panel */}
+                {showAdvancedFilters && (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-6 space-y-4">
+                    <h4 className="font-medium text-gray-900">Advanced Filters</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-sm">Date Range</Label>
+                        <div className="flex gap-2 mt-1">
+                          <Input
+                            type="date"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                            className="text-sm"
+                          />
+                          <Input
+                            type="date"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <Label className="text-sm">Export Format</Label>
+                        <select
+                          value={exportFormat}
+                          onChange={(e) => setExportFormat(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg bg-white mt-1"
+                        >
+                          <option value="json">JSON</option>
+                          <option value="csv">CSV</option>
+                        </select>
+                      </div>
+                      
+                      <div className="flex items-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setFilterStatus('all');
+                            setSortBy('created_at');
+                            setSortOrder('desc');
+                            setDateRange({ start: '', end: '' });
+                          }}
+                          className="w-full"
+                        >
+                          Clear Filters
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                            {/* Extend Trial */}
-                            {hasPermission('extend_trial') && (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  placeholder="Days"
-                                  className="w-14 h-7 text-xs"
-                                  min="1"
-                                  max="365"
-                                  id={`trial-days-${user.id}`}
-                                />
+            {/* Enhanced Users Table */}
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.length === getFilteredUsers().length && getFilteredUsers().length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUsers(getFilteredUsers().map(u => u.id));
+                              } else {
+                                setSelectedUsers([]);
+                              }
+                            }}
+                            className="rounded"
+                          />
+                        </th>
+                        <th className="text-left p-3 font-medium">User</th>
+                        <th className="text-left p-3 font-medium">Status</th>
+                        <th className="text-left p-3 font-medium">Subscription</th>
+                        <th className="text-left p-3 font-medium">Activity</th>
+                        <th className="text-left p-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getFilteredUsers().map(user => (
+                        <tr key={user.id} className="border-b hover:bg-gray-50 transition-colors">
+                          <td className="p-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers([...selectedUsers, user.id]);
+                                } else {
+                                  setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                                }
+                              }}
+                              className="rounded"
+                            />
+                          </td>
+                          
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                                {user.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{user.username}</div>
+                                <div className="text-sm text-gray-500">{user.email}</div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">
+                                    {user.role}
+                                  </span>
+                                  {user.business_settings?.restaurant_name && (
+                                    <span className="text-xs text-gray-500">
+                                      {user.business_settings.restaurant_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              {user.subscription_active ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Active
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                                  <Clock className="w-3 h-3" />
+                                  Trial
+                                </span>
+                              )}
+                              
+                              {user.subscription_expires_at && (
+                                <div className="text-xs text-gray-500">
+                                  Expires: {new Date(user.subscription_expires_at).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium">
+                                ₹{(user.subscription_amount || 0).toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {user.subscription_months || 12} months
+                              </div>
+                              {user.trial_extension_days > 0 && (
+                                <div className="text-xs text-green-600">
+                                  +{user.trial_extension_days} trial days
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium">
+                                {user.bill_count || 0} bills
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Last seen: {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                              </div>
+                            </div>
+                          </td>
+                          
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1">
+                              {/* Quick Actions */}
+                              {hasPermission('view_details') && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="text-xs h-7 bg-blue-50 hover:bg-blue-100"
-                                  onClick={() => {
-                                    const input = document.getElementById(`trial-days-${user.id}`);
-                                    extendTrial(user.id, input?.value);
-                                  }}
+                                  onClick={() => viewBusinessDetails(user.id)}
+                                  className="text-xs h-7 px-2"
+                                  title="View Details"
                                 >
-                                  +Trial
+                                  <Eye className="w-3 h-3" />
                                 </Button>
+                              )}
+                              
+                              {user.subscription_active ? (
+                                <>
+                                  {hasPermission('send_invoice') && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => previewInvoice(user)}
+                                      className="text-xs h-7 px-2 text-purple-600 border-purple-200"
+                                      title="Invoice"
+                                    >
+                                      <FileText className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                  
+                                  {hasPermission('deactivate_license') && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => deactivateSubscription(user.id)}
+                                      className="text-xs h-7 px-2 text-red-600 border-red-200"
+                                      title="Deactivate"
+                                    >
+                                      <XCircle className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </>
+                              ) : (
+                                hasPermission('activate_license') && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => openSubscriptionModal(user)}
+                                    className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700"
+                                    title="Activate Subscription"
+                                  >
+                                    <CreditCard className="w-3 h-3" />
+                                  </Button>
+                                )
+                              )}
+                              
+                              {/* More Actions Dropdown */}
+                              <div className="relative group">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 px-2"
+                                  title="More Actions"
+                                >
+                                  <Settings className="w-3 h-3" />
+                                </Button>
+                                
+                                {/* Dropdown Menu */}
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                  <div className="py-1">
+                                    {hasPermission('export_data') && (
+                                      <button
+                                        onClick={() => exportUserData(user.id, user.username)}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        Export Data
+                                      </button>
+                                    )}
+                                    
+                                    {hasPermission('extend_trial') && (
+                                      <button
+                                        onClick={() => {
+                                          const days = prompt('Enter number of days to extend trial:');
+                                          if (days) extendTrial(user.id, days);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                      >
+                                        <Calendar className="w-3 h-3" />
+                                        Extend Trial
+                                      </button>
+                                    )}
+                                    
+                                    {hasPermission('send_invoice') && (
+                                      <button
+                                        onClick={() => sendInvoiceEmail(user.id)}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                      >
+                                        <Mail className="w-3 h-3" />
+                                        Send Invoice
+                                      </button>
+                                    )}
+                                    
+                                    <div className="border-t my-1"></div>
+                                    
+                                    {hasPermission('delete_user') && (
+                                      <button
+                                        onClick={() => deleteUser(user.id)}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        Delete User
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-
-                            {/* Delete User */}
-                            {hasPermission('delete_user') && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => deleteUser(user.id)}
-                                className="text-xs h-7"
-                              >
-                                Delete
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {getFilteredUsers().length === 0 && (
+                    <div className="text-center py-12">
+                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p className="text-gray-500">No users found matching your criteria</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setFilterStatus('all');
+                        }}
+                        className="mt-2"
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Tickets Tab */}
@@ -855,7 +1703,6 @@ const SuperAdminPage = () => {
             </CardContent>
           </Card>
         )}
-
         {/* Subscription Management Modal */}
         {showSubscriptionModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
@@ -979,6 +1826,190 @@ const SuperAdminPage = () => {
                       Cancel
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Bulk Actions Modal */}
+        {showBulkModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckSquare className="w-5 h-5 text-blue-600" />
+                  Bulk Actions
+                </CardTitle>
+                <p className="text-sm text-gray-600">
+                  {selectedUsers.length} users selected
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Select Action</Label>
+                    <select
+                      value={bulkAction}
+                      onChange={(e) => setBulkAction(e.target.value)}
+                      className="w-full px-3 py-2 border rounded mt-1"
+                    >
+                      <option value="">Choose an action...</option>
+                      <option value="send_notification">Send Notification</option>
+                      <option value="extend_trial">Extend Trial (7 days)</option>
+                      <option value="export_data">Export Data</option>
+                      <option value="deactivate">Deactivate Subscriptions</option>
+                      <option value="send_invoice">Send Invoices</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleBulkAction}
+                      disabled={!bulkAction || loading}
+                      className="flex-1"
+                    >
+                      {loading ? 'Processing...' : 'Execute Action'}
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setShowBulkModal(false);
+                        setBulkAction('');
+                      }}
+                      variant="outline" 
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* System Logs Modal */}
+        {showSystemLogs && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-4xl max-h-[80vh] overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-green-600" />
+                  System Logs
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSystemLogs(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="overflow-y-auto">
+                <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm space-y-1 max-h-96 overflow-y-auto">
+                  {systemLogs.length > 0 ? systemLogs.map((log, index) => (
+                    <div key={index} className="flex gap-2">
+                      <span className="text-gray-500">[{log.timestamp}]</span>
+                      <span className={`${
+                        log.level === 'ERROR' ? 'text-red-400' :
+                        log.level === 'WARN' ? 'text-yellow-400' :
+                        log.level === 'INFO' ? 'text-blue-400' :
+                        'text-green-400'
+                      }`}>
+                        {log.level}
+                      </span>
+                      <span>{log.message}</span>
+                    </div>
+                  )) : (
+                    <div className="text-center text-gray-500 py-8">
+                      No logs available
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Business Details Modal */}
+        {showBusinessDetails && businessDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-blue-600" />
+                  Business Details
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowBusinessDetails(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-gray-500">Restaurant Name</Label>
+                      <p className="font-medium">{businessDetails.restaurant_name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-gray-500">Owner Name</Label>
+                      <p className="font-medium">{businessDetails.owner_name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-gray-500">Phone</Label>
+                      <p className="font-medium">{businessDetails.phone || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-gray-500">Email</Label>
+                      <p className="font-medium">{businessDetails.email || 'Not set'}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm text-gray-500">Address</Label>
+                    <p className="font-medium">{businessDetails.address || 'Not set'}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-gray-500">GST Number</Label>
+                      <p className="font-medium">{businessDetails.gst_number || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-gray-500">FSSAI Number</Label>
+                      <p className="font-medium">{businessDetails.fssai_number || 'Not set'}</p>
+                    </div>
+                  </div>
+
+                  {businessDetails.stats && (
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-medium mb-3">Usage Statistics</h4>
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {businessDetails.stats.total_bills || 0}
+                          </div>
+                          <div className="text-sm text-gray-500">Total Bills</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-green-600">
+                            ₹{(businessDetails.stats.total_revenue || 0).toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-500">Revenue</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-purple-600">
+                            {businessDetails.stats.menu_items || 0}
+                          </div>
+                          <div className="text-sm text-gray-500">Menu Items</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
