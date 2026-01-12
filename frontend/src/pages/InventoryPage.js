@@ -222,8 +222,8 @@ const InventoryPage = ({ user }) => {
         cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
         reorder_point: formData.reorder_point ? parseFloat(formData.reorder_point) : null,
         reorder_quantity: formData.reorder_quantity ? parseFloat(formData.reorder_quantity) : null,
-        category_id: formData.category_id || null,
-        supplier_id: formData.supplier_id || null,
+        category_id: formData.category_id && formData.category_id !== 'none' ? formData.category_id : null,
+        supplier_id: formData.supplier_id && formData.supplier_id !== 'none' ? formData.supplier_id : null,
         sku: formData.sku?.trim() || null,
         barcode: formData.barcode?.trim() || null,
         description: formData.description?.trim() || null,
@@ -329,7 +329,7 @@ const InventoryPage = ({ user }) => {
 
   const resetForm = () => {
     setFormData({ name: '', quantity: '', unit: '', min_quantity: '', max_quantity: '',
-      price_per_unit: '', cost_price: '', category_id: '', supplier_id: '', sku: '',
+      price_per_unit: '', cost_price: '', category_id: 'none', supplier_id: 'none', sku: '',
       barcode: '', description: '', location: '', expiry_date: '', batch_number: '',
       reorder_point: '', reorder_quantity: '' });
     setEditingItem(null);
@@ -355,8 +355,8 @@ const InventoryPage = ({ user }) => {
     setFormData({ name: item.name, quantity: item.quantity, unit: item.unit,
       min_quantity: item.min_quantity, max_quantity: item.max_quantity || '',
       price_per_unit: item.price_per_unit, cost_price: item.cost_price || '',
-      category_id: item.category_id ? String(item.category_id) : '', 
-      supplier_id: item.supplier_id ? String(item.supplier_id) : '',
+      category_id: item.category_id ? String(item.category_id) : 'none', 
+      supplier_id: item.supplier_id ? String(item.supplier_id) : 'none',
       sku: item.sku || '', barcode: item.barcode || '', description: item.description || '',
       location: item.location || '', expiry_date: item.expiry_date || '',
       batch_number: item.batch_number || '', reorder_point: item.reorder_point || '',
@@ -995,7 +995,7 @@ const InventoryPage = ({ user }) => {
                     <Select value={formData.category_id || ''} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
                       <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {categories.map(cat => (<SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>))}
                       </SelectContent>
                     </Select>
@@ -1004,7 +1004,7 @@ const InventoryPage = ({ user }) => {
                     <Select value={formData.supplier_id || ''} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
                       <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {suppliers.map(sup => (<SelectItem key={sup.id} value={String(sup.id)}>{sup.name}</SelectItem>))}
                       </SelectContent>
                     </Select>

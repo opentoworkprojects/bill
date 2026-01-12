@@ -559,9 +559,6 @@ const TopBanner = () => {
               <span className="mx-6 text-yellow-200">🎉 99% OFF - JUST {salePrice}/YEAR</span>
               <span className="mx-6 text-white">🚀 UNLIMITED BILLS FOREVER</span>
               <span className="mx-6 text-yellow-200">💎 ALL PREMIUM FEATURES</span>
-              <span className="mx-6 text-white">📞 24/7 PRIORITY SUPPORT</span>
-              <span className="mx-6 text-yellow-200">🔥 LIMITED TIME ONLY</span>
-              <span className="mx-6 text-white">⚡ FIRST 1000 USERS</span>
             </div>
           </div>
         </div>
@@ -573,13 +570,11 @@ const TopBanner = () => {
   return (
     <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 to-purple-600 text-white py-2 px-4">
       <div className="max-w-7xl mx-auto flex items-center justify-center gap-4 flex-wrap">
-        <Sparkles className="w-5 h-5 animate-pulse" />
-        <span className="font-bold">{bannerData.title || 'Special Offer!'}</span>
-        <span className="bg-yellow-400 text-black px-3 py-0.5 rounded-full text-sm font-bold">{bannerData.discount_percent || 20}% OFF</span>
-        <button onClick={() => navigate('/login')} className="bg-white text-violet-600 px-4 py-1 rounded-full text-sm font-bold hover:bg-yellow-400 hover:text-black transition-all">
-          {bannerData.cta_text || 'Get Deal'}
+        <span className="text-sm font-medium">🎉 Special Offer!</span>
+        <span className="text-sm">Get started for just ₹{salePrice}/year</span>
+        <button onClick={() => setDismissed(true)} className="text-white/60 hover:text-white">
+          <X className="w-4 h-4" />
         </button>
-        <button onClick={() => setDismissed(true)} className="text-white/60 hover:text-white"><X className="w-4 h-4" /></button>
       </div>
     </div>
   );
