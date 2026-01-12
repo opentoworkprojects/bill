@@ -568,12 +568,6 @@ const TopBanner = () => {
       </div>
     );
   }
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Default fallback - Simple gradient
   return (

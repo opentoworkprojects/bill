@@ -506,6 +506,17 @@ const InventoryPage = ({ user }) => {
       <div className="space-y-6" data-testid="inventory-page">
         <TrialBanner user={user} />
         
+        {/* Debug Info - Remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-medium text-yellow-800">Debug Info:</h4>
+            <p className="text-sm text-yellow-700">User: {user?.username || 'Not logged in'}</p>
+            <p className="text-sm text-yellow-700">Role: {user?.role || 'No role'}</p>
+            <p className="text-sm text-yellow-700">Can Add Items: {['admin', 'cashier'].includes(user?.role) ? 'Yes' : 'No'}</p>
+            <p className="text-sm text-yellow-700">Dialog Open: {dialogOpen ? 'Yes' : 'No'}</p>
+          </div>
+        )}
+        
         {/* Enhanced Header */}
         <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-2xl p-6 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -639,8 +650,12 @@ const InventoryPage = ({ user }) => {
                 {['admin', 'cashier'].includes(user?.role) && (
                   <Button className="bg-gradient-to-r from-violet-600 to-purple-600" onClick={() => { 
                     console.log('Add Item button clicked');
+                    console.log('User:', user);
+                    console.log('User role:', user?.role);
+                    console.log('Dialog open before:', dialogOpen);
                     resetForm(); 
-                    setDialogOpen(true); 
+                    setDialogOpen(true);
+                    console.log('Dialog open after:', true);
                   }}>
                     <Plus className="w-4 h-4 mr-2" />Add Item
                   </Button>
@@ -957,8 +972,12 @@ const InventoryPage = ({ user }) => {
         {/* Add/Edit Item Dialog */}
         <Dialog open={dialogOpen} onOpenChange={(open) => { 
           console.log('Dialog open state changed:', open);
+          console.log('Previous state:', dialogOpen);
           setDialogOpen(open); 
-          if (!open) resetForm(); 
+          if (!open) {
+            console.log('Dialog closing, resetting form');
+            resetForm();
+          }
         }}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
