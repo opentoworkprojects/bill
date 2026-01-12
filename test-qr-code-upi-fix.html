@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code UPI Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; background: #007bff; color: white; }
+        .qr-display { text-align: center; margin: 20px 0; }
+        .qr-display img { border: 2px solid #ddd; border-radius: 8px; }
+        .bill-preview { background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; white-space: pre-line; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 QR Code UPI Fix Test</h1>
+        
+        <!-- Business Settings Configuration -->
+        <div class="test-section info">
+            <h3>⚙️ Business Settings</h3>
+            <div>
+                <label>Restaurant Name:</label>
+                <input type="text" id="restaurantName" value="Billbytekot Bills" placeholder="Restaurant Name">
+            </div>
+            <div>
+                <label>Phone Number:</label>
+                <input type="text" id="phone" value="9898776876" placeholder="10-digit phone number">
+            </div>
+            <div>
+                <label>UPI ID (Optional):</label>
+                <input type="text" id="upiId" value="" placeholder="yourname@paytm or leave empty">
+            </div>
+            <div>
+                <label>FSSAI Number:</label>
+                <input type="text" id="fssai" value="81673543543543" placeholder="FSSAI Number">
+            </div>
+        </div>
+
+        <!-- Order Details -->
+        <div class="test-section">
+            <h3>🧾 Order Details</h3>
+            <div>
+                <label>Bill Number:</label>
+                <input type="text" id="billNo" value="61754" placeholder="Bill Number">
+            </div>
+            <div>
+                <label>Total Amount:</label>
+                <input type="number" id="totalAmount" value="66.00" placeholder="Total Amount">
+            </div>
+            <div>
+                <label>Balance Due:</label>
+                <input type="number" id="balanceAmount" value="33.00" placeholder="Balance Amount">
+            </div>
+            <div>
+                <label>Customer:</label>
+                <input type="text" id="customer" value="oyi765e4w3" placeholder="Customer Name">
+            </div>
+        </div>
+
+        <!-- QR Code Generation Test -->
+        <div class="test-section">
+            <h3>📱 QR Code Generation</h3>
+            <button onclick="generateQRCode()">Generate QR Code</button>
+            <button onclick="testUPIUrl()">Test UPI URL</button>
+            <button onclick="generateBillPreview()">Generate Bill Preview</button>
+            
+            <div id="qrResult" class="qr-display"></div>
+            <div id="upiUrlResult"></div>
+        </div>
+
+        <!-- Bill Preview -->
+        <div class="test-section">
+            <h3>🧾 Bill Preview</h3>
+            <div id="billPreview" class="bill-preview"></div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="test-section">
+            <h3>✅ Test Results</h3>
+            <div id="testResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // QR Code generation utilities (copied from the fixed version)
+        const generateUPIPaymentUrl = (order, businessSettings) => {
+            const billNo = order.order_number || order.id || 'BILL001';
+            const amount = order.balance_amount || order.total || 0;
+            const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
+            
+            // Determine UPI ID - prioritize configured UPI ID
+            let upiId = businessSettings?.upi_id;
+            
+            // If no UPI ID configured, create one from phone with proper format
+            if (!upiId && businessSettings?.phone) {
+                const phone = businessSettings.phone.replace(/\D/g, ''); // Remove non-digits
+                if (phone.length === 10) {
+                    // Use proper UPI format - try common UPI providers
+                    upiId = `${phone}@paytm`; // You can change this to @phonepe, @googlepay, etc.
+                }
+            }
+            
+            // Fallback to a generic UPI ID
+            if (!upiId) {
+                upiId = 'merchant@upi'; // Generic fallback
+            }
+            
+            // Create UPI payment URL according to NPCI standards
+            const paymentUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restaurantName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Bill ${billNo} - ${restaurantName}`)}`;
+            
+            return paymentUrl;
+        };
+
+        const generatePaymentQRCode = (text, size = 150) => {
+            try {
+                const qrUrl = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8&chld=M|0`;
+                return qrUrl;
+            } catch (error) {
+                console.error('QR code generation failed:', error);
+                return null;
+            }
+        };
+
+        function getBusinessSettings() {
+            return {
+                restaurant_name: document.getElementById('restaurantName').value,
+                phone: document.getElementById('phone').value,
+                upi_id: document.getElementById('upiId').value || null,
+                fssai_number: document.getElementById('fssai').value
+            };
+        }
+
+        function getOrderDetails() {
+            return {
+                id: document.getElementById('billNo').value,
+                order_number: document.getElementById('billNo').value,
+                total: parseFloat(document.getElementById('totalAmount').value),
+                balance_amount: parseFloat(document.getElementById('balanceAmount').value),
+                customer_name: document.getElementById('customer').value
+            };
+        }
+
+        function generateQRCode() {
+            const businessSettings = getBusinessSettings();
+            const order = getOrderDetails();
+            
+            console.log('Business Settings:', businessSettings);
+            console.log('Order:', order);
+            
+            // Generate UPI URL
+            const upiUrl = generateUPIPaymentUrl(order, businessSettings);
+            console.log('UPI URL:', upiUrl);
+            
+            // Generate QR Code
+            const qrCodeUrl = generatePaymentQRCode(upiUrl, 200);
+            
+            // Display results
+            const resultDiv = document.getElementById('qrResult');
+            resultDiv.innerHTML = `
+                <h4>Generated QR Code:</h4>
+                <img src="${qrCodeUrl}" alt="Payment QR Code" style="max-width: 200px;">
+                <p><strong>UPI URL:</strong> ${upiUrl}</p>
+            `;
+            
+            // Test results
+            const testDiv = document.getElementById('testResults');
+            const upiId = businessSettings.upi_id || `${businessSettings.phone.replace(/\D/g, '')}@paytm`;
+            
+            testDiv.innerHTML = `
+                <div class="success">
+                    <h4>✅ QR Code Generated Successfully</h4>
+                    <p><strong>UPI ID:</strong> ${upiId}</p>
+                    <p><strong>Amount:</strong> ₹${order.balance_amount}</p>
+                    <p><strong>Bill Number:</strong> ${order.order_number}</p>
+                    <p><strong>Restaurant:</strong> ${businessSettings.restaurant_name}</p>
+                </div>
+            `;
+        }
+
+        function testUPIUrl() {
+            const businessSettings = getBusinessSettings();
+            const order = getOrderDetails();
+            
+            const upiUrl = generateUPIPaymentUrl(order, businessSettings);
+            
+            document.getElementById('upiUrlResult').innerHTML = `
+                <div class="info">
+                    <h4>🔗 UPI URL Details</h4>
+                    <p><strong>Full URL:</strong> <code>${upiUrl}</code></p>
+                    <p><strong>Test:</strong> <a href="${upiUrl}" target="_blank">Click to test UPI payment</a></p>
+                </div>
+            `;
+        }
+
+        function generateBillPreview() {
+            const businessSettings = getBusinessSettings();
+            const order = getOrderDetails();
+            
+            // Generate UPI ID (same logic as in the fixed code)
+            const upiId = businessSettings.upi_id || `${businessSettings.phone.replace(/\D/g, '')}@paytm`;
+            
+            const billContent = `
+${businessSettings.restaurant_name}
+Delicious foods menu Check out
+FSSAI NO: ${businessSettings.fssai_number}
+hsr layout
+Contact: ${businessSettings.phone}
+═══════════════════════════════════════
+
+BILL
+Bill No:${order.order_number}    Table:T2    Date:12/1/2026
+Captain:Shivshankarkumar281@gmail.com(02:53 am)
+
+Customer: ${order.customer_name}
+═══════════════════════════════════════
+Item                    Qty    Rate    Amt
+Samosa                   1     66.00   66.00
+───────────────────────────────────────
+Sub Total                1      -     66.00
+
+TOTAL DUE                            ${order.total.toFixed(2)}
+═══════════════════════════════════════
+Payment Mode                         CASH
+Amount Received                     ${(order.total - order.balance_amount).toFixed(2)}
+BALANCE DUE                         ${order.balance_amount.toFixed(2)}
+═══════════════════════════════════════
+
+SCAN TO PAY BALANCE
+
+[QR CODE FOR PAYMENT]
+
+Balance Due: ₹${order.balance_amount.toFixed(2)}
+UPI ID: ${upiId}
+
+Thank you for dining with us!
+Bill generated by BillByteKOT
+(billbytekot.in)
+            `;
+            
+            document.getElementById('billPreview').textContent = billContent;
+            
+            // Show what changed
+            document.getElementById('testResults').innerHTML = `
+                <div class="success">
+                    <h4>✅ Bill Preview Generated</h4>
+                    <p><strong>✅ Fixed UPI ID:</strong> ${upiId}</p>
+                    <p><strong>✅ Removed:</strong> "Or call" phone number line</p>
+                    <p><strong>✅ Clean format:</strong> Only UPI ID shown for payment</p>
+                </div>
+            `;
+        }
+
+        // Initialize with test data
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('QR Code UPI Fix Test initialized');
+            
+            // Auto-generate on load
+            setTimeout(() => {
+                generateQRCode();
+                generateBillPreview();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

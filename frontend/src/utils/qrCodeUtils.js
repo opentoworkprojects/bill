@@ -84,14 +84,21 @@ export const generateUPIPaymentUrl = (order, businessSettings) => {
   const amount = order.balance_amount || order.total || 0;
   const restaurantName = businessSettings?.restaurant_name || 'Restaurant';
   
-  // Determine UPI ID
+  // Determine UPI ID - prioritize configured UPI ID
   let upiId = businessSettings?.upi_id;
+  
+  // If no UPI ID configured, create one from phone with proper format
   if (!upiId && businessSettings?.phone) {
-    // Generate UPI ID from phone number (common format)
-    upiId = `${businessSettings.phone}@paytm`;
+    const phone = businessSettings.phone.replace(/\D/g, ''); // Remove non-digits
+    if (phone.length === 10) {
+      // Use proper UPI format - try common UPI providers
+      upiId = `${phone}@paytm`; // You can change this to @phonepe, @googlepay, etc.
+    }
   }
+  
+  // Fallback to a generic UPI ID
   if (!upiId) {
-    upiId = 'payment@restaurant.com'; // Fallback
+    upiId = 'merchant@upi'; // Generic fallback
   }
   
   // Create UPI payment URL according to NPCI standards
