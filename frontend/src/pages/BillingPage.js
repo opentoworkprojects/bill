@@ -41,6 +41,8 @@ const BillingPage = ({ user }) => {
   const dropdownRef = useRef(null);
   const priceInputRef = useRef(null);
   const isSelectingRef = useRef(false);
+  // Track actual payment data after completion to fix balance display issue
+  const [completedPaymentData, setCompletedPaymentData] = useState(null);
 
   useEffect(() => {
     fetchOrder();
@@ -277,20 +279,38 @@ const BillingPage = ({ user }) => {
 
   const releaseTable = async () => {
     const kotEnabled = businessSettings?.kot_mode_enabled !== false;
-    if (!kotEnabled || !order?.table_id || order.table_id === 'counter') return;
+    if (!kotEnabled || !order?.table_id || order.table_id === 'counter') {
+      console.log('✅ Table release skipped (KOT disabled or counter order)');
+      return true;
+    }
+    
     try {
+      console.log(`🍽️ Releasing table ${order.table_number} (ID: ${order.table_id})...`);
       const tableResponse = await axios.get(`${API}/tables/${order.table_id}`);
       await axios.put(`${API}/tables/${order.table_id}`, {
-        table_number: tableResponse.data.table_number, capacity: tableResponse.data.capacity || 4, status: 'available', current_order_id: null
+        table_number: tableResponse.data.table_number, 
+        capacity: tableResponse.data.capacity || 4, 
+        status: 'available', 
+        current_order_id: null
       });
+      console.log(`✅ Table ${order.table_number} released successfully`);
       toast.success(`Table ${order.table_number} released`);
+      return true;
     } catch (error) {
-      console.error('Failed to release table:', error);
+      console.error('❌ Failed to release table:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      toast.error(`Failed to release table ${order.table_number}. Please manually clear it from Tables page.`);
+      return false;
     }
   };
 
   const processPayment = async () => {
     const total = calculateTotal();
+    // Fix: Always calculate received amount correctly - default to full payment
     const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
     const balance = Math.max(0, total - received);
     const isCredit = balance > 0;
@@ -306,13 +326,13 @@ const BillingPage = ({ user }) => {
         payment_method: splitPayment ? 'split' : paymentMethod 
       });
       
-      // Prepare payment data
+      // Prepare payment data - ensure all fields are explicitly set
       const paymentData = {
         status: isCredit ? 'pending' : 'completed',
         payment_method: splitPayment ? 'split' : paymentMethod,
-        payment_received: received,
-        balance_amount: balance,
-        is_credit: isCredit,
+        payment_received: received,  // Always set explicitly
+        balance_amount: balance,     // Always set explicitly (0 for full payment)
+        is_credit: isCredit,         // Always set explicitly (false for full payment)
         discount: calculateDiscountAmount(),
         discount_type: discountType,
         discount_value: parseFloat(discountValue) || 0,
@@ -346,11 +366,25 @@ const BillingPage = ({ user }) => {
       // Update order with payment details
       await axios.put(`${API}/orders/${orderId}`, paymentData);
       
+      // Store completed payment data for UI display (fixes balance showing after full payment)
+      setCompletedPaymentData({
+        received: received,
+        balance: balance,
+        total: total,
+        isCredit: isCredit,
+        paymentMethod: splitPayment ? 'split' : paymentMethod
+      });
+      
       toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
       setPaymentCompleted(true);
       
       // Release table for all payments (partial or full)
-      await releaseTable();
+      // Handle table release failure gracefully - payment is already complete
+      const tableReleased = await releaseTable();
+      if (!tableReleased && order?.table_id && order.table_id !== 'counter') {
+        console.warn('⚠️ Payment completed but table release failed');
+        // Table release error is already shown by releaseTable function
+      }
       
       // Print receipt
       const discountAmt = calculateDiscountAmount();
@@ -1031,9 +1065,9 @@ const BillingPage = ({ user }) => {
                 <div>
                   <p className="font-bold text-green-800 text-sm">Paid!</p>
                   <p className="text-xs text-green-600">
-                    {currency}{calculateReceivedAmount().toFixed(0)} received via {paymentMethod}
-                    {calculateReceivedAmount() < calculateTotal() && (
-                      <span className="block text-red-600">Balance Due: {currency}{(calculateTotal() - calculateReceivedAmount()).toFixed(0)}</span>
+                    {currency}{(completedPaymentData?.received || calculateTotal()).toFixed(0)} received via {completedPaymentData?.paymentMethod || paymentMethod}
+                    {completedPaymentData?.balance > 0 && (
+                      <span className="block text-red-600">Balance Due: {currency}{completedPaymentData.balance.toFixed(0)}</span>
                     )}
                   </p>
                 </div>
@@ -1296,9 +1330,9 @@ const BillingPage = ({ user }) => {
                 <div>
                   <p className="text-2xl font-bold text-green-800">Payment Successful!</p>
                   <p className="text-green-600 text-lg">
-                    {currency}{calculateReceivedAmount().toFixed(0)} received via {paymentMethod.toUpperCase()}
-                    {calculateReceivedAmount() < calculateTotal() && (
-                      <span className="block text-red-600 text-base">Balance Due: {currency}{(calculateTotal() - calculateReceivedAmount()).toFixed(0)}</span>
+                    {currency}{(completedPaymentData?.received || calculateTotal()).toFixed(0)} received via {(completedPaymentData?.paymentMethod || paymentMethod).toUpperCase()}
+                    {completedPaymentData?.balance > 0 && (
+                      <span className="block text-red-600 text-base">Balance Due: {currency}{completedPaymentData.balance.toFixed(0)}</span>
                     )}
                   </p>
                 </div>

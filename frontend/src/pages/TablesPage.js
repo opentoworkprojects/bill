@@ -41,12 +41,13 @@ const TablesPage = ({ user }) => {
     notes: '', status: 'confirmed'
   });
 
-  useEffect(() => { fetchAllData(); }, []);
+  // Force refresh on mount to ensure fresh data (fixes stale table status after payment)
+  useEffect(() => { fetchAllData(true); }, []);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      await Promise.all([fetchTables(), fetchReservations(), fetchWhatsappSettings()]);
+      await Promise.all([fetchTables(forceRefresh), fetchReservations(), fetchWhatsappSettings()]);
     } catch (error) { console.error('Error fetching data:', error); }
     finally { setLoading(false); }
   };
@@ -58,11 +59,20 @@ const TablesPage = ({ user }) => {
     } catch (error) { console.error('Failed to fetch WhatsApp settings'); }
   };
 
-  const fetchTables = async () => {
+  const fetchTables = async (forceRefresh = false) => {
     try {
-      const response = await axios.get(`${API}/tables`);
+      // Add cache-busting parameter when force refresh is requested
+      const url = forceRefresh 
+        ? `${API}/tables?_t=${Date.now()}`  
+        : `${API}/tables`;
+      console.log(`🍽️ Fetching tables${forceRefresh ? ' (force refresh)' : ''}...`);
+      const response = await axios.get(url);
       setTables(response.data.sort((a, b) => a.table_number - b.table_number));
-    } catch (error) { toast.error('Failed to fetch tables'); }
+      console.log(`✅ Fetched ${response.data.length} tables`);
+    } catch (error) { 
+      console.error('Failed to fetch tables:', error);
+      toast.error('Failed to fetch tables'); 
+    }
   };
 
   const fetchReservations = async () => {

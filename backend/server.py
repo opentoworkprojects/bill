@@ -3305,6 +3305,15 @@ async def update_table(
     updated = await db.tables.find_one(
         {"id": table_id, "organization_id": user_org_id}, {"_id": 0}
     )
+    
+    # Fix: Invalidate table cache after update to ensure fresh data on next fetch
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_table_caches(user_org_id)
+        print(f"🗑️ Table cache invalidated for org {user_org_id} after table {table_id} update (status: {table.status})")
+    except Exception as e:
+        print(f"⚠️ Table cache invalidation error: {e}")
+    
     return updated
 
 
@@ -4055,16 +4064,19 @@ async def update_order(
                 update_data[field] = order_data[field]
         
         # Calculate balance if payment_received is provided
+        # Fix: Use the new total from order_data if provided, otherwise use existing
         if "payment_received" in order_data:
-            total = existing_order.get("total", 0)
+            total = order_data.get("total", existing_order.get("total", 0))
             payment_received = order_data.get("payment_received", 0) or 0
-            update_data["balance_amount"] = total - payment_received
+            calculated_balance = max(0, total - payment_received)  # Ensure non-negative
+            update_data["balance_amount"] = calculated_balance
             # Auto-mark as credit if there's a balance
-            if update_data["balance_amount"] > 0:
+            if calculated_balance > 0:
                 update_data["is_credit"] = True
-            elif update_data["balance_amount"] <= 0:
+            else:
                 update_data["is_credit"] = False
                 update_data["balance_amount"] = 0
+            print(f"💰 Payment update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={update_data['is_credit']}")
         
         await db.orders.update_one(
             {"id": order_id, "organization_id": user_org_id},
@@ -4103,9 +4115,6 @@ async def update_order(
         "customer_name": order_data.get("customer_name", existing_order.get("customer_name", "")),
         "customer_phone": order_data.get("customer_phone", existing_order.get("customer_phone", "")),
         "payment_method": order_data.get("payment_method", existing_order.get("payment_method", "cash")),
-        "is_credit": order_data.get("is_credit", existing_order.get("is_credit", False)),
-        "payment_received": order_data.get("payment_received", existing_order.get("payment_received", 0)),
-        "balance_amount": order_data.get("balance_amount", existing_order.get("balance_amount", 0)),
         # Split payment fields
         "cash_amount": order_data.get("cash_amount", existing_order.get("cash_amount", 0)),
         "card_amount": order_data.get("card_amount", existing_order.get("card_amount", 0)),
@@ -4118,6 +4127,31 @@ async def update_order(
         "discount_amount": order_data.get("discount_amount", existing_order.get("discount_amount", 0)),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
+    
+    # Fix: Properly calculate payment fields when payment_received is provided
+    total = order_data.get("total", existing_order["total"])
+    payment_received = order_data.get("payment_received", existing_order.get("payment_received", 0)) or 0
+    
+    # Calculate balance correctly - ensure it's never negative
+    calculated_balance = max(0, total - payment_received)
+    
+    # Determine is_credit based on balance
+    is_credit = calculated_balance > 0
+    
+    # If full payment (balance <= 0), ensure is_credit is false and balance is 0
+    if calculated_balance <= 0:
+        is_credit = False
+        calculated_balance = 0
+    
+    update_data["payment_received"] = payment_received
+    update_data["balance_amount"] = calculated_balance
+    update_data["is_credit"] = is_credit
+    
+    # Also update status if provided
+    if "status" in order_data:
+        update_data["status"] = order_data["status"]
+    
+    print(f"📝 Order update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
     
     await db.orders.update_one(
         {"id": order_id, "organization_id": user_org_id},
