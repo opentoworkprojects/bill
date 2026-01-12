@@ -8,9 +8,8 @@
  */
 export const generatePaymentQRCode = (text, size = 150) => {
   try {
-    // Use Google Charts API for reliable QR code generation
-    // This works well for thermal printers and is widely supported
-    const qrUrl = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8&chld=M|0`;
+    // Use QR Server API as primary (more reliable than Google Charts)
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=png&ecc=M`;
     return qrUrl;
   } catch (error) {
     console.error('QR code generation failed:', error);
@@ -115,9 +114,8 @@ export const generateUPIPaymentUrl = (order, businessSettings) => {
  */
 export const generateThermalQRCode = (text, size = 120) => {
   try {
-    // Use higher error correction for thermal printers (M = ~15% error correction)
-    // Add margin=0 to maximize QR code size within the given dimensions
-    const qrUrl = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8&chld=M|0`;
+    // Use QR Server API with medium error correction for thermal printers
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=png&ecc=M&margin=0`;
     return qrUrl;
   } catch (error) {
     console.error('Thermal QR code generation failed:', error);

@@ -174,13 +174,11 @@ const generatePaymentUrl = (order, businessSettings) => {
   return paymentUrl;
 };
 
-// Generate QR code data URL using a QR code library or service
+// Generate QR code data URL using QR Server API (more reliable)
 const generateQRCodeDataUrl = (text, size = 120) => {
   try {
-    // For thermal printers, we need a simple black and white QR code
-    // Using Google Charts API for reliable QR code generation
-    // M = Medium error correction (~15%), margin=0 for maximum size
-    const qrUrl = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8&chld=M|0`;
+    // Use QR Server API for reliable QR code generation
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=png&ecc=M&margin=0`;
     return qrUrl;
   } catch (error) {
     console.error('QR code generation failed:', error);
