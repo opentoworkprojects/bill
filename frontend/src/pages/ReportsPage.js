@@ -1180,7 +1180,7 @@ const ReportsPage = ({ user }) => {
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           {/* Mobile-optimized scrollable tabs */}
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
-            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-6 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
+            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-7 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
               <TabsTrigger value="overview" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Overview</span>
                 <span className="sm:hidden">📊 Overview</span>
@@ -1200,6 +1200,10 @@ const ReportsPage = ({ user }) => {
               <TabsTrigger value="hours" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Peak Hours</span>
                 <span className="sm:hidden">⏰ Hours</span>
+              </TabsTrigger>
+              <TabsTrigger value="daybook" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Day Book</span>
+                <span className="sm:hidden">📒 Day Book</span>
               </TabsTrigger>
               <TabsTrigger value="export" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Export</span>
@@ -1730,6 +1734,11 @@ const ReportsPage = ({ user }) => {
             )}
           </TabsContent>
 
+          {/* Day Book Tab */}
+          <TabsContent value="daybook" className="space-y-4 sm:space-y-6">
+            <DayBookTab dateRange={dateRange} />
+          </TabsContent>
+
           {/* Export Tab */}
           <TabsContent value="export" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
@@ -1895,6 +1904,582 @@ const ReportsPage = ({ user }) => {
         </Tabs>
       </div>
     </Layout>
+  );
+};
+
+// Day Book Tab Component
+const DayBookTab = ({ dateRange }) => {
+  const [daybook, setDaybook] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    fetchDaybook();
+  }, [selectedDate]);
+
+  const fetchDaybook = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/reports/daybook?date=${selectedDate}`);
+      setDaybook(response.data);
+    } catch (error) {
+      console.error('Failed to fetch day book:', error);
+      toast.error('Failed to fetch day book');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Export Day Book to PDF via backend API
+  const handleExportDayBookPDF = async () => {
+    if (!daybook) {
+      toast.error('No data to export');
+      return;
+    }
+    setExportLoading(true);
+    try {
+      const response = await axios.get(`${API}/reports/daybook/export`, {
+        params: {
+          date: selectedDate,
+          format: 'pdf'
+        },
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daybook-${selectedDate}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('PDF exported successfully!');
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      // Fallback to client-side PDF generation
+      handleExportDayBookPDFFallback();
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // Fallback client-side PDF generation
+  const handleExportDayBookPDFFallback = () => {
+    try {
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Day Book Report - ${selectedDate}</title>
+          <style>
+            @page { size: A4; margin: 15mm; }
+            body {
+              font-family: 'Segoe UI', Arial, sans-serif;
+              font-size: 11px;
+              line-height: 1.4;
+              color: #1f2937;
+              margin: 0;
+              padding: 15px;
+            }
+            .header {
+              text-align: center;
+              padding: 20px;
+              background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+              color: white;
+              border-radius: 12px;
+              margin-bottom: 20px;
+            }
+            .header h1 { margin: 0 0 5px 0; font-size: 24px; }
+            .header p { margin: 3px 0; opacity: 0.9; }
+            .summary-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 12px;
+              margin-bottom: 20px;
+            }
+            .summary-card {
+              padding: 15px;
+              border-radius: 10px;
+              text-align: center;
+            }
+            .summary-card.inflow { background: #dcfce7; }
+            .summary-card.outflow { background: #fee2e2; }
+            .summary-card.net { background: #dbeafe; }
+            .summary-card.closing { background: #f3e8ff; }
+            .summary-card h4 { margin: 0 0 5px 0; font-size: 10px; text-transform: uppercase; color: #666; }
+            .summary-card p { margin: 0; font-size: 18px; font-weight: bold; }
+            .summary-card.inflow p { color: #15803d; }
+            .summary-card.outflow p { color: #dc2626; }
+            .summary-card.net p { color: #1d4ed8; }
+            .summary-card.closing p { color: #7c3aed; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-size: 14px; font-weight: bold; color: #7c3aed; margin-bottom: 10px; border-bottom: 2px solid #7c3aed; padding-bottom: 5px; }
+            .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            .breakdown-item { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: 6px; margin-bottom: 5px; }
+            .breakdown-item.inflow { background: #dcfce7; }
+            .breakdown-item.outflow { background: #fee2e2; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; font-size: 10px; }
+            th { background: #7c3aed; color: white; font-weight: 600; }
+            tr:nth-child(even) { background: #f9fafb; }
+            tr.inflow-row { background: #f0fdf4; }
+            tr.outflow-row { background: #fef2f2; }
+            .amount-inflow { color: #15803d; font-weight: bold; }
+            .amount-outflow { color: #dc2626; font-weight: bold; }
+            .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 10px; color: #666; }
+            @media print { body { padding: 0; } .no-print { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📒 Day Book Report</h1>
+            <p>Date: ${new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-card inflow">
+              <h4>Total Inflows</h4>
+              <p>₹${daybook.total_inflows.toFixed(2)}</p>
+              <small>${daybook.order_count} orders</small>
+            </div>
+            <div class="summary-card outflow">
+              <h4>Total Outflows</h4>
+              <p>₹${daybook.total_outflows.toFixed(2)}</p>
+              <small>${daybook.expense_count} expenses</small>
+            </div>
+            <div class="summary-card net">
+              <h4>Net Cash Flow</h4>
+              <p>${daybook.net_cash_flow >= 0 ? '+' : ''}₹${daybook.net_cash_flow.toFixed(2)}</p>
+            </div>
+            <div class="summary-card closing">
+              <h4>Closing Balance</h4>
+              <p>₹${daybook.closing_balance.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div class="breakdown-grid">
+            <div class="section">
+              <div class="section-title">💰 Inflow Breakdown</div>
+              ${Object.entries(daybook.inflow_breakdown).filter(([_, amount]) => amount > 0).map(([method, amount]) => `
+                <div class="breakdown-item inflow">
+                  <span style="text-transform: capitalize;">${method}</span>
+                  <span class="amount-inflow">₹${amount.toFixed(2)}</span>
+                </div>
+              `).join('') || '<p style="color: #666; text-align: center;">No inflows recorded</p>'}
+            </div>
+            <div class="section">
+              <div class="section-title">📤 Outflow Breakdown</div>
+              ${Object.entries(daybook.outflow_breakdown).filter(([_, amount]) => amount > 0).map(([category, amount]) => `
+                <div class="breakdown-item outflow">
+                  <span>${category}</span>
+                  <span class="amount-outflow">₹${amount.toFixed(2)}</span>
+                </div>
+              `).join('') || '<p style="color: #666; text-align: center;">No outflows recorded</p>'}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">📋 Transaction Details (${daybook.entries.length} transactions)</div>
+            ${daybook.entries.length > 0 ? `
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Running Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${daybook.entries.map(entry => `
+                    <tr class="${entry.type === 'inflow' ? 'inflow-row' : 'outflow-row'}">
+                      <td>${entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                      <td>${entry.type === 'inflow' ? '↑ Inflow' : '↓ Outflow'}</td>
+                      <td>${entry.category}</td>
+                      <td>${entry.description}</td>
+                      <td class="${entry.type === 'inflow' ? 'amount-inflow' : 'amount-outflow'}">
+                        ${entry.type === 'inflow' ? '+' : '-'}₹${entry.amount.toFixed(2)}
+                      </td>
+                      <td>₹${entry.running_balance.toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : '<p style="color: #666; text-align: center; padding: 20px;">No transactions for this date</p>'}
+          </div>
+
+          <div class="footer">
+            <p>Generated by BillByteKOT - Restaurant Management System</p>
+          </div>
+
+          <div class="no-print" style="text-align: center; margin-top: 20px;">
+            <button onclick="window.print(); setTimeout(() => window.close(), 100);" 
+              style="padding: 12px 24px; background: #7c3aed; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">
+              Download as PDF
+            </button>
+            <button onclick="window.close()" 
+              style="padding: 12px 24px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; margin-left: 10px;">
+              Close
+            </button>
+            <p style="margin-top: 10px; font-size: 12px; color: #666;">
+              Click "Download as PDF" and choose "Save as PDF" in the print dialog
+            </p>
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      toast.success('PDF preview opened! Use Print dialog to save as PDF');
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast.error('Failed to generate PDF');
+    }
+  };
+
+  // Export Day Book to Excel via backend API
+  const handleExportDayBookExcel = async () => {
+    if (!daybook) {
+      toast.error('No data to export');
+      return;
+    }
+    setExportLoading(true);
+    try {
+      const response = await axios.get(`${API}/reports/daybook/export`, {
+        params: {
+          date: selectedDate,
+          format: 'excel'
+        },
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daybook-${selectedDate}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Excel file exported successfully!');
+    } catch (error) {
+      console.error('Failed to export Excel from backend:', error);
+      // Fallback to client-side Excel generation
+      handleExportDayBookExcelFallback();
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // Fallback client-side Excel generation
+  const handleExportDayBookExcelFallback = () => {
+    try {
+      const excelContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #7c3aed; color: white; font-weight: bold; }
+            .header-row { background-color: #f3e8ff; font-weight: bold; }
+            .inflow-row { background-color: #dcfce7; }
+            .outflow-row { background-color: #fee2e2; }
+            .summary-row { background-color: #f3f4f6; font-weight: bold; }
+            .section-header { background-color: #7c3aed; color: white; font-weight: bold; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <h2>Day Book Report - ${selectedDate}</h2>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+          
+          <h3>Summary</h3>
+          <table>
+            <tr class="header-row">
+              <td>Total Inflows</td>
+              <td>Total Outflows</td>
+              <td>Net Cash Flow</td>
+              <td>Closing Balance</td>
+            </tr>
+            <tr>
+              <td style="color: green;">₹${daybook.total_inflows.toFixed(2)}</td>
+              <td style="color: red;">₹${daybook.total_outflows.toFixed(2)}</td>
+              <td style="color: ${daybook.net_cash_flow >= 0 ? 'green' : 'red'};">${daybook.net_cash_flow >= 0 ? '+' : ''}₹${daybook.net_cash_flow.toFixed(2)}</td>
+              <td style="color: purple;">₹${daybook.closing_balance.toFixed(2)}</td>
+            </tr>
+          </table>
+          
+          <h3>Inflow Breakdown</h3>
+          <table>
+            <tr class="section-header">
+              <th>Payment Method</th>
+              <th>Amount</th>
+            </tr>
+            ${Object.entries(daybook.inflow_breakdown).map(([method, amount]) => `
+              <tr class="inflow-row">
+                <td style="text-transform: capitalize;">${method}</td>
+                <td>₹${amount.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+            <tr class="summary-row">
+              <td>Total Inflows</td>
+              <td>₹${daybook.total_inflows.toFixed(2)}</td>
+            </tr>
+          </table>
+          
+          <h3>Outflow Breakdown</h3>
+          <table>
+            <tr class="section-header">
+              <th>Category</th>
+              <th>Amount</th>
+            </tr>
+            ${Object.entries(daybook.outflow_breakdown).map(([category, amount]) => `
+              <tr class="outflow-row">
+                <td>${category}</td>
+                <td>₹${amount.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+            <tr class="summary-row">
+              <td>Total Outflows</td>
+              <td>₹${daybook.total_outflows.toFixed(2)}</td>
+            </tr>
+          </table>
+          
+          <h3>Transaction Details</h3>
+          <table>
+            <tr class="section-header">
+              <th>Time</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Running Balance</th>
+            </tr>
+            ${daybook.entries.map(entry => `
+              <tr class="${entry.type === 'inflow' ? 'inflow-row' : 'outflow-row'}">
+                <td>${entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                <td>${entry.type === 'inflow' ? 'Inflow' : 'Outflow'}</td>
+                <td>${entry.category}</td>
+                <td>${entry.description}</td>
+                <td>${entry.type === 'inflow' ? '+' : '-'}₹${entry.amount.toFixed(2)}</td>
+                <td>₹${entry.running_balance.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daybook-${selectedDate}.xls`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Excel file exported successfully!');
+    } catch (error) {
+      console.error('Failed to export Excel:', error);
+      toast.error('Failed to export Excel');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      {/* Date Selector */}
+      <Card className="border-0 shadow-lg">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4 flex-wrap justify-between">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-violet-600" />
+                <Label>Select Date:</Label>
+              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500"
+              />
+              <Button variant="outline" size="sm" onClick={fetchDaybook}>
+                <RefreshCw className="w-4 h-4 mr-2" />Refresh
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportDayBookPDF}
+                disabled={exportLoading || !daybook}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                PDF
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportDayBookExcel}
+                disabled={exportLoading || !daybook}
+                className="text-green-600 border-green-200 hover:bg-green-50"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Excel
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary Cards */}
+      {daybook && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-green-600 mb-2">
+                  <TrendingUp className="w-5 h-5" />
+                  <span className="text-sm font-medium">Total Inflows</span>
+                </div>
+                <p className="text-2xl font-bold text-green-700">₹{daybook.total_inflows.toFixed(2)}</p>
+                <p className="text-xs text-green-600 mt-1">{daybook.order_count} orders</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-orange-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-red-600 mb-2">
+                  <Package className="w-5 h-5" />
+                  <span className="text-sm font-medium">Total Outflows</span>
+                </div>
+                <p className="text-2xl font-bold text-red-700">₹{daybook.total_outflows.toFixed(2)}</p>
+                <p className="text-xs text-red-600 mt-1">{daybook.expense_count} expenses</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                  <Sparkles className="w-5 h-5" />
+                  <span className="text-sm font-medium">Net Cash Flow</span>
+                </div>
+                <p className={`text-2xl font-bold ${daybook.net_cash_flow >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {daybook.net_cash_flow >= 0 ? '+' : ''}₹{daybook.net_cash_flow.toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-50 to-purple-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-violet-600 mb-2">
+                  <FileText className="w-5 h-5" />
+                  <span className="text-sm font-medium">Closing Balance</span>
+                </div>
+                <p className="text-2xl font-bold text-violet-700">₹{daybook.closing_balance.toFixed(2)}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Inflow Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                  Inflow Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {Object.entries(daybook.inflow_breakdown).map(([method, amount]) => (
+                    amount > 0 && (
+                      <div key={method} className="flex justify-between items-center p-2 bg-green-50 rounded-lg">
+                        <span className="capitalize font-medium">{method}</span>
+                        <span className="text-green-700 font-bold">₹{amount.toFixed(2)}</span>
+                      </div>
+                    )
+                  ))}
+                  {Object.values(daybook.inflow_breakdown).every(v => v === 0) && (
+                    <p className="text-gray-500 text-center py-4">No inflows recorded</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="w-5 h-5 text-red-600" />
+                  Outflow Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {Object.entries(daybook.outflow_breakdown).map(([category, amount]) => (
+                    amount > 0 && (
+                      <div key={category} className="flex justify-between items-center p-2 bg-red-50 rounded-lg">
+                        <span className="font-medium">{category}</span>
+                        <span className="text-red-700 font-bold">₹{amount.toFixed(2)}</span>
+                      </div>
+                    )
+                  ))}
+                  {Object.keys(daybook.outflow_breakdown).length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No outflows recorded</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Transaction List */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="w-5 h-5 text-violet-600" />
+                Transactions ({daybook.entries.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {daybook.entries.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No transactions for this date</p>
+                ) : (
+                  daybook.entries.map((entry, idx) => (
+                    <div key={idx} className={`flex justify-between items-center p-3 rounded-lg ${
+                      entry.type === 'inflow' ? 'bg-green-50' : 'bg-red-50'
+                    }`}>
+                      <div>
+                        <p className="font-medium text-sm">{entry.description}</p>
+                        <p className="text-xs text-gray-500">{entry.category}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold ${entry.type === 'inflow' ? 'text-green-700' : 'text-red-700'}`}>
+                          {entry.type === 'inflow' ? '+' : '-'}₹{entry.amount.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">Balance: ₹{entry.running_balance.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
   );
 };
 

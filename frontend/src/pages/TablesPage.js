@@ -44,6 +44,29 @@ const TablesPage = ({ user }) => {
   // Force refresh on mount to ensure fresh data (fixes stale table status after payment)
   useEffect(() => { fetchAllData(true); }, []);
 
+  // Auto-refresh when window gains focus (user returns from BillingPage)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 Window focused - refreshing tables');
+      fetchTables(true);
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔄 Page visible - refreshing tables');
+        fetchTables(true);
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const fetchAllData = async (forceRefresh = false) => {
     setLoading(true);
     try {
@@ -61,11 +84,15 @@ const TablesPage = ({ user }) => {
 
   const fetchTables = async (forceRefresh = false) => {
     try {
-      // Add cache-busting parameter when force refresh is requested
-      const url = forceRefresh 
-        ? `${API}/tables?_t=${Date.now()}`  
-        : `${API}/tables`;
-      console.log(`🍽️ Fetching tables${forceRefresh ? ' (force refresh)' : ''}...`);
+      // Always use fresh=true parameter to bypass cache and get direct DB data
+      // Add cache-busting timestamp when force refresh is requested
+      const params = new URLSearchParams();
+      params.append('fresh', 'true');  // Always bypass cache for table status
+      if (forceRefresh) {
+        params.append('_t', Date.now().toString());  // Cache-busting for browser
+      }
+      const url = `${API}/tables?${params.toString()}`;
+      console.log(`🍽️ Fetching tables${forceRefresh ? ' (force refresh)' : ''} with fresh=true...`);
       const response = await axios.get(url);
       setTables(response.data.sort((a, b) => a.table_number - b.table_number));
       console.log(`✅ Fetched ${response.data.length} tables`);

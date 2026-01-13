@@ -12,6 +12,7 @@ import OrdersPage from './pages/OrdersPage';
 import TablesPage from './pages/TablesPage';
 import KitchenPage from './pages/KitchenPage';
 import InventoryPage from './pages/InventoryPage';
+import ExpensePage from './pages/ExpensePage';
 import ReportsPage from './pages/ReportsPage';
 import BillingPage from './pages/BillingPage';
 import SettingsPage from './pages/SettingsPage';
@@ -762,6 +763,14 @@ function App() {
             element={
               <PrivateRoute isAuthChecking={isAuthChecking}>
                 <InventoryPage user={user} />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/expenses"
+            element={
+              <PrivateRoute isAuthChecking={isAuthChecking}>
+                <ExpensePage user={user} />
               </PrivateRoute>
             }
           />

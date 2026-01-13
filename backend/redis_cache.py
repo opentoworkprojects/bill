@@ -950,17 +950,169 @@ class CachedOrderService:
                 print(f"⚠️ Failed to invalidate inventory cache: {cache_error}")
         else:
             print(f"⚠️ Redis not connected, skipping inventory cache invalidation for org {org_id}")
+    
+    async def invalidate_table_caches(self, org_id: str):
+        """Invalidate table caches when table status changes"""
+        
+        if self.cache.is_connected():
+            try:
+                cache_key = f"tables:{org_id}"
+                await self.cache.delete(cache_key)
+                print(f"🗑️ Table cache invalidated for org {org_id}")
+            except Exception as cache_error:
+                print(f"⚠️ Failed to invalidate table cache: {cache_error}")
+        else:
+            print(f"⚠️ Redis not connected, skipping table cache invalidation for org {org_id}")
+
+
+# ============ TABLE STATUS MANAGER ============
+
+class TableStatusManager:
+    """
+    Handles immediate table status updates with direct database writes.
+    Bypasses cache for writes, then invalidates cache to ensure consistency.
+    """
+    
+    def __init__(self, db: AsyncIOMotorDatabase, cache: RedisCache):
+        self.db = db
+        self.cache = cache
+        self.max_retries = 2
+    
+    async def set_table_occupied(self, org_id: str, table_id: str, order_id: str) -> dict:
+        """
+        Immediately set table to occupied when order is created.
+        Uses direct DB update, then invalidates cache.
+        Returns dict with success status and message.
+        """
+        for attempt in range(self.max_retries):
+            try:
+                # Direct database update - bypasses cache
+                result = await self.db.tables.update_one(
+                    {"id": table_id, "organization_id": org_id},
+                    {"$set": {
+                        "status": "occupied",
+                        "current_order_id": order_id
+                    }}
+                )
+                
+                if result.modified_count > 0 or result.matched_count > 0:
+                    # Invalidate cache after successful DB update
+                    await self._invalidate_table_cache(org_id)
+                    
+                    print(f"✅ Table {table_id} set to OCCUPIED (order: {order_id})")
+                    return {
+                        "success": True,
+                        "message": f"Table set to occupied",
+                        "table_id": table_id,
+                        "status": "occupied"
+                    }
+                else:
+                    print(f"⚠️ Table {table_id} not found for org {org_id}")
+                    return {
+                        "success": False,
+                        "message": "Table not found",
+                        "table_id": table_id
+                    }
+                    
+            except Exception as e:
+                print(f"❌ Error setting table occupied (attempt {attempt + 1}): {e}")
+                if attempt == self.max_retries - 1:
+                    return {
+                        "success": False,
+                        "message": f"Failed to update table status: {str(e)}",
+                        "table_id": table_id
+                    }
+        
+        return {"success": False, "message": "Max retries exceeded", "table_id": table_id}
+    
+    async def set_table_available(self, org_id: str, table_id: str) -> dict:
+        """
+        Immediately set table to available when bill is completed.
+        Uses direct DB update, then invalidates cache.
+        Returns dict with success status and message.
+        """
+        for attempt in range(self.max_retries):
+            try:
+                # Direct database update - bypasses cache
+                result = await self.db.tables.update_one(
+                    {"id": table_id, "organization_id": org_id},
+                    {"$set": {
+                        "status": "available",
+                        "current_order_id": None
+                    }}
+                )
+                
+                if result.modified_count > 0 or result.matched_count > 0:
+                    # Invalidate cache after successful DB update
+                    await self._invalidate_table_cache(org_id)
+                    
+                    print(f"✅ Table {table_id} set to AVAILABLE (cleared)")
+                    return {
+                        "success": True,
+                        "message": "Table cleared and available",
+                        "table_id": table_id,
+                        "status": "available"
+                    }
+                else:
+                    print(f"⚠️ Table {table_id} not found for org {org_id}")
+                    return {
+                        "success": False,
+                        "message": "Table not found",
+                        "table_id": table_id
+                    }
+                    
+            except Exception as e:
+                print(f"❌ Error setting table available (attempt {attempt + 1}): {e}")
+                if attempt == self.max_retries - 1:
+                    return {
+                        "success": False,
+                        "message": f"Failed to update table status: {str(e)}",
+                        "table_id": table_id
+                    }
+        
+        return {"success": False, "message": "Max retries exceeded", "table_id": table_id}
+    
+    async def get_tables_fresh(self, org_id: str) -> List[Dict]:
+        """
+        Fetch tables directly from database, bypassing cache.
+        Used for critical operations requiring fresh data.
+        """
+        try:
+            tables = await self.db.tables.find(
+                {"organization_id": org_id},
+                {"_id": 0}
+            ).sort("table_number", 1).to_list(100)
+            
+            print(f"📊 Fresh fetch: {len(tables)} tables for org {org_id}")
+            return tables
+            
+        except Exception as e:
+            print(f"❌ Error fetching fresh tables: {e}")
+            return []
+    
+    async def _invalidate_table_cache(self, org_id: str):
+        """Internal method to invalidate table cache"""
+        if self.cache.is_connected():
+            try:
+                cache_key = f"tables:{org_id}"
+                await self.cache.delete(cache_key)
+                print(f"🗑️ Table cache invalidated for org {org_id}")
+            except Exception as e:
+                print(f"⚠️ Failed to invalidate table cache: {e}")
+
 
 # Global cache instance
 redis_cache = RedisCache()
 cached_order_service = None
+table_status_manager = None
 
 async def init_redis_cache(db: AsyncIOMotorDatabase):
     """Initialize Redis cache and order service"""
-    global cached_order_service
+    global cached_order_service, table_status_manager
     
     await redis_cache.connect()
     cached_order_service = CachedOrderService(db, redis_cache)
+    table_status_manager = TableStatusManager(db, redis_cache)
     
     print("🚀 Redis cache service initialized")
 
@@ -974,3 +1126,9 @@ def get_cached_order_service() -> CachedOrderService:
     if cached_order_service is None:
         raise RuntimeError("Redis cache not initialized. Call init_redis_cache() first.")
     return cached_order_service
+
+def get_table_status_manager() -> TableStatusManager:
+    """Get the table status manager instance"""
+    if table_status_manager is None:
+        raise RuntimeError("Redis cache not initialized. Call init_redis_cache() first.")
+    return table_status_manager

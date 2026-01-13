@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search } from 'lucide-react';
+import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, RefreshCw, Loader2 } from 'lucide-react';
 import { printReceipt } from '../utils/printUtils';
 
 const BillingPage = ({ user }) => {
@@ -43,6 +43,10 @@ const BillingPage = ({ user }) => {
   const isSelectingRef = useRef(false);
   // Track actual payment data after completion to fix balance display issue
   const [completedPaymentData, setCompletedPaymentData] = useState(null);
+  // Menu loading states for better UX
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState(null);
+  const [menuLastFetched, setMenuLastFetched] = useState(null);
 
   useEffect(() => {
     fetchOrder();
@@ -93,7 +97,10 @@ const BillingPage = ({ user }) => {
     }
   };
 
-  const fetchMenuItems = async () => {
+  const fetchMenuItems = async (forceRefresh = false) => {
+    setMenuLoading(true);
+    setMenuError(null);
+    
     try {
       console.log('Fetching menu items...');
       
@@ -101,7 +108,34 @@ const BillingPage = ({ user }) => {
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('No auth token found');
+        setMenuError('Authentication required');
+        setMenuLoading(false);
         return;
+      }
+      
+      // Try to use cached menu items for instant display (if not force refresh)
+      const cacheKey = `menu_items_${user?.organization_id || user?.id || 'default'}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      
+      if (!forceRefresh && cachedData) {
+        try {
+          const { items, timestamp } = JSON.parse(cachedData);
+          const cacheAge = Date.now() - timestamp;
+          const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+          
+          if (cacheAge < CACHE_TTL && items.length > 0) {
+            console.log('📦 Using cached menu items:', items.length, 'items');
+            setMenuItems(items);
+            setMenuLastFetched(new Date(timestamp));
+            setMenuLoading(false);
+            
+            // Refresh in background after showing cached data
+            setTimeout(() => fetchMenuItems(true), 100);
+            return;
+          }
+        } catch (e) {
+          console.warn('Cache parse error:', e);
+        }
       }
       
       const response = await axios.get(`${API}/menu`, {
@@ -115,6 +149,17 @@ const BillingPage = ({ user }) => {
       
       console.log('Menu fetch successful:', availableItems.length, 'available items out of', items.length, 'total');
       setMenuItems(availableItems);
+      setMenuLastFetched(new Date());
+      
+      // Cache the menu items
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          items: availableItems,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn('Failed to cache menu items:', e);
+      }
       
       if (availableItems.length === 0) {
         console.warn('No available menu items found');
@@ -126,15 +171,21 @@ const BillingPage = ({ user }) => {
       console.error('Error status:', error.response?.status);
       console.error('Error data:', error.response?.data);
       
+      let errorMessage = 'Failed to load menu items';
+      
       if (error.response?.status === 401) {
-        toast.error('Authentication required. Please login again.');
+        errorMessage = 'Authentication required. Please login again.';
       } else if (error.response?.status === 403) {
-        toast.error('Not authorized to view menu items.');
-      } else {
-        toast.error('Failed to load menu items. Please refresh the page.');
+        errorMessage = 'Not authorized to view menu items.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
       }
       
+      setMenuError(errorMessage);
+      toast.error(errorMessage);
       setMenuItems([]);
+    } finally {
+      setMenuLoading(false);
     }
   };
 

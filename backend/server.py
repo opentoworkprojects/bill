@@ -30,7 +30,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # Import Redis cache service
-from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service
+from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service, get_table_status_manager
 
 # Import monitoring system
 from monitoring import init_monitoring, collect_metrics_task, monitoring_router
@@ -682,6 +682,52 @@ class InventoryItemCreate(BaseModel):
     batch_number: Optional[str] = None
     reorder_point: Optional[float] = None
     reorder_quantity: Optional[float] = None
+
+
+# Expense Management Models
+EXPENSE_CATEGORIES = [
+    "Rent", "Utilities", "Salaries", "Supplies", "Maintenance", 
+    "Marketing", "Insurance", "Taxes", "Equipment", "Transportation",
+    "Food & Ingredients", "Cleaning", "Licenses", "Professional Services", "Other"
+]
+
+class Expense(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    date: str  # ISO date string YYYY-MM-DD
+    amount: float
+    category: str
+    description: str
+    payment_method: str = "cash"  # cash, card, upi, bank_transfer
+    vendor_name: Optional[str] = None
+    receipt_url: Optional[str] = None
+    notes: Optional[str] = None
+    organization_id: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ExpenseCreate(BaseModel):
+    date: str
+    amount: float
+    category: str
+    description: str
+    payment_method: str = "cash"
+    vendor_name: Optional[str] = None
+    receipt_url: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ExpenseUpdate(BaseModel):
+    date: Optional[str] = None
+    amount: Optional[float] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    payment_method: Optional[str] = None
+    vendor_name: Optional[str] = None
+    receipt_url: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class ChatMessage(BaseModel):
@@ -3267,19 +3313,30 @@ async def create_table(
 
 
 @api_router.get("/tables", response_model=List[Table])
-async def get_tables(current_user: dict = Depends(get_current_user)):
+async def get_tables(
+    fresh: bool = Query(False, description="Bypass cache and fetch directly from database"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all tables for the organization. Use fresh=true to bypass cache."""
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
 
     try:
-        # Use Redis-cached service for tables
+        # If fresh=true, use TableStatusManager to get fresh data directly from DB
+        if fresh:
+            table_manager = get_table_status_manager()
+            tables = await table_manager.get_tables_fresh(user_org_id)
+            print(f"🔄 Returned {len(tables)} tables (fresh from DB, bypassed cache)")
+            return tables
+        
+        # Otherwise use Redis-cached service for tables
         cached_service = get_cached_order_service()
         tables = await cached_service.get_tables(user_org_id, use_cache=True)
         print(f"🚀 Returned {len(tables)} tables (Redis cached)")
         return tables
         
     except Exception as e:
-        print(f"❌ Error fetching tables from cache: {e}")
+        print(f"❌ Error fetching tables: {e}")
         # Fallback to direct MongoDB query
         tables = await db.tables.find({"organization_id": user_org_id}, {"_id": 0}).to_list(1000)
         print(f"📊 Fallback: Returned {len(tables)} tables from MongoDB")
@@ -3609,18 +3666,32 @@ async def create_order(
     
     # Only update table status if KOT mode is enabled and table exists
     if kot_mode_enabled and table_id != "counter":
-        await db.tables.update_one(
-            {"id": table_id, "organization_id": user_org_id},
-            {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
-        )
-        
-        # Invalidate tables cache
+        # Use TableStatusManager for immediate, direct DB update
         try:
-            cached_service = get_cached_order_service()
-            await cached_service.invalidate_table_caches(user_org_id)
-            print(f"🗑️ Tables cache invalidated for table update")
+            table_manager = get_table_status_manager()
+            result = await table_manager.set_table_occupied(user_org_id, table_id, order_obj.id)
+            if result["success"]:
+                print(f"✅ Table {table_id} set to OCCUPIED via TableStatusManager")
+            else:
+                print(f"⚠️ TableStatusManager failed: {result['message']}")
+                # Fallback to direct update
+                await db.tables.update_one(
+                    {"id": table_id, "organization_id": user_org_id},
+                    {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
+                )
         except Exception as e:
-            print(f"⚠️ Tables cache invalidation error: {e}")
+            print(f"⚠️ TableStatusManager error: {e}, using fallback")
+            # Fallback to direct update if TableStatusManager fails
+            await db.tables.update_one(
+                {"id": table_id, "organization_id": user_org_id},
+                {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
+            )
+            # Invalidate tables cache
+            try:
+                cached_service = get_cached_order_service()
+                await cached_service.invalidate_table_caches(user_org_id)
+            except Exception as cache_e:
+                print(f"⚠️ Tables cache invalidation error: {cache_e}")
     
     # Generate WhatsApp notification if enabled and phone provided
     whatsapp_link = None
@@ -4025,16 +4096,32 @@ async def update_order(
             {"$set": update_data}
         )
         
-        # Clear table when order is completed
+        # Clear table when order is completed - Use TableStatusManager for immediate, direct DB update
         if existing_order.get("table_id") and existing_order.get("table_id") != "counter":
             try:
-                await db.tables.update_one(
-                    {"id": existing_order["table_id"], "organization_id": user_org_id},
-                    {"$set": {"status": "available", "current_order_id": None}}
-                )
-                print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared for completed order {order_id}")
+                table_manager = get_table_status_manager()
+                result = await table_manager.set_table_available(user_org_id, existing_order["table_id"])
+                if result["success"]:
+                    print(f"✅ Table {existing_order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for completed order {order_id}")
+                else:
+                    print(f"⚠️ TableStatusManager failed: {result['message']}")
+                    # Fallback to direct update
+                    await db.tables.update_one(
+                        {"id": existing_order["table_id"], "organization_id": user_org_id},
+                        {"$set": {"status": "available", "current_order_id": None}}
+                    )
+                    print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for completed order {order_id}")
             except Exception as e:
-                print(f"⚠️ Table clearing error: {e}")
+                print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                # Fallback to direct update if TableStatusManager fails
+                try:
+                    await db.tables.update_one(
+                        {"id": existing_order["table_id"], "organization_id": user_org_id},
+                        {"$set": {"status": "available", "current_order_id": None}}
+                    )
+                    print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for completed order {order_id}")
+                except Exception as fallback_error:
+                    print(f"⚠️ Table clearing fallback error: {fallback_error}")
         
         # Invalidate cache for completed order update
         try:
@@ -4091,17 +4178,34 @@ async def update_order(
         except Exception as e:
             print(f"⚠️ Cache invalidation error: {e}")
         
-        # Clear table if payment is fully completed (no balance remaining)
+        # Clear table if payment is fully completed (no balance remaining) - Use TableStatusManager
         if update_data.get("balance_amount", 0) <= 0 and not update_data.get("is_credit", False):
-            try:
-                # Free up the table
-                await db.tables.update_one(
-                    {"id": existing_order.get("table_id"), "organization_id": user_org_id},
-                    {"$set": {"status": "available", "current_order_id": None}}
-                )
-                print(f"🍽️ Table freed for completed payment: {existing_order.get('table_id')}")
-            except Exception as e:
-                print(f"⚠️ Table clearing error: {e}")
+            table_id = existing_order.get("table_id")
+            if table_id and table_id != "counter":
+                try:
+                    table_manager = get_table_status_manager()
+                    result = await table_manager.set_table_available(user_org_id, table_id)
+                    if result["success"]:
+                        print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed payment")
+                    else:
+                        print(f"⚠️ TableStatusManager failed: {result['message']}")
+                        # Fallback to direct update
+                        await db.tables.update_one(
+                            {"id": table_id, "organization_id": user_org_id},
+                            {"$set": {"status": "available", "current_order_id": None}}
+                        )
+                        print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                except Exception as e:
+                    print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                    # Fallback to direct update if TableStatusManager fails
+                    try:
+                        await db.tables.update_one(
+                            {"id": table_id, "organization_id": user_org_id},
+                            {"$set": {"status": "available", "current_order_id": None}}
+                        )
+                        print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                    except Exception as fallback_error:
+                        print(f"⚠️ Table clearing fallback error: {fallback_error}")
         
         return {"message": "Order payment details updated successfully"}
     
@@ -4166,19 +4270,36 @@ async def update_order(
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
     
-    # Clear table if payment is fully completed (no balance remaining)
+    # Clear table if payment is fully completed (no balance remaining) - Use TableStatusManager
     if (update_data.get("balance_amount", 0) <= 0 and 
         not update_data.get("is_credit", False) and 
         update_data.get("payment_received", 0) > 0):
-        try:
-            # Free up the table
-            await db.tables.update_one(
-                {"id": existing_order.get("table_id"), "organization_id": user_org_id},
-                {"$set": {"status": "available", "current_order_id": None}}
-            )
-            print(f"🍽️ Table freed for completed payment: {existing_order.get('table_id')}")
-        except Exception as e:
-            print(f"⚠️ Table clearing error: {e}")
+        table_id = existing_order.get("table_id")
+        if table_id and table_id != "counter":
+            try:
+                table_manager = get_table_status_manager()
+                result = await table_manager.set_table_available(user_org_id, table_id)
+                if result["success"]:
+                    print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed payment")
+                else:
+                    print(f"⚠️ TableStatusManager failed: {result['message']}")
+                    # Fallback to direct update
+                    await db.tables.update_one(
+                        {"id": table_id, "organization_id": user_org_id},
+                        {"$set": {"status": "available", "current_order_id": None}}
+                    )
+                    print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+            except Exception as e:
+                print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                # Fallback to direct update if TableStatusManager fails
+                try:
+                    await db.tables.update_one(
+                        {"id": table_id, "organization_id": user_org_id},
+                        {"$set": {"status": "available", "current_order_id": None}}
+                    )
+                    print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                except Exception as fallback_error:
+                    print(f"⚠️ Table clearing fallback error: {fallback_error}")
     
     return {"message": "Order updated successfully"}
 
@@ -4220,12 +4341,31 @@ async def cancel_order(
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
     
-    # Release table if order had one
-    if order.get("table_id"):
-        await db.tables.update_one(
-            {"id": order["table_id"], "organization_id": user_org_id},
-            {"$set": {"status": "available", "current_order_id": None}}
-        )
+    # Release table if order had one - Use TableStatusManager for immediate sync
+    if order.get("table_id") and order.get("table_id") != "counter":
+        try:
+            table_manager = get_table_status_manager()
+            result = await table_manager.set_table_available(user_org_id, order["table_id"])
+            if result["success"]:
+                print(f"✅ Table {order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for cancelled order {order_id}")
+            else:
+                print(f"⚠️ TableStatusManager failed: {result['message']}")
+                # Fallback to direct update
+                await db.tables.update_one(
+                    {"id": order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table cleared via fallback for cancelled order {order_id}")
+        except Exception as e:
+            print(f"⚠️ TableStatusManager error: {e}, using fallback")
+            try:
+                await db.tables.update_one(
+                    {"id": order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table cleared via fallback for cancelled order {order_id}")
+            except Exception as fallback_error:
+                print(f"⚠️ Table clearing fallback error: {fallback_error}")
     
     return {"message": "Order cancelled successfully"}
 
@@ -4248,12 +4388,31 @@ async def delete_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    # Release table if order had one
-    if order.get("table_id"):
-        await db.tables.update_one(
-            {"id": order["table_id"], "organization_id": user_org_id},
-            {"$set": {"status": "available", "current_order_id": None}}
-        )
+    # Release table if order had one - Use TableStatusManager for immediate sync
+    if order.get("table_id") and order.get("table_id") != "counter":
+        try:
+            table_manager = get_table_status_manager()
+            result = await table_manager.set_table_available(user_org_id, order["table_id"])
+            if result["success"]:
+                print(f"✅ Table {order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for deleted order {order_id}")
+            else:
+                print(f"⚠️ TableStatusManager failed: {result['message']}")
+                # Fallback to direct update
+                await db.tables.update_one(
+                    {"id": order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table cleared via fallback for deleted order {order_id}")
+        except Exception as e:
+            print(f"⚠️ TableStatusManager error: {e}, using fallback")
+            try:
+                await db.tables.update_one(
+                    {"id": order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table cleared via fallback for deleted order {order_id}")
+            except Exception as fallback_error:
+                print(f"⚠️ Table clearing fallback error: {fallback_error}")
     
     # Delete order
     await db.orders.delete_one(
@@ -4335,6 +4494,12 @@ async def create_payment_order(
         doc["created_at"] = doc["created_at"].isoformat()
         await db.payments.insert_one(doc)
 
+        # Get the order to retrieve table_id for table status update
+        existing_order = await db.orders.find_one(
+            {"id": payment_data.order_id, "organization_id": user_org_id},
+            {"_id": 0}
+        )
+
         await db.orders.update_one(
             {"id": payment_data.order_id, "organization_id": user_org_id},
             {"$set": {"status": "completed"}},
@@ -4342,6 +4507,42 @@ async def create_payment_order(
         await db.users.update_one(
             {"id": current_user["id"]}, {"$inc": {"bill_count": 1}}
         )
+
+        # Use TableStatusManager to set table to available when payment is completed
+        # This ensures immediate table status sync (Requirements 1.2, 1.3)
+        if existing_order and existing_order.get("table_id") and existing_order.get("table_id") != "counter":
+            try:
+                table_manager = get_table_status_manager()
+                result = await table_manager.set_table_available(user_org_id, existing_order["table_id"])
+                if result["success"]:
+                    print(f"✅ Table {existing_order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for payment {payment_data.order_id}")
+                else:
+                    print(f"⚠️ TableStatusManager failed: {result['message']}")
+                    # Fallback to direct update
+                    await db.tables.update_one(
+                        {"id": existing_order["table_id"], "organization_id": user_org_id},
+                        {"$set": {"status": "available", "current_order_id": None}}
+                    )
+                    print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for payment {payment_data.order_id}")
+            except Exception as e:
+                print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                # Fallback to direct update if TableStatusManager fails
+                try:
+                    await db.tables.update_one(
+                        {"id": existing_order["table_id"], "organization_id": user_org_id},
+                        {"$set": {"status": "available", "current_order_id": None}}
+                    )
+                    print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for payment {payment_data.order_id}")
+                except Exception as fallback_error:
+                    print(f"⚠️ Table clearing fallback error: {fallback_error}")
+
+        # Invalidate cache for completed payment
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_order_caches(user_org_id, payment_data.order_id)
+            print(f"🗑️ Cache invalidated for payment {payment_data.order_id}")
+        except Exception as e:
+            print(f"⚠️ Cache invalidation error: {e}")
 
         return {"payment_id": payment_obj.id, "status": "completed"}
 
@@ -4368,11 +4569,53 @@ async def verify_payment(
         {"$set": {"razorpay_payment_id": razorpay_payment_id, "status": "completed"}},
     )
 
+    # Get the order to retrieve table_id for table status update
+    existing_order = await db.orders.find_one(
+        {"id": order_id, "organization_id": user_org_id},
+        {"_id": 0}
+    )
+
     await db.orders.update_one(
         {"id": order_id, "organization_id": user_org_id},
         {"$set": {"status": "completed"}},
     )
     await db.users.update_one({"id": current_user["id"]}, {"$inc": {"bill_count": 1}})
+
+    # Use TableStatusManager to set table to available when payment is completed
+    # This ensures immediate table status sync (Requirements 1.2, 1.3)
+    if existing_order and existing_order.get("table_id") and existing_order.get("table_id") != "counter":
+        try:
+            table_manager = get_table_status_manager()
+            result = await table_manager.set_table_available(user_org_id, existing_order["table_id"])
+            if result["success"]:
+                print(f"✅ Table {existing_order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for verified payment {order_id}")
+            else:
+                print(f"⚠️ TableStatusManager failed: {result['message']}")
+                # Fallback to direct update
+                await db.tables.update_one(
+                    {"id": existing_order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for verified payment {order_id}")
+        except Exception as e:
+            print(f"⚠️ TableStatusManager error: {e}, using fallback")
+            # Fallback to direct update if TableStatusManager fails
+            try:
+                await db.tables.update_one(
+                    {"id": existing_order["table_id"], "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for verified payment {order_id}")
+            except Exception as fallback_error:
+                print(f"⚠️ Table clearing fallback error: {fallback_error}")
+
+    # Invalidate cache for completed payment
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_order_caches(user_org_id, order_id)
+        print(f"🗑️ Cache invalidated for verified payment {order_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
 
     return {"status": "payment_verified"}
 
@@ -4811,6 +5054,899 @@ async def get_inventory_analytics(current_user: dict = Depends(get_current_user)
         "recent_movements": movement_summary,
         "movements": movements[:10]  # Last 10 movements
     }
+
+
+# ============ EXPENSE MANAGEMENT ENDPOINTS ============
+
+@api_router.get("/expenses", response_model=List[Expense])
+async def get_expenses(
+    start_date: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get expenses with optional date range and category filters"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    query = {"organization_id": user_org_id}
+    
+    # Add date range filter
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["date"] = date_filter
+    
+    # Add category filter
+    if category:
+        query["category"] = category
+    
+    expenses = await db.expenses.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    return expenses
+
+
+@api_router.get("/expenses/categories")
+async def get_expense_categories():
+    """Get list of expense categories"""
+    return {"categories": EXPENSE_CATEGORIES}
+
+
+@api_router.get("/expenses/summary")
+async def get_expense_summary(
+    start_date: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get expense summary with totals by category"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    query = {"organization_id": user_org_id}
+    
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["date"] = date_filter
+    
+    expenses = await db.expenses.find(query, {"_id": 0}).to_list(1000)
+    
+    # Calculate totals
+    total = sum(e["amount"] for e in expenses)
+    by_category = {}
+    by_payment_method = {}
+    
+    for expense in expenses:
+        cat = expense.get("category", "Other")
+        method = expense.get("payment_method", "cash")
+        
+        by_category[cat] = by_category.get(cat, 0) + expense["amount"]
+        by_payment_method[method] = by_payment_method.get(method, 0) + expense["amount"]
+    
+    return {
+        "total": total,
+        "count": len(expenses),
+        "by_category": by_category,
+        "by_payment_method": by_payment_method
+    }
+
+
+@api_router.get("/expenses/{expense_id}", response_model=Expense)
+async def get_expense(expense_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single expense by ID"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    expense = await db.expenses.find_one(
+        {"id": expense_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    
+    return expense
+
+
+@api_router.post("/expenses", response_model=Expense)
+async def create_expense(
+    expense: ExpenseCreate, current_user: dict = Depends(get_current_user)
+):
+    """Create a new expense"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    # Validate amount
+    if expense.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    
+    # Validate category
+    if expense.category not in EXPENSE_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {', '.join(EXPENSE_CATEGORIES)}")
+    
+    expense_obj = Expense(
+        **expense.model_dump(),
+        organization_id=user_org_id,
+        created_by=current_user.get("id")
+    )
+    
+    await db.expenses.insert_one(expense_obj.model_dump())
+    print(f"💰 Created expense: {expense.category} - ₹{expense.amount}")
+    
+    return expense_obj
+
+
+@api_router.put("/expenses/{expense_id}", response_model=Expense)
+async def update_expense(
+    expense_id: str,
+    expense_update: ExpenseUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an existing expense"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    existing = await db.expenses.find_one(
+        {"id": expense_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    
+    # Build update data
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    for field, value in expense_update.model_dump(exclude_unset=True).items():
+        if value is not None:
+            # Validate amount
+            if field == "amount" and value <= 0:
+                raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+            # Validate category
+            if field == "category" and value not in EXPENSE_CATEGORIES:
+                raise HTTPException(status_code=400, detail=f"Invalid category")
+            update_data[field] = value
+    
+    await db.expenses.update_one(
+        {"id": expense_id, "organization_id": user_org_id},
+        {"$set": update_data}
+    )
+    
+    updated = await db.expenses.find_one(
+        {"id": expense_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    
+    print(f"💰 Updated expense: {expense_id}")
+    return updated
+
+
+@api_router.delete("/expenses/{expense_id}")
+async def delete_expense(expense_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an expense"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    existing = await db.expenses.find_one(
+        {"id": expense_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    
+    await db.expenses.delete_one({"id": expense_id, "organization_id": user_org_id})
+    
+    print(f"🗑️ Deleted expense: {expense_id}")
+    return {"message": "Expense deleted successfully"}
+
+
+# ============ DAY BOOK / CASH FLOW REPORT ENDPOINTS ============
+
+@api_router.get("/reports/daybook")
+async def get_daybook(
+    date: str = Query(..., description="Date YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="End date for range YYYY-MM-DD"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get Day Book / Cash Flow report for a date or date range.
+    Shows opening balance, inflows (sales), outflows (expenses), and closing balance.
+    """
+    user_org_id = get_secure_org_id(current_user)
+    
+    # Determine date range
+    start_date = date
+    if not end_date:
+        end_date = date
+    
+    # Get completed orders (inflows) for the date range
+    orders_query = {
+        "organization_id": user_org_id,
+        "status": {"$in": ["completed", "paid"]},
+        "created_at": {"$gte": f"{start_date}T00:00:00", "$lte": f"{end_date}T23:59:59"}
+    }
+    
+    orders = await db.orders.find(orders_query, {"_id": 0}).to_list(1000)
+    
+    # Get expenses (outflows) for the date range
+    expenses_query = {
+        "organization_id": user_org_id,
+        "date": {"$gte": start_date, "$lte": end_date}
+    }
+    
+    expenses = await db.expenses.find(expenses_query, {"_id": 0}).to_list(1000)
+    
+    # Calculate inflows by payment method
+    inflow_breakdown = {"cash": 0, "card": 0, "upi": 0, "other": 0}
+    total_inflows = 0
+    
+    inflow_entries = []
+    for order in orders:
+        amount = order.get("payment_received", order.get("total", 0))
+        payment_method = order.get("payment_method", "cash")
+        
+        # Handle split payments
+        if payment_method == "split":
+            cash = order.get("cash_amount", 0)
+            card = order.get("card_amount", 0)
+            upi = order.get("upi_amount", 0)
+            inflow_breakdown["cash"] += cash
+            inflow_breakdown["card"] += card
+            inflow_breakdown["upi"] += upi
+            total_inflows += cash + card + upi
+        else:
+            if payment_method in inflow_breakdown:
+                inflow_breakdown[payment_method] += amount
+            else:
+                inflow_breakdown["other"] += amount
+            total_inflows += amount
+        
+        inflow_entries.append({
+            "timestamp": order.get("created_at"),
+            "type": "inflow",
+            "category": f"Sales-{payment_method.upper()}",
+            "description": f"Order #{order.get('invoice_number', order.get('id', '')[:8])} - Table {order.get('table_number', 'Counter')}",
+            "amount": amount,
+            "reference_id": order.get("id")
+        })
+    
+    # Calculate outflows by category
+    outflow_breakdown = {}
+    total_outflows = 0
+    
+    outflow_entries = []
+    for expense in expenses:
+        amount = expense.get("amount", 0)
+        category = expense.get("category", "Other")
+        
+        outflow_breakdown[category] = outflow_breakdown.get(category, 0) + amount
+        total_outflows += amount
+        
+        outflow_entries.append({
+            "timestamp": f"{expense.get('date')}T12:00:00",
+            "type": "outflow",
+            "category": category,
+            "description": expense.get("description", ""),
+            "amount": amount,
+            "reference_id": expense.get("id")
+        })
+    
+    # Combine and sort entries by timestamp
+    all_entries = inflow_entries + outflow_entries
+    all_entries.sort(key=lambda x: x.get("timestamp", ""))
+    
+    # Calculate running balance
+    running_balance = 0
+    for entry in all_entries:
+        if entry["type"] == "inflow":
+            running_balance += entry["amount"]
+        else:
+            running_balance -= entry["amount"]
+        entry["running_balance"] = running_balance
+    
+    # Calculate opening balance (sum of all previous transactions)
+    # For simplicity, we'll set opening balance to 0 for now
+    # In a real system, this would be calculated from previous day's closing
+    opening_balance = 0
+    closing_balance = opening_balance + total_inflows - total_outflows
+    
+    return {
+        "date": date,
+        "end_date": end_date,
+        "opening_balance": opening_balance,
+        "total_inflows": total_inflows,
+        "total_outflows": total_outflows,
+        "closing_balance": closing_balance,
+        "net_cash_flow": total_inflows - total_outflows,
+        "inflow_breakdown": inflow_breakdown,
+        "outflow_breakdown": outflow_breakdown,
+        "entries": all_entries,
+        "order_count": len(orders),
+        "expense_count": len(expenses)
+    }
+
+
+@api_router.get("/reports/daybook/summary")
+async def get_daybook_summary(
+    period: str = Query("month", description="Period: today, week, month, year"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get Day Book summary for a period"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    today = datetime.now(timezone.utc)
+    
+    if period == "today":
+        start_date = today.strftime("%Y-%m-%d")
+        end_date = start_date
+    elif period == "week":
+        start_date = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+        end_date = today.strftime("%Y-%m-%d")
+    elif period == "month":
+        start_date = today.replace(day=1).strftime("%Y-%m-%d")
+        end_date = today.strftime("%Y-%m-%d")
+    elif period == "year":
+        start_date = today.replace(month=1, day=1).strftime("%Y-%m-%d")
+        end_date = today.strftime("%Y-%m-%d")
+    else:
+        start_date = today.strftime("%Y-%m-%d")
+        end_date = start_date
+    
+    # Get orders
+    orders = await db.orders.find({
+        "organization_id": user_org_id,
+        "status": {"$in": ["completed", "paid"]},
+        "created_at": {"$gte": f"{start_date}T00:00:00", "$lte": f"{end_date}T23:59:59"}
+    }, {"_id": 0}).to_list(1000)
+    
+    # Get expenses
+    expenses = await db.expenses.find({
+        "organization_id": user_org_id,
+        "date": {"$gte": start_date, "$lte": end_date}
+    }, {"_id": 0}).to_list(1000)
+    
+    total_inflows = sum(o.get("payment_received", o.get("total", 0)) for o in orders)
+    total_outflows = sum(e.get("amount", 0) for e in expenses)
+    
+    return {
+        "period": period,
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_inflows": total_inflows,
+        "total_outflows": total_outflows,
+        "net_cash_flow": total_inflows - total_outflows,
+        "order_count": len(orders),
+        "expense_count": len(expenses)
+    }
+
+
+@api_router.get("/reports/daybook/export")
+async def export_daybook(
+    date: str = Query(..., description="Date YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="End date for range YYYY-MM-DD"),
+    format: str = Query("pdf", description="Export format: pdf or excel"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Export Day Book / Cash Flow report to PDF or Excel format.
+    """
+    user_org_id = get_secure_org_id(current_user)
+    
+    # Determine date range
+    start_date = date
+    if not end_date:
+        end_date = date
+    
+    # Get completed orders (inflows) for the date range
+    orders_query = {
+        "organization_id": user_org_id,
+        "status": {"$in": ["completed", "paid"]},
+        "created_at": {"$gte": f"{start_date}T00:00:00", "$lte": f"{end_date}T23:59:59"}
+    }
+    
+    orders = await db.orders.find(orders_query, {"_id": 0}).to_list(1000)
+    
+    # Get expenses (outflows) for the date range
+    expenses_query = {
+        "organization_id": user_org_id,
+        "date": {"$gte": start_date, "$lte": end_date}
+    }
+    
+    expenses = await db.expenses.find(expenses_query, {"_id": 0}).to_list(1000)
+    
+    # Calculate inflows by payment method
+    inflow_breakdown = {"cash": 0, "card": 0, "upi": 0, "other": 0}
+    total_inflows = 0
+    
+    inflow_entries = []
+    for order in orders:
+        amount = order.get("payment_received", order.get("total", 0))
+        payment_method = order.get("payment_method", "cash")
+        
+        # Handle split payments
+        if payment_method == "split":
+            cash = order.get("cash_amount", 0)
+            card = order.get("card_amount", 0)
+            upi = order.get("upi_amount", 0)
+            inflow_breakdown["cash"] += cash
+            inflow_breakdown["card"] += card
+            inflow_breakdown["upi"] += upi
+            total_inflows += cash + card + upi
+        else:
+            if payment_method in inflow_breakdown:
+                inflow_breakdown[payment_method] += amount
+            else:
+                inflow_breakdown["other"] += amount
+            total_inflows += amount
+        
+        inflow_entries.append({
+            "timestamp": order.get("created_at"),
+            "type": "inflow",
+            "category": f"Sales-{payment_method.upper()}",
+            "description": f"Order #{order.get('invoice_number', order.get('id', '')[:8])} - Table {order.get('table_number', 'Counter')}",
+            "amount": amount,
+            "reference_id": order.get("id")
+        })
+    
+    # Calculate outflows by category
+    outflow_breakdown = {}
+    total_outflows = 0
+    
+    outflow_entries = []
+    for expense in expenses:
+        amount = expense.get("amount", 0)
+        category = expense.get("category", "Other")
+        
+        outflow_breakdown[category] = outflow_breakdown.get(category, 0) + amount
+        total_outflows += amount
+        
+        outflow_entries.append({
+            "timestamp": f"{expense.get('date')}T12:00:00",
+            "type": "outflow",
+            "category": category,
+            "description": expense.get("description", ""),
+            "amount": amount,
+            "reference_id": expense.get("id")
+        })
+    
+    # Combine and sort entries by timestamp
+    all_entries = inflow_entries + outflow_entries
+    all_entries.sort(key=lambda x: x.get("timestamp", ""))
+    
+    # Calculate running balance
+    running_balance = 0
+    for entry in all_entries:
+        if entry["type"] == "inflow":
+            running_balance += entry["amount"]
+        else:
+            running_balance -= entry["amount"]
+        entry["running_balance"] = running_balance
+    
+    # Calculate balances
+    opening_balance = 0
+    closing_balance = opening_balance + total_inflows - total_outflows
+    net_cash_flow = total_inflows - total_outflows
+    
+    # Prepare daybook data
+    daybook_data = {
+        "date": date,
+        "end_date": end_date,
+        "opening_balance": opening_balance,
+        "total_inflows": total_inflows,
+        "total_outflows": total_outflows,
+        "closing_balance": closing_balance,
+        "net_cash_flow": net_cash_flow,
+        "inflow_breakdown": inflow_breakdown,
+        "outflow_breakdown": outflow_breakdown,
+        "entries": all_entries,
+        "order_count": len(orders),
+        "expense_count": len(expenses)
+    }
+    
+    if format.lower() == "excel":
+        return await generate_daybook_excel(daybook_data, date, end_date)
+    else:
+        return await generate_daybook_pdf(daybook_data, date, end_date)
+
+
+async def generate_daybook_pdf(daybook_data: dict, date: str, end_date: str) -> StreamingResponse:
+    """Generate Day Book PDF report using reportlab"""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch, mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    except ImportError:
+        # Fallback to CSV if reportlab not available
+        return await generate_daybook_csv(daybook_data, date, end_date)
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=12, textColor=colors.HexColor('#7c3aed'))
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, spaceAfter=20, textColor=colors.gray)
+    section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=12, spaceBefore=15, spaceAfter=8, textColor=colors.HexColor('#7c3aed'))
+    
+    elements = []
+    
+    # Title
+    date_range_str = f"{date}" if date == end_date else f"{date} to {end_date}"
+    elements.append(Paragraph("📒 Day Book Report", title_style))
+    elements.append(Paragraph(f"Date: {date_range_str} | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", subtitle_style))
+    
+    # Summary Table
+    elements.append(Paragraph("Summary", section_style))
+    summary_data = [
+        ['Opening Balance', 'Total Inflows', 'Total Outflows', 'Net Cash Flow', 'Closing Balance'],
+        [
+            f"₹{daybook_data['opening_balance']:.2f}",
+            f"₹{daybook_data['total_inflows']:.2f}",
+            f"₹{daybook_data['total_outflows']:.2f}",
+            f"{'+'if daybook_data['net_cash_flow'] >= 0 else ''}₹{daybook_data['net_cash_flow']:.2f}",
+            f"₹{daybook_data['closing_balance']:.2f}"
+        ]
+    ]
+    summary_table = Table(summary_data, colWidths=[90, 90, 90, 90, 90])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f3e8ff')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ('TEXTCOLOR', (1, 1), (1, 1), colors.green),
+        ('TEXTCOLOR', (2, 1), (2, 1), colors.red),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 15))
+    
+    # Inflow Breakdown
+    if daybook_data['inflow_breakdown']:
+        elements.append(Paragraph("💰 Inflow Breakdown", section_style))
+        inflow_data = [['Payment Method', 'Amount']]
+        for method, amount in daybook_data['inflow_breakdown'].items():
+            if amount > 0:
+                inflow_data.append([method.capitalize(), f"₹{amount:.2f}"])
+        inflow_data.append(['Total Inflows', f"₹{daybook_data['total_inflows']:.2f}"])
+        
+        inflow_table = Table(inflow_data, colWidths=[200, 100])
+        inflow_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#15803d')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.HexColor('#dcfce7')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#bbf7d0')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ]))
+        elements.append(inflow_table)
+        elements.append(Spacer(1, 10))
+    
+    # Outflow Breakdown
+    if daybook_data['outflow_breakdown']:
+        elements.append(Paragraph("📤 Outflow Breakdown", section_style))
+        outflow_data = [['Category', 'Amount']]
+        for category, amount in daybook_data['outflow_breakdown'].items():
+            if amount > 0:
+                outflow_data.append([category, f"₹{amount:.2f}"])
+        outflow_data.append(['Total Outflows', f"₹{daybook_data['total_outflows']:.2f}"])
+        
+        outflow_table = Table(outflow_data, colWidths=[200, 100])
+        outflow_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.HexColor('#fee2e2')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#fecaca')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ]))
+        elements.append(outflow_table)
+        elements.append(Spacer(1, 10))
+    
+    # Transaction Details
+    if daybook_data['entries']:
+        elements.append(Paragraph(f"📋 Transaction Details ({len(daybook_data['entries'])} transactions)", section_style))
+        trans_data = [['Time', 'Type', 'Category', 'Description', 'Amount', 'Balance']]
+        for entry in daybook_data['entries']:
+            try:
+                time_str = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).strftime('%H:%M') if entry.get('timestamp') else '-'
+            except:
+                time_str = '-'
+            
+            amount_str = f"{'+'if entry['type'] == 'inflow' else '-'}₹{entry['amount']:.2f}"
+            trans_data.append([
+                time_str,
+                '↑ Inflow' if entry['type'] == 'inflow' else '↓ Outflow',
+                entry.get('category', '')[:20],
+                entry.get('description', '')[:30],
+                amount_str,
+                f"₹{entry.get('running_balance', 0):.2f}"
+            ])
+        
+        trans_table = Table(trans_data, colWidths=[40, 55, 80, 130, 70, 70])
+        trans_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (4, 1), (5, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ]
+        # Add row colors based on type
+        for i, entry in enumerate(daybook_data['entries'], 1):
+            if entry['type'] == 'inflow':
+                trans_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f0fdf4')))
+            else:
+                trans_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#fef2f2')))
+        
+        trans_table.setStyle(TableStyle(trans_style))
+        elements.append(trans_table)
+    
+    # Footer
+    elements.append(Spacer(1, 20))
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.gray)
+    elements.append(Paragraph("Generated by BillByteKOT - Restaurant Management System", footer_style))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    filename = f"daybook-{date}.pdf" if date == end_date else f"daybook-{date}-to-{end_date}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+async def generate_daybook_excel(daybook_data: dict, date: str, end_date: str) -> StreamingResponse:
+    """Generate Day Book Excel report using openpyxl"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        # Fallback to CSV if openpyxl not available
+        return await generate_daybook_csv(daybook_data, date, end_date)
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Day Book"
+    
+    # Styles
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="7c3aed", end_color="7c3aed", fill_type="solid")
+    inflow_fill = PatternFill(start_color="dcfce7", end_color="dcfce7", fill_type="solid")
+    outflow_fill = PatternFill(start_color="fee2e2", end_color="fee2e2", fill_type="solid")
+    summary_fill = PatternFill(start_color="f3e8ff", end_color="f3e8ff", fill_type="solid")
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    row = 1
+    
+    # Title
+    date_range_str = f"{date}" if date == end_date else f"{date} to {end_date}"
+    ws.merge_cells(f'A{row}:F{row}')
+    ws[f'A{row}'] = f"Day Book Report - {date_range_str}"
+    ws[f'A{row}'].font = Font(bold=True, size=16, color="7c3aed")
+    ws[f'A{row}'].alignment = Alignment(horizontal='center')
+    row += 1
+    
+    ws.merge_cells(f'A{row}:F{row}')
+    ws[f'A{row}'] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    ws[f'A{row}'].alignment = Alignment(horizontal='center')
+    row += 2
+    
+    # Summary Section
+    ws[f'A{row}'] = "SUMMARY"
+    ws[f'A{row}'].font = Font(bold=True, size=12, color="7c3aed")
+    row += 1
+    
+    summary_headers = ['Opening Balance', 'Total Inflows', 'Total Outflows', 'Net Cash Flow', 'Closing Balance']
+    for col, header in enumerate(summary_headers, 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+    row += 1
+    
+    summary_values = [
+        daybook_data['opening_balance'],
+        daybook_data['total_inflows'],
+        daybook_data['total_outflows'],
+        daybook_data['net_cash_flow'],
+        daybook_data['closing_balance']
+    ]
+    for col, value in enumerate(summary_values, 1):
+        cell = ws.cell(row=row, column=col, value=f"₹{value:.2f}")
+        cell.fill = summary_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+        if col == 2:  # Inflows - green
+            cell.font = Font(color="15803d", bold=True)
+        elif col == 3:  # Outflows - red
+            cell.font = Font(color="dc2626", bold=True)
+        elif col == 4:  # Net - based on value
+            cell.font = Font(color="15803d" if value >= 0 else "dc2626", bold=True)
+    row += 2
+    
+    # Inflow Breakdown
+    ws[f'A{row}'] = "INFLOW BREAKDOWN"
+    ws[f'A{row}'].font = Font(bold=True, size=12, color="15803d")
+    row += 1
+    
+    for col, header in enumerate(['Payment Method', 'Amount'], 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = PatternFill(start_color="15803d", end_color="15803d", fill_type="solid")
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+    row += 1
+    
+    for method, amount in daybook_data['inflow_breakdown'].items():
+        if amount > 0:
+            ws.cell(row=row, column=1, value=method.capitalize()).border = thin_border
+            ws.cell(row=row, column=1).fill = inflow_fill
+            cell = ws.cell(row=row, column=2, value=f"₹{amount:.2f}")
+            cell.border = thin_border
+            cell.fill = inflow_fill
+            cell.alignment = Alignment(horizontal='right')
+            row += 1
+    
+    # Total row
+    ws.cell(row=row, column=1, value="Total Inflows").font = Font(bold=True)
+    ws.cell(row=row, column=1).border = thin_border
+    cell = ws.cell(row=row, column=2, value=f"₹{daybook_data['total_inflows']:.2f}")
+    cell.font = Font(bold=True, color="15803d")
+    cell.border = thin_border
+    cell.alignment = Alignment(horizontal='right')
+    row += 2
+    
+    # Outflow Breakdown
+    ws[f'A{row}'] = "OUTFLOW BREAKDOWN"
+    ws[f'A{row}'].font = Font(bold=True, size=12, color="dc2626")
+    row += 1
+    
+    for col, header in enumerate(['Category', 'Amount'], 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = PatternFill(start_color="dc2626", end_color="dc2626", fill_type="solid")
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+    row += 1
+    
+    for category, amount in daybook_data['outflow_breakdown'].items():
+        if amount > 0:
+            ws.cell(row=row, column=1, value=category).border = thin_border
+            ws.cell(row=row, column=1).fill = outflow_fill
+            cell = ws.cell(row=row, column=2, value=f"₹{amount:.2f}")
+            cell.border = thin_border
+            cell.fill = outflow_fill
+            cell.alignment = Alignment(horizontal='right')
+            row += 1
+    
+    # Total row
+    ws.cell(row=row, column=1, value="Total Outflows").font = Font(bold=True)
+    ws.cell(row=row, column=1).border = thin_border
+    cell = ws.cell(row=row, column=2, value=f"₹{daybook_data['total_outflows']:.2f}")
+    cell.font = Font(bold=True, color="dc2626")
+    cell.border = thin_border
+    cell.alignment = Alignment(horizontal='right')
+    row += 2
+    
+    # Transaction Details
+    ws[f'A{row}'] = f"TRANSACTION DETAILS ({len(daybook_data['entries'])} transactions)"
+    ws[f'A{row}'].font = Font(bold=True, size=12, color="7c3aed")
+    row += 1
+    
+    trans_headers = ['Time', 'Type', 'Category', 'Description', 'Amount', 'Running Balance']
+    for col, header in enumerate(trans_headers, 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+    row += 1
+    
+    for entry in daybook_data['entries']:
+        try:
+            time_str = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).strftime('%H:%M') if entry.get('timestamp') else '-'
+        except:
+            time_str = '-'
+        
+        fill = inflow_fill if entry['type'] == 'inflow' else outflow_fill
+        amount_prefix = '+' if entry['type'] == 'inflow' else '-'
+        
+        values = [
+            time_str,
+            '↑ Inflow' if entry['type'] == 'inflow' else '↓ Outflow',
+            entry.get('category', ''),
+            entry.get('description', ''),
+            f"{amount_prefix}₹{entry['amount']:.2f}",
+            f"₹{entry.get('running_balance', 0):.2f}"
+        ]
+        
+        for col, value in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.fill = fill
+            cell.border = thin_border
+            if col >= 5:
+                cell.alignment = Alignment(horizontal='right')
+        row += 1
+    
+    # Adjust column widths
+    column_widths = [12, 12, 20, 40, 15, 18]
+    for i, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    
+    # Save to buffer
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    filename = f"daybook-{date}.xlsx" if date == end_date else f"daybook-{date}-to-{end_date}.xlsx"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+async def generate_daybook_csv(daybook_data: dict, date: str, end_date: str) -> StreamingResponse:
+    """Fallback CSV export if PDF/Excel libraries not available"""
+    csv_content = f"Day Book Report - {date}\n"
+    csv_content += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+    
+    csv_content += "SUMMARY\n"
+    csv_content += f"Opening Balance,Total Inflows,Total Outflows,Net Cash Flow,Closing Balance\n"
+    csv_content += f"{daybook_data['opening_balance']:.2f},{daybook_data['total_inflows']:.2f},{daybook_data['total_outflows']:.2f},{daybook_data['net_cash_flow']:.2f},{daybook_data['closing_balance']:.2f}\n\n"
+    
+    csv_content += "INFLOW BREAKDOWN\n"
+    csv_content += "Payment Method,Amount\n"
+    for method, amount in daybook_data['inflow_breakdown'].items():
+        csv_content += f"{method},{amount:.2f}\n"
+    csv_content += f"Total,{daybook_data['total_inflows']:.2f}\n\n"
+    
+    csv_content += "OUTFLOW BREAKDOWN\n"
+    csv_content += "Category,Amount\n"
+    for category, amount in daybook_data['outflow_breakdown'].items():
+        csv_content += f"{category},{amount:.2f}\n"
+    csv_content += f"Total,{daybook_data['total_outflows']:.2f}\n\n"
+    
+    csv_content += "TRANSACTION DETAILS\n"
+    csv_content += "Time,Type,Category,Description,Amount,Running Balance\n"
+    for entry in daybook_data['entries']:
+        try:
+            time_str = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).strftime('%H:%M') if entry.get('timestamp') else '-'
+        except:
+            time_str = '-'
+        
+        amount_prefix = '+' if entry['type'] == 'inflow' else '-'
+        csv_content += f"{time_str},{entry['type']},{entry.get('category', '')},\"{entry.get('description', '')}\",{amount_prefix}{entry['amount']:.2f},{entry.get('running_balance', 0):.2f}\n"
+    
+    filename = f"daybook-{date}.csv" if date == end_date else f"daybook-{date}-to-{end_date}.csv"
+    
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 class InventoryDeduction(BaseModel):
