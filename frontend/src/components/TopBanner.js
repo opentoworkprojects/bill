@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '../App';
-import { Gift, Zap, Clock, Sparkles, Star, Flame, PartyPopper, X, Rocket, Crown, Timer, ArrowRight, Percent, Tag } from 'lucide-react';
+import { Zap, Clock, Sparkles, Star, Flame, X, Crown, Timer, ArrowRight, Tag, Monitor, Smartphone, Tablet } from 'lucide-react';
 
 const TopBanner = ({ saleData: propSaleData = null }) => {
   const navigate = useNavigate();
@@ -440,7 +440,7 @@ const TopBanner = ({ saleData: propSaleData = null }) => {
     );
   }
 
-  // Design 11: Early Adopter Special - Monthly pricing highlighted
+  // Design 11: Early Adopter Special - Monthly pricing highlighted with floating devices
   if (design === 'early-adopter') {
     const monthlyPrice = bannerData.monthly_price || 159;
     const yearlyPrice = bannerData.sale_price || 1899;
@@ -453,14 +453,173 @@ const TopBanner = ({ saleData: propSaleData = null }) => {
         backgroundSize: '400% 400%',
         animation: 'gradient-x 4s ease infinite'
       }}>
-        {/* Glowing orbs - pointer-events-none */}
+        {/* Enhanced Glowing orbs */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-24 h-24 bg-purple-400 rounded-full filter blur-3xl opacity-30 animate-pulse" />
-          <div className="absolute top-0 right-1/4 w-24 h-24 bg-violet-500 rounded-full filter blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '0.5s' }} />
-          <div className="absolute top-0 left-1/2 w-20 h-20 bg-pink-400 rounded-full filter blur-3xl opacity-25 animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-0 left-1/4 w-32 h-32 bg-purple-400 rounded-full filter blur-3xl opacity-40 animate-pulse" />
+          <div className="absolute top-0 right-1/4 w-32 h-32 bg-violet-500 rounded-full filter blur-3xl opacity-40 animate-pulse" style={{ animationDelay: '0.5s' }} />
+          <div className="absolute top-0 left-1/2 w-28 h-28 bg-pink-400 rounded-full filter blur-3xl opacity-35 animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute bottom-0 left-1/3 w-24 h-24 bg-indigo-400 rounded-full filter blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '1.5s' }} />
         </div>
         
-        <div className="relative z-10 py-2.5 px-4">
+        {/* Floating Device Mockups - Enhanced with App UI Preview */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          
+          {/* Desktop Monitor - Left side with App Screen */}
+          <div className="absolute left-[3%] top-1/2 -translate-y-1/2 hidden lg:block" style={{ animation: 'float 3s ease-in-out infinite' }}>
+            <div className="relative transform hover:scale-110 transition-transform">
+              {/* Monitor Frame */}
+              <div className="w-20 h-14 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-gray-700 shadow-2xl overflow-hidden">
+                {/* Screen Content - Mini App UI */}
+                <div className="w-full h-full bg-gradient-to-br from-violet-600/90 to-purple-700/90 p-1">
+                  <div className="w-full h-1 bg-white/30 rounded mb-0.5" />
+                  <div className="flex gap-0.5">
+                    <div className="w-2 h-2 bg-green-400/60 rounded-sm" />
+                    <div className="w-2 h-2 bg-yellow-400/60 rounded-sm" />
+                    <div className="w-2 h-2 bg-blue-400/60 rounded-sm" />
+                  </div>
+                  <div className="mt-1 space-y-0.5">
+                    <div className="w-full h-1.5 bg-white/20 rounded" />
+                    <div className="w-3/4 h-1 bg-white/15 rounded" />
+                  </div>
+                </div>
+              </div>
+              {/* Monitor Stand */}
+              <div className="w-6 h-2 bg-gradient-to-b from-gray-700 to-gray-800 mx-auto rounded-b" />
+              <div className="w-10 h-1.5 bg-gradient-to-b from-gray-600 to-gray-700 mx-auto rounded-b shadow-lg" />
+              {/* Label */}
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                <span className="text-[8px] text-white/80 font-semibold whitespace-nowrap flex items-center gap-1">
+                  <Monitor className="w-2 h-2" /> Desktop
+                </span>
+              </div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-violet-400/20 rounded-lg filter blur-xl -z-10" />
+            </div>
+          </div>
+          
+          {/* Tablet - Left-center with App Screen */}
+          <div className="absolute left-[14%] top-1/2 -translate-y-1/2 hidden xl:block" style={{ animation: 'float 3.5s ease-in-out infinite', animationDelay: '0.5s' }}>
+            <div className="relative transform hover:scale-110 transition-transform rotate-[-5deg]">
+              {/* Tablet Frame */}
+              <div className="w-14 h-18 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border-2 border-gray-700 shadow-2xl overflow-hidden p-1">
+                {/* Screen Content */}
+                <div className="w-full h-full bg-gradient-to-br from-indigo-600/90 to-violet-700/90 rounded-lg p-1">
+                  <div className="w-full h-1.5 bg-white/30 rounded mb-1" />
+                  <div className="grid grid-cols-2 gap-0.5">
+                    <div className="h-3 bg-white/20 rounded" />
+                    <div className="h-3 bg-white/15 rounded" />
+                    <div className="h-3 bg-white/15 rounded" />
+                    <div className="h-3 bg-white/20 rounded" />
+                  </div>
+                </div>
+              </div>
+              {/* Label */}
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                <span className="text-[8px] text-white/80 font-semibold whitespace-nowrap flex items-center gap-1">
+                  <Tablet className="w-2 h-2" /> Tablet
+                </span>
+              </div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-indigo-400/20 rounded-xl filter blur-xl -z-10" />
+            </div>
+          </div>
+          
+          {/* Mobile Phone - Right side with App Screen */}
+          <div className="absolute right-[3%] top-1/2 -translate-y-1/2 hidden lg:block" style={{ animation: 'float 2.8s ease-in-out infinite', animationDelay: '0.3s' }}>
+            <div className="relative transform hover:scale-110 transition-transform rotate-[5deg]">
+              {/* Phone Frame */}
+              <div className="w-9 h-16 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border-2 border-gray-700 shadow-2xl overflow-hidden p-0.5">
+                {/* Notch */}
+                <div className="w-4 h-1 bg-gray-900 rounded-full mx-auto mb-0.5" />
+                {/* Screen Content */}
+                <div className="w-full h-full bg-gradient-to-br from-purple-600/90 to-pink-600/90 rounded-lg p-0.5">
+                  <div className="w-full h-1 bg-white/30 rounded mb-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="w-full h-2 bg-white/20 rounded" />
+                    <div className="w-3/4 h-1.5 bg-white/15 rounded" />
+                    <div className="w-full h-2 bg-white/20 rounded" />
+                  </div>
+                  {/* Bottom nav */}
+                  <div className="absolute bottom-1 left-1 right-1 h-1.5 bg-white/20 rounded-full" />
+                </div>
+              </div>
+              {/* Label */}
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                <span className="text-[8px] text-white/80 font-semibold whitespace-nowrap flex items-center gap-1">
+                  <Smartphone className="w-2 h-2" /> Mobile
+                </span>
+              </div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-pink-400/20 rounded-xl filter blur-xl -z-10" />
+            </div>
+          </div>
+          
+          {/* Second Desktop/Laptop - Right-center */}
+          <div className="absolute right-[14%] top-1/2 -translate-y-1/2 hidden xl:block" style={{ animation: 'float 3.2s ease-in-out infinite', animationDelay: '0.8s' }}>
+            <div className="relative transform hover:scale-110 transition-transform rotate-[3deg]">
+              {/* Laptop Screen */}
+              <div className="w-16 h-10 bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-lg border-2 border-b-0 border-gray-700 shadow-2xl overflow-hidden">
+                <div className="w-full h-full bg-gradient-to-br from-cyan-600/90 to-blue-700/90 p-1">
+                  <div className="flex items-center gap-0.5 mb-1">
+                    <div className="w-1 h-1 bg-red-400 rounded-full" />
+                    <div className="w-1 h-1 bg-yellow-400 rounded-full" />
+                    <div className="w-1 h-1 bg-green-400 rounded-full" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="w-full h-1.5 bg-white/25 rounded" />
+                    <div className="w-2/3 h-1 bg-white/15 rounded" />
+                  </div>
+                </div>
+              </div>
+              {/* Laptop Base */}
+              <div className="w-18 h-1.5 bg-gradient-to-b from-gray-600 to-gray-700 rounded-b-lg mx-auto shadow-lg" style={{ width: '72px' }} />
+              {/* Label */}
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                <span className="text-[8px] text-white/80 font-semibold whitespace-nowrap flex items-center gap-1">
+                  <Monitor className="w-2 h-2" /> Web App
+                </span>
+              </div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-cyan-400/20 rounded-lg filter blur-xl -z-10" />
+            </div>
+          </div>
+          
+          {/* Floating particles and sparkles */}
+          {[...Array(12)].map((_, i) => (
+            <div 
+              key={i} 
+              className="absolute rounded-full"
+              style={{
+                left: `${5 + Math.random() * 90}%`,
+                top: `${10 + Math.random() * 80}%`,
+                width: `${3 + Math.random() * 4}px`,
+                height: `${3 + Math.random() * 4}px`,
+                background: ['#fbbf24', '#f472b6', '#a78bfa', '#60a5fa', '#34d399'][Math.floor(Math.random() * 5)],
+                animation: `ping ${1.5 + Math.random() * 1.5}s cubic-bezier(0, 0, 0.2, 1) infinite`,
+                animationDelay: `${Math.random() * 2}s`,
+                opacity: 0.6
+              }}
+            />
+          ))}
+          
+          {/* Floating stars */}
+          {[...Array(6)].map((_, i) => (
+            <Star 
+              key={`star-${i}`}
+              className="absolute text-yellow-300/50"
+              style={{
+                left: `${8 + Math.random() * 84}%`,
+                top: `${15 + Math.random() * 70}%`,
+                width: `${8 + Math.random() * 6}px`,
+                height: `${8 + Math.random() * 6}px`,
+                animation: `pulse ${2 + Math.random() * 2}s ease-in-out infinite`,
+                animationDelay: `${Math.random() * 2}s`
+              }}
+            />
+          ))}
+        </div>
+        
+        <div className="relative z-10 py-3 px-4">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 sm:gap-5 flex-wrap">
             
             {/* Badge */}
