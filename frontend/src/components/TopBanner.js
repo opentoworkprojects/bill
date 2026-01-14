@@ -454,8 +454,9 @@ const TopBanner = ({ saleData: propSaleData = null }) => {
       }}>
         {/* Glowing orbs - pointer-events-none */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-20 h-20 bg-yellow-400 rounded-full filter blur-2xl opacity-30" />
-          <div className="absolute top-0 right-1/4 w-20 h-20 bg-orange-500 rounded-full filter blur-2xl opacity-30" />
+          <div className="absolute top-0 left-1/4 w-20 h-20 bg-red-500 rounded-full filter blur-2xl opacity-40 animate-pulse" />
+          <div className="absolute top-0 right-1/4 w-20 h-20 bg-orange-600 rounded-full filter blur-2xl opacity-40 animate-pulse" style={{ animationDelay: '0.5s' }} />
+          <div className="absolute top-0 left-1/2 w-16 h-16 bg-yellow-500 rounded-full filter blur-2xl opacity-30 animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
         
         <div className="relative z-10 py-2 px-4">

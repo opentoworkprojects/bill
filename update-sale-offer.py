@@ -36,20 +36,20 @@ async def update_sale_offer():
         await client.admin.command('ping')
         print("✅ Connected to MongoDB")
         
-        # Early Adopter sale offer configuration
+        # Early Adopter sale offer configuration - 5% OFF
         sale_offer = {
             "enabled": True,
             "title": "🚀 Early Adopter Special",
-            "subtitle": "Be among the first to experience BillByteKOT",
+            "subtitle": "Be among the first to experience BillByteKOT!",
             "discount_text": "5% OFF",
-            "badge_text": "EARLY BIRD",
-            "bg_color": "from-emerald-500 to-teal-600",
+            "badge_text": "🔥 EARLY ADOPTER SPECIAL",
+            "bg_color": "from-orange-500 to-red-500",
             "theme": "early_adopter",
-            "banner_design": "gradient-wave",
+            "banner_design": "early-adopter",
             "discount_percent": 5,
             "original_price": 1999,
             "sale_price": 1899,
-            "cta_text": "Join as Early Adopter!",
+            "cta_text": "Grab This Deal Now!",
             "urgency_text": "⚡ Limited early adopter slots available!",
             "end_date": "2026-01-31",
             "valid_until": "2026-01-31T23:59:59+00:00",
