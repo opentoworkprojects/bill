@@ -1184,7 +1184,7 @@ const LandingPage = () => {
             </h1>
 
             <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto font-light animate-fade-in-up delay-200">
-              Smart automation that handles orders, billing, kitchen & payments—while you focus on growth. Trusted by 500+ restaurants. 
+              Smart automation that handles orders, billing, kitchen, payments & staff reports—while you focus on growth. Trusted by 500+ restaurants. 
               {pricing?.campaign_active && (
                 <span className="font-semibold text-red-600"> {pricing?.campaign_discount_percent || 10}% OFF!</span>
               )}
