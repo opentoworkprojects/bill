@@ -1177,9 +1177,9 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight animate-fade-in-up"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Best Restaurant Billing
+              Run Your Restaurant
               <span className="block bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-transparent text-gradient-animate">
-                Software in India
+                On Autopilot
               </span>
             </h1>
 
