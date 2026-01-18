@@ -1177,14 +1177,14 @@ const LandingPage = () => {
               className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight animate-fade-in-up"
               style={{ fontFamily: "Space Grotesk, sans-serif" }}
             >
-              Best Restaurant Billing
+              Run Your Restaurant
               <span className="block bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-transparent text-gradient-animate">
-                Software in India
+                On Autopilot
               </span>
             </h1>
 
             <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto font-light animate-fade-in-up delay-200">
-              AI-powered POS system with KOT, thermal printing & WhatsApp integration. Trusted by 500+ restaurants. 
+              Smart automation that handles orders, billing, kitchen, payments & staff reports—while you focus on growth. Trusted by 500+ restaurants. 
               {pricing?.campaign_active && (
                 <span className="font-semibold text-red-600"> {pricing?.campaign_discount_percent || 10}% OFF!</span>
               )}
