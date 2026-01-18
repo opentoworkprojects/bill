@@ -378,8 +378,12 @@ const BillingPage = ({ user }) => {
       });
       
       // Prepare payment data - ensure all fields are explicitly set
+      // CRITICAL FIX: QR orders (Self-Order) should stay 'pending' until kitchen marks as completed
+      const isQROrder = order?.waiter_name === 'Self-Order';
+      const shouldStayPending = isQROrder || isCredit;
+      
       const paymentData = {
-        status: isCredit ? 'pending' : 'completed',
+        status: shouldStayPending ? 'pending' : 'completed',
         payment_method: splitPayment ? 'split' : paymentMethod,
         payment_received: received,  // Always set explicitly
         balance_amount: balance,     // Always set explicitly (0 for full payment)
@@ -448,7 +452,7 @@ const BillingPage = ({ user }) => {
         discount: discountAmt, 
         discount_amount: discountAmt, 
         tax_rate: getEffectiveTaxRate(),
-        status: isCredit ? 'pending' : 'completed',
+        status: shouldStayPending ? 'pending' : 'completed',
         payment_method: splitPayment ? 'split' : paymentMethod,
         payment_received: received,
         balance_amount: balance,
