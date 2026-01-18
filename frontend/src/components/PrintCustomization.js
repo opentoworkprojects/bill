@@ -23,6 +23,11 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+// Ensure API is available
+if (!API) {
+  console.error('API constant not available from App.js');
+}
+
 const PrintCustomization = ({ businessSettings, onUpdate }) => {
   // Initialize with proper defaults and existing settings
   const initializeCustomization = useCallback(() => {
@@ -166,7 +171,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
   const generatePreview = async () => {
     try {
       if (activeTab === 'receipt') {
-        // Use actual printUtils function for receipt preview
+        // Use actual printUtils function for receipt preview with current settings
         const sampleOrder = {
           id: 'SAMPLE123',
           invoice_number: 'ABC12345',
@@ -194,9 +199,21 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         };
         
         try {
-          // Import and use the actual print utility functions
-          const { generatePlainTextReceipt } = await import('../utils/printUtils');
-          const plainTextContent = generatePlainTextReceipt(sampleOrder, businessSettings);
+          // Import and use the actual print utility functions with current customization
+          const { generateReceiptHTML } = await import('../utils/printUtils');
+          
+          // Create temporary settings object that matches current customization
+          const tempSettings = {
+            print_customization: customization
+          };
+          
+          const htmlContent = generateReceiptHTML(sampleOrder, businessSettings);
+          
+          // Convert HTML to plain text for preview (simplified)
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = htmlContent;
+          const plainTextContent = tempDiv.textContent || tempDiv.innerText || '';
+          
           setPreviewContent(plainTextContent);
         } catch (importError) {
           console.warn('Could not import printUtils, using fallback preview:', importError);
@@ -447,6 +464,11 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         return;
       }
 
+      // Debug logging
+      console.log('🔧 Starting print settings save...');
+      console.log('Token available:', !!token);
+      console.log('Current customization:', customization);
+
       // Ensure we have valid business settings structure
       const currentSettings = businessSettings || {};
       
@@ -486,18 +508,27 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         print_customization: printCustomization
       };
       
-      console.log('Saving print settings:', updatedSettings.print_customization);
+      console.log('🔧 Saving print settings:', printCustomization);
+      console.log('🔧 Full settings payload:', updatedSettings);
       
       const response = await axios.put(`${API}/business/settings`, updatedSettings, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 15000 // Increased timeout to 15 seconds
       });
       
-      console.log('Print settings saved successfully:', response.data);
+      console.log('🔧 Save response:', response.data);
       toast.success('Print settings saved successfully!');
+      
+      // Invalidate settings cache after successful save
+      try {
+        const { invalidateSettingsCache } = await import('../utils/printUtils');
+        invalidateSettingsCache();
+      } catch (importError) {
+        console.warn('Could not invalidate cache:', importError);
+      }
       
       // Safely update parent component
       try {
@@ -518,6 +549,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
             print_customization: printCustomization
           };
           localStorage.setItem('user', JSON.stringify(user));
+          console.log('🔧 Updated localStorage with new settings');
         }
       } catch (storageError) {
         console.warn('Error updating local storage:', storageError);
@@ -527,7 +559,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       setHasUnsavedChanges(false);
       
     } catch (error) {
-      console.error('Failed to save print settings:', error);
+      console.error('🔧 Failed to save print settings:', error);
       
       let errorMessage = 'Failed to save print settings';
       
@@ -535,6 +567,9 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         errorMessage = 'Request timed out. Please check your connection and try again.';
       } else if (error.response?.status === 401) {
         errorMessage = 'Session expired. Please login again.';
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         // Optionally redirect to login
         setTimeout(() => {
           window.location.href = '/login';
@@ -551,7 +586,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         } else {
           errorMessage = 'Invalid settings format. Please check your inputs.';
         }
-        console.error('Validation error details:', detail);
+        console.error('🔧 Validation error details:', detail);
       } else if (error.response?.status === 400) {
         errorMessage = error.response?.data?.detail || 'Invalid settings data. Please check your inputs.';
       } else if (error.response?.status >= 500) {
@@ -564,6 +599,12 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
+      }
+      
+      // Additional debugging for network errors
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check if the server is running and try again.';
+        console.error('🔧 Network error - server might be down or CORS issue');
       }
       
       toast.error(errorMessage);
@@ -1173,6 +1214,25 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
                 className="px-4"
               >
                 <RotateCcw className="w-4 h-4" />
+              </Button>
+              {/* Debug button for troubleshooting */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  console.log('🔧 DEBUG INFO:');
+                  console.log('Token:', localStorage.getItem('token') ? 'Available' : 'Missing');
+                  console.log('User:', localStorage.getItem('user') ? 'Available' : 'Missing');
+                  console.log('Business Settings:', businessSettings);
+                  console.log('Current Customization:', customization);
+                  console.log('Has Unsaved Changes:', hasUnsavedChanges);
+                  console.log('Validation Errors:', validationErrors);
+                  console.log('API URL:', API);
+                  toast.info('Debug info logged to console');
+                }}
+                className="px-2"
+                title="Debug Info"
+              >
+                🔧
               </Button>
             </div>
           </div>

@@ -112,37 +112,122 @@ export const printViaBluetooth = async (text) => {
 
 // ============ SETTINGS ============
 
-export const getPrintSettings = () => {
+// ============ SETTINGS WITH CACHING ============
+
+let cachedBusinessSettings = null;
+let cachedPrintSettings = null;
+let settingsLastFetched = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+// Invalidate cache when needed
+export const invalidateSettingsCache = () => {
+  cachedBusinessSettings = null;
+  cachedPrintSettings = null;
+  settingsLastFetched = null;
+  console.log('🔄 Settings cache invalidated');
+};
+
+// Get cached or fresh business settings
+export const getBusinessSettings = (forceRefresh = false) => {
   try {
+    const now = Date.now();
+    
+    // Check if we have valid cached data
+    if (!forceRefresh && cachedBusinessSettings && settingsLastFetched && 
+        (now - settingsLastFetched) < CACHE_DURATION) {
+      return cachedBusinessSettings;
+    }
+    
+    // Get from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const s = user.business_settings?.print_customization || {};
-    return {
+    const businessSettings = user.business_settings || {};
+    
+    // Update cache
+    cachedBusinessSettings = businessSettings;
+    settingsLastFetched = now;
+    
+    return businessSettings;
+  } catch (e) { 
+    console.error('Error getting business settings:', e);
+    return {}; 
+  }
+};
+
+export const getPrintSettings = (forceRefresh = false) => {
+  try {
+    const now = Date.now();
+    
+    // Check if we have valid cached data
+    if (!forceRefresh && cachedPrintSettings && settingsLastFetched && 
+        (now - settingsLastFetched) < CACHE_DURATION) {
+      return cachedPrintSettings;
+    }
+    
+    const businessSettings = getBusinessSettings(forceRefresh);
+    const s = businessSettings.print_customization || {};
+    
+    const printSettings = {
       paper_width: s.paper_width || '80mm',
+      font_size: s.font_size || 'medium',
       show_logo: s.show_logo ?? true,
+      logo_size: s.logo_size || 'medium',
       show_address: s.show_address ?? true,
       show_phone: s.show_phone ?? true,
+      show_email: s.show_email ?? false,
+      show_website: s.show_website ?? false,
       show_gstin: s.show_gstin ?? true,
-      show_fssai: s.show_fssai ?? true,
+      show_fssai: s.show_fssai ?? false,
       show_tagline: s.show_tagline ?? true,
       show_customer_name: s.show_customer_name ?? true,
       show_waiter_name: s.show_waiter_name ?? true,
       show_table_number: s.show_table_number ?? true,
       show_order_time: s.show_order_time ?? true,
       show_item_notes: s.show_item_notes ?? true,
+      border_style: s.border_style || 'single',
+      separator_style: s.separator_style || 'dashes',
+      footer_style: s.footer_style || 'simple',
       qr_code_enabled: s.qr_code_enabled ?? true,
+      auto_print: s.auto_print ?? false,
       print_copies: Math.max(1, Math.min(5, parseInt(s.print_copies) || 1)),
+      kot_auto_print: s.kot_auto_print ?? true,
+      kot_font_size: s.kot_font_size || 'large',
       kot_show_time: s.kot_show_time ?? true,
       kot_highlight_notes: s.kot_highlight_notes ?? true,
+      header_style: s.header_style || 'centered'
     };
+    
+    // Update cache
+    cachedPrintSettings = printSettings;
+    settingsLastFetched = now;
+    
+    return printSettings;
   } catch (e) {
-    return { paper_width: '80mm', show_logo: true, show_address: true, show_phone: true, show_gstin: true, show_fssai: true, show_tagline: true, show_customer_name: true, show_waiter_name: true, show_table_number: true, show_order_time: true, show_item_notes: true, qr_code_enabled: true, print_copies: 1, kot_show_time: true, kot_highlight_notes: true };
+    console.error('Error getting print settings:', e);
+    return { 
+      paper_width: '80mm', 
+      font_size: 'medium',
+      show_logo: true, 
+      show_address: true, 
+      show_phone: true, 
+      show_gstin: true, 
+      show_fssai: true, 
+      show_tagline: true, 
+      show_customer_name: true, 
+      show_waiter_name: true, 
+      show_table_number: true, 
+      show_order_time: true, 
+      show_item_notes: true, 
+      qr_code_enabled: true, 
+      auto_print: false,
+      print_copies: 1, 
+      kot_show_time: true, 
+      kot_highlight_notes: true,
+      border_style: 'single',
+      separator_style: 'dashes',
+      footer_style: 'simple',
+      header_style: 'centered'
+    };
   }
-};
-
-export const getBusinessSettings = () => {
-  try {
-    return JSON.parse(localStorage.getItem('user') || '{}').business_settings || {};
-  } catch (e) { return {}; }
 };
 
 const getBillNumber = (order) => {
@@ -255,12 +340,36 @@ const generateFallbackQRCode = (size = 120) => {
 
 // ============ PRINT FUNCTIONS ============
 
-const getPrintStyles = (width) => `
+const getPrintStyles = (width, settings = null) => {
+  const printSettings = settings || getPrintSettings();
+  const fontSize = printSettings.font_size === 'small' ? '11px' : 
+                   printSettings.font_size === 'large' ? '15px' : '13px';
+  
+  return `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: ${width} auto; margin: 0; }
-  @media print { html, body { width: ${width}; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; } }
-  body { font-family: 'Courier New', monospace; font-size: ${width === '58mm' ? '11px' : '13px'}; font-weight: 600; line-height: 1.4; width: ${width}; padding: 3mm; background: #fff; color: #000; }
+  @media print { 
+    html, body { 
+      width: ${width}; 
+      margin: 0 !important; 
+      padding: 0 !important; 
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important;
+    } 
+  }
+  body { 
+    font-family: 'Courier New', monospace; 
+    font-size: ${fontSize}; 
+    font-weight: 600; 
+    line-height: 1.4; 
+    width: ${width}; 
+    padding: 3mm; 
+    background: #fff; 
+    color: #000; 
+  }
   .center { text-align: center; }
+  .left { text-align: left; }
+  .right { text-align: right; }
   .bold { font-weight: 900 !important; }
   .large { font-size: 1.3em; font-weight: 900; }
   .small { font-size: 0.9em; }
@@ -281,10 +390,15 @@ const getPrintStyles = (width) => `
   .kot-note { background: #000; color: #fff; padding: 2mm; margin: 1mm 0 2mm 3mm; font-weight: 900; }
 `;
 
-export const printThermal = (htmlContent, paperWidth = '80mm') => {
+export const printThermal = (htmlContent, paperWidth = '80mm', forceDialog = false) => {
+  const settings = getPrintSettings();
+  
   if (isElectron() && window.electronAPI?.printReceipt) {
     try { 
-      window.electronAPI.printReceipt(htmlContent, { paperWidth }); 
+      window.electronAPI.printReceipt(htmlContent, { 
+        paperWidth,
+        silent: !forceDialog // Use silent printing unless dialog is forced
+      }); 
       toast.success('Printing...'); 
       return true; 
     } catch (e) {
@@ -292,47 +406,78 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
     }
   }
   
-  // Silent print without dialog - create hidden iframe
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'absolute';
-  iframe.style.left = '-9999px';
-  iframe.style.width = '1px';
-  iframe.style.height = '1px';
-  iframe.style.opacity = '0';
-  document.body.appendChild(iframe);
+  // Check if we should show dialog based on settings
+  const showDialog = forceDialog || false; // Always silent unless forced
   
-  const width = paperWidth === '58mm' ? '58mm' : '80mm';
-  const printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Print</title><style>${getPrintStyles(width)}</style></head><body><div class="receipt">${htmlContent}</div></body></html>`;
-  
-  iframe.contentDocument.write(printContent);
-  iframe.contentDocument.close();
-  
-  // Wait for content to load, then print silently
-  iframe.onload = () => {
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        toast.success('Receipt sent to printer!');
-        
-        // Clean up after printing
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      } catch (e) {
-        console.error('Silent print failed:', e);
-        // Fallback to popup window if silent print fails
-        const printWindow = window.open('', '_blank', 'width=400,height=600');
-        if (printWindow) {
-          printWindow.document.write(printContent + `<script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},300);},100);};</script>`);
-          printWindow.document.close();
+  if (showDialog) {
+    // Show print dialog in popup window
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) {
+      toast.error('Popup blocked! Please allow popups for printing.');
+      return false;
+    }
+    
+    const width = paperWidth === '58mm' ? '58mm' : '80mm';
+    const printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Print Receipt</title><style>${getPrintStyles(width)}</style></head><body><div class="receipt">${htmlContent}</div><script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},300);},100);};</script></body></html>`;
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    toast.success('Print dialog opened!');
+    return true;
+  } else {
+    // Silent print without dialog - create hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.style.opacity = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    
+    const width = paperWidth === '58mm' ? '58mm' : '80mm';
+    const printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Print</title><style>${getPrintStyles(width)}@media print{@page{margin:0;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body><div class="receipt">${htmlContent}</div></body></html>`;
+    
+    iframe.contentDocument.write(printContent);
+    iframe.contentDocument.close();
+    
+    // Wait for content to load, then print silently
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          // Set print settings to avoid dialog
+          iframe.contentWindow.focus();
+          
+          // Try to print silently
+          iframe.contentWindow.print();
+          toast.success('Receipt sent to printer!');
+          
+          // Clean up after printing
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 2000);
+        } catch (e) {
+          console.error('Silent print failed:', e);
+          // Clean up iframe on error
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          toast.error('Print failed. Please try again.');
         }
+      }, 500);
+    };
+    
+    // Fallback cleanup in case onload doesn't fire
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
         document.body.removeChild(iframe);
       }
-    }, 500);
-  };
-  
-  return true;
+    }, 5000);
+    
+    return true;
+  }
 };
 
 export const generateReceiptHTML = (order, businessOverride = null) => {
@@ -342,6 +487,11 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
   
   let html = '';
   
+  // Apply settings-based styling
+  const fontSize = settings.font_size === 'small' ? '11px' : 
+                   settings.font_size === 'large' ? '15px' : '13px';
+  
+  // Header with logo
   if (settings.show_logo && b.logo_url) {
     const logoSizes = {
       small: 'max-width:40px;max-height:30px;',
@@ -351,21 +501,44 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
     const logoSize = logoSizes[settings.logo_size] || logoSizes.medium;
     html += `<div class="center mb-1"><img src="${b.logo_url}" alt="Logo" style="${logoSize}" onerror="this.style.display='none'"/></div>`;
   }
-  html += `<div class="center header-logo">${b.restaurant_name || 'Restaurant'}</div>`;
+  
+  // Restaurant name with header style
+  const headerClass = settings.header_style === 'left' ? 'left' : 
+                     settings.header_style === 'right' ? 'right' : 'center';
+  html += `<div class="${headerClass} header-logo">${b.restaurant_name || 'Restaurant'}</div>`;
+  
   if (settings.show_tagline && b.tagline) html += `<div class="center small mb-1">${b.tagline}</div>`;
   if (settings.show_fssai && b.fssai) html += `<div class="center xsmall bold">FSSAI NO: ${b.fssai}</div>`;
   if (settings.show_address && b.address) html += `<div class="center xsmall">${b.address}</div>`;
   if (settings.show_phone && b.phone) html += `<div class="center xsmall">Contact: ${b.phone}</div>`;
+  if (settings.show_email && b.email) html += `<div class="center xsmall">Email: ${b.email}</div>`;
+  if (settings.show_website && b.website) html += `<div class="center xsmall">Web: ${b.website}</div>`;
+  if (settings.show_gstin && b.gstin) html += `<div class="center xsmall">GSTIN: ${b.gstin}</div>`;
   
-  html += '<div class="dotted-line"></div>';
+  // Separator based on settings
+  const separatorClass = settings.separator_style === 'dots' ? 'dotted-line' :
+                        settings.separator_style === 'equals' ? 'double-line' :
+                        settings.separator_style === 'line' ? 'separator' : 'separator';
+  html += `<div class="${separatorClass}"></div>`;
+  
+  // Bill header
   html += '<div class="center large mb-1">BILL</div>';
   
   const date = new Date(order.created_at || Date.now());
   html += `<div class="bill-info"><span>Bill No:${billNo}</span><span>Table:${order.table_number ? 'T' + order.table_number : 'Counter'}</span><span>Date:${date.toLocaleDateString('en-IN')}</span></div>`;
-  html += `<div class="bill-info"><span>Captain:${order.waiter_name || 'Self'}</span><span></span><span>(${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })})</span></div>`;
+  
+  // Order details based on settings
+  let orderDetails = '';
+  if (settings.show_waiter_name && order.waiter_name) orderDetails += `Captain:${order.waiter_name} `;
+  if (settings.show_order_time) orderDetails += `(${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })})`;
+  if (orderDetails) html += `<div class="bill-info"><span>${orderDetails}</span></div>`;
+  
   if (settings.show_customer_name && order.customer_name) html += `<div class="bill-info"><span>Customer: ${order.customer_name}</span></div>`;
   
-  html += '<div class="double-line"></div>';
+  // Border style
+  const borderClass = settings.border_style === 'double' ? 'double-line' : 'separator';
+  html += `<div class="${borderClass}"></div>`;
+  
   html += '<div class="table-header"><span style="flex:2">Item</span><span style="width:35px;text-align:center">Qty</span><span style="width:55px;text-align:right">Rate</span><span style="width:60px;text-align:right">Amt</span></div>';
   
   (order.items || []).forEach(item => {
@@ -373,7 +546,7 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
     if (settings.show_item_notes && item.notes) html += `<div style="font-size:0.85em;margin-left:3mm;font-style:italic">Note: ${item.notes}</div>`;
   });
   
-  html += '<div class="separator"></div>';
+  html += `<div class="${separatorClass}"></div>`;
   
   const subtotal = order.subtotal || 0, tax = order.tax || 0, total = order.total || 0;
   const discount = order.discount || order.discount_amount || 0;
@@ -394,14 +567,14 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
     html += `<div class="total-row small"><span>Tax (${displayTaxRate}%)</span><span></span><span></span><span>${tax.toFixed(2)}</span></div>`;
   }
   
-  html += '<div class="double-line"></div>';
+  html += `<div class="${borderClass}"></div>`;
   html += `<div class="total-row grand-total"><span>TOTAL DUE</span><span>${total.toFixed(2)}</span></div>`;
   
   const { payment_received = 0, balance_amount = 0, is_credit, cash_amount = 0, card_amount = 0, upi_amount = 0, credit_amount = 0, payment_method } = order;
   const isSplit = payment_method === 'split' || (cash_amount > 0 && (card_amount > 0 || upi_amount > 0 || credit_amount > 0)) || (card_amount > 0 && (upi_amount > 0 || credit_amount > 0)) || (upi_amount > 0 && credit_amount > 0);
   
   // Always show payment section
-  html += '<div class="separator"></div>';
+  html += `<div class="${separatorClass}"></div>`;
   
   if (isSplit) {
     html += '<div class="center bold small mb-1">PAYMENT DETAILS</div>';
@@ -434,12 +607,12 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
     }
   }
   
-  html += '<div class="double-line"></div>';
+  html += `<div class="${borderClass}"></div>`;
   
   // Add QR code for unpaid/overdue bills
   const isUnpaid = is_credit || balance_amount > 0;
   if (settings.qr_code_enabled && isUnpaid) {
-    html += '<div class="separator"></div>';
+    html += `<div class="${separatorClass}"></div>`;
     html += '<div class="center bold small mb-1">SCAN TO PAY BALANCE</div>';
     
     // Generate payment URL for QR code
@@ -458,7 +631,16 @@ export const generateReceiptHTML = (order, businessOverride = null) => {
     html += `<div class="center xsmall">UPI ID: ${b.upi_id || b.phone ? `${b.phone}@paytm` : 'payment@restaurant.com'}</div>`;
   }
   
-  html += `<div class="footer center"><div class="bold">${b.footer_message || 'Thank you! Visit Again...'}</div><div class="xsmall mt-1">Bill generated by BillByteKOT</div><div class="xsmall">(billbytekot.in)</div></div>`;
+  // Footer based on settings
+  const footerMessage = settings.footer_style === 'detailed' ? 
+    `${b.footer_message || 'Thank you! Visit Again...'}\nBill generated by BillByteKOT\n(billbytekot.in)` :
+    b.footer_message || 'Thank you! Visit Again...';
+    
+  html += `<div class="footer center"><div class="bold">${footerMessage}</div>`;
+  if (settings.footer_style === 'simple') {
+    html += `<div class="xsmall mt-1">Bill generated by BillByteKOT</div><div class="xsmall">(billbytekot.in)</div>`;
+  }
+  html += `</div>`;
   
   return html;
 };
@@ -691,9 +873,11 @@ export const printReceipt = async (order, businessOverride = null) => {
       }
     }
     
-    // Fallback to window print with correct settings
-    return printThermal(generateReceiptHTML(order, businessOverride), settings.paper_width);
+    // Use settings to determine if dialog should be shown
+    const forceDialog = false; // Always silent unless specifically requested
+    return printThermal(generateReceiptHTML(order, businessOverride), settings.paper_width, forceDialog);
   } catch (e) { 
+    console.error('Print failed:', e);
     toast.error('Print failed'); 
     return false; 
   }
@@ -715,9 +899,11 @@ export const printKOT = async (order, businessOverride = null) => {
       }
     }
     
-    // Fallback to window print with correct settings
-    return printThermal(generateKOTHTML(order, businessOverride), settings.paper_width);
+    // Use settings to determine if dialog should be shown
+    const forceDialog = false; // Always silent unless specifically requested
+    return printThermal(generateKOTHTML(order, businessOverride), settings.paper_width, forceDialog);
   } catch (e) { 
+    console.error('Print failed:', e);
     toast.error('Print failed'); 
     return false; 
   }
