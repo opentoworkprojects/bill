@@ -1238,7 +1238,7 @@ const OrdersPage = ({ user }) => {
             <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage restaurant orders • Updates every 2 seconds</p>
           </div>
           {['admin', 'waiter', 'cashier'].includes(user?.role) && (
-            <>
+            <div className="flex items-center gap-3">
               {/* New Order Button - Unified for both KOT modes */}
               <Button 
                 onClick={() => {
@@ -1269,9 +1269,11 @@ const OrdersPage = ({ user }) => {
                 <span className="hidden sm:inline">Refresh</span>
                 <span className="sm:hidden">↻</span>
               </Button>
-              
-              {/* Unified New Order Dialog - Works for both KOT enabled/disabled */}
-              {dialogOpen && (
+            </div>
+          )}
+
+        {/* Unified New Order Dialog - Works for both KOT enabled/disabled */}
+        {dialogOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
                     {/* Header with Icon */}
@@ -1429,9 +1431,9 @@ const OrdersPage = ({ user }) => {
                   </div>
                 </div>
               )}
-            </>
-          )}
+
         </div>
+
         {/* Tabs for Active Orders and Today's Bills */}
         <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-xl">
           <button
