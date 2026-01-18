@@ -389,6 +389,7 @@ const getPrintStyles = (width, settings = null) => {
   .kot-item { font-size: 1.2em; font-weight: 900; margin: 2mm 0; padding: 2mm; border: 2px solid #000; }
   .kot-note { background: #000; color: #fff; padding: 2mm; margin: 1mm 0 2mm 3mm; font-weight: 900; }
 `;
+};
 
 export const printThermal = (htmlContent, paperWidth = '80mm', forceDialog = false) => {
   const settings = getPrintSettings();
