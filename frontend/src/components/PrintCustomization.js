@@ -23,11 +23,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// Ensure API is available
-if (!API) {
-  console.error('API constant not available from App.js');
-}
-
 const PrintCustomization = ({ businessSettings, onUpdate }) => {
   // Initialize with proper defaults and existing settings
   const initializeCustomization = useCallback(() => {
@@ -171,78 +166,9 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
   const generatePreview = async () => {
     try {
       if (activeTab === 'receipt') {
-        // Use actual printUtils function for receipt preview with current settings
-        const sampleOrder = {
-          id: 'SAMPLE123',
-          invoice_number: 'ABC12345',
-          table_number: 5,
-          waiter_name: 'John Doe',
-          customer_name: 'Guest Customer',
-          customer_phone: '+91 9876543210',
-          created_at: new Date().toISOString(),
-          items: [
-            { name: 'Butter Chicken', quantity: 2, price: 350, notes: customization.show_item_notes ? 'Extra spicy' : '' },
-            { name: 'Garlic Naan', quantity: 1, price: 60, notes: '' },
-            { name: 'Jeera Rice', quantity: 2, price: 120, notes: customization.show_item_notes ? 'Less salt' : '' },
-          ],
-          subtotal: 880,
-          tax: 44,
-          tax_rate: 5,
-          total: 924,
-          discount: 0,
-          discount_amount: 0,
-          payment_method: 'cash',
-          payment_received: 500, // Partial payment to show QR code
-          balance_amount: 424,
-          is_credit: true,
-          status: 'pending'
-        };
-        
-        try {
-          // Import and use the actual print utility functions with current customization
-          const { generateReceiptHTML } = await import('../utils/printUtils');
-          
-          // Create temporary settings object that matches current customization
-          const tempSettings = {
-            print_customization: customization
-          };
-          
-          const htmlContent = generateReceiptHTML(sampleOrder, businessSettings);
-          
-          // Convert HTML to plain text for preview (simplified)
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = htmlContent;
-          const plainTextContent = tempDiv.textContent || tempDiv.innerText || '';
-          
-          setPreviewContent(plainTextContent);
-        } catch (importError) {
-          console.warn('Could not import printUtils, using fallback preview:', importError);
-          setPreviewContent(generateReceiptPreview());
-        }
+        setPreviewContent(generateReceiptPreview());
       } else {
-        // Use actual printUtils function for KOT preview
-        const sampleKOTOrder = {
-          id: 'KOT001234',
-          table_number: 5,
-          waiter_name: 'John Doe',
-          customer_name: 'Guest Customer',
-          created_at: new Date().toISOString(),
-          priority: 'normal',
-          items: [
-            { name: 'BUTTER CHICKEN', quantity: 2, notes: customization.kot_highlight_notes ? 'Extra spicy' : '' },
-            { name: 'GARLIC NAAN', quantity: 1, notes: '' },
-            { name: 'JEERA RICE', quantity: 2, notes: customization.kot_highlight_notes ? 'Less salt' : '' },
-          ]
-        };
-        
-        try {
-          const { generateKOTContent } = await import('../utils/printUtils');
-          const plainTextContent = generateKOTContent(sampleKOTOrder);
-          setPreviewContent(plainTextContent);
-        } catch (importError) {
-          console.warn('Could not import printUtils, using fallback preview:', importError);
-          setPreviewContent(generateKOTPreview());
-        }
+        setPreviewContent(generateKOTPreview());
       }
     } catch (error) {
       console.error('Error generating preview:', error);
@@ -521,14 +447,6 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       
       console.log('🔧 Save response:', response.data);
       toast.success('Print settings saved successfully!');
-      
-      // Invalidate settings cache after successful save
-      try {
-        const { invalidateSettingsCache } = await import('../utils/printUtils');
-        invalidateSettingsCache();
-      } catch (importError) {
-        console.warn('Could not invalidate cache:', importError);
-      }
       
       // Safely update parent component
       try {
