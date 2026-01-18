@@ -292,12 +292,46 @@ export const printThermal = (htmlContent, paperWidth = '80mm') => {
     }
   }
   
-  const printWindow = window.open('', '_blank', 'width=400,height=600');
-  if (!printWindow) { toast.error('Popup blocked!'); return false; }
+  // Silent print without dialog - create hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'absolute';
+  iframe.style.left = '-9999px';
+  iframe.style.width = '1px';
+  iframe.style.height = '1px';
+  iframe.style.opacity = '0';
+  document.body.appendChild(iframe);
   
   const width = paperWidth === '58mm' ? '58mm' : '80mm';
-  printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Print</title><style>${getPrintStyles(width)}</style></head><body><div class="receipt">${htmlContent}</div><script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},300);},100);};</script></body></html>`);
-  printWindow.document.close();
+  const printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Print</title><style>${getPrintStyles(width)}</style></head><body><div class="receipt">${htmlContent}</div></body></html>`;
+  
+  iframe.contentDocument.write(printContent);
+  iframe.contentDocument.close();
+  
+  // Wait for content to load, then print silently
+  iframe.onload = () => {
+    setTimeout(() => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        toast.success('Receipt sent to printer!');
+        
+        // Clean up after printing
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      } catch (e) {
+        console.error('Silent print failed:', e);
+        // Fallback to popup window if silent print fails
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        if (printWindow) {
+          printWindow.document.write(printContent + `<script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},300);},100);};</script>`);
+          printWindow.document.close();
+        }
+        document.body.removeChild(iframe);
+      }
+    }, 500);
+  };
+  
   return true;
 };
 
