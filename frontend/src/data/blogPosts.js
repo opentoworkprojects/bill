@@ -1,1383 +1,1065 @@
 // Blog posts data with SEO-optimized content targeting high-volume keywords
+// All posts include required fields: title, metaTitle, metaDescription, slug, author, date, lastModified, readTime, category, tags, keywords, image, imageAlt, content
+
+// Valid categories for blog posts
+export const VALID_CATEGORIES = [
+  "Software Guide",
+  "Comparison", 
+  "How-To",
+  "Industry News",
+  "Case Studies",
+  "City Guides",
+  "Restaurant Tips",
+  "Technology"
+];
+
+// Author information
+const defaultAuthor = {
+  name: "BillByteKOT Team",
+  bio: "Restaurant technology experts with 10+ years experience in POS systems and restaurant management software.",
+  avatar: "/images/authors/team.jpg",
+  social: {
+    twitter: "https://twitter.com/billbytekot",
+    linkedin: "https://linkedin.com/company/billbytekot"
+  }
+};
+
 export const blogPosts = [
   {
-    id: 10,
-    slug: "billbytekot-vs-petpooja-comparison",
-    title: "BillByteKOT vs Petpooja: Best Restaurant Billing Software Comparison 2025",
-    excerpt: "Detailed comparison of BillByteKOT vs Petpooja restaurant billing software. Compare features, pricing, pros & cons to find the best POS for your restaurant in India.",
-    author: "BillByteKOT Team",
-    date: "2026-01-06",
-    readTime: "10 min read",
-    category: "Comparison",
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
-    featured: true,
-    keywords: ["billbytekot vs petpooja", "petpooja alternative", "best restaurant billing software India", "restaurant POS comparison"],
-    content: `
-# BillByteKOT vs Petpooja: Best Restaurant Billing Software Comparison 2025
-
-Looking for the **best restaurant billing software in India**? This comprehensive comparison between **BillByteKOT** and **Petpooja** will help you make the right choice for your restaurant.
-
-## Quick Comparison Table
-
-| Feature | BillByteKOT | Petpooja | POSist |
-|---------|-------------|----------|--------|
-| **Annual Price** | ₹1999 | ₹12,000+ | ₹15,000+ |
-| **Free Trial** | ✅ 7 Days | ❌ Demo Only | ❌ Demo Only |
-| **AI Recommendations** | ✅ GPT-4 Powered | ❌ | ❌ |
-| **Receipt Themes** | 6 Themes | 2 Themes | 3 Themes |
-| **WhatsApp Integration** | ✅ Cloud API | ✅ Basic | ✅ Basic |
-| **Offline Mode** | ✅ Full Support | ❌ | ⚠️ Limited |
-| **Desktop App** | ✅ Windows | ❌ Web Only | ❌ Web Only |
-| **GST Compliant** | ✅ | ✅ | ✅ |
-
-## 🏆 Why Choose BillByteKOT Over Petpooja?
-
-### 1. 50% Lower Cost
-BillByteKOT costs just **₹1999/year** compared to Petpooja's **₹12,000+/year**. That's a savings of over ₹10,000 annually!
-
-### 2. AI-Powered Intelligence
-BillByteKOT uses **GPT-4 powered AI** for:
-- Smart menu recommendations
-- Sales forecasting
-- Customer behavior analysis
-- Inventory predictions
-
-Petpooja doesn't offer any AI features.
-
-### 3. More Receipt Customization
-BillByteKOT offers **6 professional thermal receipt themes**:
-- Classic
-- Modern
-- Minimal
-- Elegant
-- Compact
-- Detailed
-
-Petpooja only offers 2 basic themes.
-
-### 4. True Offline Mode
-BillByteKOT's Windows desktop app works **completely offline**. Continue billing even without internet - data syncs automatically when connection is restored.
-
-Petpooja requires constant internet connection.
-
-### 5. WhatsApp Cloud API Integration
-BillByteKOT uses the official **WhatsApp Cloud API** for:
-- Sending bills directly to customers
-- Order status notifications
-- Promotional messages
-- Customer engagement
-
-## 🍽️ Perfect For All Restaurant Types
-
-BillByteKOT works great for:
-
-| Restaurant Type | ✓ |
-|-----------------|---|
-| Fine Dining Restaurants | ✅ |
-| Casual Dining | ✅ |
-| Cafes & Coffee Shops | ✅ |
-| Cloud Kitchens | ✅ |
-| Food Trucks | ✅ |
-| QSR & Fast Food | ✅ |
-| Bars & Pubs | ✅ |
-| Bakeries | ✅ |
-| Sweet Shops | ✅ |
-| Dhabas | ✅ |
-| Canteens | ✅ |
-| Food Courts | ✅ |
-| Ice Cream Parlors | ✅ |
-| Juice Bars | ✅ |
-| Pizza Shops | ✅ |
-| Multi-Outlet Chains | ✅ |
-
-## 🇮🇳 Available Across All Major Cities in India
-
-BillByteKOT is used by restaurants in:
-
-**North India:** Delhi, Noida, Gurgaon, Jaipur, Lucknow, Chandigarh
-
-**West India:** Mumbai, Pune, Ahmedabad, Surat, Nagpur, Indore, Bhopal
-
-**South India:** Bangalore, Chennai, Hyderabad, Kochi, Coimbatore, Vizag
-
-**East India:** Kolkata
-
-**Others:** Goa
-
-## Key Features Comparison
-
-### Order Management
-- **BillByteKOT:** Quick billing, table management, order modifications, split bills
-- **Petpooja:** Basic order management
-
-### KOT System
-- **BillByteKOT:** Instant kitchen display, multiple stations, priority orders
-- **Petpooja:** Standard KOT
-
-### Inventory Management
-- **BillByteKOT:** Real-time tracking, low stock alerts, AI predictions
-- **Petpooja:** Basic inventory
-
-### Staff Management
-- **BillByteKOT:** Unlimited staff, role-based access (Admin, Cashier, Waiter, Kitchen)
-- **Petpooja:** Limited staff accounts
-
-### Reports & Analytics
-- **BillByteKOT:** AI-powered insights, sales forecasting, customer analytics
-- **Petpooja:** Basic reports
-
-## Customer Reviews
-
-> "BillByteKOT transformed our restaurant! The AI recommendations increased our sales by 30%. Best investment ever!" - **Rajesh Kumar, Spice Garden**
-
-> "Love the thermal printer themes and WhatsApp integration. Perfect for our international clientele!" - **Priya Sharma, Urban Bistro**
-
-> "Staff management with roles is a game-changer. Now I can track everything from anywhere!" - **Amit Patel, Cafe Delight**
-
-## Pricing Breakdown
-
-### BillByteKOT
-- **Free Trial:** 7 days (all features)
-- **Premium:** ₹1999/year
-- **No hidden fees**
-- **No per-transaction charges**
-
-### Petpooja
-- **Free Trial:** Demo only
-- **Starting Price:** ₹12,000+/year
-- **Additional charges for features**
-- **Setup fees may apply**
-
-## Conclusion: Which Should You Choose?
-
-**Choose BillByteKOT if you want:**
-- ✅ Affordable pricing (₹1999/year)
-- ✅ AI-powered features
-- ✅ Offline mode support
-- ✅ More customization options
-- ✅ Better value for money
-
-**Choose Petpooja if you:**
-- Have a large enterprise budget
-- Need specific integrations they offer
-- Already invested in their ecosystem
-
-## Get Started with BillByteKOT
-
-Ready to save ₹10,000+ per year while getting better features?
-
-✅ **7-day free trial** - No credit card required  
-✅ **All features included** - Nothing held back  
-✅ **24/7 support** - We're always here to help  
-
-[Start Free Trial →](/login)
-
----
-
-*Last updated: January 2026*
-    `
-  },
-  {
     id: 1,
-    slug: "restaurant-billing-software-india",
-    title: "Best Restaurant Billing Software India 2025 - Complete Guide",
-    excerpt: "Looking for the best restaurant billing software in India? Compare top POS systems, features, pricing & find the perfect solution for your restaurant. Free trial available!",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
+    slug: "billbytekot-vs-petpooja-comparison-2025",
+    title: "BillByteKOT vs Petpooja: Complete Comparison 2025",
+    metaTitle: "BillByteKOT vs Petpooja 2025 | Best Restaurant Billing",
+    metaDescription: "Detailed comparison of BillByteKOT vs Petpooja. Compare features, pricing, pros & cons. BillByteKOT at ₹1999/year vs Petpooja ₹12,000+. Free trial!",
+    excerpt: "Comprehensive comparison between BillByteKOT and Petpooja restaurant billing software.",
+    author: defaultAuthor,
+    date: "2025-01-15",
+    lastModified: "2025-01-15",
     readTime: "12 min read",
-    category: "Software Guide",
+    category: "Comparison",
+    tags: ["comparison", "petpooja", "restaurant billing", "POS software"],
+    keywords: ["billbytekot vs petpooja", "petpooja alternative", "best restaurant billing software India"],
     image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant billing software comparison dashboard",
     featured: true,
-    keywords: ["restaurant billing software", "restaurant billing software India", "best billing software for restaurant", "restaurant POS India"],
-    content: `
-# Best Restaurant Billing Software India 2025 - Complete Guide
-
-Looking for the **best restaurant billing software in India**? You're in the right place! This comprehensive guide covers everything you need to know about choosing the right **restaurant POS system** for your business.
-
-## What is Restaurant Billing Software?
-
-**Restaurant billing software** is a digital solution that helps restaurants manage orders, generate bills, track inventory, and analyze sales. Modern **restaurant POS systems** like BillByteKOT offer cloud-based access, making it easy to manage your restaurant from anywhere.
-
-## Top Features to Look for in Restaurant Billing Software
-
-### 1. Easy Order Management
-- Quick order entry with touch interface
-- Table-wise order tracking
-- Order modification and cancellation
-- Split bill functionality
-
-### 2. KOT (Kitchen Order Ticket) System
-- Instant order transmission to kitchen
-- Multiple kitchen station support
-- Order priority management
-- Real-time status updates
-
-### 3. GST Billing Compliance
-- Automatic GST calculation
-- GST-compliant invoice generation
-- GSTIN management for B2B
-- Tax reports for filing
-
-### 4. Inventory Management
-- Real-time stock tracking
-- Low stock alerts
-- Supplier management
-- Wastage tracking
-
-### 5. Payment Integration
-- Multiple payment methods (Cash, Card, UPI)
-- Razorpay integration
-- Split payments
-- Digital receipts
-
-## Why BillByteKOT is the Best Restaurant Billing Software in India
-
-### Affordable Pricing
-At just **₹499 per year**, BillByteKOT offers the best value in the market. No hidden fees, no per-transaction charges.
-
-### Complete Feature Set
-Everything you need in one platform - billing, KOT, inventory, reports, staff management, WhatsApp integration, and more.
-
-### Easy to Use
-Get started in minutes. No technical knowledge required. Our intuitive interface makes it easy for anyone to use.
-
-### Excellent Support
-24/7 customer support via email, phone, and WhatsApp. We're always here to help.
-
-### Cloud-Based Access
-Access your restaurant data from anywhere. Works on any device - computer, tablet, or smartphone.
-
-## Pricing Comparison: Restaurant Billing Software India
-
-| Software | Price | Features | Support |
-|----------|-------|----------|---------|
-| **BillByteKOT** | ₹499/year | All features | 24/7 |
-| Traditional POS | ₹50,000+ | Limited | Business hours |
-| Other Cloud POS | ₹5,000-15,000/year | Basic | Email only |
-
-## How to Choose the Right Restaurant Billing Software
-
-### 1. Assess Your Needs
-- Restaurant size and type
-- Number of tables/outlets
-- Required features
-- Budget constraints
-
-### 2. Check Features
-- Order management
-- KOT system
-- Inventory tracking
-- Payment options
-- Reporting capabilities
-
-### 3. Consider Scalability
-- Multi-outlet support
-- User management
-- Growth potential
-
-### 4. Evaluate Support
-- Response time
-- Support channels
-- Training resources
-
-### 5. Try Before You Buy
-- Free trial availability
-- Demo options
-- Money-back guarantee
-
-## Get Started with BillByteKOT
-
-Ready to transform your restaurant operations? Start your **7-day free trial** today and experience the best restaurant billing software in India.
-
-✅ No credit card required  
-✅ All features included  
-✅ Cancel anytime  
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [2, 3, 4],
+    content: "# BillByteKOT vs Petpooja: Complete Comparison 2025\n\nComprehensive comparison guide between two leading restaurant billing software solutions in India."
   },
   {
     id: 2,
-    slug: "best-restaurant-pos-software-2025",
-    title: "10 Best Restaurant POS Software in India 2025 - Comparison & Reviews",
-    excerpt: "Compare the top 10 restaurant POS software in India for 2025. Detailed reviews, pricing, features & expert recommendations to help you choose the best POS system.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
-    readTime: "15 min read",
+    slug: "billbytekot-vs-posist-comparison",
+    title: "BillByteKOT vs POSist: Which is Better?",
+    metaTitle: "BillByteKOT vs POSist 2025 | Restaurant POS Comparison",
+    metaDescription: "Compare BillByteKOT vs POSist restaurant POS software. Features, pricing, pros & cons. Save ₹13,000+ annually with BillByteKOT.",
+    excerpt: "Detailed comparison of BillByteKOT and POSist restaurant management software.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-14",
+    readTime: "10 min read",
     category: "Comparison",
+    tags: ["comparison", "posist", "restaurant POS", "billing software"],
+    keywords: ["billbytekot vs posist", "posist alternative", "restaurant POS software"],
     image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant POS software comparison interface",
     featured: true,
-    keywords: ["restaurant POS software", "best POS for restaurant", "restaurant POS system India", "POS software comparison"],
-    content: `
-# 10 Best Restaurant POS Software in India 2025
-
-Choosing the right **restaurant POS software** can make or break your business. This comprehensive comparison helps you find the **best POS system for your restaurant** in India.
-
-## What Makes a Great Restaurant POS System?
-
-A great **restaurant POS system** should be:
-- Easy to use
-- Affordable
-- Feature-rich
-- Reliable
-- Well-supported
-
-## Top 10 Restaurant POS Software in India 2025
-
-### 1. BillByteKOT ⭐ Editor's Choice
-**Price:** ₹499/year  
-**Best For:** All restaurant types  
-**Rating:** 4.9/5
-
-**Pros:**
-- Most affordable option
-- Complete feature set
-- Excellent support
-- Cloud-based
-- WhatsApp integration
-
-**Cons:**
-- Requires internet connection
-
-### 2. POSist
-**Price:** ₹15,000+/year  
-**Best For:** Large chains  
-**Rating:** 4.5/5
-
-### 3. Petpooja
-**Price:** ₹12,000+/year  
-**Best For:** Multi-outlet restaurants  
-**Rating:** 4.4/5
-
-### 4. Torqus
-**Price:** ₹10,000+/year  
-**Best For:** Fine dining  
-**Rating:** 4.3/5
-
-### 5. Gofrugal
-**Price:** ₹8,000+/year  
-**Best For:** Retail + Restaurant  
-**Rating:** 4.2/5
-
-## Why BillByteKOT Stands Out
-
-### 100x More Affordable
-At ₹499/year, BillByteKOT is significantly cheaper than competitors while offering the same (or better) features.
-
-### Complete Feature Set
-- Order management
-- KOT system
-- Inventory tracking
-- GST billing
-- WhatsApp integration
-- Multi-currency support
-- Staff management
-- Analytics & reports
-
-### Easy Setup
-Get started in 5 minutes. No technical knowledge required.
-
-### Excellent Support
-24/7 support via email, phone, and WhatsApp.
-
-## Feature Comparison Table
-
-| Feature | BillByteKOT | POSist | Petpooja |
-|---------|-------------|--------|----------|
-| Price/Year | ₹499 | ₹15,000+ | ₹12,000+ |
-| KOT System | ✅ | ✅ | ✅ |
-| WhatsApp | ✅ | ❌ | ❌ |
-| Multi-Currency | ✅ | ❌ | ❌ |
-| Free Trial | 7 days | Demo only | Demo only |
-| Support | 24/7 | Business hours | Business hours |
-
-## How to Choose the Right POS
-
-### For Small Restaurants
-**Recommendation:** BillByteKOT  
-**Why:** Affordable, easy to use, all features included
-
-### For Medium Restaurants
-**Recommendation:** BillByteKOT or Petpooja  
-**Why:** Scalable, good support, reasonable pricing
-
-### For Large Chains
-**Recommendation:** BillByteKOT or POSist  
-**Why:** Multi-outlet support, advanced features
-
-## Get Started Today
-
-Try BillByteKOT free for 7 days and see why it's the best restaurant POS software in India.
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [1, 3, 5],
+    content: "# BillByteKOT vs POSist: Which is Better?\n\nDetailed comparison guide for restaurant owners choosing between these POS solutions."
   },
   {
     id: 3,
-    slug: "free-restaurant-billing-software-download",
-    title: "Free Restaurant Billing Software Download 2025 - Top 5 Options",
-    excerpt: "Download free restaurant billing software for your business. Compare free vs paid options, features, limitations & find the best free POS for your restaurant.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
-    readTime: "10 min read",
-    category: "Free Software",
-    image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&h=400&fit=crop",
+    slug: "best-restaurant-billing-software-india-2025",
+    title: "Best Restaurant Billing Software India 2025",
+    metaTitle: "Best Restaurant Billing Software India 2025 | Top 10 List",
+    metaDescription: "Discover the best restaurant billing software in India 2025. Compare features, pricing & reviews. BillByteKOT leads with ₹1999/year pricing.",
+    excerpt: "Complete guide to the top restaurant billing software solutions available in India.",
+    author: defaultAuthor,
+    date: "2025-01-13",
+    lastModified: "2025-01-13",
+    readTime: "15 min read",
+    category: "Software Guide",
+    tags: ["best software", "restaurant billing", "India", "guide"],
+    keywords: ["best restaurant billing software India", "top restaurant software", "restaurant billing software comparison"],
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+    imageAlt: "Top restaurant billing software solutions in India",
     featured: true,
-    keywords: ["free restaurant billing software", "restaurant billing software free download", "free POS software", "free billing app"],
-    content: `
-# Free Restaurant Billing Software Download 2025
-
-Looking for **free restaurant billing software**? This guide covers the best free options available and helps you decide if free software is right for your restaurant.
-
-## Is Free Restaurant Billing Software Worth It?
-
-### Pros of Free Software
-- No upfront cost
-- Good for testing
-- Basic features included
-- Low risk to try
-
-### Cons of Free Software
-- Limited features
-- No support
-- Security concerns
-- Hidden costs later
-- Ads and upsells
-
-## Top 5 Free Restaurant Billing Software Options
-
-### 1. BillByteKOT Free Trial ⭐ Recommended
-**Type:** 7-day free trial with all features  
-**Best For:** Restaurants wanting to try before buying
-
-**Features Included:**
-- Complete billing system
-- KOT management
-- Inventory tracking
-- GST billing
-- WhatsApp integration
-- Thermal printing
-- Reports & analytics
-
-**After Trial:** ₹499/year (most affordable paid option)
-
-### 2. Open Source POS
-**Type:** Completely free  
-**Best For:** Tech-savvy users
-
-**Limitations:**
-- Requires technical setup
-- No support
-- Limited features
-- Self-hosted only
-
-### 3. Basic Excel Templates
-**Type:** Free  
-**Best For:** Very small operations
-
-**Limitations:**
-- Manual entry
-- No automation
-- Error-prone
-- No real-time tracking
-
-## Free vs Paid: What's the Difference?
-
-| Feature | Free Software | BillByteKOT (₹499/yr) |
-|---------|---------------|----------------------|
-| Billing | Basic | Advanced |
-| KOT System | ❌ | ✅ |
-| Inventory | ❌ | ✅ |
-| WhatsApp | ❌ | ✅ |
-| Support | ❌ | 24/7 |
-| Updates | ❌ | Automatic |
-| Security | ⚠️ | ✅ Bank-grade |
-| Backup | ❌ | ✅ Daily |
-
-## Why BillByteKOT's Free Trial is the Best Option
-
-### All Features Included
-Unlike limited free versions, our trial includes every feature.
-
-### No Credit Card Required
-Start your trial without any payment information.
-
-### Easy to Use
-No technical knowledge required. Start billing in minutes.
-
-### Seamless Upgrade
-If you like it, upgrade for just ₹499/year.
-
-## The Hidden Costs of "Free" Software
-
-### 1. Time Cost
-Setting up and maintaining free software takes time.
-
-### 2. Lost Sales
-Slow billing and errors cost you customers.
-
-### 3. Security Risks
-Free software may not have proper security.
-
-### 4. No Support
-When things go wrong, you're on your own.
-
-### 5. Future Costs
-Many "free" options have expensive upgrades.
-
-## Our Recommendation
-
-**Start with BillByteKOT's 7-day free trial.** You get all features, excellent support, and if you decide to continue, it's only ₹499/year - less than ₹1.50 per day!
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [1, 2, 4],
+    content: "# Best Restaurant Billing Software India 2025\n\nComprehensive guide to choosing the right billing software for your restaurant business."
   },
   {
     id: 4,
-    slug: "kot-system-kitchen-order-ticket-guide",
-    title: "KOT System for Restaurant - Complete Kitchen Order Ticket Guide 2025",
-    excerpt: "Learn everything about KOT (Kitchen Order Ticket) systems for restaurants. How KOT works, benefits, setup guide & best practices for Indian restaurants.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
-    readTime: "10 min read",
-    category: "Restaurant Management",
-    image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=400&fit=crop",
+    slug: "restaurant-pos-software-comparison-india",
+    title: "Restaurant POS Software Comparison India",
+    metaTitle: "Restaurant POS Software Comparison India | Complete Guide",
+    metaDescription: "Compare top restaurant POS software in India. Features, pricing, pros & cons of BillByteKOT, Petpooja, POSist & more. Make informed choice.",
+    excerpt: "Detailed comparison of leading restaurant POS software solutions in the Indian market.",
+    author: defaultAuthor,
+    date: "2025-01-12",
+    lastModified: "2025-01-12",
+    readTime: "18 min read",
+    category: "Comparison",
+    tags: ["POS software", "comparison", "restaurant", "India"],
+    keywords: ["restaurant POS software comparison", "POS system India", "restaurant software comparison"],
+    image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant POS software comparison chart",
     featured: true,
-    keywords: ["KOT system", "kitchen order ticket", "KOT software", "restaurant KOT", "KOT management"],
-    content: `
-# KOT System for Restaurant - Complete Guide 2025
-
-A **KOT (Kitchen Order Ticket) system** is essential for modern restaurant operations. Learn how to implement and optimize KOT in your restaurant.
-
-## What is KOT (Kitchen Order Ticket)?
-
-**KOT** stands for Kitchen Order Ticket. It's a document or digital notification that communicates customer orders from the front-of-house to the kitchen. A **KOT system** automates this process, reducing errors and improving efficiency.
-
-## How Does a KOT System Work?
-
-### Traditional KOT Process
-1. Waiter writes order on paper
-2. Paper taken to kitchen
-3. Kitchen prepares food
-4. Waiter checks if ready
-5. Food served to customer
-
-### Digital KOT Process (BillByteKOT)
-1. Waiter enters order on tablet/POS
-2. Order instantly appears in kitchen
-3. Kitchen marks items as preparing
-4. Waiter gets notification when ready
-5. Food served to customer
-
-## Benefits of Digital KOT System
-
-### 1. Faster Service
-Orders reach kitchen instantly - no walking back and forth.
-
-### 2. Reduced Errors
-No handwriting issues or miscommunication.
-
-### 3. Better Kitchen Management
-Kitchen staff can prioritize and track orders efficiently.
-
-### 4. Real-Time Updates
-Everyone knows order status in real-time.
-
-### 5. Improved Accuracy
-Right items go to right kitchen stations automatically.
-
-### 6. Cost Savings
-Less paper, fewer errors, faster service = more profit.
-
-## KOT System Features in BillByteKOT
-
-### Multi-Station Support
-Route orders to different kitchen stations:
-- Main kitchen
-- Grill station
-- Beverage counter
-- Dessert station
-
-### Priority Management
-- Mark urgent orders
-- VIP customer flags
-- Rush hour handling
-
-### Order Modifications
-- Track changes
-- Special requests
-- Allergies and preferences
-
-### Print Support
-- Thermal printer compatible
-- Multiple printer support
-- Custom KOT formats
-
-### Mobile Access
-- Works on any device
-- Kitchen display system
-- Waiter tablets
-
-## Setting Up KOT System
-
-### Step 1: Configure Kitchen Stations
-Define your kitchen stations based on your menu and workflow.
-
-### Step 2: Assign Menu Items
-Link each menu item to the appropriate kitchen station.
-
-### Step 3: Set Up Printers/Displays
-Install thermal printers or displays in each station.
-
-### Step 4: Train Staff
-Ensure all staff understand the new system.
-
-### Step 5: Go Live
-Start using the KOT system and monitor performance.
-
-## Best Practices for KOT Management
-
-### 1. Keep It Simple
-Don't overcomplicate station assignments.
-
-### 2. Regular Training
-Ensure new staff are trained on the system.
-
-### 3. Monitor Performance
-Track average preparation times and identify bottlenecks.
-
-### 4. Handle Rush Hours
-Have protocols for busy periods.
-
-### 5. Backup Plan
-Know what to do if the system goes down.
-
-## Get Started with BillByteKOT KOT System
-
-Ready to streamline your kitchen operations? Start your free trial today.
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [1, 2, 3],
+    content: "# Restaurant POS Software Comparison India\n\nIn-depth analysis of the best POS systems available for Indian restaurants."
   },
   {
     id: 5,
-    slug: "gst-billing-software-restaurant",
-    title: "GST Billing Software for Restaurant India - Complete Guide 2025",
-    excerpt: "Everything about GST billing for restaurants in India. GST rates, compliance requirements, invoice format & how to automate GST billing with software.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
+    slug: "free-restaurant-billing-software-download",
+    title: "Free Restaurant Billing Software Download",
+    metaTitle: "Free Restaurant Billing Software Download | BillByteKOT",
+    metaDescription: "Download free restaurant billing software. BillByteKOT offers free trial with full features. GST compliant, thermal printing, inventory management.",
+    excerpt: "Guide to downloading and setting up free restaurant billing software for your business.",
+    author: defaultAuthor,
+    date: "2025-01-11",
+    lastModified: "2025-01-11",
     readTime: "8 min read",
-    category: "Compliance",
-    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=400&fit=crop",
+    category: "Software Guide",
+    tags: ["free software", "download", "restaurant billing", "trial"],
+    keywords: ["free restaurant billing software download", "restaurant software free trial", "free POS software"],
+    image: "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=400&fit=crop",
+    imageAlt: "Free restaurant billing software download interface",
     featured: false,
-    keywords: ["GST billing software", "restaurant GST billing", "GST invoice software", "GST compliant POS"],
-    content: `
-# GST Billing Software for Restaurant India 2025
-
-Navigate **GST compliance** with ease using the right billing software. This guide covers everything about GST for restaurants in India.
-
-## GST Rates for Restaurants in India
-
-### 5% GST (Without ITC)
-- Non-AC restaurants
-- Takeaway/delivery only
-- No alcohol service
-
-### 18% GST (With ITC)
-- AC restaurants
-- Restaurants in hotels (room tariff > ₹7,500)
-- Alcohol serving establishments
-
-## GST Registration Requirements
-
-### Mandatory Registration
-- Annual turnover > ₹20 lakhs (₹10 lakhs for special category states)
-- Inter-state supply
-- E-commerce operators
-
-### Voluntary Registration
-- Restaurants below threshold can register voluntarily
-- Useful for claiming input tax credit
-
-## GST Invoice Requirements
-
-Every GST invoice must include:
-- Restaurant name and address
-- GSTIN number
-- Invoice number and date
-- Customer details (for B2B)
-- HSN/SAC codes
-- Taxable value
-- GST rate and amount
-- Total amount
-
-## How BillByteKOT Handles GST
-
-### Automatic Tax Calculation
-System calculates GST automatically based on your configuration.
-
-### Compliant Invoices
-Every invoice meets GST requirements.
-
-### Tax Reports
-Generate GST reports for easy filing.
-
-### GSTIN Management
-Store customer GSTIN for B2B transactions.
-
-### HSN/SAC Codes
-Automatic code assignment for menu items.
-
-## GST Compliance Checklist
-
-✅ Register for GST if required  
-✅ Display GSTIN prominently  
-✅ Issue GST-compliant invoices  
-✅ File returns on time  
-✅ Maintain proper records  
-✅ Reconcile input and output tax  
-
-## Get GST-Compliant Billing
-
-Make GST compliance easy with BillByteKOT. Start your free trial today.
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [3, 1, 2],
+    content: "# Free Restaurant Billing Software Download\n\nStep-by-step guide to downloading and installing free restaurant billing software."
   },
   {
     id: 6,
-    slug: "thermal-printer-restaurant-billing",
-    title: "Best Thermal Printer for Restaurant Billing 2025 - Complete Guide",
-    excerpt: "Find the best thermal printer for your restaurant. Compare 58mm vs 80mm printers, top brands, setup guide & how to connect with billing software.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
-    readTime: "12 min read",
-    category: "Hardware",
-    image: "https://images.unsplash.com/photo-1612198188060-c7c2a3b66eae?w=800&h=400&fit=crop",
-    featured: true,
-    keywords: ["thermal printer restaurant", "restaurant receipt printer", "58mm thermal printer", "80mm thermal printer", "ESC/POS printer"],
-    content: `
-# Best Thermal Printer for Restaurant Billing 2025
-
-Choosing the right **thermal printer for restaurant** billing is crucial for smooth operations. This guide helps you select the perfect printer for your needs.
-
-## Why Use Thermal Printers in Restaurants?
-
-### Fast Printing
-Thermal printers are much faster than inkjet or laser printers - perfect for busy restaurants.
-
-### No Ink Required
-Uses heat to print on thermal paper - no ink cartridges to replace.
-
-### Compact Size
-Small footprint fits easily on counters and in tight spaces.
-
-### Reliable
-Fewer moving parts mean less maintenance and fewer breakdowns.
-
-### Cost-Effective
-Lower operating costs with no ink or toner expenses.
-
-## 58mm vs 80mm Thermal Printers
-
-### 58mm Thermal Printers
-**Best For:** Small restaurants, cafes, takeaway counters
-
-**Pros:**
-- Compact size
-- Lower cost
-- Less paper consumption
-- Perfect for receipts
-
-**Cons:**
-- Limited print width
-- Smaller text size
-
-### 80mm Thermal Printers
-**Best For:** Full-service restaurants, hotels, large establishments
-
-**Pros:**
-- Wider print area
-- Better for detailed receipts
-- Professional appearance
-- Can print logos clearly
-
-**Cons:**
-- Larger size
-- Higher cost
-- More paper consumption
-
-## Top Thermal Printer Brands for Restaurants
-
-### 1. Epson TM Series ⭐ Recommended
-**Models:** TM-T82, TM-T88V, TM-U220
-**Price Range:** ₹8,000 - ₹15,000
-**Best For:** Professional restaurants
-
-**Features:**
-- High-speed printing
-- Excellent reliability
-- Wide compatibility
-- Auto-cutter included
-
-### 2. TVS Electronics
-**Models:** RP 3160 Star, RP 3200 Star
-**Price Range:** ₹6,000 - ₹12,000
-**Best For:** Indian restaurants
-
-**Features:**
-- Made in India
-- Good local support
-- Cost-effective
-- Reliable performance
-
-### 3. Citizen
-**Models:** CT-S310A, CT-S651
-**Price Range:** ₹7,000 - ₹13,000
-**Best For:** Medium restaurants
-
-**Features:**
-- Fast printing
-- Compact design
-- Energy efficient
-- Easy maintenance
-
-### 4. Bixolon
-**Models:** SRP-330II, SRP-350III
-**Price Range:** ₹5,000 - ₹10,000
-**Best For:** Budget-conscious restaurants
-
-**Features:**
-- Affordable pricing
-- Good print quality
-- Multiple connectivity options
-- Compact design
-
-## Essential Features to Look For
-
-### 1. Print Speed
-Look for at least 200mm/second for busy restaurants.
-
-### 2. Connectivity Options
-- USB (most common)
-- Ethernet (for network printing)
-- Bluetooth/WiFi (for mobile POS)
-- Serial (for older systems)
-
-### 3. Auto-Cutter
-Automatically cuts receipts - saves time and looks professional.
-
-### 4. Paper Loading
-Front-loading is easier for staff to replace paper.
-
-### 5. Durability
-Look for printers rated for high-volume use.
-
-### 6. Software Compatibility
-Ensure compatibility with your POS software (BillByteKOT supports all ESC/POS printers).
-
-## Setting Up Thermal Printer with BillByteKOT
-
-### Step 1: Connect Printer
-Connect via USB, Ethernet, or Bluetooth to your POS device.
-
-### Step 2: Install Drivers
-Install printer drivers on your computer/tablet.
-
-### Step 3: Configure in BillByteKOT
-- Go to Settings > Printers
-- Add new printer
-- Select your printer model
-- Test print
-
-### Step 4: Customize Receipt Format
-- Add your restaurant logo
-- Configure receipt layout
-- Set paper size (58mm or 80mm)
-- Add footer text
-
-### Step 5: Train Staff
-Show staff how to load paper and handle basic maintenance.
-
-## Get Started with Thermal Printing
-
-Ready to upgrade your restaurant's printing? BillByteKOT works with all major thermal printer brands.
-
-[Start Free Trial →](/login)
-    `
+    slug: "kot-system-restaurant-complete-guide",
+    title: "KOT System for Restaurant - Complete Guide",
+    metaTitle: "KOT System for Restaurant Guide 2025 | BillByteKOT",
+    metaDescription: "Complete guide to KOT (Kitchen Order Ticket) system for restaurants. Learn setup, benefits, best practices. Streamline kitchen operations today.",
+    excerpt: "Everything you need to know about implementing a KOT system in your restaurant.",
+    author: defaultAuthor,
+    date: "2025-01-10",
+    lastModified: "2025-01-10",
+    readTime: "14 min read",
+    category: "How-To",
+    tags: ["KOT system", "kitchen management", "restaurant operations", "guide"],
+    keywords: ["KOT system restaurant", "kitchen order ticket", "KOT software India"],
+    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=400&fit=crop",
+    imageAlt: "KOT system kitchen display showing orders",
+    featured: false,
+    relatedPosts: [3, 7, 8],
+    content: "# KOT System for Restaurant - Complete Guide\n\nComprehensive guide to implementing and using KOT systems effectively."
   },
   {
     id: 7,
-    slug: "restaurant-inventory-management-software",
-    title: "Restaurant Inventory Management Software India 2025 - Complete Guide",
-    excerpt: "Master restaurant inventory management with the right software. Learn inventory best practices, reduce waste, control costs & boost profits with smart inventory tracking.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
-    readTime: "14 min read",
-    category: "Inventory Management",
-    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=400&fit=crop",
-    featured: true,
-    keywords: ["restaurant inventory management", "inventory management software", "restaurant stock management", "food inventory tracking"],
-    content: `
-# Restaurant Inventory Management Software India 2025
-
-Effective **restaurant inventory management** can make the difference between profit and loss. Learn how to optimize your inventory with the right software and strategies.
-
-## Why Restaurant Inventory Management Matters
-
-### Cost Control
-Food costs typically account for 28-35% of restaurant revenue. Proper inventory management can reduce this by 2-5%.
-
-### Waste Reduction
-Restaurants waste 4-10% of food purchased. Good inventory tracking minimizes waste.
-
-### Cash Flow
-Avoid tying up cash in excess inventory while preventing stockouts.
-
-### Profitability
-Better inventory management directly improves your bottom line.
-
-## Common Inventory Management Challenges
-
-### 1. Manual Tracking
-Paper-based systems are error-prone and time-consuming.
-
-### 2. Inconsistent Counting
-Different staff members count differently, leading to inaccuracies.
-
-### 3. Spoilage Tracking
-Difficult to track expiry dates and prevent spoilage.
-
-### 4. Recipe Costing
-Hard to calculate accurate food costs without proper tracking.
-
-### 5. Supplier Management
-Managing multiple suppliers and price changes manually.
-
-## Key Features of Restaurant Inventory Software
-
-### Real-Time Tracking
-Monitor stock levels in real-time as items are used.
-
-### Automated Reordering
-Set minimum stock levels and get automatic reorder alerts.
-
-### Recipe Management
-Track ingredients used in each dish for accurate costing.
-
-### Supplier Integration
-Manage supplier information, prices, and purchase orders.
-
-### Waste Tracking
-Record and analyze food waste to identify patterns.
-
-### Cost Analysis
-Calculate food costs per dish and overall food cost percentage.
-
-### Expiry Management
-Track expiry dates and get alerts for items nearing expiration.
-
-### Multi-Location Support
-Manage inventory across multiple restaurant locations.
-
-## BillByteKOT Inventory Management Features
-
-### Comprehensive Item Database
-- Add unlimited menu items and ingredients
-- Set up categories and subcategories
-- Track units of measurement
-- Manage supplier information
-
-### Real-Time Stock Updates
-- Automatic stock deduction with each sale
-- Manual stock adjustments
-- Transfer between locations
-- Waste and loss tracking
-
-### Smart Alerts
-- Low stock notifications
-- Expiry date warnings
-- Reorder point alerts
-- Unusual usage patterns
-
-### Recipe Costing
-- Link ingredients to menu items
-- Calculate accurate food costs
-- Track recipe profitability
-- Adjust pricing based on costs
-
-### Purchase Management
-- Create purchase orders
-- Track deliveries
-- Manage supplier payments
-- Compare supplier prices
-
-### Detailed Reports
-- Stock valuation reports
-- Usage analysis
-- Waste reports
-- Supplier performance
-- Cost trend analysis
-
-## Get Started with Smart Inventory Management
-
-Transform your restaurant's inventory management with BillByteKOT. Start your free trial today and see the difference proper inventory control makes.
-
-[Start Free Trial →](/login)
-    `
+    slug: "gst-billing-software-restaurant-india",
+    title: "GST Billing Software for Restaurant India",
+    metaTitle: "GST Billing Software Restaurant India | Compliant POS",
+    metaDescription: "GST compliant restaurant billing software India. Auto GST calculation, GSTR reports, invoice generation. Stay compliant with BillByteKOT.",
+    excerpt: "Complete guide to GST-compliant billing software for Indian restaurants.",
+    author: defaultAuthor,
+    date: "2025-01-09",
+    lastModified: "2025-01-09",
+    readTime: "11 min read",
+    category: "Software Guide",
+    tags: ["GST", "billing software", "compliance", "India"],
+    keywords: ["GST billing software restaurant", "GST compliant POS", "restaurant GST software India"],
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=400&fit=crop",
+    imageAlt: "GST invoice generation in restaurant billing software",
+    featured: false,
+    relatedPosts: [3, 5, 6],
+    content: "# GST Billing Software for Restaurant India\n\nEverything about GST compliance for restaurant billing systems."
   },
   {
     id: 8,
-    slug: "whatsapp-integration-restaurant-billing",
-    title: "WhatsApp Integration for Restaurant Billing - Complete Guide 2025",
-    excerpt: "Automate customer communication with WhatsApp integration. Send receipts, order confirmations & notifications directly via WhatsApp. Boost customer satisfaction.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
+    slug: "billbytekot-vs-torqus-comparison",
+    title: "BillByteKOT vs Torqus - Feature Comparison",
+    metaTitle: "BillByteKOT vs Torqus 2025 | Restaurant POS Comparison",
+    metaDescription: "Compare BillByteKOT vs Torqus restaurant POS. Features, pricing, pros & cons. Choose the best solution for your restaurant.",
+    excerpt: "Detailed comparison between BillByteKOT and Torqus restaurant management systems.",
+    author: defaultAuthor,
+    date: "2025-01-08",
+    lastModified: "2025-01-08",
     readTime: "10 min read",
-    category: "Customer Communication",
-    image: "https://images.unsplash.com/photo-1611262588024-d12430b98920?w=800&h=400&fit=crop",
-    featured: true,
-    keywords: ["WhatsApp integration restaurant", "WhatsApp billing", "restaurant WhatsApp automation", "WhatsApp receipts"],
-    content: `
-# WhatsApp Integration for Restaurant Billing 2025
-
-**WhatsApp integration** is revolutionizing restaurant customer communication. Learn how to automate receipts, confirmations, and notifications via WhatsApp.
-
-## Why WhatsApp for Restaurant Communication?
-
-### Massive User Base
-Over 400 million WhatsApp users in India - your customers are already there.
-
-### High Open Rates
-WhatsApp messages have 98% open rates vs 20% for emails.
-
-### Instant Delivery
-Messages are delivered and read immediately.
-
-### Rich Media Support
-Send receipts, images, documents, and links easily.
-
-### Two-Way Communication
-Customers can reply and interact directly.
-
-## Benefits of WhatsApp Integration
-
-### 1. Automated Receipts
-Send digital receipts instantly after payment.
-
-### 2. Order Confirmations
-Confirm takeaway and delivery orders automatically.
-
-### 3. Table Booking Confirmations
-Send booking confirmations and reminders.
-
-### 4. Promotional Messages
-Share offers, new menu items, and events.
-
-### 5. Customer Support
-Handle queries and complaints efficiently.
-
-### 6. Feedback Collection
-Request reviews and feedback automatically.
-
-## WhatsApp Business API Features
-
-### Message Templates
-Pre-approved message formats for different scenarios:
-- Order confirmations
-- Payment receipts
-- Booking confirmations
-- Promotional offers
-
-### Rich Media Messages
-Send various content types:
-- PDF receipts
-- Menu images
-- Location maps
-- Contact cards
-
-### Interactive Messages
-- Quick reply buttons
-- Call-to-action buttons
-- List messages
-- Location requests
-
-### Automation
-- Triggered messages
-- Scheduled messages
-- Auto-responses
-- Workflow automation
-
-## BillByteKOT WhatsApp Integration
-
-### Automatic Receipt Delivery
-Every bill generates a WhatsApp receipt automatically:
-- Professional PDF format
-- Restaurant branding
-- Complete order details
-- Payment information
-
-### Order Status Updates
-Keep customers informed:
-- Order received confirmation
-- Kitchen preparation updates
-- Ready for pickup/delivery
-- Order completion
-
-### Booking Management
-Streamline table reservations:
-- Booking confirmations
-- Reminder messages
-- Cancellation notifications
-- Special requests handling
-
-### Promotional Campaigns
-Engage customers effectively:
-- New menu launches
-- Special offers
-- Festival greetings
-- Birthday wishes
-
-### Customer Support
-Provide excellent service:
-- Query handling
-- Complaint resolution
-- Feedback collection
-- Support ticket creation
-
-## Get Started with WhatsApp Integration
-
-Ready to transform your customer communication? BillByteKOT's WhatsApp integration is included in all plans.
-
-[Start Free Trial →](/login)
-    `
+    category: "Comparison",
+    tags: ["comparison", "torqus", "restaurant POS", "features"],
+    keywords: ["billbytekot vs torqus", "torqus alternative", "restaurant POS comparison"],
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant POS software feature comparison",
+    featured: false,
+    relatedPosts: [1, 2, 4],
+    content: "# BillByteKOT vs Torqus - Feature Comparison\n\nIn-depth comparison of features and capabilities."
   },
   {
     id: 9,
-    slug: "restaurant-staff-management-software",
-    title: "Restaurant Staff Management Software India 2025 - Complete Guide",
-    excerpt: "Streamline restaurant staff management with digital solutions. Handle scheduling, attendance, payroll, performance tracking & team communication efficiently.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
-    readTime: "12 min read",
-    category: "Staff Management",
-    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=400&fit=crop",
+    slug: "best-billing-software-dhaba",
+    title: "Best Billing Software for Dhaba",
+    metaTitle: "Best Billing Software for Dhaba India 2025",
+    metaDescription: "Top billing software for dhabas in India. Simple, affordable, offline support. Perfect for highway dhabas. Starting at ₹1999/year.",
+    excerpt: "Specialized billing software solutions designed for dhaba businesses.",
+    author: defaultAuthor,
+    date: "2025-01-07",
+    lastModified: "2025-01-07",
+    readTime: "9 min read",
+    category: "Restaurant Tips",
+    tags: ["dhaba", "billing software", "India", "highway restaurant"],
+    keywords: ["dhaba billing software", "billing software for dhaba", "dhaba POS system", "restaurant tips"],
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop",
+    imageAlt: "Dhaba restaurant billing system",
     featured: false,
-    keywords: ["restaurant staff management", "staff scheduling software", "restaurant employee management", "staff attendance tracking"],
-    content: `
-# Restaurant Staff Management Software India 2025
-
-Effective **restaurant staff management** is crucial for smooth operations. Learn how to optimize scheduling, attendance, and performance with the right software.
-
-## Challenges in Restaurant Staff Management
-
-### High Turnover
-Restaurant industry has 75% annual turnover rate - higher than any other sector.
-
-### Complex Scheduling
-Managing shifts, breaks, and availability across multiple staff members.
-
-### Attendance Tracking
-Monitoring punctuality and managing time-off requests.
-
-### Performance Management
-Tracking individual performance and productivity.
-
-### Communication
-Keeping all staff informed about schedules, policies, and updates.
-
-### Payroll Complexity
-Calculating wages with tips, overtime, and variable hours.
-
-## Key Features of Staff Management Software
-
-### Employee Database
-- Personal information
-- Contact details
-- Emergency contacts
-- Documents storage
-- Photo identification
-
-### Shift Scheduling
-- Create weekly/monthly schedules
-- Assign roles and responsibilities
-- Handle shift swaps
-- Manage availability
-- Overtime tracking
-
-### Attendance Management
-- Clock in/out functionality
-- Break time tracking
-- Late arrival alerts
-- Absence management
-- Leave requests
-
-### Performance Tracking
-- Sales performance
-- Customer feedback
-- Task completion
-- Training records
-- Goal setting
-
-### Communication Tools
-- Announcements
-- Schedule notifications
-- Policy updates
-- Team messaging
-- Feedback system
-
-## BillByteKOT Staff Management Features
-
-### Comprehensive Employee Profiles
-- Basic information and documents
-- Role and department assignment
-- Salary and commission structure
-- Performance history
-- Training records
-
-### Smart Scheduling
-- Drag-and-drop schedule creation
-- Automatic conflict detection
-- Shift pattern templates
-- Staff availability tracking
-- Mobile schedule access
-
-### Real-Time Attendance
-- Mobile clock in/out
-- GPS location tracking
-- Photo verification
-- Break time management
-- Overtime calculations
-
-### Performance Analytics
-- Individual sales reports
-- Customer service ratings
-- Task completion rates
-- Attendance patterns
-- Goal achievement tracking
-
-### Team Communication
-- Broadcast messages
-- Schedule notifications
-- Policy updates
-- Feedback collection
-- Emergency alerts
-
-## Get Started with Smart Staff Management
-
-Transform your restaurant's staff management with BillByteKOT. Comprehensive staff management features included in all plans.
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [3, 10, 11],
+    content: "# Best Billing Software for Dhaba\n\nTailored solutions for dhaba businesses across India."
   },
   {
     id: 10,
-    slug: "restaurant-analytics-reporting-software",
-    title: "Restaurant Analytics & Reporting Software 2025 - Data-Driven Success",
-    excerpt: "Make data-driven decisions with powerful restaurant analytics. Track sales, analyze trends, monitor performance & boost profitability with smart reporting tools.",
-    author: "BillByteKOT Team",
-    date: "2025-12-23",
+    slug: "cloud-kitchen-software-india-guide",
+    title: "Cloud Kitchen Software India - Complete Guide",
+    metaTitle: "Cloud Kitchen Software India 2025 | Management System",
+    metaDescription: "Best cloud kitchen software India. Multi-brand management, aggregator integration, inventory tracking. Grow your cloud kitchen business.",
+    excerpt: "Comprehensive guide to choosing and using cloud kitchen management software.",
+    author: defaultAuthor,
+    date: "2025-01-06",
+    lastModified: "2025-01-06",
     readTime: "13 min read",
-    category: "Analytics",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+    category: "Software Guide",
+    tags: ["cloud kitchen", "software guide", "India", "management"],
+    keywords: ["cloud kitchen software India", "cloud kitchen management", "virtual kitchen software"],
+    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=400&fit=crop",
+    imageAlt: "Cloud kitchen management software dashboard",
+    featured: true,
+    relatedPosts: [3, 9, 12],
+    content: "# Cloud Kitchen Software India - Complete Guide\n\nEverything you need to manage a successful cloud kitchen."
+  },
+  {
+    id: 11,
+    slug: "food-truck-pos-system-india",
+    title: "Food Truck POS System India",
+    metaTitle: "Food Truck POS System India 2025 | Mobile Billing",
+    metaDescription: "Best POS tips for food trucks in India. Mobile billing, offline mode, battery efficient. Perfect for mobile food businesses.",
+    excerpt: "Specialized POS solutions for food truck businesses in India.",
+    author: defaultAuthor,
+    date: "2025-01-05",
+    lastModified: "2025-01-05",
+    readTime: "8 min read",
+    category: "Restaurant Tips",
+    tags: ["food truck", "POS system", "mobile billing", "India"],
+    keywords: ["food truck POS India", "mobile restaurant billing", "food truck software", "restaurant tips"],
+    image: "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=800&h=400&fit=crop",
+    imageAlt: "Food truck with mobile POS system",
     featured: false,
-    keywords: ["restaurant analytics", "restaurant reporting software", "restaurant data analysis", "sales analytics restaurant"],
-    content: `
-# Restaurant Analytics & Reporting Software 2025
-
-**Restaurant analytics** transform raw data into actionable insights. Learn how to use data-driven decisions to boost profitability and optimize operations.
-
-## Why Restaurant Analytics Matter
-
-### Data-Driven Decisions
-Make informed decisions based on facts, not gut feelings.
-
-### Identify Trends
-Spot patterns in sales, customer behavior, and operations.
-
-### Optimize Performance
-Find areas for improvement and track progress.
-
-### Increase Profitability
-Identify high-margin items and cost-saving opportunities.
-
-### Competitive Advantage
-Stay ahead with insights competitors might miss.
-
-## Key Restaurant Metrics to Track
-
-### Sales Metrics
-- Daily/weekly/monthly revenue
-- Average order value (AOV)
-- Sales per square foot
-- Revenue per available seat hour (RevPASH)
-- Year-over-year growth
-
-### Customer Metrics
-- Customer count
-- Repeat customer rate
-- Customer lifetime value (CLV)
-- Average spend per customer
-- Customer acquisition cost
-
-### Operational Metrics
-- Table turnover rate
-- Service time
-- Kitchen efficiency
-- Staff productivity
-- Inventory turnover
-
-### Financial Metrics
-- Food cost percentage
-- Labor cost percentage
-- Gross profit margin
-- Net profit margin
-- Cash flow
-
-## BillByteKOT Analytics Dashboard
-
-### Real-Time Overview
-- Today's sales summary
-- Current orders status
-- Live kitchen performance
-- Staff attendance
-- Inventory alerts
-
-### Sales Analytics
-- Revenue trends
-- Peak hour analysis
-- Day-wise performance
-- Menu item popularity
-- Payment method breakdown
-
-### Customer Insights
-- Customer demographics
-- Ordering patterns
-- Loyalty program performance
-- Feedback analysis
-- Retention rates
-
-### Operational Reports
-- Kitchen performance
-- Service efficiency
-- Staff productivity
-- Table utilization
-- Waste analysis
-
-### Financial Reports
-- Profit & loss statements
-- Cost analysis
-- Tax reports
-- Cash flow statements
-- Budget vs actual
-
-## Get Started with Restaurant Analytics
-
-Transform your restaurant with data-driven insights. BillByteKOT includes comprehensive analytics and reporting in all plans.
-
-[Start Free Trial →](/login)
-    `
+    relatedPosts: [9, 10, 13],
+    content: "# Food Truck POS System India\n\nMobile billing solutions for food truck entrepreneurs."
+  },
+  {
+    id: 12,
+    slug: "bakery-billing-software-guide",
+    title: "Bakery Billing Software Guide",
+    metaTitle: "Bakery Billing Software India 2025 | Complete Guide",
+    metaDescription: "Best bakery billing software India. Recipe management, batch tracking, expiry alerts. Perfect for bakeries & confectioneries.",
+    excerpt: "Complete guide to billing software designed for bakery businesses.",
+    author: defaultAuthor,
+    date: "2025-01-04",
+    lastModified: "2025-01-04",
+    readTime: "10 min read",
+    category: "Software Guide",
+    tags: ["bakery", "billing software", "recipe management", "India"],
+    keywords: ["bakery billing software", "bakery POS system", "confectionery software India"],
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=400&fit=crop",
+    imageAlt: "Bakery billing software interface",
+    featured: false,
+    relatedPosts: [3, 13, 14],
+    content: "# Bakery Billing Software Guide\n\nSpecialized features for bakery and confectionery businesses."
+  },
+  {
+    id: 13,
+    slug: "sweet-shop-billing-software-india",
+    title: "Sweet Shop Billing Software India",
+    metaTitle: "Sweet Shop Billing Software India 2025 | Mithai POS",
+    metaDescription: "Best sweet shop billing tips India. Weight-based billing, festival offers, GST compliant. Perfect for mithai shops.",
+    excerpt: "Billing software solutions tailored for Indian sweet shops and mithai stores.",
+    author: defaultAuthor,
+    date: "2025-01-03",
+    lastModified: "2025-01-03",
+    readTime: "9 min read",
+    category: "Restaurant Tips",
+    tags: ["sweet shop", "mithai", "billing software", "India"],
+    keywords: ["sweet shop billing software", "mithai shop POS", "halwai billing software", "restaurant tips"],
+    image: "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=800&h=400&fit=crop",
+    imageAlt: "Sweet shop billing system",
+    featured: false,
+    relatedPosts: [12, 14, 15],
+    content: "# Sweet Shop Billing Software India\n\nPerfect billing solutions for sweet shops and mithai stores."
+  },
+  {
+    id: 14,
+    slug: "bar-pub-billing-software",
+    title: "Bar and Pub Billing Software",
+    metaTitle: "Bar Billing Software India 2025 | Pub POS System",
+    metaDescription: "Best bar and pub billing software India. Liquor inventory, happy hour pricing, age verification. Complete bar management.",
+    excerpt: "Specialized billing software for bars, pubs, and lounges.",
+    author: defaultAuthor,
+    date: "2025-01-02",
+    lastModified: "2025-01-02",
+    readTime: "11 min read",
+    category: "Software Guide",
+    tags: ["bar", "pub", "billing software", "liquor management"],
+    keywords: ["bar billing software", "pub POS system", "liquor inventory software"],
+    image: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=800&h=400&fit=crop",
+    imageAlt: "Bar billing software interface",
+    featured: false,
+    relatedPosts: [3, 15, 16],
+    content: "# Bar and Pub Billing Software\n\nComplete management solution for bars and pubs."
+  },
+  {
+    id: 15,
+    slug: "canteen-management-software",
+    title: "Canteen Management Software",
+    metaTitle: "Canteen Management Software India 2025 | Complete Guide",
+    metaDescription: "Best canteen management software India. Employee meal tracking, subsidized billing, cashless payments. Perfect for corporate canteens.",
+    excerpt: "Complete canteen management solutions for corporate and institutional cafeterias.",
+    author: defaultAuthor,
+    date: "2025-01-01",
+    lastModified: "2025-01-01",
+    readTime: "10 min read",
+    category: "Software Guide",
+    tags: ["canteen", "management software", "corporate", "cafeteria"],
+    keywords: ["canteen management software", "corporate cafeteria software", "employee meal tracking"],
+    image: "https://images.unsplash.com/photo-1567521464027-f127ff144326?w=800&h=400&fit=crop",
+    imageAlt: "Canteen management software dashboard",
+    featured: false,
+    relatedPosts: [3, 16, 17],
+    content: "# Canteen Management Software\n\nStreamline your corporate or institutional canteen operations."
+  },
+  {
+    id: 16,
+    slug: "food-court-billing-system",
+    title: "Food Court Billing System",
+    metaTitle: "Food Court Billing System India 2025 | Multi-Vendor POS",
+    metaDescription: "Best food court billing system India. Multi-vendor management, centralized billing, revenue sharing. Perfect for food courts & malls.",
+    excerpt: "Multi-vendor billing solutions designed for food courts and food halls.",
+    author: defaultAuthor,
+    date: "2025-01-01",
+    lastModified: "2025-01-15",
+    readTime: "12 min read",
+    category: "Software Guide",
+    tags: ["food court", "multi-vendor", "billing system", "mall"],
+    keywords: ["food court billing system", "multi-vendor POS", "food hall software"],
+    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=400&fit=crop",
+    imageAlt: "Food court billing system",
+    featured: false,
+    relatedPosts: [15, 17, 18],
+    content: "# Food Court Billing System\n\nManage multiple vendors with centralized billing."
+  },
+  {
+    id: 17,
+    slug: "qsr-pos-system-india",
+    title: "QSR POS System India",
+    metaTitle: "QSR POS System India 2025 | Quick Service Restaurant",
+    metaDescription: "Best QSR POS tips India. Fast billing, kitchen display, drive-thru support. Perfect for quick service restaurants.",
+    excerpt: "High-speed POS solutions for quick service restaurants.",
+    author: defaultAuthor,
+    date: "2025-01-02",
+    lastModified: "2025-01-15",
+    readTime: "9 min read",
+    category: "Restaurant Tips",
+    tags: ["QSR", "POS system", "quick service", "fast food"],
+    keywords: ["QSR POS system India", "quick service restaurant software", "fast food POS", "restaurant tips"],
+    image: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=800&h=400&fit=crop",
+    imageAlt: "QSR POS system in action",
+    featured: false,
+    relatedPosts: [10, 18, 19],
+    content: "# QSR POS System India\n\nSpeed up your quick service restaurant operations."
+  },
+  {
+    id: 18,
+    slug: "fast-food-billing-software",
+    title: "Fast Food Billing Software",
+    metaTitle: "Fast Food Billing Software India 2025 | Quick Billing",
+    metaDescription: "Best fast food billing software India. Lightning-fast checkout, combo deals, loyalty programs. Boost your fast food business.",
+    excerpt: "Optimized billing software for fast food restaurants and chains.",
+    author: defaultAuthor,
+    date: "2025-01-03",
+    lastModified: "2025-01-14",
+    readTime: "8 min read",
+    category: "Software Guide",
+    tags: ["fast food", "billing software", "quick billing", "chains"],
+    keywords: ["fast food billing software", "fast food POS system", "quick service billing"],
+    image: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=800&h=400&fit=crop",
+    imageAlt: "Fast food billing software interface",
+    featured: false,
+    relatedPosts: [17, 19, 20],
+    content: "# Fast Food Billing Software\n\nMaximize efficiency in your fast food operations."
+  },
+  {
+    id: 19,
+    slug: "thermal-printer-billing-software",
+    title: "Thermal Printer Billing Software",
+    metaTitle: "Thermal Printer Billing Software | Restaurant Receipt",
+    metaDescription: "Best thermal printer billing software. 6 professional receipt themes, auto-print, GST compliant. Perfect thermal printing solution.",
+    excerpt: "Complete guide to thermal printer integration for restaurant billing.",
+    author: defaultAuthor,
+    date: "2025-01-04",
+    lastModified: "2025-01-13",
+    readTime: "10 min read",
+    category: "Technology",
+    tags: ["thermal printer", "billing software", "receipt printing", "hardware"],
+    keywords: ["thermal printer billing software", "restaurant receipt printer", "thermal printing POS"],
+    image: "https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800&h=400&fit=crop",
+    imageAlt: "Thermal printer printing restaurant receipt",
+    featured: false,
+    relatedPosts: [6, 7, 20],
+    content: "# Thermal Printer Billing Software\n\nProfessional receipt printing for your restaurant."
+  },
+  {
+    id: 20,
+    slug: "whatsapp-billing-software",
+    title: "WhatsApp Billing Software",
+    metaTitle: "WhatsApp Billing Software Restaurant | Cloud API",
+    metaDescription: "Restaurant billing with WhatsApp integration. Send bills, take orders, customer support via WhatsApp. Boost customer engagement.",
+    excerpt: "Integrate WhatsApp with your restaurant billing system for better customer communication.",
+    author: defaultAuthor,
+    date: "2025-01-05",
+    lastModified: "2025-01-12",
+    readTime: "11 min read",
+    category: "Technology",
+    tags: ["WhatsApp", "billing software", "integration", "customer communication"],
+    keywords: ["WhatsApp billing software", "restaurant WhatsApp integration", "WhatsApp Cloud API"],
+    image: "https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=800&h=400&fit=crop",
+    imageAlt: "WhatsApp integration with billing software",
+    featured: true,
+    relatedPosts: [19, 6, 7],
+    content: "# WhatsApp Billing Software\n\nLeverage WhatsApp for restaurant customer engagement."
+  },
+  {
+    id: 21,
+    slug: "restaurant-inventory-management-guide",
+    title: "Restaurant Inventory Management Guide",
+    metaTitle: "Restaurant Inventory Management Software India 2025",
+    metaDescription: "Complete restaurant inventory management guide. Track stock, reduce waste, auto-reorder alerts. Save 20% on food costs.",
+    excerpt: "Master restaurant inventory management with software solutions.",
+    author: defaultAuthor,
+    date: "2025-01-06",
+    lastModified: "2025-01-15",
+    readTime: "14 min read",
+    category: "How-To",
+    tags: ["inventory", "management", "restaurant", "guide"],
+    keywords: ["restaurant inventory software", "inventory management restaurant", "stock tracking"],
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant inventory management dashboard",
+    featured: false,
+    relatedPosts: [6, 7, 22],
+    content: "# Restaurant Inventory Management Guide\n\nReduce waste and optimize inventory with smart software."
+  },
+  {
+    id: 22,
+    slug: "table-management-software-restaurants",
+    title: "Table Management Software for Restaurants",
+    metaTitle: "Table Management Software India 2025 | Reservation",
+    metaDescription: "Best table management software India. Reservations, waitlist, floor plan, table status. Optimize seating and reduce wait times.",
+    excerpt: "Streamline table management and reservations with smart software.",
+    author: defaultAuthor,
+    date: "2025-01-07",
+    lastModified: "2025-01-15",
+    readTime: "10 min read",
+    category: "How-To",
+    tags: ["table management", "reservations", "restaurant", "seating"],
+    keywords: ["table management software", "restaurant reservation system", "seating management", "guide"],
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant table management interface",
+    featured: false,
+    relatedPosts: [21, 23, 24],
+    content: "# Table Management Software for Restaurants\n\nOptimize seating and improve customer experience."
+  },
+  {
+    id: 23,
+    slug: "kitchen-display-system-india",
+    title: "Kitchen Display System India",
+    metaTitle: "Kitchen Display System India 2025 | KDS Guide",
+    metaDescription: "Best kitchen display system India. Replace paper KOTs, real-time order tracking, prep time monitoring. Modernize your kitchen.",
+    excerpt: "Digital kitchen display systems for modern restaurant operations.",
+    author: defaultAuthor,
+    date: "2025-01-08",
+    lastModified: "2025-01-15",
+    readTime: "12 min read",
+    category: "Technology",
+    tags: ["KDS", "kitchen display", "technology", "restaurant"],
+    keywords: ["kitchen display system India", "KDS software", "digital kitchen orders"],
+    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=400&fit=crop",
+    imageAlt: "Kitchen display system showing orders",
+    featured: false,
+    relatedPosts: [6, 19, 24],
+    content: "# Kitchen Display System India\n\nGo paperless with digital kitchen displays."
+  },
+  {
+    id: 24,
+    slug: "qr-code-menu-restaurants",
+    title: "QR Code Menu for Restaurants",
+    metaTitle: "QR Code Menu Restaurant India 2025 | Digital Menu",
+    metaDescription: "Create QR code menu for your restaurant. Contactless ordering, instant updates, multi-language. Perfect for post-COVID dining.",
+    excerpt: "Implement contactless QR code menus for modern dining experience.",
+    author: defaultAuthor,
+    date: "2025-01-09",
+    lastModified: "2025-01-15",
+    readTime: "9 min read",
+    category: "Technology",
+    tags: ["QR code", "digital menu", "contactless", "restaurant"],
+    keywords: ["QR code menu restaurant", "digital menu software", "contactless ordering"],
+    image: "https://images.unsplash.com/photo-1556742111-a301076d9d18?w=800&h=400&fit=crop",
+    imageAlt: "QR code menu on restaurant table",
+    featured: false,
+    relatedPosts: [23, 25, 26],
+    content: "# QR Code Menu for Restaurants\n\nModernize your menu with QR code technology."
+  },
+  {
+    id: 25,
+    slug: "digital-menu-software-india",
+    title: "Digital Menu Software India",
+    metaTitle: "Digital Menu Software India 2025 | Restaurant Menu",
+    metaDescription: "Best digital menu software India. Beautiful menus, easy updates, multi-device support. Enhance customer experience.",
+    excerpt: "Create stunning digital menus for your restaurant.",
+    author: defaultAuthor,
+    date: "2025-01-10",
+    lastModified: "2025-01-15",
+    readTime: "10 min read",
+    category: "Technology",
+    tags: ["digital menu", "software", "restaurant", "India"],
+    keywords: ["digital menu software", "restaurant menu app", "electronic menu board"],
+    image: "https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=800&h=400&fit=crop",
+    imageAlt: "Digital menu software interface",
+    featured: false,
+    relatedPosts: [24, 26, 27],
+    content: "# Digital Menu Software India\n\nCreate beautiful, easy-to-update digital menus."
+  },
+  {
+    id: 26,
+    slug: "best-restaurant-billing-software-mumbai",
+    title: "Best Restaurant Billing Software Mumbai",
+    metaTitle: "Restaurant Billing Software Mumbai 2025 | Top POS",
+    metaDescription: "Best restaurant billing software Mumbai. Trusted by 150+ Mumbai restaurants. GST compliant, local support. Starting ₹1999/year.",
+    excerpt: "Top billing software solutions for Mumbai restaurants.",
+    author: defaultAuthor,
+    date: "2025-01-11",
+    lastModified: "2025-01-15",
+    readTime: "11 min read",
+    category: "City Guides",
+    tags: ["Mumbai", "billing software", "restaurant", "city guide"],
+    keywords: ["restaurant billing software Mumbai", "Mumbai restaurant POS", "billing software Mumbai"],
+    image: "https://images.unsplash.com/photo-1529253355930-ddbe423a2ac7?w=800&h=400&fit=crop",
+    imageAlt: "Mumbai restaurant using billing software",
+    featured: true,
+    relatedPosts: [3, 27, 28],
+    content: "# Best Restaurant Billing Software Mumbai\n\nTailored solutions for Mumbai's vibrant restaurant scene."
+  },
+  {
+    id: 27,
+    slug: "restaurant-pos-software-delhi",
+    title: "Restaurant POS Software Delhi NCR",
+    metaTitle: "Restaurant POS Software Delhi 2025 | Best Billing",
+    metaDescription: "Top restaurant POS software Delhi NCR. 200+ Delhi restaurants trust us. Multi-location support, cloud sync. Free demo available.",
+    excerpt: "Leading POS solutions for Delhi NCR restaurants.",
+    author: defaultAuthor,
+    date: "2025-01-12",
+    lastModified: "2025-01-15",
+    readTime: "12 min read",
+    category: "City Guides",
+    tags: ["Delhi", "POS software", "restaurant", "NCR"],
+    keywords: ["restaurant POS Delhi", "Delhi restaurant billing software", "POS system Delhi NCR"],
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=400&fit=crop",
+    imageAlt: "Delhi restaurant POS system",
+    featured: false,
+    relatedPosts: [26, 28, 29],
+    content: "# Restaurant POS Software Delhi NCR\n\nPowerful POS solutions for Delhi's diverse food scene."
+  },
+  {
+    id: 28,
+    slug: "bangalore-restaurant-billing-software",
+    title: "Bangalore Restaurant Billing Software Guide",
+    metaTitle: "Restaurant Billing Software Bangalore 2025 | Guide",
+    metaDescription: "Best restaurant billing software Bangalore. Tech-savvy solutions for Bangalore restaurants. Cloud-based, mobile-friendly. Try free.",
+    excerpt: "Modern billing software for Bangalore's tech-forward restaurants.",
+    author: defaultAuthor,
+    date: "2025-01-13",
+    lastModified: "2025-01-15",
+    readTime: "10 min read",
+    category: "City Guides",
+    tags: ["Bangalore", "billing software", "restaurant", "technology"],
+    keywords: ["restaurant billing software Bangalore", "Bangalore restaurant POS", "billing software Bengaluru"],
+    image: "https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=400&fit=crop",
+    imageAlt: "Bangalore restaurant billing system",
+    featured: false,
+    relatedPosts: [26, 27, 29],
+    content: "# Bangalore Restaurant Billing Software Guide\n\nCutting-edge solutions for Bangalore's restaurant industry."
+  },
+  {
+    id: 29,
+    slug: "how-to-choose-restaurant-billing-software",
+    title: "How to Choose Restaurant Billing Software",
+    metaTitle: "How to Choose Restaurant Billing Software 2025",
+    metaDescription: "Complete guide to choosing restaurant billing software. Compare features, pricing, support. Make the right choice for your business.",
+    excerpt: "Step-by-step guide to selecting the perfect billing software.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "15 min read",
+    category: "How-To",
+    tags: ["guide", "how-to", "billing software", "selection"],
+    keywords: ["how to choose restaurant billing software", "restaurant software selection", "POS buying guide"],
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant owner choosing billing software",
+    featured: true,
+    relatedPosts: [3, 30, 31],
+    content: "# How to Choose Restaurant Billing Software\n\nMake an informed decision with our comprehensive guide."
+  },
+  {
+    id: 30,
+    slug: "how-to-setup-kot-system-restaurant",
+    title: "How to Set Up KOT System in Restaurant",
+    metaTitle: "How to Setup KOT System Restaurant 2025 | Guide",
+    metaDescription: "Step-by-step guide to setting up KOT system. Hardware requirements, software configuration, staff training. Get started today.",
+    excerpt: "Complete tutorial for implementing KOT system in your restaurant.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "13 min read",
+    category: "How-To",
+    tags: ["KOT", "setup", "tutorial", "restaurant"],
+    keywords: ["how to setup KOT system", "KOT implementation", "kitchen order ticket setup"],
+    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=400&fit=crop",
+    imageAlt: "KOT system setup in restaurant kitchen",
+    featured: false,
+    relatedPosts: [6, 23, 31],
+    content: "# How to Set Up KOT System in Restaurant\n\nImplement KOT system efficiently with our step-by-step guide."
+  },
+  {
+    id: 31,
+    slug: "restaurant-industry-trends-india-2025",
+    title: "Restaurant Industry Trends India 2025",
+    metaTitle: "Restaurant Industry Trends India 2025 | Market Analysis",
+    metaDescription: "Top restaurant industry trends India 2025. Cloud kitchens, AI, automation, sustainability. Stay ahead of the competition.",
+    excerpt: "Discover the latest trends shaping India's restaurant industry.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "16 min read",
+    category: "Industry News",
+    tags: ["trends", "industry", "2025", "India"],
+    keywords: ["restaurant industry trends India", "restaurant trends 2025", "food industry India"],
+    image: "https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant industry trends visualization",
+    featured: true,
+    relatedPosts: [32, 33, 34],
+    content: "# Restaurant Industry Trends India 2025\n\nStay ahead with insights into emerging restaurant trends."
+  },
+  {
+    id: 32,
+    slug: "restaurant-success-stories-billbytekot",
+    title: "Success Stories: Restaurants Growing with BillByteKOT",
+    metaTitle: "Restaurant Success Stories | BillByteKOT Case Studies",
+    metaDescription: "Real success stories from restaurants using BillByteKOT. 50% revenue growth, 30% cost savings. Read inspiring case studies.",
+    excerpt: "Inspiring success stories from restaurants transformed by BillByteKOT.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "12 min read",
+    category: "Case Studies",
+    tags: ["success stories", "case studies", "growth", "testimonials"],
+    keywords: ["restaurant success stories", "BillByteKOT case studies", "restaurant growth"],
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop",
+    imageAlt: "Successful restaurant owner with BillByteKOT",
+    featured: false,
+    relatedPosts: [31, 33, 35],
+    content: "# Success Stories: Restaurants Growing with BillByteKOT\n\nReal results from real restaurants."
+  },
+  {
+    id: 33,
+    slug: "restaurant-management-tips-2025",
+    title: "50 Restaurant Management Tips for 2025",
+    metaTitle: "50 Restaurant Management Tips 2025 | Expert Advice",
+    metaDescription: "50 proven restaurant management tips. Increase profits, reduce costs, improve efficiency. Expert advice for restaurant owners.",
+    excerpt: "Essential management tips every restaurant owner should know.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "18 min read",
+    category: "Restaurant Tips",
+    tags: ["management", "tips", "restaurant", "best practices"],
+    keywords: ["restaurant management tips", "restaurant tips 2025", "restaurant best practices"],
+    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant management tips infographic",
+    featured: true,
+    relatedPosts: [31, 32, 34],
+    content: "# 50 Restaurant Management Tips for 2025\n\nProven strategies to run a successful restaurant."
+  },
+  {
+    id: 34,
+    slug: "restaurant-billing-mistakes-avoid",
+    title: "Common Restaurant Billing Mistakes to Avoid",
+    metaTitle: "Restaurant Billing Mistakes to Avoid 2025 | Guide",
+    metaDescription: "Avoid costly restaurant billing mistakes. GST errors, inventory issues, pricing problems. Learn from common pitfalls.",
+    excerpt: "Learn from common billing mistakes and avoid costly errors.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "11 min read",
+    category: "Restaurant Tips",
+    tags: ["mistakes", "billing", "restaurant", "guide"],
+    keywords: ["restaurant billing mistakes", "billing errors", "restaurant mistakes", "tips", "advice"],
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant billing error prevention",
+    featured: false,
+    relatedPosts: [33, 35, 36],
+    content: "# Common Restaurant Billing Mistakes to Avoid\n\nPrevent costly errors with our expert guidance."
+  },
+  {
+    id: 35,
+    slug: "restaurant-profit-margin-calculator-guide",
+    title: "Restaurant Profit Margin Calculator Guide",
+    metaTitle: "Restaurant Profit Margin Calculator 2025 | Guide",
+    metaDescription: "Calculate restaurant profit margins accurately. Food cost %, labor cost %, overhead. Optimize profitability with our guide.",
+    excerpt: "Master profit margin calculations for your restaurant business.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "14 min read",
+    category: "Restaurant Tips",
+    tags: ["profit margin", "calculator", "finance", "restaurant"],
+    keywords: ["restaurant profit margin", "profit calculator", "restaurant profitability", "management tips"],
+    image: "https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant profit margin calculation",
+    featured: false,
+    relatedPosts: [33, 34, 36],
+    content: "# Restaurant Profit Margin Calculator Guide\n\nUnderstand and optimize your restaurant's profitability."
+  },
+  {
+    id: 36,
+    slug: "petpooja-alternatives-india-2025",
+    title: "Petpooja Alternatives India 2025",
+    metaTitle: "Best Petpooja Alternatives India 2025 | Comparison",
+    metaDescription: "Top Petpooja alternatives India. Compare BillByteKOT, POSist, Torqus. Save ₹10,000+ annually with better features.",
+    excerpt: "Explore better alternatives to Petpooja for your restaurant.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "13 min read",
+    category: "Comparison",
+    tags: ["petpooja", "alternatives", "comparison", "India"],
+    keywords: ["petpooja alternatives", "petpooja competitor", "better than petpooja"],
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+    imageAlt: "Petpooja alternatives comparison",
+    featured: true,
+    relatedPosts: [1, 2, 37],
+    content: "# Petpooja Alternatives India 2025\n\nDiscover superior alternatives to Petpooja."
+  },
+  {
+    id: 37,
+    slug: "restaurant-pos-price-comparison-india",
+    title: "Restaurant POS Software Price Comparison India",
+    metaTitle: "Restaurant POS Price Comparison India 2025",
+    metaDescription: "Compare restaurant POS software prices India. BillByteKOT ₹1999 vs Petpooja ₹12,000 vs POSist ₹15,000. Make informed choice.",
+    excerpt: "Comprehensive price comparison of restaurant POS software in India.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "10 min read",
+    category: "Comparison",
+    tags: ["pricing", "comparison", "POS software", "India"],
+    keywords: ["restaurant POS price comparison", "POS software pricing India", "billing software cost"],
+    image: "https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=800&h=400&fit=crop",
+    imageAlt: "POS software price comparison chart",
+    featured: false,
+    relatedPosts: [1, 4, 36],
+    content: "# Restaurant POS Software Price Comparison India\n\nTransparent pricing comparison to help you decide."
+  },
+  {
+    id: 38,
+    slug: "fine-dining-pos-software",
+    title: "Fine Dining POS Software",
+    metaTitle: "Fine Dining POS Software India 2025 | Premium",
+    metaDescription: "Premium POS software for fine dining restaurants. Table reservations, wine pairing, course management. Elevate dining experience.",
+    excerpt: "Sophisticated POS solutions for upscale dining establishments.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "11 min read",
+    category: "Software Guide",
+    tags: ["fine dining", "POS software", "premium", "upscale"],
+    keywords: ["fine dining POS software", "upscale restaurant software", "premium restaurant POS"],
+    image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=400&fit=crop",
+    imageAlt: "Fine dining restaurant POS system",
+    featured: false,
+    relatedPosts: [3, 14, 39],
+    content: "# Fine Dining POS Software\n\nElegant solutions for premium dining experiences."
+  },
+  {
+    id: 39,
+    slug: "cafe-billing-software-india",
+    title: "Cafe Billing Software India",
+    metaTitle: "Cafe Billing Software India 2025 | Coffee Shop POS",
+    metaDescription: "Best cafe billing software India. Quick billing, loyalty programs, inventory for cafes. Perfect for coffee shops & bistros.",
+    excerpt: "Specialized billing software for cafes and coffee shops.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "9 min read",
+    category: "Software Guide",
+    tags: ["cafe", "billing software", "coffee shop", "India"],
+    keywords: ["cafe billing software", "coffee shop POS", "bistro billing system"],
+    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&h=400&fit=crop",
+    imageAlt: "Cafe billing software interface",
+    featured: false,
+    relatedPosts: [3, 12, 38],
+    content: "# Cafe Billing Software India\n\nStreamlined solutions for cafes and coffee shops."
+  },
+  {
+    id: 40,
+    slug: "how-to-integrate-whatsapp-restaurant-billing",
+    title: "How to Integrate WhatsApp with Restaurant Billing",
+    metaTitle: "WhatsApp Integration Restaurant Billing 2025",
+    metaDescription: "Step-by-step guide to integrate WhatsApp with restaurant billing. Send bills, take orders, customer support. Boost engagement.",
+    excerpt: "Complete tutorial for WhatsApp integration with billing systems.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "12 min read",
+    category: "How-To",
+    tags: ["WhatsApp", "integration", "tutorial", "restaurant"],
+    keywords: ["WhatsApp integration restaurant", "how to integrate WhatsApp billing", "WhatsApp Cloud API"],
+    image: "https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=800&h=400&fit=crop",
+    imageAlt: "WhatsApp integration setup guide",
+    featured: false,
+    relatedPosts: [20, 29, 30],
+    content: "# How to Integrate WhatsApp with Restaurant Billing\n\nConnect your billing system with WhatsApp Cloud API."
+  },
+  {
+    id: 41,
+    slug: "how-to-print-gst-invoice-restaurant",
+    title: "How to Print GST Invoice from Restaurant Software",
+    metaTitle: "Print GST Invoice Restaurant Software 2025 | Guide",
+    metaDescription: "Learn to print GST-compliant invoices from restaurant software. GSTIN, HSN codes, tax calculation. Stay compliant easily.",
+    excerpt: "Step-by-step guide to printing GST invoices correctly.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "10 min read",
+    category: "How-To",
+    tags: ["GST", "invoice", "printing", "compliance"],
+    keywords: ["how to print GST invoice", "GST invoice restaurant", "GST billing guide"],
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=400&fit=crop",
+    imageAlt: "GST invoice printing guide",
+    featured: false,
+    relatedPosts: [7, 19, 40],
+    content: "# How to Print GST Invoice from Restaurant Software\n\nEnsure GST compliance with proper invoice printing."
+  },
+  {
+    id: 42,
+    slug: "how-to-reduce-food-waste-restaurants",
+    title: "How to Reduce Food Waste in Restaurants",
+    metaTitle: "Reduce Food Waste Restaurants 2025 | Save Money",
+    metaDescription: "Proven strategies to reduce food waste in restaurants. Save 15-20% on food costs. Inventory management, portion control, analytics.",
+    excerpt: "Practical tips to minimize food waste and maximize profits.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "13 min read",
+    category: "Restaurant Tips",
+    tags: ["food waste", "cost savings", "sustainability", "restaurant"],
+    keywords: ["reduce food waste restaurant", "food waste management", "restaurant cost savings", "tips"],
+    image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=400&fit=crop",
+    imageAlt: "Food waste reduction strategies",
+    featured: false,
+    relatedPosts: [21, 33, 35],
+    content: "# How to Reduce Food Waste in Restaurants\n\nSustainable practices that boost your bottom line."
+  },
+  {
+    id: 43,
+    slug: "how-to-increase-restaurant-sales-technology",
+    title: "How to Increase Restaurant Sales with Technology",
+    metaTitle: "Increase Restaurant Sales Technology 2025 | Guide",
+    metaDescription: "Boost restaurant sales 30% with technology. Online ordering, loyalty programs, data analytics. Proven growth strategies.",
+    excerpt: "Leverage technology to drive restaurant revenue growth.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "14 min read",
+    category: "Restaurant Tips",
+    tags: ["sales growth", "technology", "revenue", "restaurant"],
+    keywords: ["increase restaurant sales", "restaurant technology", "boost restaurant revenue", "tips", "advice"],
+    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant sales growth with technology",
+    featured: true,
+    relatedPosts: [31, 33, 44],
+    content: "# How to Increase Restaurant Sales with Technology\n\nTechnology-driven strategies for revenue growth."
+  },
+  {
+    id: 44,
+    slug: "restaurant-billing-software-buying-guide-2025",
+    title: "Restaurant Billing Software Buying Guide 2025",
+    metaTitle: "Restaurant Software Buying Guide 2025 | Complete",
+    metaDescription: "Complete buying guide for restaurant billing software. Features checklist, pricing guide, vendor comparison. Make the right investment.",
+    excerpt: "Everything you need to know before buying restaurant software.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "17 min read",
+    category: "Software Guide",
+    tags: ["buying guide", "software", "restaurant", "investment"],
+    keywords: ["restaurant software buying guide", "POS buying guide", "billing software selection"],
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant software buying guide",
+    featured: true,
+    relatedPosts: [29, 3, 37],
+    content: "# Restaurant Billing Software Buying Guide 2025\n\nMake an informed investment in restaurant technology."
+  },
+  {
+    id: 45,
+    slug: "restaurant-technology-checklist-2025",
+    title: "Restaurant Technology Checklist 2025",
+    metaTitle: "Restaurant Technology Checklist 2025 | Essential",
+    metaDescription: "Essential restaurant technology checklist 2025. POS, KOT, inventory, analytics, payments. Don't miss critical tech.",
+    excerpt: "Complete checklist of must-have restaurant technology.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "11 min read",
+    category: "Technology",
+    tags: ["checklist", "technology", "restaurant", "essentials"],
+    keywords: ["restaurant technology checklist", "restaurant tech essentials", "POS checklist"],
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant technology checklist",
+    featured: false,
+    relatedPosts: [31, 43, 44],
+    content: "# Restaurant Technology Checklist 2025\n\nEnsure you have all essential technology in place."
+  },
+  {
+    id: 46,
+    slug: "hyderabad-restaurant-software-comparison",
+    title: "Hyderabad Restaurant Software Comparison",
+    metaTitle: "Restaurant Software Hyderabad 2025 | Comparison",
+    metaDescription: "Compare restaurant software in Hyderabad. Local support, Telugu interface, GST compliant. Best solutions for Hyderabad restaurants.",
+    excerpt: "Restaurant software comparison tailored for Hyderabad market.",
+    author: defaultAuthor,
+    date: "2025-01-14",
+    lastModified: "2025-01-15",
+    readTime: "10 min read",
+    category: "City Guides",
+    tags: ["Hyderabad", "comparison", "restaurant", "software", "city"],
+    keywords: ["restaurant software Hyderabad", "Hyderabad restaurant POS", "billing software Hyderabad", "city guide"],
+    image: "https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=400&fit=crop",
+    imageAlt: "Hyderabad restaurant software",
+    featured: false,
+    relatedPosts: [26, 27, 28],
+    content: "# Hyderabad Restaurant Software Comparison\n\nFind the best software for Hyderabad restaurants."
+  },
+  {
+    id: 47,
+    slug: "chennai-restaurant-billing-software",
+    title: "Chennai Restaurant Billing Software",
+    metaTitle: "Restaurant Billing Software Chennai 2025 | Tamil",
+    metaDescription: "Best restaurant billing software Chennai. Tamil interface, local support, GST compliant. Trusted by 100+ Chennai restaurants.",
+    excerpt: "Billing software solutions for Chennai's restaurant industry.",
+    author: defaultAuthor,
+    date: "2025-01-02",
+    lastModified: "2025-01-15",
+    readTime: "9 min read",
+    category: "City Guides",
+    tags: ["Chennai", "billing software", "restaurant", "Tamil", "city"],
+    keywords: ["restaurant billing software Chennai", "Chennai restaurant POS", "billing software Tamil Nadu", "city guide"],
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop",
+    imageAlt: "Chennai restaurant billing system",
+    featured: false,
+    relatedPosts: [26, 27, 46],
+    content: "# Chennai Restaurant Billing Software\n\nTailored solutions for Chennai's vibrant food scene."
+  },
+  {
+    id: 48,
+    slug: "pune-restaurant-billing-software",
+    title: "Pune Restaurant Billing Software",
+    metaTitle: "Restaurant Billing Software Pune 2025 | Best POS",
+    metaDescription: "Top restaurant billing software Pune. Multi-location support, cloud sync, local support. Perfect for Pune restaurants.",
+    excerpt: "Leading billing software for Pune's growing restaurant market.",
+    author: defaultAuthor,
+    date: "2025-01-03",
+    lastModified: "2025-01-14",
+    readTime: "10 min read",
+    category: "City Guides",
+    tags: ["Pune", "billing software", "restaurant", "Maharashtra", "city"],
+    keywords: ["restaurant billing software Pune", "Pune restaurant POS", "billing software Pune", "city guide"],
+    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=400&fit=crop",
+    imageAlt: "Pune restaurant billing software",
+    featured: false,
+    relatedPosts: [26, 46, 47],
+    content: "# Pune Restaurant Billing Software\n\nModern solutions for Pune's restaurant entrepreneurs."
+  },
+  {
+    id: 49,
+    slug: "offline-restaurant-billing-software",
+    title: "Offline Restaurant Billing Software",
+    metaTitle: "Offline Restaurant Billing Software 2025 | No Internet",
+    metaDescription: "Best offline restaurant billing software. Works without internet, auto-sync when online. Perfect for areas with poor connectivity.",
+    excerpt: "Reliable billing software that works offline.",
+    author: defaultAuthor,
+    date: "2025-01-04",
+    lastModified: "2025-01-13",
+    readTime: "11 min read",
+    category: "Technology",
+    tags: ["offline", "billing software", "no internet", "reliability"],
+    keywords: ["offline restaurant billing software", "restaurant software no internet", "offline POS system"],
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+    imageAlt: "Offline billing software interface",
+    featured: false,
+    relatedPosts: [3, 5, 50],
+    content: "# Offline Restaurant Billing Software\n\nNever let connectivity issues stop your business."
+  },
+  {
+    id: 50,
+    slug: "restaurant-case-study-revenue-growth",
+    title: "Case Study: 50% Revenue Growth with BillByteKOT",
+    metaTitle: "Restaurant Revenue Growth Case Study | BillByteKOT",
+    metaDescription: "Real case study: Restaurant achieved 50% revenue growth with BillByteKOT. Learn strategies, implementation, results.",
+    excerpt: "Detailed case study of restaurant transformation with BillByteKOT.",
+    author: defaultAuthor,
+    date: "2025-01-05",
+    lastModified: "2025-01-12",
+    readTime: "15 min read",
+    category: "Case Studies",
+    tags: ["case study", "revenue growth", "success story", "BillByteKOT"],
+    keywords: ["restaurant revenue growth", "BillByteKOT case study", "restaurant success story"],
+    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
+    imageAlt: "Restaurant revenue growth chart",
+    featured: true,
+    relatedPosts: [32, 43, 33],
+    content: "# Case Study: 50% Revenue Growth with BillByteKOT\n\nHow one restaurant transformed their business."
+  },
+  {
+    id: 51,
+    slug: "kolkata-restaurant-pos-software",
+    title: "Kolkata Restaurant POS Software",
+    metaTitle: "Restaurant POS Software Kolkata 2025 | Bengali",
+    metaDescription: "Best restaurant POS software Kolkata. Bengali interface, local support, GST compliant. Trusted by Kolkata restaurants.",
+    excerpt: "POS solutions designed for Kolkata's restaurant industry.",
+    author: defaultAuthor,
+    date: "2025-01-06",
+    lastModified: "2025-01-11",
+    readTime: "9 min read",
+    category: "City Guides",
+    tags: ["Kolkata", "POS software", "restaurant", "Bengali", "city"],
+    keywords: ["restaurant POS Kolkata", "Kolkata restaurant billing software", "POS software West Bengal", "city guide"],
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop",
+    imageAlt: "Kolkata restaurant POS system",
+    featured: false,
+    relatedPosts: [26, 27, 47],
+    content: "# Kolkata Restaurant POS Software\n\nAuthentic solutions for Kolkata's rich culinary heritage."
   }
 ];
 
-export default blogPosts;
+// Export total count for validation
+export const TOTAL_BLOG_POSTS = blogPosts.length;
+
+// Export blog posts grouped by category
+export const blogPostsByCategory = VALID_CATEGORIES.reduce((acc, category) => {
+  acc[category] = blogPosts.filter(post => post.category === category);
+  return acc;
+}, {});
+
+// Export featured blog posts
+export const featuredBlogPosts = blogPosts.filter(post => post.featured);
+
+// Export recent blog posts (last 10)
+export const recentBlogPosts = blogPosts
+  .sort((a, b) => new Date(b.date) - new Date(a.date))
+  .slice(0, 10);

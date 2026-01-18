@@ -39,6 +39,8 @@ import POSSoftwarePage from './pages/POSSoftwarePage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import NotFound from './pages/NotFound';
 import PWAHomePage from './pages/PWAHomePage';
+import CityLandingPage from './pages/CityLandingPage';
+import ComparisonPage from './pages/ComparisonPage';
 import DesktopInfo from './components/DesktopInfo';
 import UpdateBanner from './components/UpdateBanner';
 import { Toaster } from './components/ui/sonner';
@@ -836,6 +838,8 @@ function App() {
           <Route path="/super-admin" element={<SuperAdminPage />} />
           <Route path="/admin" element={<SuperAdminPage />} />
           <Route path="/pwa" element={<PWAHomePage />} />
+          <Route path="/city/:citySlug" element={<CityLandingPage />} />
+          <Route path="/compare/:comparisonSlug" element={<ComparisonPage />} />
           {/* 404 Not Found Route - Must be last */}
           <Route path="*" element={<NotFound />} />
         </Routes>

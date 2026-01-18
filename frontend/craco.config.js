@@ -130,4 +130,15 @@ if (config.enableVisualEdits || config.enableHealthCheck) {
   };
 }
 
+// Jest configuration for handling ES modules in node_modules
+webpackConfig.jest = {
+  configure: (jestConfig) => {
+    // Transform fast-check and other ES module packages
+    jestConfig.transformIgnorePatterns = [
+      '/node_modules/(?!(fast-check|pure-rand)/)',
+    ];
+    return jestConfig;
+  },
+};
+
 module.exports = webpackConfig;
