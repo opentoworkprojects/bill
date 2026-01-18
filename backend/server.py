@@ -4075,16 +4075,11 @@ async def get_todays_bills(current_user: dict = Depends(get_current_user)):
         print(f"📊 Fetching today's bills from MongoDB for org {user_org_id} (from {today_utc.isoformat()})")
         
         try:
-            # Query for today's completed or paid orders
+            # Query for today's COMPLETED orders ONLY
             query = {
                 "organization_id": user_org_id,
                 "created_at": {"$gte": today_utc.isoformat()},
-                "$or": [
-                    {"status": "completed"},
-                    {"status": "paid"},
-                    # Only include orders with payment if they're also completed/paid
-                    {"status": {"$in": ["completed", "paid"]}, "payment_received": {"$gt": 0}}
-                ]
+                "status": {"$in": ["completed", "paid"]}  # ONLY completed or paid orders
             }
             
             orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
@@ -4113,10 +4108,10 @@ async def get_todays_bills(current_user: dict = Depends(get_current_user)):
         print(f"🆘 Using fallback query for today's bills org {user_org_id}")
         
         try:
-            # Get recent orders and filter on the server side
+            # Get recent completed/paid orders only
             basic_query = {
                 "organization_id": user_org_id,
-                "status": {"$in": ["completed", "paid", "cancelled"]}
+                "status": {"$in": ["completed", "paid"]}  # ONLY completed/paid, no cancelled
             }
             
             orders = await db.orders.find(basic_query, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
