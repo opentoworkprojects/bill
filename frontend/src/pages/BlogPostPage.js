@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { ChefHat, Calendar, User, Clock, ArrowLeft, Share2, BookmarkPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import blogPostsData from '../data/blogPosts';
+import { blogPosts as blogPostsData } from '../data/blogPosts';
 
 const BlogPostPage = () => {
   const { slug } = useParams();

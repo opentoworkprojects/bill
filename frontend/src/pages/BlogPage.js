@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp } from 'lucide-react';
-import blogPostsData from '../data/blogPosts';
+import { blogPosts as blogPostsData } from '../data/blogPosts';
 
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
