@@ -390,14 +390,6 @@ export const logout = () => {
   delete axios.defaults.headers.common['Authorization'];
   clearAuthData();
   
-  // Invalidate settings cache on logout
-  try {
-    const { invalidateSettingsCache } = require('./utils/printUtils');
-    invalidateSettingsCache();
-  } catch (e) {
-    console.warn('Could not invalidate cache on logout:', e);
-  }
-  
   // Call the global callback to clear React state
   if (globalLogoutCallback) {
     globalLogoutCallback();
@@ -415,14 +407,6 @@ export const setAuthToken = (token, userData = null) => {
     
     // Store in all available storage mechanisms
     storeAuthData(token, userData);
-    
-    // Invalidate settings cache on login to get fresh data
-    try {
-      const { invalidateSettingsCache } = require('./utils/printUtils');
-      invalidateSettingsCache();
-    } catch (e) {
-      console.warn('Could not invalidate cache on login:', e);
-    }
   } else {
     delete axios.defaults.headers.common['Authorization'];
     clearAuthData();
