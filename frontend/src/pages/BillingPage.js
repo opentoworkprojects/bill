@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, RefreshCw, Loader2, Eye } from 'lucide-react';
+import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye } from 'lucide-react';
 import { printReceipt } from '../utils/printUtils';
 
 const BillingPage = ({ user }) => {
@@ -45,6 +45,12 @@ const BillingPage = ({ user }) => {
   // Add preview functionality
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
+  
+  // Advanced UI state for better UX
+  const [dropdownPosition, setDropdownPosition] = useState('bottom');
+  const [isDropdownAnimating, setIsDropdownAnimating] = useState(false);
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const handlePreview = async () => {
     try {
@@ -86,14 +92,38 @@ const BillingPage = ({ user }) => {
     }
   };
   // Menu loading states for better UX
-  const [menuLoading, setMenuLoading] = useState(true);
-  const [menuError, setMenuError] = useState(null);
-  const [menuLastFetched, setMenuLastFetched] = useState(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [lastSearchTime, setLastSearchTime] = useState(0);
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState(null);
 
   useEffect(() => {
     fetchOrder();
     fetchBusinessSettings();
     fetchMenuItems();
+    
+    // Advanced screen size and keyboard detection
+    const handleResize = () => {
+      setScreenHeight(window.innerHeight);
+    };
+    
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const keyboardHeight = window.innerHeight - window.visualViewport.height;
+        setKeyboardHeight(keyboardHeight > 100 ? keyboardHeight : 0);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+      }
+    };
   }, [orderId]);
 
   useEffect(() => {
@@ -105,14 +135,65 @@ const BillingPage = ({ user }) => {
       }
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowMenuDropdown(false);
+        setSearchFocused(false);
       }
     };
+    
     // Use click instead of mousedown - fires after touch events complete
     document.addEventListener('click', handleClickOutside, true);
     return () => {
       document.removeEventListener('click', handleClickOutside, true);
     };
   }, []);
+
+  // Intelligent dropdown positioning
+  const calculateDropdownPosition = useCallback(() => {
+    if (!dropdownRef.current) return 'bottom';
+    
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const availableSpaceBelow = screenHeight - rect.bottom - keyboardHeight;
+    const availableSpaceAbove = rect.top;
+    const dropdownHeight = 300; // Estimated dropdown height
+    
+    // If there's not enough space below but enough above, show above
+    if (availableSpaceBelow < dropdownHeight && availableSpaceAbove > dropdownHeight) {
+      return 'top';
+    }
+    
+    return 'bottom';
+  }, [screenHeight, keyboardHeight]);
+
+  // Update dropdown position when needed
+  useEffect(() => {
+    if (showMenuDropdown) {
+      const position = calculateDropdownPosition();
+      setDropdownPosition(position);
+    }
+  }, [showMenuDropdown, calculateDropdownPosition]);
+
+  // Debounced search for better performance
+  const handleSearchChange = useCallback((value) => {
+    setSearchQuery(value);
+    setLastSearchTime(Date.now());
+    
+    // Clear existing timer
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+    
+    // Set new timer for dropdown show/hide
+    const timer = setTimeout(() => {
+      if (value.trim()) {
+        setShowMenuDropdown(true);
+        setIsDropdownAnimating(true);
+        setTimeout(() => setIsDropdownAnimating(false), 200);
+      } else {
+        setShowMenuDropdown(false);
+      }
+    }, 150); // 150ms debounce for smooth UX
+    
+    setSearchDebounceTimer(timer);
+  }, [searchDebounceTimer]);
 
   const fetchOrder = async () => {
     try {
@@ -788,8 +869,92 @@ const BillingPage = ({ user }) => {
 
   return (
     <Layout user={user}>
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+        
+        .scrollbar-thumb-violet-300::-webkit-scrollbar-thumb {
+          background-color: rgb(196 181 253);
+          border-radius: 6px;
+        }
+        
+        .scrollbar-track-gray-100::-webkit-scrollbar-track {
+          background-color: rgb(243 244 246);
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .animate-fadeInUp {
+          animation: fadeInUp 0.3s ease-out;
+        }
+        
+        .animate-pulse-slow {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        /* Enhanced touch feedback */
+        .touch-feedback {
+          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .touch-feedback:active {
+          transform: scale(0.96);
+          filter: brightness(0.95);
+        }
+        
+        /* Smooth keyboard adaptation */
+        .keyboard-adaptive {
+          transition: padding-bottom 0.3s ease-out, margin-bottom 0.3s ease-out;
+        }
+        
+        /* Enhanced gradient animations */
+        .gradient-animate {
+          background-size: 200% 200%;
+          animation: gradientShift 3s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
       {/* ========== MOBILE LAYOUT ========== */}
-      <div className="lg:hidden p-2 pb-4">
+      <div className="lg:hidden" style={{ paddingBottom: keyboardHeight > 0 ? '20px' : '16px' }}>
         <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-3 py-2 rounded-t-xl flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="font-bold">#{order.invoice_number || order.id.slice(0, 6)}</span>
@@ -797,47 +962,97 @@ const BillingPage = ({ user }) => {
           </div>
           <span className="text-sm">{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
         </div>
-        <Card className="rounded-t-none border-0 shadow-lg">
+        <Card className="rounded-t-none border-0 shadow-lg" style={{ marginBottom: keyboardHeight > 0 ? '10px' : '0' }}>
           <CardContent className="p-3">
-            {/* Smart Search Bar */}
+            {/* Enhanced Smart Search Bar */}
             <div className="relative mb-2" ref={dropdownRef}>
               <div className="flex gap-1">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${searchFocused ? 'text-violet-500' : 'text-gray-400'}`} />
                   <Input 
                     placeholder="Search item... (Enter to add)" 
                     value={searchQuery} 
-                    onChange={(e) => { setSearchQuery(e.target.value); setShowMenuDropdown(true); }} 
-                    onFocus={() => setShowMenuDropdown(true)}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => {
+                      setSearchFocused(true);
+                      if (searchQuery.trim()) {
+                        setShowMenuDropdown(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay blur to allow for item selection
+                      setTimeout(() => setSearchFocused(false), 200);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && hasMatches) {
                         e.preventDefault();
                         handleAddMenuItem(filteredMenuItems[0]);
                       }
+                      if (e.key === 'Escape') {
+                        setShowMenuDropdown(false);
+                        setSearchFocused(false);
+                      }
                     }}
-                    className="pl-8 h-10 text-base" 
+                    className={`pl-8 h-10 text-base transition-all duration-200 ${searchFocused ? 'ring-2 ring-violet-500 border-violet-300' : 'border-gray-300'}`}
                   />
                 </div>
                 {!hasMatches && searchQuery.trim() && (
                   <>
-                    <Input type="number" placeholder="₹" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} className="w-16 h-10 text-base" ref={priceInputRef} />
-                    <Button size="sm" onClick={handleAddCustomItem} className="h-10 px-3 bg-green-600"><Plus className="w-4 h-4" /></Button>
+                    <Input 
+                      type="number" 
+                      placeholder="₹" 
+                      value={customPrice} 
+                      onChange={(e) => setCustomPrice(e.target.value)} 
+                      className="w-16 h-10 text-base transition-all duration-200 focus:ring-2 focus:ring-green-500" 
+                      ref={priceInputRef} 
+                    />
+                    <Button 
+                      size="sm" 
+                      onClick={handleAddCustomItem} 
+                      className="h-10 px-3 bg-green-600 hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
                   </>
                 )}
               </div>
               
-              {/* Suggested Items - Large touch targets */}
+              {/* Enhanced Suggested Items with Intelligent Positioning */}
               {showMenuDropdown && searchQuery.trim() && hasMatches && (
-                <div className="mt-2 bg-white border-2 border-violet-400 rounded-2xl overflow-hidden shadow-xl">
-                  <div className="bg-violet-600 text-white px-4 py-2.5 text-sm font-semibold flex justify-between items-center">
-                    <span>👆 Tap to add ({filteredMenuItems.length})</span>
+                <div 
+                  className={`absolute z-50 w-full bg-white border-2 border-violet-400 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 transform ${
+                    isDropdownAnimating ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
+                  } ${
+                    dropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                  }`}
+                  style={{
+                    maxHeight: Math.min(300, screenHeight - keyboardHeight - 200),
+                    animation: isDropdownAnimating ? 'none' : 'slideIn 0.2s ease-out'
+                  }}
+                >
+                  <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-4 py-2.5 text-sm font-semibold flex justify-between items-center">
+                    <span className="flex items-center gap-2">
+                      <span className="animate-pulse">👆</span>
+                      <span>Tap to add ({filteredMenuItems.length})</span>
+                    </span>
                     <button 
-                      onClick={() => setShowMenuDropdown(false)} 
-                      className="bg-white/20 rounded-full w-7 h-7 flex items-center justify-center"
-                    >✕</button>
+                      onClick={() => {
+                        setShowMenuDropdown(false);
+                        setSearchFocused(false);
+                      }}
+                      className="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="max-h-64 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {filteredMenuItems.slice(0, 6).map((item, idx) => (
+                  <div 
+                    className="overflow-y-auto scrollbar-thin scrollbar-thumb-violet-300 scrollbar-track-gray-100" 
+                    style={{ 
+                      WebkitOverflowScrolling: 'touch',
+                      maxHeight: Math.min(240, screenHeight - keyboardHeight - 260)
+                    }}
+                  >
+                    {filteredMenuItems.slice(0, 8).map((item, idx) => (
                       <div 
                         key={item.id}
                         role="button"
@@ -851,41 +1066,121 @@ const BillingPage = ({ user }) => {
                           e.preventDefault();
                           handleAddMenuItem(item);
                         }}
-                        className={`w-full flex items-center justify-between px-4 py-5 border-b-2 border-gray-100 cursor-pointer select-none ${idx === 0 ? 'bg-violet-50 border-violet-200' : 'bg-white'} active:bg-violet-200`}
-                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'rgba(139, 92, 246, 0.3)', minHeight: '60px' }}
+                        className={`w-full flex items-center justify-between px-4 py-4 border-b border-gray-100 cursor-pointer select-none transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
+                          idx === 0 
+                            ? 'bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 shadow-sm' 
+                            : 'bg-white hover:bg-gray-50'
+                        }`}
+                        style={{ 
+                          touchAction: 'manipulation', 
+                          WebkitTapHighlightColor: 'rgba(139, 92, 246, 0.1)', 
+                          minHeight: '56px' 
+                        }}
                       >
-                        <span className={`font-semibold text-lg ${idx === 0 ? 'text-violet-700' : 'text-gray-800'}`}>
-                          {idx === 0 && '⏎ '}{item.name}
-                        </span>
-                        <span className="bg-violet-600 text-white px-4 py-2 rounded-xl font-bold text-base ml-2">
-                          {currency}{item.price}
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <span className={`font-semibold text-base block truncate ${idx === 0 ? 'text-violet-700' : 'text-gray-800'}`}>
+                            {idx === 0 && <span className="text-green-500 mr-1">⏎</span>}
+                            {item.name}
+                          </span>
+                          {item.category && (
+                            <span className="text-xs text-gray-500 mt-0.5 block">{item.category}</span>
+                          )}
+                        </div>
+                        <div className="ml-3 flex-shrink-0">
+                          <span className={`px-3 py-1.5 rounded-xl font-bold text-sm text-white transition-all duration-200 ${
+                            idx === 0 ? 'bg-gradient-to-r from-violet-600 to-purple-600 shadow-md' : 'bg-violet-500'
+                          }`}>
+                            {currency}{item.price}
+                          </span>
+                        </div>
                       </div>
                     ))}
+                    
+                    {filteredMenuItems.length > 8 && (
+                      <div className="px-4 py-3 text-center text-sm text-gray-500 bg-gray-50">
+                        +{filteredMenuItems.length - 8} more items available
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
               
-              {/* No match message */}
+              {/* Enhanced No match message */}
               {showMenuDropdown && searchQuery.trim() && !hasMatches && (
-                <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <p className="text-orange-700 text-sm">
-                    No match. Enter price → <span className="font-bold">{searchQuery}</span>
-                  </p>
+                <div className={`absolute z-40 w-full bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-xl p-4 shadow-lg transition-all duration-300 ${
+                  dropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Plus className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-orange-700 font-medium text-sm">
+                        Create new item: <span className="font-bold">"{searchQuery}"</span>
+                      </p>
+                      <p className="text-orange-600 text-xs mt-0.5">Enter price and click + to add</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="max-h-[28vh] overflow-y-auto mb-2 space-y-1">
-              {orderItems.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2 py-1 px-2 bg-gray-50 rounded">
-                  <button onClick={() => handleItemQuantityChange(idx, -1)} className="w-6 h-6 bg-white border rounded text-xs">-</button>
-                  <span className="w-6 h-6 bg-violet-600 text-white rounded flex items-center justify-center text-xs font-bold">{item.quantity}</span>
-                  <button onClick={() => handleItemQuantityChange(idx, 1)} className="w-6 h-6 bg-white border rounded text-xs">+</button>
-                  <span className="flex-1 text-sm truncate">{item.name}</span>
-                  <span className="font-bold text-sm text-violet-600">{currency}{(item.price * item.quantity).toFixed(0)}</span>
-                  <button onClick={() => handleRemoveItem(idx)} className="text-red-400 p-0.5"><Trash2 className="w-4 h-4" /></button>
+            {/* Enhanced Order Items List */}
+            <div 
+              className="overflow-y-auto mb-3 space-y-2 scrollbar-thin scrollbar-thumb-violet-300 scrollbar-track-gray-100" 
+              style={{ 
+                maxHeight: `${Math.min(30, (screenHeight - keyboardHeight) * 0.35)}vh`,
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
+              {orderItems.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Search className="w-8 h-8 text-gray-300" />
+                  </div>
+                  <p className="text-sm font-medium">No items added yet</p>
+                  <p className="text-xs mt-1">Search and add items to start billing</p>
                 </div>
-              ))}
+              ) : (
+                orderItems.map((item, idx) => (
+                  <div 
+                    key={`${item.menu_item_id}-${idx}`} 
+                    className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:shadow-md transform hover:scale-[1.01]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleItemQuantityChange(idx, -1)} 
+                        className="w-8 h-8 bg-white border-2 border-red-200 rounded-lg text-red-600 font-bold transition-all duration-200 hover:bg-red-50 hover:border-red-300 active:scale-95 flex items-center justify-center"
+                      >
+                        −
+                      </button>
+                      <div className="w-10 h-8 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg flex items-center justify-center font-bold text-sm shadow-md">
+                        {item.quantity}
+                      </div>
+                      <button 
+                        onClick={() => handleItemQuantityChange(idx, 1)} 
+                        className="w-8 h-8 bg-white border-2 border-green-200 rounded-lg text-green-600 font-bold transition-all duration-200 hover:bg-green-50 hover:border-green-300 active:scale-95 flex items-center justify-center"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-sm text-gray-800 block truncate">{item.name}</span>
+                      <span className="text-xs text-gray-500">₹{item.price} each</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-base text-violet-600 block">
+                        {currency}{(item.price * item.quantity).toFixed(0)}
+                      </span>
+                      <button 
+                        onClick={() => handleRemoveItem(idx)} 
+                        className="text-red-400 hover:text-red-600 p-1 transition-all duration-200 transform hover:scale-110 active:scale-95"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
             <div className="border-t pt-2 space-y-2 text-sm">
               {/* Subtotal Row */}
@@ -1191,88 +1486,224 @@ const BillingPage = ({ user }) => {
       </div>
 
 
-      {/* ========== DESKTOP LAYOUT - FULL WIDTH ========== */}
-      <div className="hidden lg:flex h-[calc(100vh-80px)] gap-3 p-3">
+      {/* ========== DESKTOP LAYOUT - ENHANCED ========== */}
+      <div className="hidden lg:flex h-[calc(100vh-80px)] gap-4 p-4">
         {/* Left Panel - Items (65%) */}
-        <div className="flex-[3] flex flex-col bg-white rounded-xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-4 py-3 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <span className="text-xl font-bold">#{order.invoice_number || order.id.slice(0, 6)}</span>
-              <span className="text-violet-200">{order.table_number ? `Table ${order.table_number}` : 'Counter Order'}</span>
+        <div className="flex-[3] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+          <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white px-6 py-4 gradient-animate">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <span className="text-2xl font-bold">#{order.invoice_number || order.id.slice(0, 6)}</span>
+                <span className="text-violet-200 bg-white/10 px-3 py-1 rounded-full text-sm font-medium">
+                  {order.table_number ? `Table ${order.table_number}` : 'Counter Order'}
+                </span>
+              </div>
+              <span className="text-violet-200 text-sm bg-white/10 px-3 py-1 rounded-full">
+                {new Date(order.created_at).toLocaleString()}
+              </span>
             </div>
-            <span className="text-violet-200 text-sm">{new Date(order.created_at).toLocaleString()}</span>
           </div>
-          <div className="p-4 border-b">
-            {/* Smart Search Bar - Desktop */}
+          
+          <div className="p-6 border-b border-gray-100">
+            {/* Enhanced Desktop Search Bar */}
             <div className="relative" ref={dropdownRef}>
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${searchFocused ? 'text-violet-500' : 'text-gray-400'}`} />
                   <Input 
                     placeholder="Search menu or type item name..." 
                     value={searchQuery} 
-                    onChange={(e) => { setSearchQuery(e.target.value); setShowMenuDropdown(true); }} 
-                    onFocus={() => setShowMenuDropdown(true)} 
-                    className="pl-12 h-12 text-lg" 
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => {
+                      setSearchFocused(true);
+                      if (searchQuery.trim()) {
+                        setShowMenuDropdown(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setSearchFocused(false), 200);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && hasMatches) {
+                        e.preventDefault();
+                        handleAddMenuItem(filteredMenuItems[0]);
+                      }
+                      if (e.key === 'Escape') {
+                        setShowMenuDropdown(false);
+                        setSearchFocused(false);
+                      }
+                    }}
+                    className={`pl-12 h-14 text-lg border-2 rounded-xl transition-all duration-200 ${
+                      searchFocused 
+                        ? 'ring-4 ring-violet-100 border-violet-300 shadow-lg' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   />
                 </div>
                 {!hasMatches && searchQuery.trim() && (
                   <>
-                    <Input type="number" placeholder="₹ Price" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} className="w-32 h-12 text-lg" />
-                    <Button onClick={handleAddCustomItem} className="h-12 px-6 bg-green-600 hover:bg-green-700 text-lg"><Plus className="w-5 h-5 mr-2" />Add</Button>
+                    <Input 
+                      type="number" 
+                      placeholder="₹ Price" 
+                      value={customPrice} 
+                      onChange={(e) => setCustomPrice(e.target.value)} 
+                      className="w-40 h-14 text-lg border-2 rounded-xl transition-all duration-200 focus:ring-4 focus:ring-green-100 focus:border-green-300" 
+                    />
+                    <Button 
+                      onClick={handleAddCustomItem} 
+                      className="h-14 px-8 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Add Item
+                    </Button>
                   </>
                 )}
               </div>
+              
+              {/* Enhanced Desktop Dropdown */}
               {showMenuDropdown && searchQuery.trim() && (
-                <div className="absolute z-20 w-full mt-1 bg-white border rounded-xl shadow-2xl max-h-80 overflow-y-auto" style={{ touchAction: 'pan-y' }}>
+                <div 
+                  className={`absolute z-50 w-full mt-2 bg-white border-2 border-violet-200 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 transform ${
+                    isDropdownAnimating ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
+                  }`}
+                  style={{ maxHeight: '400px' }}
+                >
                   {hasMatches ? (
-                    filteredMenuItems.slice(0, 12).map(item => (
-                      <div 
-                        key={item.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          isSelectingRef.current = true;
-                          handleAddMenuItem(item);
-                        }}
-                        onTouchStart={() => { isSelectingRef.current = true; }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
-                          handleAddMenuItem(item);
-                        }}
-                        className="w-full px-4 py-4 text-left hover:bg-violet-50 active:bg-violet-100 flex justify-between items-center text-lg border-b last:border-0 cursor-pointer select-none"
-                        style={{ touchAction: 'manipulation' }}
-                      >
-                        <span className="font-medium">{item.name}</span><span className="text-violet-600 font-bold">{currency}{item.price}</span>
+                    <>
+                      <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-6 py-3 flex justify-between items-center">
+                        <span className="font-semibold flex items-center gap-2">
+                          <span className="animate-pulse-slow">🔍</span>
+                          Found {filteredMenuItems.length} items
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setShowMenuDropdown(false);
+                            setSearchFocused(false);
+                          }}
+                          className="bg-white/20 hover:bg-white/30 rounded-full w-8 h-8 flex items-center justify-center transition-all duration-200 transform hover:scale-110"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                    ))
+                      <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-violet-300 scrollbar-track-gray-100">
+                        {filteredMenuItems.slice(0, 12).map((item, idx) => (
+                          <div 
+                            key={item.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              isSelectingRef.current = true;
+                              handleAddMenuItem(item);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleAddMenuItem(item);
+                              }
+                            }}
+                            className={`w-full px-6 py-4 text-left cursor-pointer select-none transition-all duration-200 transform hover:scale-[1.01] flex justify-between items-center border-b border-gray-100 last:border-0 ${
+                              idx === 0 
+                                ? 'bg-gradient-to-r from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100' 
+                                : 'bg-white hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex-1">
+                              <span className={`font-semibold text-lg block ${idx === 0 ? 'text-violet-700' : 'text-gray-800'}`}>
+                                {idx === 0 && <span className="text-green-500 mr-2">⏎</span>}
+                                {item.name}
+                              </span>
+                              {item.category && (
+                                <span className="text-sm text-gray-500 mt-1 block">{item.category}</span>
+                              )}
+                            </div>
+                            <span className={`px-4 py-2 rounded-xl font-bold text-lg text-white ml-4 transition-all duration-200 ${
+                              idx === 0 
+                                ? 'bg-gradient-to-r from-violet-600 to-purple-600 shadow-lg' 
+                                : 'bg-violet-500 hover:bg-violet-600'
+                            }`}>
+                              {currency}{item.price}
+                            </span>
+                          </div>
+                        ))}
+                        
+                        {filteredMenuItems.length > 12 && (
+                          <div className="px-6 py-4 text-center text-gray-500 bg-gray-50 border-t">
+                            <span className="text-sm">+{filteredMenuItems.length - 12} more items available</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <div className="px-4 py-3 text-gray-500">
-                      No menu item found. Enter price to add "<span className="font-semibold text-gray-700">{searchQuery}</span>" as custom item.
+                    <div className="p-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-orange-700 font-semibold text-lg">
+                            Create new item: "{searchQuery}"
+                          </p>
+                          <p className="text-orange-600 text-sm mt-1">Enter price and click "Add Item" to create</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-violet-300 scrollbar-track-gray-100">
             {orderItems.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-gray-400 text-xl">Search and add items to the order</div>
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center animate-fadeInUp">
+                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
+                    <Search className="w-12 h-12 text-gray-300" />
+                  </div>
+                  <p className="text-xl font-medium mb-2">No items added yet</p>
+                  <p className="text-sm">Search and add items to start creating the bill</p>
+                </div>
+              </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {orderItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => handleItemQuantityChange(idx, -1)} className="w-12 h-12 bg-white border-2 hover:border-violet-300 rounded-xl text-xl font-bold flex items-center justify-center">−</button>
-                      <span className="w-14 h-12 bg-violet-600 text-white rounded-xl flex items-center justify-center text-xl font-bold">{item.quantity}</span>
-                      <button onClick={() => handleItemQuantityChange(idx, 1)} className="w-12 h-12 bg-white border-2 hover:border-violet-300 rounded-xl text-xl font-bold flex items-center justify-center">+</button>
+                  <div 
+                    key={`${item.menu_item_id}-${idx}`} 
+                    className="flex items-center gap-6 p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border border-gray-200 shadow-sm transition-all duration-200 hover:shadow-lg transform hover:scale-[1.01] animate-fadeInUp"
+                    style={{ animationDelay: `${idx * 0.05}s` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleItemQuantityChange(idx, -1)} 
+                        className="w-12 h-12 bg-white border-2 border-red-200 rounded-xl text-red-600 font-bold text-xl transition-all duration-200 hover:bg-red-50 hover:border-red-300 active:scale-95 flex items-center justify-center shadow-sm hover:shadow-md"
+                      >
+                        −
+                      </button>
+                      <div className="w-16 h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg">
+                        {item.quantity}
+                      </div>
+                      <button 
+                        onClick={() => handleItemQuantityChange(idx, 1)} 
+                        className="w-12 h-12 bg-white border-2 border-green-200 rounded-xl text-green-600 font-bold text-xl transition-all duration-200 hover:bg-green-50 hover:border-green-300 active:scale-95 flex items-center justify-center shadow-sm hover:shadow-md"
+                      >
+                        +
+                      </button>
                     </div>
                     <div className="flex-1">
-                      <p className="font-semibold text-xl">{item.name}</p>
-                      <p className="text-gray-500">{currency}{item.price} each</p>
+                      <p className="font-semibold text-xl text-gray-800">{item.name}</p>
+                      <p className="text-gray-500 mt-1">{currency}{item.price} each</p>
                     </div>
-                    <span className="text-2xl font-bold text-violet-600">{currency}{(item.price * item.quantity).toFixed(0)}</span>
-                    <button onClick={() => handleRemoveItem(idx)} className="w-12 h-12 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl flex items-center justify-center"><Trash2 className="w-6 h-6" /></button>
+                    <div className="text-right">
+                      <span className="text-3xl font-bold text-violet-600 block">
+                        {currency}{(item.price * item.quantity).toFixed(0)}
+                      </span>
+                      <button 
+                        onClick={() => handleRemoveItem(idx)} 
+                        className="text-red-400 hover:text-red-600 p-2 mt-2 transition-all duration-200 transform hover:scale-110 active:scale-95 rounded-lg hover:bg-red-50"
+                      >
+                        <Trash2 className="w-6 h-6" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
