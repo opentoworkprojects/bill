@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign } from 'lucide-react';
+import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
@@ -127,7 +127,7 @@ const OrdersPage = ({ user }) => {
     }
   }, []);
 
-  // Add real-time polling for active orders and today's bills (every 30 seconds)
+  // Real-time polling for active orders and today's bills (every 2 seconds for real-time experience)
   useEffect(() => {
     const interval = setInterval(() => {
       if (activeTab === 'active') {
@@ -135,10 +135,81 @@ const OrdersPage = ({ user }) => {
       } else if (activeTab === 'history') {
         fetchTodaysBills(); // Refresh today's bills when viewing history tab
       }
-    }, 30000); // Poll every 30 seconds
+    }, 2000); // Poll every 2 seconds for real-time experience
 
     return () => clearInterval(interval);
   }, [activeTab]);
+
+  // Aggressive real-time refresh on window focus (when user returns to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 Window focused - refreshing orders for real-time sync');
+      if (activeTab === 'active') {
+        fetchOrders();
+      } else if (activeTab === 'history') {
+        fetchTodaysBills();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [activeTab]);
+
+  // Real-time refresh on tab visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Tab became visible - refreshing orders for real-time sync');
+        if (activeTab === 'active') {
+          fetchOrders();
+        } else if (activeTab === 'history') {
+          fetchTodaysBills();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [activeTab]);
+
+  // Real-time refresh on mouse movement (user is active)
+  useEffect(() => {
+    let lastRefresh = Date.now();
+    const handleMouseMove = () => {
+      const now = Date.now();
+      // Only refresh if it's been more than 5 seconds since last refresh
+      if (now - lastRefresh > 5000) {
+        lastRefresh = now;
+        if (activeTab === 'active') {
+          fetchOrders();
+        } else if (activeTab === 'history') {
+          fetchTodaysBills();
+        }
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, [activeTab]);
+
+  // Manual refresh function for real-time updates
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    setLoading(true);
+    try {
+      if (activeTab === 'active') {
+        await fetchOrders();
+      } else if (activeTab === 'history') {
+        await fetchTodaysBills();
+      }
+      // Also refresh tables for real-time table status
+      await fetchTables();
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadInitialData = async () => {
     try {
@@ -1156,11 +1227,18 @@ const OrdersPage = ({ user }) => {
         <TrialBanner user={user} />
         <div className="flex justify-between items-center flex-wrap gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl sm:text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Orders</h1>
-            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage restaurant orders</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Orders</h1>
+              {/* Live indicator */}
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                Live
+              </div>
+            </div>
+            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage restaurant orders • Updates every 2 seconds</p>
           </div>
           {['admin', 'waiter', 'cashier'].includes(user?.role) && (
-            <>
+            <div className="flex items-center gap-3">
               {/* New Order Button - Unified for both KOT modes */}
               <Button 
                 onClick={() => {
@@ -1176,12 +1254,24 @@ const OrdersPage = ({ user }) => {
                 data-testid="create-order-button"
               >
                 <Plus className="w-4 h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">New Order</span>
-                <span className="sm:hidden">New</span>
+                <span>New Order</span>
               </Button>
-              
-              {/* Unified New Order Dialog - Works for both KOT enabled/disabled */}
-              {dialogOpen && (
+
+              {/* Real-time Refresh Button */}
+              <Button 
+                onClick={handleManualRefresh}
+                variant="outline"
+                className="text-sm sm:text-base border-violet-200 text-violet-600 hover:bg-violet-50" 
+                disabled={loading}
+              >
+                <RefreshCw className={`w-4 h-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </Button>
+            </div>
+          )}
+
+        {/* Unified New Order Dialog - Works for both KOT enabled/disabled */}
+        {dialogOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
                     {/* Header with Icon */}
@@ -1339,13 +1429,17 @@ const OrdersPage = ({ user }) => {
                   </div>
                 </div>
               )}
-            </>
-          )}
+
         </div>
+
         {/* Tabs for Active Orders and Today's Bills */}
         <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-xl">
           <button
-            onClick={() => setActiveTab('active')}
+            onClick={() => {
+              setActiveTab('active');
+              // Immediate refresh when switching to Active Orders
+              setTimeout(() => fetchOrders(), 100);
+            }}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
               activeTab === 'active'
                 ? 'bg-white text-violet-700 shadow-sm'
@@ -1359,7 +1453,11 @@ const OrdersPage = ({ user }) => {
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => {
+              setActiveTab('history');
+              // Immediate refresh when switching to Today's Bills
+              setTimeout(() => fetchTodaysBills(), 100);
+            }}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
               activeTab === 'history'
                 ? 'bg-white text-violet-700 shadow-sm'

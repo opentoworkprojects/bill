@@ -1142,6 +1142,9 @@ export const blogPosts = [
   }
 ];
 
+// Export blog posts as default
+export default blogPosts;
+
 // Export total count for validation
 export const TOTAL_BLOG_POSTS = blogPosts.length;
 

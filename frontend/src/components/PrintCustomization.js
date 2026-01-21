@@ -166,66 +166,9 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
   const generatePreview = async () => {
     try {
       if (activeTab === 'receipt') {
-        // Use actual printUtils function for receipt preview
-        const sampleOrder = {
-          id: 'SAMPLE123',
-          invoice_number: 'ABC12345',
-          table_number: 5,
-          waiter_name: 'John Doe',
-          customer_name: 'Guest Customer',
-          customer_phone: '+91 9876543210',
-          created_at: new Date().toISOString(),
-          items: [
-            { name: 'Butter Chicken', quantity: 2, price: 350, notes: customization.show_item_notes ? 'Extra spicy' : '' },
-            { name: 'Garlic Naan', quantity: 1, price: 60, notes: '' },
-            { name: 'Jeera Rice', quantity: 2, price: 120, notes: customization.show_item_notes ? 'Less salt' : '' },
-          ],
-          subtotal: 880,
-          tax: 44,
-          tax_rate: 5,
-          total: 924,
-          discount: 0,
-          discount_amount: 0,
-          payment_method: 'cash',
-          payment_received: 500, // Partial payment to show QR code
-          balance_amount: 424,
-          is_credit: true,
-          status: 'pending'
-        };
-        
-        try {
-          // Import and use the actual print utility functions
-          const { generatePlainTextReceipt } = await import('../utils/printUtils');
-          const plainTextContent = generatePlainTextReceipt(sampleOrder, businessSettings);
-          setPreviewContent(plainTextContent);
-        } catch (importError) {
-          console.warn('Could not import printUtils, using fallback preview:', importError);
-          setPreviewContent(generateReceiptPreview());
-        }
+        setPreviewContent(generateReceiptPreview());
       } else {
-        // Use actual printUtils function for KOT preview
-        const sampleKOTOrder = {
-          id: 'KOT001234',
-          table_number: 5,
-          waiter_name: 'John Doe',
-          customer_name: 'Guest Customer',
-          created_at: new Date().toISOString(),
-          priority: 'normal',
-          items: [
-            { name: 'BUTTER CHICKEN', quantity: 2, notes: customization.kot_highlight_notes ? 'Extra spicy' : '' },
-            { name: 'GARLIC NAAN', quantity: 1, notes: '' },
-            { name: 'JEERA RICE', quantity: 2, notes: customization.kot_highlight_notes ? 'Less salt' : '' },
-          ]
-        };
-        
-        try {
-          const { generateKOTContent } = await import('../utils/printUtils');
-          const plainTextContent = generateKOTContent(sampleKOTOrder);
-          setPreviewContent(plainTextContent);
-        } catch (importError) {
-          console.warn('Could not import printUtils, using fallback preview:', importError);
-          setPreviewContent(generateKOTPreview());
-        }
+        setPreviewContent(generateKOTPreview());
       }
     } catch (error) {
       console.error('Error generating preview:', error);
@@ -447,6 +390,11 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         return;
       }
 
+      // Debug logging
+      console.log('🔧 Starting print settings save...');
+      console.log('Token available:', !!token);
+      console.log('Current customization:', customization);
+
       // Ensure we have valid business settings structure
       const currentSettings = businessSettings || {};
       
@@ -486,17 +434,18 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         print_customization: printCustomization
       };
       
-      console.log('Saving print settings:', updatedSettings.print_customization);
+      console.log('🔧 Saving print settings:', printCustomization);
+      console.log('🔧 Full settings payload:', updatedSettings);
       
       const response = await axios.put(`${API}/business/settings`, updatedSettings, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 15000 // Increased timeout to 15 seconds
       });
       
-      console.log('Print settings saved successfully:', response.data);
+      console.log('🔧 Save response:', response.data);
       toast.success('Print settings saved successfully!');
       
       // Safely update parent component
@@ -518,6 +467,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
             print_customization: printCustomization
           };
           localStorage.setItem('user', JSON.stringify(user));
+          console.log('🔧 Updated localStorage with new settings');
         }
       } catch (storageError) {
         console.warn('Error updating local storage:', storageError);
@@ -527,7 +477,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       setHasUnsavedChanges(false);
       
     } catch (error) {
-      console.error('Failed to save print settings:', error);
+      console.error('🔧 Failed to save print settings:', error);
       
       let errorMessage = 'Failed to save print settings';
       
@@ -535,6 +485,9 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         errorMessage = 'Request timed out. Please check your connection and try again.';
       } else if (error.response?.status === 401) {
         errorMessage = 'Session expired. Please login again.';
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         // Optionally redirect to login
         setTimeout(() => {
           window.location.href = '/login';
@@ -551,7 +504,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         } else {
           errorMessage = 'Invalid settings format. Please check your inputs.';
         }
-        console.error('Validation error details:', detail);
+        console.error('🔧 Validation error details:', detail);
       } else if (error.response?.status === 400) {
         errorMessage = error.response?.data?.detail || 'Invalid settings data. Please check your inputs.';
       } else if (error.response?.status >= 500) {
@@ -564,6 +517,12 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
+      }
+      
+      // Additional debugging for network errors
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check if the server is running and try again.';
+        console.error('🔧 Network error - server might be down or CORS issue');
       }
       
       toast.error(errorMessage);
@@ -1173,6 +1132,25 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
                 className="px-4"
               >
                 <RotateCcw className="w-4 h-4" />
+              </Button>
+              {/* Debug button for troubleshooting */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  console.log('🔧 DEBUG INFO:');
+                  console.log('Token:', localStorage.getItem('token') ? 'Available' : 'Missing');
+                  console.log('User:', localStorage.getItem('user') ? 'Available' : 'Missing');
+                  console.log('Business Settings:', businessSettings);
+                  console.log('Current Customization:', customization);
+                  console.log('Has Unsaved Changes:', hasUnsavedChanges);
+                  console.log('Validation Errors:', validationErrors);
+                  console.log('API URL:', API);
+                  toast.info('Debug info logged to console');
+                }}
+                className="px-2"
+                title="Debug Info"
+              >
+                🔧
               </Button>
             </div>
           </div>
