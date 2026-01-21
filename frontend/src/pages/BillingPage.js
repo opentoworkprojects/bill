@@ -222,6 +222,36 @@ const BillingPage = ({ user }) => {
     }
   };
 
+  // Enhanced debugging for dropdown issues
+  useEffect(() => {
+    console.log('🔍 BillByteKOT Billing Debug:', {
+      menuItemsCount: menuItems.length,
+      searchQuery,
+      showMenuDropdown,
+      hasMatches: filteredMenuItems.length > 0,
+      menuLoading,
+      menuError
+    });
+  }, [menuItems.length, searchQuery, showMenuDropdown, menuLoading, menuError]);
+
+  // Add visual feedback for menu loading state
+  useEffect(() => {
+    if (menuLoading) {
+      console.log('📦 Loading menu items...');
+    } else if (menuItems.length === 0 && !menuError) {
+      console.log('⚠️ No menu items found. Please add items in Settings > Menu');
+      toast.info('No menu items found. Please add items in Settings > Menu', {
+        duration: 5000,
+        action: {
+          label: 'Go to Menu Settings',
+          onClick: () => navigate('/settings')
+        }
+      });
+    } else if (menuItems.length > 0) {
+      console.log('✅ Menu items loaded successfully:', menuItems.length);
+    }
+  }, [menuLoading, menuItems.length, menuError, navigate]);
+
   const fetchMenuItems = async (forceRefresh = false) => {
     setMenuLoading(true);
     setMenuError(null);
@@ -977,10 +1007,19 @@ const BillingPage = ({ user }) => {
               <div className="flex gap-1">
                 <div className="relative flex-1">
                   <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${searchFocused ? 'text-violet-500' : 'text-gray-400'}`} />
+                  {menuLoading && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
                   <Input 
-                    placeholder="Search item... (Enter to add)" 
+                    placeholder={menuLoading ? "Loading menu..." : menuError ? "Error loading menu" : "Search item... (Enter to add)"} 
                     value={searchQuery} 
                     onChange={(e) => handleSearchChange(e.target.value)}
+                    disabled={menuLoading || menuError}
+                    className={`pl-8 h-10 text-base transition-all duration-200 ${
+                      searchFocused ? 'ring-2 ring-violet-500 border-violet-300' : 'border-gray-300'
+                    } ${menuError ? 'border-red-300 bg-red-50' : ''}`}
                     onFocus={() => {
                       setSearchFocused(true);
                       if (searchQuery.trim()) {
@@ -1024,6 +1063,40 @@ const BillingPage = ({ user }) => {
                   </>
                 )}
               </div>
+              
+              {/* Menu Error Message */}
+              {menuError && (
+                <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-red-700">
+                    <span className="text-red-500">⚠️</span>
+                    <span className="text-sm font-medium">Menu Loading Error</span>
+                  </div>
+                  <p className="text-red-600 text-xs mt-1">{menuError}</p>
+                  <button 
+                    onClick={() => fetchMenuItems(true)}
+                    className="mt-2 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded transition-colors"
+                  >
+                    Retry Loading Menu
+                  </button>
+                </div>
+              )}
+              
+              {/* No Menu Items Warning */}
+              {!menuLoading && !menuError && menuItems.length === 0 && (
+                <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-yellow-700">
+                    <span className="text-yellow-500">💡</span>
+                    <span className="text-sm font-medium">No Menu Items Found</span>
+                  </div>
+                  <p className="text-yellow-600 text-xs mt-1">Add menu items in Settings to enable search suggestions</p>
+                  <button 
+                    onClick={() => navigate('/settings')}
+                    className="mt-2 text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-700 px-2 py-1 rounded transition-colors"
+                  >
+                    Go to Settings
+                  </button>
+                </div>
+              )}
               
               {/* Enhanced Suggested Items with Intelligent Positioning */}
               {showMenuDropdown && searchQuery.trim() && hasMatches && (

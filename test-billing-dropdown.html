@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillByteKOT Billing Dropdown Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .dropdown-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .dropdown-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: all 0.2s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold mb-6 text-center text-violet-600">
+            🧪 BillByteKOT Dropdown Test
+        </h1>
+        
+        <!-- Search Input with Dropdown -->
+        <div class="relative mb-6">
+            <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input 
+                    type="text" 
+                    id="searchInput"
+                    placeholder="Search items... (type to test dropdown)" 
+                    class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-300 transition-all duration-200"
+                />
+            </div>
+            
+            <!-- Dropdown Menu -->
+            <div 
+                id="dropdown" 
+                class="absolute z-50 w-full bg-white border-2 border-violet-400 rounded-xl overflow-hidden shadow-2xl mt-2 hidden"
+            >
+                <div class="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-4 py-2.5 text-sm font-semibold flex justify-between items-center">
+                    <span class="flex items-center gap-2">
+                        <span>👆</span>
+                        <span>Tap to add (<span id="itemCount">0</span>)</span>
+                    </span>
+                    <button 
+                        id="closeDropdown"
+                        class="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center transition-all duration-200"
+                    >
+                        ✕
+                    </button>
+                </div>
+                <div id="dropdownItems" class="max-h-60 overflow-y-auto">
+                    <!-- Items will be populated here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Added Items List -->
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold mb-3">Added Items:</h3>
+            <div id="addedItems" class="space-y-2 min-h-[100px] bg-gray-50 rounded-lg p-4">
+                <p class="text-gray-500 text-center">No items added yet</p>
+            </div>
+        </div>
+        
+        <!-- Debug Info -->
+        <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="text-sm font-semibold mb-2">Debug Info:</h3>
+            <div id="debugInfo" class="text-xs text-gray-600 space-y-1">
+                <div>Status: <span id="status">Ready</span></div>
+                <div>Search Query: <span id="searchQuery">""</span></div>
+                <div>Filtered Items: <span id="filteredCount">0</span></div>
+                <div>Dropdown Visible: <span id="dropdownVisible">false</span></div>
+            </div>
+        </div>
+        
+        <!-- Test Controls -->
+        <div class="mt-6 space-y-2">
+            <button id="testBtn" class="w-full bg-violet-600 text-white py-2 px-4 rounded-lg hover:bg-violet-700 transition-colors">
+                🧪 Run Dropdown Test
+            </button>
+            <button id="addSampleItems" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                ➕ Add Sample Menu Items
+            </button>
+            <button id="clearItems" class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors">
+                🗑️ Clear All Items
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Sample menu items for testing
+        let menuItems = [];
+        let addedItems = [];
+        let searchQuery = '';
+        let showDropdown = false;
+
+        // DOM elements
+        const searchInput = document.getElementById('searchInput');
+        const dropdown = document.getElementById('dropdown');
+        const dropdownItems = document.getElementById('dropdownItems');
+        const addedItemsContainer = document.getElementById('addedItems');
+        const debugElements = {
+            status: document.getElementById('status'),
+            searchQuery: document.getElementById('searchQuery'),
+            filteredCount: document.getElementById('filteredCount'),
+            dropdownVisible: document.getElementById('dropdownVisible'),
+            itemCount: document.getElementById('itemCount')
+        };
+
+        // Update debug info
+        function updateDebugInfo() {
+            debugElements.status.textContent = menuItems.length > 0 ? 'Ready' : 'No menu items';
+            debugElements.searchQuery.textContent = `"${searchQuery}"`;
+            debugElements.dropdownVisible.textContent = showDropdown;
+            
+            const filteredItems = getFilteredItems();
+            debugElements.filteredCount.textContent = filteredItems.length;
+            debugElements.itemCount.textContent = filteredItems.length;
+        }
+
+        // Get filtered menu items
+        function getFilteredItems() {
+            if (!searchQuery.trim()) return [];
+            return menuItems.filter(item => 
+                item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        // Show/hide dropdown
+        function toggleDropdown(show) {
+            showDropdown = show;
+            if (show) {
+                dropdown.classList.remove('hidden');
+                dropdown.classList.add('dropdown-enter');
+                setTimeout(() => {
+                    dropdown.classList.add('dropdown-enter-active');
+                }, 10);
+            } else {
+                dropdown.classList.add('hidden');
+                dropdown.classList.remove('dropdown-enter', 'dropdown-enter-active');
+            }
+            updateDebugInfo();
+        }
+
+        // Render dropdown items
+        function renderDropdownItems() {
+            const filteredItems = getFilteredItems();
+            
+            if (filteredItems.length === 0) {
+                dropdownItems.innerHTML = `
+                    <div class="p-4 text-center text-gray-500">
+                        <div class="text-orange-600 font-medium">No matches found</div>
+                        <div class="text-sm mt-1">Create new item: "${searchQuery}"</div>
+                    </div>
+                `;
+                return;
+            }
+
+            dropdownItems.innerHTML = filteredItems.map((item, idx) => `
+                <div 
+                    class="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-violet-50' : ''}"
+                    onclick="addItem(${item.id})"
+                >
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800">${item.name}</div>
+                        ${item.category ? `<div class="text-xs text-gray-500">${item.category}</div>` : ''}
+                    </div>
+                    <div class="ml-3">
+                        <span class="px-3 py-1 rounded-lg font-bold text-sm text-white bg-violet-500">
+                            ₹${item.price}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Add item to order
+        function addItem(itemId) {
+            const item = menuItems.find(i => i.id === itemId);
+            if (!item) return;
+
+            const existingItem = addedItems.find(i => i.id === itemId);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                addedItems.push({ ...item, quantity: 1 });
+            }
+
+            searchInput.value = '';
+            searchQuery = '';
+            toggleDropdown(false);
+            renderAddedItems();
+            updateDebugInfo();
+            
+            // Show success message
+            debugElements.status.textContent = `Added: ${item.name}`;
+            setTimeout(() => updateDebugInfo(), 2000);
+        }
+
+        // Render added items
+        function renderAddedItems() {
+            if (addedItems.length === 0) {
+                addedItemsContainer.innerHTML = '<p class="text-gray-500 text-center">No items added yet</p>';
+                return;
+            }
+
+            addedItemsContainer.innerHTML = addedItems.map((item, idx) => `
+                <div class="flex items-center justify-between bg-white p-3 rounded-lg border">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1">
+                            <button onclick="changeQuantity(${idx}, -1)" class="w-6 h-6 bg-red-100 text-red-600 rounded text-sm font-bold">-</button>
+                            <span class="w-8 text-center font-bold">${item.quantity}</span>
+                            <button onclick="changeQuantity(${idx}, 1)" class="w-6 h-6 bg-green-100 text-green-600 rounded text-sm font-bold">+</button>
+                        </div>
+                        <div>
+                            <div class="font-semibold">${item.name}</div>
+                            <div class="text-sm text-gray-500">₹${item.price} each</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-violet-600">₹${(item.price * item.quantity).toFixed(0)}</div>
+                        <button onclick="removeItem(${idx})" class="text-red-400 hover:text-red-600 text-sm">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Change item quantity
+        function changeQuantity(idx, change) {
+            addedItems[idx].quantity += change;
+            if (addedItems[idx].quantity <= 0) {
+                addedItems.splice(idx, 1);
+            }
+            renderAddedItems();
+        }
+
+        // Remove item
+        function removeItem(idx) {
+            addedItems.splice(idx, 1);
+            renderAddedItems();
+        }
+
+        // Handle search input
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            
+            if (searchQuery.trim()) {
+                renderDropdownItems();
+                toggleDropdown(true);
+            } else {
+                toggleDropdown(false);
+            }
+            
+            updateDebugInfo();
+        });
+
+        // Handle search input focus
+        searchInput.addEventListener('focus', () => {
+            if (searchQuery.trim()) {
+                toggleDropdown(true);
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target) && !searchInput.contains(e.target)) {
+                toggleDropdown(false);
+            }
+        });
+
+        // Close dropdown button
+        document.getElementById('closeDropdown').addEventListener('click', () => {
+            toggleDropdown(false);
+        });
+
+        // Test button
+        document.getElementById('testBtn').addEventListener('click', () => {
+            debugElements.status.textContent = 'Running test...';
+            
+            // Simulate typing
+            searchInput.focus();
+            searchInput.value = 'pizza';
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            
+            setTimeout(() => {
+                debugElements.status.textContent = 'Test completed';
+            }, 1000);
+        });
+
+        // Add sample items button
+        document.getElementById('addSampleItems').addEventListener('click', () => {
+            menuItems = [
+                { id: 1, name: 'Margherita Pizza', price: 299, category: 'Pizza', available: true },
+                { id: 2, name: 'Chicken Burger', price: 199, category: 'Burger', available: true },
+                { id: 3, name: 'Pasta Alfredo', price: 249, category: 'Pasta', available: true },
+                { id: 4, name: 'Caesar Salad', price: 149, category: 'Salad', available: true },
+                { id: 5, name: 'Chocolate Cake', price: 99, category: 'Dessert', available: true },
+                { id: 6, name: 'Coffee Latte', price: 79, category: 'Beverage', available: true },
+                { id: 7, name: 'Paneer Tikka', price: 179, category: 'Indian', available: true },
+                { id: 8, name: 'Fish & Chips', price: 229, category: 'Seafood', available: true }
+            ];
+            
+            debugElements.status.textContent = `Added ${menuItems.length} sample items`;
+            updateDebugInfo();
+            
+            setTimeout(() => updateDebugInfo(), 2000);
+        });
+
+        // Clear items button
+        document.getElementById('clearItems').addEventListener('click', () => {
+            menuItems = [];
+            addedItems = [];
+            searchInput.value = '';
+            searchQuery = '';
+            toggleDropdown(false);
+            renderAddedItems();
+            updateDebugInfo();
+            
+            debugElements.status.textContent = 'All items cleared';
+            setTimeout(() => updateDebugInfo(), 2000);
+        });
+
+        // Initialize
+        updateDebugInfo();
+        renderAddedItems();
+    </script>
+</body>
+</html>
