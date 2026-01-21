@@ -12,6 +12,7 @@ import {
 import axios from 'axios';
 import { API } from '../App';
 import { useNavigate } from 'react-router-dom';
+import { EnhancedSEOHead, HomepageSchemaInjector } from '../seo';
 
 const ContactPage = () => {
   const navigate = useNavigate();
@@ -76,6 +77,48 @@ const ContactPage = () => {
   }
 
   return (
+    <>
+      {/* SEO Meta Tags and Schema Markup */}
+      <EnhancedSEOHead
+        title="Contact BillByteKOT - Restaurant Software Support | Get Help & Demo"
+        description="Contact BillByteKOT for restaurant software support, demo requests, and technical assistance. Get help with billing software, KOT system, and restaurant management solutions."
+        keywords={[
+          'BillByteKOT contact',
+          'restaurant software support',
+          'BillByteKOT help',
+          'restaurant software demo',
+          'BillByteKOT customer service',
+          'restaurant billing software support',
+          'KOT software help',
+          'restaurant POS support India'
+        ]}
+        url="https://billbytekot.in/contact"
+        contentType="contact"
+      />
+      
+      {/* LocalBusiness Schema for Contact Information */}
+      <HomepageSchemaInjector 
+        pageData={{
+          name: 'BillByteKOT',
+          description: 'Leading restaurant billing software provider in India',
+          contactInfo: {
+            address: {
+              street: 'Tech Park',
+              city: 'Mumbai',
+              state: 'Maharashtra',
+              postalCode: '400001',
+              country: 'IN'
+            },
+            telephone: '+91-9876543210',
+            email: 'support@billbytekot.in'
+          },
+          url: 'https://billbytekot.in/contact',
+          businessHours: [
+            { dayOfWeek: 'Mo-Fr', opens: '09:00', closes: '18:00' }
+          ]
+        }}
+      />
+      
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50">
       {/* Header */}
       <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white py-16">
@@ -396,6 +439,7 @@ const ContactPage = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 

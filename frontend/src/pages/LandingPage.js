@@ -16,6 +16,7 @@ import MobileAppLeadPopup from "../components/MobileAppLeadPopup";
 import SaleBanner from "../components/SaleBanner";
 import TopBanner from "../components/TopBanner";
 import useSaleOfferData from "../hooks/useSaleOfferData";
+import { HomepageSEO, FAQPageSchemaInjector } from "../seo";
 import {
   ChefHat,
   Sparkles,
@@ -896,7 +897,158 @@ const LandingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white" data-testid="landing-page">
+    <>
+      {/* SEO Meta Tags and Schema Markup */}
+      <HomepageSEO
+        title="BillByteKOT - #1 Restaurant Billing Software India | Free KOT System & Thermal Printing"
+        description="BillByteKOT is India's most trusted restaurant billing software with FREE KOT system, thermal printing, GST billing & WhatsApp integration. Used by 500+ restaurants. Better than Petpooja at ₹1999/year only!"
+        keywords={[
+          'BillByteKOT',
+          'BillByte KOT',
+          'Bill Byte KOT',
+          'BillByteKOT restaurant software',
+          'BillByteKOT POS system',
+          'restaurant billing software',
+          'POS system India',
+          'KOT software',
+          'restaurant management software',
+          'GST billing software',
+          'thermal printer billing',
+          'restaurant POS India',
+          'kitchen order ticket system',
+          'restaurant software India',
+          'billing software for restaurants',
+          'BillByteKOT vs Petpooja',
+          'restaurant billing software India',
+          'best restaurant POS software',
+          'restaurant management system India'
+        ]}
+        url="https://billbytekot.in"
+        image="https://billbytekot.in/og-homepage.jpg"
+        schemaData={{
+          // Enhanced brand-specific data for search disambiguation
+          name: 'BillByteKOT',
+          alternateName: ['BillByte KOT', 'Bill Byte KOT', 'BillByteKOT Restaurant Software', 'BillByteKOT POS'],
+          description: 'BillByteKOT is the best restaurant billing software in India with FREE KOT system, thermal printing, GST billing & WhatsApp integration. Trusted by 500+ restaurants nationwide.',
+          applicationCategory: 'BusinessApplication',
+          applicationSubCategory: 'Restaurant Management Software',
+          operatingSystem: ['Web Browser', 'Windows', 'macOS', 'Android', 'iOS'],
+          
+          // Brand disambiguation properties
+          brand: {
+            name: 'BillByteKOT',
+            alternateName: ['BillByte', 'BillByteKOT Software'],
+            logo: 'https://billbytekot.in/logo.png',
+            slogan: 'Simplifying Restaurant Management',
+            description: 'Leading restaurant billing and management software provider in India'
+          },
+          
+          // Industry and category specification
+          industry: 'Restaurant Technology',
+          keywords: 'restaurant billing software, KOT system, POS software, restaurant management, GST billing, thermal printing, restaurant software India',
+          
+          // Enhanced feature list with brand context
+          featureList: [
+            'BillByteKOT Restaurant Billing & Invoicing System',
+            'Kitchen Order Ticket (KOT) Management with BillByteKOT',
+            'Inventory & Stock Management for Restaurants',
+            'GST Compliance & Tax Management',
+            'Thermal Printer Integration (6 Professional Themes)',
+            'WhatsApp Cloud API Integration',
+            'Staff & User Management System',
+            'Real-time Reports & Analytics Dashboard',
+            'Table Management & Reservation System',
+            'Multi-location Restaurant Support',
+            'Offline Mode Support',
+            'Mobile App Access'
+          ],
+          
+          // Enhanced rating with brand context
+          aggregateRating: {
+            ratingValue: 4.9,
+            reviewCount: 500,
+            bestRating: 5,
+            worstRating: 1,
+            ratingExplanation: 'Based on reviews from 500+ restaurant owners using BillByteKOT'
+          },
+          
+          // Enhanced pricing with brand positioning
+          offers: {
+            name: 'BillByteKOT Restaurant Software License',
+            price: '1999',
+            priceCurrency: 'INR',
+            availability: 'InStock',
+            validFrom: '2024-01-01',
+            priceValidUntil: '2025-12-31',
+            description: 'Complete restaurant management solution at ₹1999/year - 85% cheaper than competitors like Petpooja',
+            category: 'Restaurant Software License'
+          },
+          
+          // Organization details for brand disambiguation
+          publisher: {
+            name: 'BillByte Innovations',
+            alternateName: 'BillByteKOT Team',
+            description: 'Restaurant technology company specializing in billing and management software'
+          },
+          
+          // Competitive positioning
+          competitorComparison: {
+            advantages: [
+              'More affordable than Petpooja (₹1999 vs ₹12000+)',
+              'AI-powered restaurant recommendations',
+              '6 professional thermal receipt themes',
+              'WhatsApp Cloud API integration',
+              'Offline mode support',
+              'Free 7-day trial'
+            ]
+          },
+          
+          // Target audience specification
+          audience: {
+            audienceType: 'Restaurant Owners',
+            geographicArea: 'India',
+            description: 'Restaurant owners, managers, and food business operators in India'
+          }
+        }}
+      />
+      
+      {/* Brand-specific FAQ Schema for search disambiguation */}
+      <FAQPageSchemaInjector faqs={[
+        {
+          question: "What is BillByteKOT?",
+          answer: "BillByteKOT is India's leading restaurant billing software that provides a complete restaurant management solution including KOT (Kitchen Order Ticket) system, thermal printing, GST billing, inventory management, and WhatsApp integration. It's designed specifically for restaurants, cafes, and food businesses in India."
+        },
+        {
+          question: "How is BillByteKOT different from other restaurant software?",
+          answer: "BillByteKOT stands out with its affordable pricing at ₹1999/year (85% cheaper than competitors like Petpooja), AI-powered recommendations, 6 professional thermal receipt themes, WhatsApp Cloud API integration, offline mode support, and comprehensive restaurant management features all in one platform."
+        },
+        {
+          question: "Is BillByteKOT better than Petpooja?",
+          answer: "Yes, BillByteKOT offers several advantages over Petpooja: significantly lower cost (₹1999 vs ₹12,000+), modern WhatsApp integration, AI-powered features, better thermal printing themes, offline mode support, and more user-friendly interface. Many restaurants have switched from Petpooja to BillByteKOT for these benefits."
+        },
+        {
+          question: "What does KOT mean in BillByteKOT?",
+          answer: "KOT stands for Kitchen Order Ticket. It's a system that sends order details directly to the kitchen, helping restaurants manage orders efficiently. BillByteKOT provides a FREE advanced KOT system that streamlines kitchen operations and reduces order errors."
+        },
+        {
+          question: "Is BillByteKOT suitable for small restaurants?",
+          answer: "Absolutely! BillByteKOT is perfect for small restaurants, cafes, dhabas, and food stalls. With its affordable pricing, easy-to-use interface, and comprehensive features, it's designed to help small food businesses grow and manage operations efficiently."
+        },
+        {
+          question: "Does BillByteKOT work offline?",
+          answer: "Yes, BillByteKOT supports offline mode, allowing restaurants to continue billing and operations even without internet connectivity. Data syncs automatically when connection is restored, ensuring no business disruption."
+        },
+        {
+          question: "Can I try BillByteKOT before purchasing?",
+          answer: "Yes, BillByteKOT offers a free 7-day trial with full access to all features. You can test the complete restaurant management system including billing, KOT, inventory, and reports before making a purchase decision."
+        },
+        {
+          question: "What type of businesses use BillByteKOT?",
+          answer: "BillByteKOT is used by various food businesses including restaurants, cafes, dhabas, sweet shops, bakeries, cloud kitchens, food trucks, bars, canteens, and food courts across India. It's suitable for any food service business that needs billing and management software."
+        }
+      ]} />
+      
+      <div className="min-h-screen bg-white" data-testid="landing-page">
       {/* Dynamic Top Banner - Multiple Designs from Super Admin */}
       {/* Pass centralized saleOffer data for consistency - Requirements: 8.1, 8.2 */}
       <TopBanner saleData={saleOffer} />
@@ -3198,7 +3350,8 @@ const LandingPage = () => {
         </svg>
         <span className="hidden group-hover:inline text-sm font-medium whitespace-nowrap">Chat with us</span>
       </a>
-    </div>
+      </div>
+    </>
   );
 };
 

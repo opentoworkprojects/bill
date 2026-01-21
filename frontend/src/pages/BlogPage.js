@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp } from 'lucide-react';
-import blogPostsData from '../data/blogPosts';
+import { blogPosts as blogPostsData } from '../data/blogPosts';
+import { CategoryPageSEO } from '../seo';
 
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -164,25 +164,37 @@ const BlogPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* SEO Meta Tags */}
-      <Helmet>
-        <title>Restaurant Billing Software Blog | Tips, Guides & Updates | BillByteKOT</title>
-        <meta name="description" content="Expert guides on restaurant billing software, KOT systems, thermal printing, inventory management, and restaurant technology. Free tips and tutorials for restaurant owners." />
-        <meta name="keywords" content="restaurant billing software blog, KOT system guide, restaurant POS tips, thermal printer setup, restaurant management tips, BillByteKOT blog" />
-        <link rel="canonical" href="https://billbytekot.in/blog" />
-        
-        {/* Open Graph */}
-        <meta property="og:title" content="Restaurant Billing Software Blog | BillByteKOT" />
-        <meta property="og:description" content="Expert guides on restaurant billing software, KOT systems, and restaurant technology." />
-        <meta property="og:url" content="https://billbytekot.in/blog" />
-        <meta property="og:type" content="website" />
-        
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Restaurant Billing Software Blog | BillByteKOT" />
-        <meta name="twitter:description" content="Expert guides on restaurant billing software, KOT systems, and restaurant technology." />
-      </Helmet>
+    <>
+      {/* SEO Meta Tags and Schema Markup */}
+      <CategoryPageSEO
+        title="Restaurant Billing Software Blog | Tips, Guides & Updates | BillByteKOT"
+        description="Expert guides on restaurant billing software, KOT systems, thermal printing, inventory management, and restaurant technology. Free tips and tutorials for restaurant owners."
+        keywords={[
+          'restaurant billing software blog',
+          'KOT system guide',
+          'restaurant POS tips',
+          'thermal printer setup',
+          'restaurant management tips',
+          'restaurant software tutorials',
+          'billing software guides',
+          'restaurant technology blog',
+          'POS system tips',
+          'restaurant business tips'
+        ]}
+        url="https://billbytekot.in/blog"
+        image="https://billbytekot.in/og-blog.jpg"
+        schemaData={{
+          name: 'Restaurant Software Blog',
+          description: 'Expert guides and tips on restaurant billing software, KOT systems, and restaurant technology.',
+          items: filteredPosts.slice(0, 10).map(post => ({
+            name: post.title,
+            description: post.excerpt,
+            url: `https://billbytekot.in/blog/${post.slug}`
+          }))
+        }}
+      />
+      
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
@@ -464,7 +476,8 @@ const BlogPage = () => {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -5,6 +5,7 @@ import {
   ChefHat, CheckCircle, ArrowRight, Printer, 
   Clock, Zap, Bell, Monitor, Smartphone 
 } from "lucide-react";
+import { ProductPageSEO } from "../seo";
 
 const KOTSoftwarePage = () => {
   const navigate = useNavigate();
@@ -19,6 +20,59 @@ const KOTSoftwarePage = () => {
   ];
 
   return (
+    <>
+      {/* SEO Meta Tags and Schema Markup */}
+      <ProductPageSEO
+        title="Best KOT Software for Restaurants | Kitchen Order Ticket System - BillByteKOT"
+        description="Advanced KOT (Kitchen Order Ticket) software for restaurants with instant order transmission, real-time tracking, thermal printing & kitchen display system. Free trial available!"
+        keywords={[
+          'KOT software',
+          'Kitchen Order Ticket system',
+          'KOT system for restaurants',
+          'restaurant KOT software India',
+          'kitchen order management',
+          'restaurant order system',
+          'KOT printing software',
+          'kitchen display system',
+          'restaurant order tracking',
+          'BillByteKOT KOT system'
+        ]}
+        url="https://billbytekot.in/kot-software"
+        image="https://billbytekot.in/og-kot-software.jpg"
+        schemaData={{
+          name: 'BillByteKOT KOT Software',
+          description: 'Advanced KOT (Kitchen Order Ticket) software for restaurants with instant order transmission, real-time tracking, thermal printing & kitchen display system.',
+          applicationCategory: 'BusinessApplication',
+          applicationSubCategory: 'Kitchen Order Ticket Software',
+          operatingSystem: ['Web Browser', 'Windows', 'macOS', 'Android', 'iOS'],
+          featureList: [
+            'Kitchen Order Ticket (KOT) Management',
+            'Instant Order Transmission to Kitchen',
+            'Real-time Order Tracking',
+            'Thermal KOT Printing',
+            'Kitchen Display System',
+            'Order Priority Management',
+            'Sound Notifications for New Orders',
+            'Mobile Kitchen Access',
+            'Order Status Updates',
+            'Kitchen Performance Analytics'
+          ],
+          aggregateRating: {
+            ratingValue: 4.9,
+            reviewCount: 500,
+            bestRating: 5,
+            worstRating: 1
+          },
+          offers: {
+            name: 'BillByteKOT KOT Software License',
+            price: '1999',
+            priceCurrency: 'INR',
+            availability: 'InStock',
+            description: 'Complete KOT system included with BillByteKOT restaurant software'
+          }
+        }}
+      />
+      
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
@@ -131,6 +185,7 @@ const KOTSoftwarePage = () => {
         </div>
       </footer>
     </div>
+    </>
   );
 };
 

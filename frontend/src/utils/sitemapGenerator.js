@@ -25,6 +25,9 @@ const DEFAULT_PRIORITY = 0.5;
 const DEFAULT_CHANGEFREQ = 'weekly';
 const PRIORITY_MAP = {
   '/': 1.0,
+  '/restaurant-billing-software': 0.95,
+  '/kot-software': 0.9,
+  '/pos-software': 0.9,
   '/pricing': 0.9,
   '/features': 0.9,
   '/about': 0.8,
@@ -33,6 +36,10 @@ const PRIORITY_MAP = {
   '/blog/': 0.7,
   '/docs': 0.7,
   '/docs/': 0.7,
+  '/compare': 0.8,
+  '/compare/': 0.8,
+  '/city': 0.6,
+  '/city/': 0.6,
   '/privacy': 0.3,
   '/terms': 0.3,
   '/sitemap.xml': 0.1,
@@ -40,6 +47,9 @@ const PRIORITY_MAP = {
 
 const CHANGEFREQ_MAP = {
   '/': 'daily',
+  '/restaurant-billing-software': 'weekly',
+  '/kot-software': 'weekly',
+  '/pos-software': 'weekly',
   '/blog': 'daily',
   '/blog/': 'daily',
   '/pricing': 'monthly',
@@ -48,6 +58,10 @@ const CHANGEFREQ_MAP = {
   '/contact': 'monthly',
   '/docs': 'weekly',
   '/docs/': 'weekly',
+  '/compare': 'monthly',
+  '/compare/': 'monthly',
+  '/city': 'monthly',
+  '/city/': 'monthly',
   '/privacy': 'yearly',
   '/terms': 'yearly',
 };

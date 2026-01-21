@@ -4,13 +4,39 @@ const { SitemapStream } = require('sitemap');
 const { Readable } = require('stream');
 
 const pages = [
+  // Brand-critical pages for search disambiguation
   { url: '/', changefreq: 'daily', priority: 1.0 },
-  { url: '/pricing', changefreq: 'monthly', priority: 0.8 },
-  { url: '/features', changefreq: 'monthly', priority: 0.8 },
+  { url: '/billbytekot', changefreq: 'weekly', priority: 0.95 },
+  { url: '/restaurant-billing-software', changefreq: 'weekly', priority: 0.95 },
+  { url: '/kot-software', changefreq: 'weekly', priority: 0.9 },
+  { url: '/pos-software', changefreq: 'weekly', priority: 0.9 },
+  
+  // Core product pages
+  { url: '/pricing', changefreq: 'monthly', priority: 0.9 },
+  { url: '/features', changefreq: 'monthly', priority: 0.9 },
+  
+  // Content and support
   { url: '/blog', changefreq: 'weekly', priority: 0.7 },
-  { url: '/contact', changefreq: 'monthly', priority: 0.6 },
+  { url: '/contact', changefreq: 'monthly', priority: 0.8 },
+  
+  // Comparison pages for competitive positioning
+  { url: '/compare/billbytekot-vs-petpooja', changefreq: 'monthly', priority: 0.8 },
+  { url: '/compare/billbytekot-vs-posist', changefreq: 'monthly', priority: 0.8 },
+  
+  // City pages for local SEO (top cities)
+  { url: '/city/mumbai', changefreq: 'monthly', priority: 0.6 },
+  { url: '/city/delhi', changefreq: 'monthly', priority: 0.6 },
+  { url: '/city/bangalore', changefreq: 'monthly', priority: 0.6 },
+  { url: '/city/hyderabad', changefreq: 'monthly', priority: 0.6 },
+  { url: '/city/chennai', changefreq: 'monthly', priority: 0.6 },
+  
+  // User flow pages
   { url: '/login', changefreq: 'monthly', priority: 0.5 },
   { url: '/signup', changefreq: 'monthly', priority: 0.8 },
+  
+  // Legal pages
+  { url: '/privacy', changefreq: 'yearly', priority: 0.3 },
+  { url: '/terms', changefreq: 'yearly', priority: 0.3 },
 ];
 
 const generateSitemap = () => {

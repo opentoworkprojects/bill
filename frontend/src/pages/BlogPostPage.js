@@ -4,7 +4,8 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { ChefHat, Calendar, User, Clock, ArrowLeft, Share2, BookmarkPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import blogPostsData from '../data/blogPosts';
+import { blogPosts as blogPostsData } from '../data/blogPosts';
+import { BlogPostSEO } from '../seo';
 
 const BlogPostPage = () => {
   const { slug } = useParams();
@@ -15,32 +16,43 @@ const BlogPostPage = () => {
   
   if (newBlogPost) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* SEO Meta Tags */}
-        <Helmet>
-          <title>{newBlogPost.title} | BillByteKOT Blog</title>
-          <meta name="description" content={newBlogPost.excerpt || newBlogPost.title} />
-          <meta name="keywords" content={`${newBlogPost.category}, restaurant billing, KOT system, BillByteKOT, ${newBlogPost.title.toLowerCase()}`} />
-          <link rel="canonical" href={`https://billbytekot.in/blog/${slug}`} />
-          
-          {/* Open Graph */}
-          <meta property="og:title" content={`${newBlogPost.title} | BillByteKOT`} />
-          <meta property="og:description" content={newBlogPost.excerpt || newBlogPost.title} />
-          <meta property="og:image" content={newBlogPost.image} />
-          <meta property="og:url" content={`https://billbytekot.in/blog/${slug}`} />
-          <meta property="og:type" content="article" />
-          
-          {/* Twitter */}
-          <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content={newBlogPost.title} />
-          <meta name="twitter:description" content={newBlogPost.excerpt || newBlogPost.title} />
-          <meta name="twitter:image" content={newBlogPost.image} />
-          
-          {/* Article specific */}
-          <meta property="article:published_time" content={newBlogPost.date} />
-          <meta property="article:author" content={newBlogPost.author} />
-          <meta property="article:section" content={newBlogPost.category} />
-        </Helmet>
+      <>
+        {/* SEO Meta Tags and Schema Markup */}
+        <BlogPostSEO
+          title={`${newBlogPost.title} | BillByteKOT Blog`}
+          description={newBlogPost.excerpt || newBlogPost.title}
+          keywords={[
+            newBlogPost.category.toLowerCase(),
+            'restaurant billing',
+            'KOT system',
+            'restaurant software',
+            'BillByteKOT',
+            ...newBlogPost.title.toLowerCase().split(' ').slice(0, 5)
+          ]}
+          url={`https://billbytekot.in/blog/${slug}`}
+          image={newBlogPost.image}
+          author={newBlogPost.author}
+          publishedDate={newBlogPost.date}
+          modifiedDate={newBlogPost.modifiedDate || newBlogPost.date}
+          schemaData={{
+            headline: newBlogPost.title,
+            description: newBlogPost.excerpt || newBlogPost.title,
+            image: newBlogPost.image,
+            author: newBlogPost.author,
+            publishedDate: newBlogPost.date,
+            modifiedDate: newBlogPost.modifiedDate || newBlogPost.date,
+            url: `https://billbytekot.in/blog/${slug}`,
+            wordCount: newBlogPost.content ? newBlogPost.content.split(' ').length : 1000,
+            keywords: [newBlogPost.category, 'restaurant billing', 'KOT system', 'restaurant software'],
+            articleSection: newBlogPost.category,
+            about: {
+              name: 'Restaurant Management',
+              description: 'Tips and guides for restaurant owners and managers'
+            }
+          }}
+        />
+        
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         
         {/* Header */}
         <header className="bg-white border-b sticky top-0 z-50">
@@ -115,7 +127,8 @@ const BlogPostPage = () => {
             </Button>
           </div>
         </article>
-      </div>
+        </div>
+      </>
     );
   }
 

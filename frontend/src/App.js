@@ -36,6 +36,7 @@ import ReferEarnPage from './pages/ReferEarnPage';
 import RestaurantBillingSoftwarePage from './pages/RestaurantBillingSoftwarePage';
 import KOTSoftwarePage from './pages/KOTSoftwarePage';
 import POSSoftwarePage from './pages/POSSoftwarePage';
+import BrandPage from './pages/BrandPage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import NotFound from './pages/NotFound';
 import PWAHomePage from './pages/PWAHomePage';
@@ -823,6 +824,9 @@ function App() {
           <Route path="/restaurant-billing-software" element={<RestaurantBillingSoftwarePage />} />
           <Route path="/kot-software" element={<KOTSoftwarePage />} />
           <Route path="/pos-software-for-restaurants" element={<POSSoftwarePage />} />
+          <Route path="/billbytekot" element={<BrandPage />} />
+          <Route path="/about-billbytekot" element={<BrandPage />} />
+          <Route path="/what-is-billbytekot" element={<BrandPage />} />
           <Route path="/track/:trackingToken" element={<TrackOrderPage />} />
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/menu/:orgId" element={<PublicMenuPage />} />

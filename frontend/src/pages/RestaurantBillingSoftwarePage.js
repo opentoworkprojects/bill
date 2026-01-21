@@ -5,6 +5,7 @@ import {
   ChefHat, CheckCircle, Star, ArrowRight, Printer, 
   Shield, Zap, Globe, Users, BarChart3, MessageCircle 
 } from "lucide-react";
+import { ProductPageSEO } from "../seo";
 
 const RestaurantBillingSoftwarePage = () => {
   const navigate = useNavigate();
@@ -19,7 +20,56 @@ const RestaurantBillingSoftwarePage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <>
+      {/* SEO Meta Tags and Schema Markup */}
+      <ProductPageSEO
+        title="Best Restaurant Billing Software in India | BillByteKOT - Free KOT System"
+        description="Complete restaurant billing software with FREE KOT system, thermal printing, GST billing, inventory management & WhatsApp integration. Trusted by 500+ restaurants in India."
+        keywords={[
+          'restaurant billing software India',
+          'restaurant POS system',
+          'KOT software',
+          'GST billing software restaurants',
+          'thermal printer billing software',
+          'restaurant management software India',
+          'restaurant software with KOT',
+          'billing software for restaurants',
+          'restaurant POS India',
+          'restaurant billing system'
+        ]}
+        url="https://billbytekot.in/restaurant-billing-software"
+        image="https://billbytekot.in/og-restaurant-billing.jpg"
+        schemaData={{
+          name: 'BillByteKOT Restaurant Billing Software',
+          description: 'Complete restaurant billing software with FREE KOT system, thermal printing, GST billing, inventory management & WhatsApp integration.',
+          applicationCategory: 'BusinessApplication',
+          applicationSubCategory: 'Restaurant Billing Software',
+          operatingSystem: ['Web Browser', 'Windows', 'macOS', 'Android', 'iOS'],
+          featureList: [
+            'Restaurant Billing & Invoicing',
+            'Kitchen Order Ticket (KOT) System',
+            'Thermal Printer Integration',
+            'GST Compliance & Tax Management',
+            'Inventory Management',
+            'WhatsApp Bill Sharing',
+            'Multi-Currency Support',
+            'Staff Management',
+            'Real-time Analytics',
+            'Table Management'
+          ],
+          offers: {
+            price: '1999',
+            priceCurrency: 'INR',
+            availability: 'InStock'
+          },
+          aggregateRating: {
+            ratingValue: 4.9,
+            reviewCount: 500
+          }
+        }}
+      />
+      
+      <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -128,7 +178,8 @@ const RestaurantBillingSoftwarePage = () => {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 };
 

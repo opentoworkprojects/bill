@@ -5,6 +5,7 @@ import {
   ChefHat, CheckCircle, ArrowRight, CreditCard, 
   Shield, Globe, Package, BarChart3, Users 
 } from "lucide-react";
+import { ProductPageSEO } from "../seo";
 
 const POSSoftwarePage = () => {
   const navigate = useNavigate();
@@ -19,6 +20,59 @@ const POSSoftwarePage = () => {
   ];
 
   return (
+    <>
+      {/* SEO Meta Tags and Schema Markup */}
+      <ProductPageSEO
+        title="Best POS Software for Restaurants | Point of Sale System India - BillByteKOT"
+        description="Complete restaurant POS software with payment processing, inventory management, sales tracking & GST billing. Cloud-based system works on any device. Free trial available!"
+        keywords={[
+          'POS software for restaurants',
+          'restaurant POS system India',
+          'point of sale software',
+          'restaurant POS system',
+          'POS software India',
+          'restaurant point of sale',
+          'cloud POS software',
+          'restaurant payment system',
+          'POS system for restaurants',
+          'BillByteKOT POS software'
+        ]}
+        url="https://billbytekot.in/pos-software"
+        image="https://billbytekot.in/og-pos-software.jpg"
+        schemaData={{
+          name: 'BillByteKOT POS Software',
+          description: 'Complete restaurant POS software with payment processing, inventory management, sales tracking & GST billing. Cloud-based system works on any device.',
+          applicationCategory: 'BusinessApplication',
+          applicationSubCategory: 'Point of Sale Software',
+          operatingSystem: ['Web Browser', 'Windows', 'macOS', 'Android', 'iOS'],
+          featureList: [
+            'Complete Point of Sale System',
+            'All Payment Methods (Cash, Card, UPI, Online)',
+            'GST Compliant Billing & Invoicing',
+            'Inventory & Stock Management',
+            'Cloud-Based Access Anywhere',
+            'Real-time Sales Analytics & Reports',
+            'Multi-User Staff Management',
+            'Customer Management System',
+            'Barcode Scanning Support',
+            'Offline Mode Support'
+          ],
+          aggregateRating: {
+            ratingValue: 4.9,
+            reviewCount: 500,
+            bestRating: 5,
+            worstRating: 1
+          },
+          offers: {
+            name: 'BillByteKOT POS Software License',
+            price: '1999',
+            priceCurrency: 'INR',
+            availability: 'InStock',
+            description: 'Complete POS system included with BillByteKOT restaurant software'
+          }
+        }}
+      />
+      
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
@@ -157,6 +211,7 @@ const POSSoftwarePage = () => {
         </div>
       </footer>
     </div>
+    </>
   );
 };
 
