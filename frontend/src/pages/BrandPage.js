@@ -1,10 +1,8 @@
-import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { 
-  ChefHat, CheckCircle, Star, ArrowRight, Printer, 
-  Shield, Zap, Globe, Users, BarChart3, MessageCircle,
+  ChefHat, Star, ArrowRight,
   Award, TrendingUp, Clock, Heart
 } from 'lucide-react';
 import { EnhancedSEOHead, FAQPageSchemaInjector, HomepageSchemaInjector } from '../seo';
