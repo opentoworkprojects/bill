@@ -8404,8 +8404,14 @@ async def startup_validation():
             await db.stock_movements.create_index([("organization_id", 1), ("item_id", 1)])
             await db.stock_movements.create_index([("organization_id", 1), ("created_at", -1)])
             
-            # Referral system indexes
-            await db.users.create_index("referral_code", unique=True, sparse=True)  # Fast lookup by referral code
+            # Referral system indexes - Make referral_code index sparse and handle existing nulls
+            try:
+                # Try to create referral_code index, but handle existing null values gracefully
+                await db.users.create_index("referral_code", unique=True, sparse=True)
+            except Exception as referral_index_error:
+                print(f"⚠️  Referral code index creation skipped: {referral_index_error}")
+                print("💡 This is expected if multiple users have null referral codes")
+            
             await db.referrals.create_index("referral_code")  # Lookup referrals by code
             await db.referrals.create_index("referrer_user_id")  # Find all referrals by a user
             await db.referrals.create_index("referee_user_id", unique=True, sparse=True)  # One referral per referee
@@ -8420,7 +8426,7 @@ async def startup_validation():
             print("✅ Database indexes created successfully")
         except Exception as e:
             print(f"⚠️  Index creation warning: {e}")
-            print(f"❌ Alternative connection failed: {e2}")
+            # Continue startup even if index creation fails
 
             # Strategy 3: Try with pymongo legacy SSL options
             try:
