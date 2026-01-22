@@ -173,7 +173,7 @@ const BillingPage = ({ user }) => {
     }
   }, [showMenuDropdown, calculateDropdownPosition]);
 
-  // Debounced search for better performance
+  // Debounced search for better performance with improved logic
   const handleSearchChange = useCallback((value) => {
     setSearchQuery(value);
     setLastSearchTime(Date.now());
@@ -183,19 +183,61 @@ const BillingPage = ({ user }) => {
       clearTimeout(searchDebounceTimer);
     }
     
-    // Set new timer for dropdown show/hide
+    // Set new timer for dropdown show/hide with better logic
     const timer = setTimeout(() => {
-      if (value.trim()) {
+      if (value.trim().length >= 1) { // Show dropdown after 1 character
         setShowMenuDropdown(true);
         setIsDropdownAnimating(true);
         setTimeout(() => setIsDropdownAnimating(false), 200);
+        console.log('🔍 Showing dropdown for query:', value);
       } else {
         setShowMenuDropdown(false);
+        console.log('🔍 Hiding dropdown - query too short');
       }
-    }, 150); // 150ms debounce for smooth UX
+    }, 100); // Reduced debounce for faster response
     
     setSearchDebounceTimer(timer);
   }, [searchDebounceTimer]);
+  
+  // Handle menu item selection with improved feedback
+  const handleAddMenuItem = useCallback((item) => {
+    console.log('➕ Adding menu item:', item.name);
+    
+    // Check if item already exists in order
+    const existingItemIndex = orderItems.findIndex(orderItem => orderItem.menu_item_id === item.id);
+    
+    if (existingItemIndex >= 0) {
+      // Increase quantity if item already exists
+      const updatedItems = [...orderItems];
+      updatedItems[existingItemIndex].quantity += 1;
+      setOrderItems(updatedItems);
+      toast.success(`Increased ${item.name} quantity to ${updatedItems[existingItemIndex].quantity}`);
+    } else {
+      // Add new item
+      const newItem = {
+        menu_item_id: item.id,
+        name: item.name,
+        quantity: 1,
+        price: item.price,
+        notes: ''
+      };
+      setOrderItems([...orderItems, newItem]);
+      toast.success(`Added ${item.name} to order`);
+    }
+    
+    // Clear search and hide dropdown
+    setSearchQuery('');
+    setShowMenuDropdown(false);
+    setSearchFocused(false);
+    
+    // Focus back to search input for next item
+    setTimeout(() => {
+      const searchInput = document.querySelector('[data-testid="menu-search-input"]');
+      if (searchInput) {
+        searchInput.focus();
+      }
+    }, 100);
+  }, [orderItems]);
 
   const fetchOrder = async () => {
     try {
@@ -229,41 +271,31 @@ const BillingPage = ({ user }) => {
       searchQuery,
       showMenuDropdown,
       hasMatches: filteredMenuItems.length > 0,
-      menuLoading,
       menuError
     });
-  }, [menuItems.length, searchQuery, showMenuDropdown, menuLoading, menuError]);
+  }, [menuItems.length, searchQuery, showMenuDropdown, menuError]);
 
-  // Add visual feedback for menu loading state
+  // Add visual feedback for menu state (no loading notifications)
   useEffect(() => {
-    if (menuLoading) {
-      console.log('📦 Loading menu items...');
-    } else if (menuItems.length === 0 && !menuError) {
-      console.log('⚠️ No menu items found. Please add items in Settings > Menu');
-      toast.info('No menu items found. Please add items in Settings > Menu', {
-        duration: 5000,
-        action: {
-          label: 'Go to Menu Settings',
-          onClick: () => navigate('/settings')
-        }
-      });
+    if (menuItems.length === 0 && !menuError) {
+      console.log('⚠️ No menu items found. Please add items in Menu page');
     } else if (menuItems.length > 0) {
       console.log('✅ Menu items loaded successfully:', menuItems.length);
     }
-  }, [menuLoading, menuItems.length, menuError, navigate]);
+  }, [menuItems.length, menuError, navigate]);
 
   const fetchMenuItems = async (forceRefresh = false) => {
     setMenuLoading(true);
     setMenuError(null);
     
     try {
-      console.log('Fetching menu items...');
+      console.log('🔄 Fetching menu items silently...');
       
       // Check if user is authenticated
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('No auth token found');
-        setMenuError('Authentication required');
+        console.error('❌ No auth token found');
+        setMenuError('Authentication required. Please login again.');
         setMenuLoading(false);
         return;
       }
@@ -276,68 +308,81 @@ const BillingPage = ({ user }) => {
         try {
           const { items, timestamp } = JSON.parse(cachedData);
           const cacheAge = Date.now() - timestamp;
-          const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+          const CACHE_TTL = 2 * 60 * 1000; // 2 minutes for faster updates
           
           if (cacheAge < CACHE_TTL && items.length > 0) {
             console.log('📦 Using cached menu items:', items.length, 'items');
             setMenuItems(items);
-            setMenuLastFetched(new Date(timestamp));
             setMenuLoading(false);
             
             // Refresh in background after showing cached data
-            setTimeout(() => fetchMenuItems(true), 100);
+            setTimeout(() => fetchMenuItems(true), 500);
             return;
           }
         } catch (e) {
-          console.warn('Cache parse error:', e);
+          console.warn('⚠️ Cache parse error:', e);
         }
       }
+      
+      // Add timeout and retry logic
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       const response = await axios.get(`${API}/menu`, {
         headers: {
           'Authorization': `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const items = Array.isArray(response.data) ? response.data : [];
       const availableItems = items.filter(item => item.available);
       
-      console.log('Menu fetch successful:', availableItems.length, 'available items out of', items.length, 'total');
+      console.log('✅ Menu fetch successful:', availableItems.length, 'available items out of', items.length, 'total');
       setMenuItems(availableItems);
-      setMenuLastFetched(new Date());
       
-      // Cache the menu items
+      // Cache the menu items with better error handling
       try {
         localStorage.setItem(cacheKey, JSON.stringify({
           items: availableItems,
           timestamp: Date.now()
         }));
+        console.log('💾 Menu items cached successfully');
       } catch (e) {
-        console.warn('Failed to cache menu items:', e);
+        console.warn('⚠️ Failed to cache menu items:', e);
       }
       
       if (availableItems.length === 0) {
-        console.warn('No available menu items found');
-        toast.warning('No menu items available. Please add menu items first.');
+        console.warn('⚠️ No available menu items found');
+        setMenuError('No menu items available');
+      } else {
+        console.log('🎉 Menu loaded successfully with', availableItems.length, 'items');
       }
       
     } catch (error) {
-      console.error('Failed to fetch menu items', error);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
+      console.error('❌ Failed to fetch menu items', error);
       
       let errorMessage = 'Failed to load menu items';
       
-      if (error.response?.status === 401) {
-        errorMessage = 'Authentication required. Please login again.';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Menu loading timed out. Please try again.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Authentication expired. Please login again.';
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setTimeout(() => navigate('/login'), 2000);
       } else if (error.response?.status === 403) {
         errorMessage = 'Not authorized to view menu items.';
       } else if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error. Please check your connection.';
       }
       
       setMenuError(errorMessage);
-      toast.error(errorMessage);
       setMenuItems([]);
     } finally {
       setMenuLoading(false);
@@ -420,25 +465,51 @@ const BillingPage = ({ user }) => {
   const calculateTotal = useCallback(() => total, [total]);
   const getEffectiveTaxRate = useCallback(() => effectiveTaxRate, [effectiveTaxRate]);
 
-  const handleAddMenuItem = (menuItem) => {
-    const existingIndex = orderItems.findIndex(item => item.menu_item_id === menuItem.id);
-    if (existingIndex !== -1) {
-      const updated = [...orderItems];
-      updated[existingIndex].quantity += 1;
-      setOrderItems(updated);
-    } else {
-      setOrderItems([...orderItems, { menu_item_id: menuItem.id, name: menuItem.name, price: menuItem.price, quantity: 1, notes: '' }]);
+  // Get filtered menu items based on search with improved logic
+  const filteredMenuItems = useMemo(() => {
+    if (!searchQuery.trim() || menuItems.length === 0) {
+      return [];
     }
-    setShowMenuDropdown(false);
-    setSearchQuery('');
-    setCustomPrice('');
-    toast.success(`Added: ${menuItem.name}`);
-  };
-
-  // Get filtered menu items based on search
-  const filteredMenuItems = searchQuery.trim() 
-    ? menuItems.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : [];
+    
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Multi-field search with scoring
+    const searchResults = menuItems.map(item => {
+      let score = 0;
+      const name = item.name.toLowerCase();
+      const category = item.category.toLowerCase();
+      const description = (item.description || '').toLowerCase();
+      
+      // Exact name match gets highest score
+      if (name === query) score += 100;
+      // Name starts with query
+      else if (name.startsWith(query)) score += 50;
+      // Name contains query
+      else if (name.includes(query)) score += 25;
+      
+      // Category matches
+      if (category === query) score += 30;
+      else if (category.includes(query)) score += 15;
+      
+      // Description matches
+      if (description.includes(query)) score += 10;
+      
+      return { ...item, searchScore: score };
+    })
+    .filter(item => item.searchScore > 0)
+    .sort((a, b) => b.searchScore - a.searchScore)
+    .slice(0, 20); // Limit to top 20 results
+    
+    console.log('🔍 Search results:', {
+      query,
+      totalItems: menuItems.length,
+      matches: searchResults.length,
+      topMatch: searchResults[0]?.name
+    });
+    
+    return searchResults;
+  }, [searchQuery, menuItems]);
+  
   const hasMatches = filteredMenuItems.length > 0;
 
   // Add custom item (when no menu match)
@@ -1007,27 +1078,82 @@ const BillingPage = ({ user }) => {
               <div className="flex gap-1">
                 <div className="relative flex-1">
                   <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${searchFocused ? 'text-violet-500' : 'text-gray-400'}`} />
-                  {menuLoading && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                      <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  )}
                   <Input 
-                    placeholder={menuLoading ? "Loading menu..." : menuError ? "Error loading menu" : "Search item... (Enter to add)"} 
+                    placeholder={
+                      menuError ? "Click retry to reload menu" : 
+                      menuItems.length === 0 ? "No menu items - Go to Menu page to add items" :
+                      "Search item... (Enter to add)"
+                    } 
                     value={searchQuery} 
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    disabled={menuLoading || menuError}
-                    className={`pl-8 h-10 text-base transition-all duration-200 ${
+                    className={`pl-8 pr-12 h-10 text-base transition-all duration-200 ${
                       searchFocused ? 'ring-2 ring-violet-500 border-violet-300' : 'border-gray-300'
-                    } ${menuError ? 'border-red-300 bg-red-50' : ''}`}
+                    } ${menuError ? 'border-red-300 bg-red-50' : ''} ${
+                      menuItems.length === 0 && !menuLoading ? 'border-yellow-300 bg-yellow-50' : ''
+                    }`}
                     onFocus={() => {
                       setSearchFocused(true);
-                      if (searchQuery.trim()) {
+                      if (searchQuery.trim() && menuItems.length > 0) {
                         setShowMenuDropdown(true);
                       }
                     }}
                     onBlur={() => {
                       // Delay blur to allow for item selection
+                      setTimeout(() => setSearchFocused(false), 200);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && hasMatches) {
+                        e.preventDefault();
+                        handleAddMenuItem(filteredMenuItems[0]);
+                      }
+                      if (e.key === 'Escape') {
+                        setShowMenuDropdown(false);
+                        setSearchQuery('');
+                      }
+                    }}
+                    data-testid="menu-search-input"
+                  />
+                  
+                  {/* Action buttons for different states - no loading spinner */}
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {menuError && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => fetchMenuItems(true)}
+                        className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Retry
+                      </Button>
+                    )}
+                    
+                    {menuItems.length === 0 && !menuLoading && !menuError && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate('/menu')}
+                        className="h-6 px-2 text-xs text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                      >
+                        Add Items
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <Input 
+                    placeholder={
+                      menuError ? "Click retry to reload menu" : 
+                      menuItems.length === 0 ? "No menu items - Go to Menu page to add items" :
+                      "Search item... (Enter to add)"
+                    } 
+                    value={searchQuery} 
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => {
+                      setSearchFocused(true);
+                      if (searchQuery.trim() && menuItems.length > 0) {
+                        setShowMenuDropdown(true);
+                      }
+                    }}
+                    onBlur={() => {
                       setTimeout(() => setSearchFocused(false), 200);
                     }}
                     onKeyDown={(e) => {

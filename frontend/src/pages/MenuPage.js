@@ -23,6 +23,7 @@ const MenuPage = ({ user }) => {
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef(null);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [loading, setLoading] = useState(true); // Add loading state
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -46,12 +47,44 @@ const MenuPage = ({ user }) => {
   }, [searchTerm, menuItems]);
 
   const fetchMenuItems = async () => {
+    setLoading(true);
     try {
+      console.log('🔄 Fetching menu items...');
+      
       const response = await axios.get(`${API}/menu`);
-      setMenuItems(response.data);
-      setFilteredItems(response.data);
+      const items = Array.isArray(response.data) ? response.data : [];
+      
+      setMenuItems(items);
+      setFilteredItems(items);
+      
+      if (items.length === 0) {
+        toast.info('No menu items found. Add your first menu item below!');
+      } else {
+        console.log('✅ Menu items loaded:', items.length);
+      }
+      
     } catch (error) {
-      toast.error('Failed to fetch menu items');
+      console.error('❌ Failed to fetch menu items:', error);
+      
+      let errorMessage = 'Failed to fetch menu items';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication expired. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to view menu items.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+        action: {
+          label: 'Retry',
+          onClick: () => fetchMenuItems()
+        }
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -333,7 +366,14 @@ const MenuPage = ({ user }) => {
           />
         )}
 
-        {categories.map((category) => {
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading menu items...</p>
+            </div>
+          </div>
+        ) : categories.map((category) => {
           const categoryItems = filteredItems.filter(item => item.category === category);
           if (categoryItems.length === 0) return null;
 
@@ -384,7 +424,7 @@ const MenuPage = ({ user }) => {
           );
         })}
 
-        {filteredItems.length === 0 && (
+        {!loading && filteredItems.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500">No menu items found</p>
           </div>
