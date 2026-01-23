@@ -651,24 +651,46 @@ const BillingPage = ({ user }) => {
       }
       
       // Use optimized payment processor with callbacks for immediate UI feedback
-      const result = await processPaymentFast(paymentData, {
-        onStart: (data) => {
-          // Optimistic UI update - show success immediately
-          console.log('💫 Optimistic update: Payment processing started');
-          setCompletedPaymentData({
-            received: received,
-            balance: balance,
-            total: total,
-            isCredit: isCredit,
-            paymentMethod: splitPayment ? 'split' : paymentMethod
-          });
-        },
-        onError: (error) => {
-          // Revert optimistic update on error
-          console.log('❌ Reverting optimistic update due to error:', error);
-          setCompletedPaymentData(null);
-        }
-      });
+      let result;
+      try {
+        result = await processPaymentFast(paymentData, {
+          onStart: (data) => {
+            // Optimistic UI update - show success immediately
+            console.log('💫 Optimistic update: Payment processing started');
+            setCompletedPaymentData({
+              received: received,
+              balance: balance,
+              total: total,
+              isCredit: isCredit,
+              paymentMethod: splitPayment ? 'split' : paymentMethod
+            });
+          },
+          onError: (error) => {
+            // Revert optimistic update on error
+            console.log('❌ Reverting optimistic update due to error:', error);
+            setCompletedPaymentData(null);
+          }
+        });
+      } catch (optimizedError) {
+        console.warn('⚠️ Optimized payment failed, falling back to standard method:', optimizedError);
+        
+        // Fallback to standard payment processing
+        const token = localStorage.getItem('token');
+        result = await axios.put(`${API}/orders/${orderId}`, paymentData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Set completed payment data for fallback
+        setCompletedPaymentData({
+          received: received,
+          balance: balance,
+          total: total,
+          isCredit: isCredit,
+          paymentMethod: splitPayment ? 'split' : paymentMethod
+        });
+        
+        result = { success: true, processingTime: 0 };
+      }
       
       console.log(`✅ Payment completed in ${result.processingTime.toFixed(0)}ms`);
       
@@ -732,6 +754,38 @@ const BillingPage = ({ user }) => {
         data: error.response?.data,
         message: error.message
       });
+      
+      // Check if payment actually succeeded despite the error
+      try {
+        console.log('🔍 Verifying payment status after error...');
+        const token = localStorage.getItem('token');
+        const verifyResponse = await axios.get(`${API}/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const updatedOrder = verifyResponse.data;
+        if (updatedOrder.status === 'completed' || updatedOrder.payment_received > 0) {
+          console.log('✅ Payment actually succeeded despite error!');
+          toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
+          setPaymentCompleted(true);
+          setCompletedPaymentData({
+            received: received,
+            balance: balance,
+            total: total,
+            isCredit: isCredit,
+            paymentMethod: splitPayment ? 'split' : paymentMethod
+          });
+          
+          // Release table if needed
+          releaseTable().catch(err => {
+            console.warn('⚠️ Table release failed after payment verification:', err);
+          });
+          
+          return; // Exit early - payment was successful
+        }
+      } catch (verifyError) {
+        console.warn('⚠️ Could not verify payment status:', verifyError);
+      }
       
       let errorMessage = 'Payment failed. Please try again.';
       

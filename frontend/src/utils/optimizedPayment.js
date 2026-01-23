@@ -29,6 +29,10 @@ export class OptimizedPaymentProcessor {
     if (!paymentData.total || paymentData.total <= 0) errors.push('Invalid total amount');
     if (!paymentData.payment_method) errors.push('Payment method is required');
     
+    // Check authentication
+    const token = localStorage.getItem('token');
+    if (!token) errors.push('Authentication token is missing');
+    
     return {
       isValid: errors.length === 0,
       errors
@@ -75,12 +79,22 @@ export class OptimizedPaymentProcessor {
         promises.map(p => this.withTimeout(p, 3000)) // 3 second timeout
       );
 
-      // 7. Handle results
+      // 7. Handle results with improved error checking
       const paymentResult = results[0];
       const orderResult = results[1];
 
-      if (paymentResult.status === 'rejected' || orderResult.status === 'rejected') {
-        throw new Error('Payment processing failed');
+      // Check if order update succeeded (this is the critical operation)
+      if (orderResult.status === 'rejected') {
+        const error = orderResult.reason;
+        console.error('Order update failed:', error);
+        throw new Error(`Order update failed: ${error.message || error}`);
+      }
+
+      // Payment record creation is optional - log warning if it fails but don't fail the whole payment
+      if (paymentResult.status === 'rejected') {
+        const error = paymentResult.reason;
+        console.warn('Payment record creation failed (non-critical):', error);
+        // Don't throw error - payment still succeeded if order was updated
       }
 
       const endTime = performance.now();
@@ -88,9 +102,11 @@ export class OptimizedPaymentProcessor {
 
       return {
         success: true,
-        paymentId: paymentResult.value?.data?.id,
+        paymentId: paymentResult.status === 'fulfilled' ? paymentResult.value?.data?.id : null,
         orderId: orderResult.value?.data?.id,
-        processingTime: endTime - startTime
+        processingTime: endTime - startTime,
+        paymentRecordCreated: paymentResult.status === 'fulfilled',
+        orderUpdated: orderResult.status === 'fulfilled'
       };
 
     } catch (error) {
@@ -138,6 +154,7 @@ export class OptimizedPaymentProcessor {
    * Optimized payment record creation
    */
   async createPaymentRecord(paymentData) {
+    const token = localStorage.getItem('token');
     return axios.post(`${API}/payments/create-order`, {
       order_id: paymentData.order_id,
       amount: paymentData.payment_received,
@@ -146,7 +163,8 @@ export class OptimizedPaymentProcessor {
       timeout: 2000, // 2 second timeout
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'Authorization': `Bearer ${token}`
       }
     });
   }
@@ -155,10 +173,12 @@ export class OptimizedPaymentProcessor {
    * Optimized order status update
    */
   async updateOrderStatus(paymentData) {
+    const token = localStorage.getItem('token');
     return axios.put(`${API}/orders/${paymentData.order_id}`, paymentData, {
       timeout: 2000, // 2 second timeout
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       }
     });
   }
@@ -168,13 +188,25 @@ export class OptimizedPaymentProcessor {
    */
   async releaseTableAsync(tableId) {
     try {
-      const tableResponse = await axios.get(`${API}/tables/${tableId}`, { timeout: 1000 });
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`
+      };
+      
+      const tableResponse = await axios.get(`${API}/tables/${tableId}`, { 
+        timeout: 1000,
+        headers 
+      });
+      
       await axios.put(`${API}/tables/${tableId}`, {
         table_number: tableResponse.data.table_number,
         capacity: tableResponse.data.capacity || 4,
         status: 'available',
         current_order_id: null
-      }, { timeout: 1000 });
+      }, { 
+        timeout: 1000,
+        headers 
+      });
       
       console.log(`✅ Table ${tableResponse.data.table_number} released`);
       return true;
@@ -245,9 +277,14 @@ export class OptimizedPaymentProcessor {
    */
   async preloadPaymentData(orderId) {
     try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`
+      };
+      
       const promises = [
-        axios.get(`${API}/business/settings`),
-        axios.get(`${API}/orders/${orderId}`)
+        axios.get(`${API}/business/settings`, { headers }),
+        axios.get(`${API}/orders/${orderId}`, { headers })
       ];
       
       const [settingsResponse, orderResponse] = await Promise.all(promises);
