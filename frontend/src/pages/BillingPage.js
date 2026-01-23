@@ -651,24 +651,46 @@ const BillingPage = ({ user }) => {
       }
       
       // Use optimized payment processor with callbacks for immediate UI feedback
-      const result = await processPaymentFast(paymentData, {
-        onStart: (data) => {
-          // Optimistic UI update - show success immediately
-          console.log('💫 Optimistic update: Payment processing started');
-          setCompletedPaymentData({
-            received: received,
-            balance: balance,
-            total: total,
-            isCredit: isCredit,
-            paymentMethod: splitPayment ? 'split' : paymentMethod
-          });
-        },
-        onError: (error) => {
-          // Revert optimistic update on error
-          console.log('❌ Reverting optimistic update due to error:', error);
-          setCompletedPaymentData(null);
-        }
-      });
+      let result;
+      try {
+        result = await processPaymentFast(paymentData, {
+          onStart: (data) => {
+            // Optimistic UI update - show success immediately
+            console.log('💫 Optimistic update: Payment processing started');
+            setCompletedPaymentData({
+              received: received,
+              balance: balance,
+              total: total,
+              isCredit: isCredit,
+              paymentMethod: splitPayment ? 'split' : paymentMethod
+            });
+          },
+          onError: (error) => {
+            // Revert optimistic update on error
+            console.log('❌ Reverting optimistic update due to error:', error);
+            setCompletedPaymentData(null);
+          }
+        });
+      } catch (optimizedError) {
+        console.warn('⚠️ Optimized payment failed, falling back to standard method:', optimizedError);
+        
+        // Fallback to standard payment processing
+        const token = localStorage.getItem('token');
+        result = await axios.put(`${API}/orders/${orderId}`, paymentData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Set completed payment data for fallback
+        setCompletedPaymentData({
+          received: received,
+          balance: balance,
+          total: total,
+          isCredit: isCredit,
+          paymentMethod: splitPayment ? 'split' : paymentMethod
+        });
+        
+        result = { success: true, processingTime: 0 };
+      }
       
       console.log(`✅ Payment completed in ${result.processingTime.toFixed(0)}ms`);
       
