@@ -1,0 +1,115 @@
+{
+  "timestamp": "2026-01-24T01:24:14.243903",
+  "base_url": "https://billbytekot-backend.onrender.com/api",
+  "endpoints_tested": 6,
+  "results": [
+    {
+      "endpoint": "/orders",
+      "method": "GET",
+      "iterations": 3,
+      "avg_time_ms": 680.7147661844889,
+      "median_time_ms": 596.9328880310059,
+      "min_time_ms": 567.7790641784668,
+      "max_time_ms": 877.4323463439941,
+      "std_dev": 170.98491488773135,
+      "status_codes": [
+        404,
+        404,
+        404
+      ],
+      "errors": [],
+      "success_rate": 100.0
+    },
+    {
+      "endpoint": "/menu",
+      "method": "GET",
+      "iterations": 3,
+      "avg_time_ms": 725.8977890014648,
+      "median_time_ms": 582.8800201416016,
+      "min_time_ms": 568.3119297027588,
+      "max_time_ms": 1026.5014171600342,
+      "std_dev": 260.4322623280959,
+      "status_codes": [
+        404,
+        404,
+        404
+      ],
+      "errors": [],
+      "success_rate": 100.0
+    },
+    {
+      "endpoint": "/tables",
+      "method": "GET",
+      "iterations": 3,
+      "avg_time_ms": 617.3702081044515,
+      "median_time_ms": 618.445873260498,
+      "min_time_ms": 598.3121395111084,
+      "max_time_ms": 635.352611541748,
+      "std_dev": 18.54364941722904,
+      "status_codes": [
+        404,
+        404,
+        404
+      ],
+      "errors": [],
+      "success_rate": 100.0
+    },
+    {
+      "endpoint": "/analytics/daily",
+      "method": "GET",
+      "iterations": 3,
+      "avg_time_ms": 602.4526755015055,
+      "median_time_ms": 600.7440090179443,
+      "min_time_ms": 589.7436141967773,
+      "max_time_ms": 616.8704032897949,
+      "std_dev": 13.643875090614777,
+      "status_codes": [
+        404,
+        404,
+        404
+      ],
+      "errors": [],
+      "success_rate": 100.0
+    },
+    {
+      "endpoint": "/reports/daily",
+      "method": "GET",
+      "iterations": 3,
+      "avg_time_ms": 618.702252705892,
+      "median_time_ms": 631.5538883209229,
+      "min_time_ms": 587.6293182373047,
+      "max_time_ms": 636.9235515594482,
+      "std_dev": 27.04355307999728,
+      "status_codes": [
+        404,
+        404,
+        404
+      ],
+      "errors": [],
+      "success_rate": 100.0
+    },
+    {
+      "endpoint": "/super-admin/users",
+      "method": "GET",
+      "iterations": 3,
+      "avg_time_ms": 603.9856274922689,
+      "median_time_ms": 598.0756282806396,
+      "min_time_ms": 575.9100914001465,
+      "max_time_ms": 637.9711627960205,
+      "std_dev": 31.449804668901155,
+      "status_codes": [
+        404,
+        404,
+        404
+      ],
+      "errors": [],
+      "success_rate": 100.0
+    }
+  ],
+  "slow_endpoints": [],
+  "summary": {
+    "avg_response_time_ms": 641.520553165012,
+    "max_response_time_ms": 1026.5014171600342,
+    "slow_endpoint_count": 0
+  }
+}

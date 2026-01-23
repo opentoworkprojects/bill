@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react';
 import '@/App.css';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+
+// ✅ Import Performance Optimization Modules
+import {
+  apiClient,
+  lazyImageLoader,
+  expiringCache,
+  ServiceWorkerManager,
+  ResourcePrefetcher,
+  MemoryManager
+} from './utils/apiClient';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -566,7 +576,50 @@ function App() {
     
     initAuth();
     
-    // Setup offline sync
+    // ✅ PERFORMANCE: Initialize optimization modules
+    console.log('⚡ Initializing performance optimizations...');
+    
+    // Initialize lazy image loader
+    lazyImageLoader.init()
+    console.log('📸 Lazy image loader initialized')
+    
+    // Prefetch critical resources
+    ResourcePrefetcher.prefetchDNS('billbytekot-backend.onrender.com')
+    ResourcePrefetcher.preconnect('billbytekot-backend.onrender.com')
+    console.log('🔗 Resource prefetching enabled')
+    
+    // Initialize Service Worker Manager
+    ServiceWorkerManager.register()
+      .then(reg => console.log('✅ Service Worker registered'))
+      .catch(err => console.log('⚠️ Service Worker registration failed:', err))
+    
+    // Setup memory monitoring (log every 5 minutes)
+    const memoryMonitor = setInterval(() => {
+      const stats = MemoryManager.getMemoryUsage()
+      if (stats) {
+        console.log('💾 Memory:', stats.jsHeapSize, '/', stats.jsHeapLimit)
+      }
+    }, 5 * 60 * 1000)
+    
+    // Setup offline support with cache prefetching
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then(registration => {
+          console.log('✅ Service Worker ready for offline support')
+        })
+        .catch(err => console.log('Service Worker not ready:', err))
+    }
+    
+    // Setup auto-cleanup of expired cache (every 2 minutes)
+    const cacheCleanup = setInterval(() => {
+      const statsBefore = expiringCache.getStats?.()
+      // Cache cleanup happens automatically, but we can log stats
+      if (statsBefore) {
+        console.log('📊 Cache stats:', statsBefore)
+      }
+    }, 2 * 60 * 1000)
+    
+    // Setup Auto Sync
     setupAutoSync(axios.create({ baseURL: API }));
     
     // Start notification polling for in-app notifications (less frequent)
@@ -659,6 +712,12 @@ function App() {
     return () => {
       axios.interceptors.response.eject(interceptor);
       clearInterval(keepAliveInterval);
+      clearInterval(memoryMonitor);
+      clearInterval(cacheCleanup);
+      
+      // ✅ PERFORMANCE: Cleanup optimization modules
+      lazyImageLoader.disconnect()
+      console.log('📸 Lazy image loader cleaned up')
     };
   }, []);
 

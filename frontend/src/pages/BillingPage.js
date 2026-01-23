@@ -11,6 +11,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye } from 'lucide-react';
 import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
 import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPayment';
+import { billingCache } from '../utils/billingCache';
+import { startBillingTimer, endBillingTimer } from '../utils/performanceMonitor';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
@@ -100,20 +102,7 @@ const BillingPage = ({ user }) => {
   const [searchDebounceTimer, setSearchDebounceTimer] = useState(null);
 
   useEffect(() => {
-    fetchOrder();
-    fetchBusinessSettings();
-    fetchMenuItems();
-    
-    // Preload payment data for faster processing
-    if (orderId) {
-      preloadPaymentData(orderId).then(data => {
-        if (data) {
-          console.log('💾 Payment data preloaded successfully');
-        }
-      }).catch(error => {
-        console.warn('⚠️ Failed to preload payment data:', error);
-      });
-    }
+    loadBillingDataOptimized();
     
     // Advanced screen size and keyboard detection
     const handleResize = () => {
@@ -139,6 +128,76 @@ const BillingPage = ({ user }) => {
       }
     };
   }, [orderId]);
+
+  // 🚀 OPTIMIZED DATA LOADING - Uses cache for instant loading
+  const loadBillingDataOptimized = async () => {
+    if (!orderId) return;
+
+    // Start performance timing
+    startBillingTimer(orderId);
+
+    try {
+      console.log('⚡ Loading billing data with cache optimization...');
+      
+      // Try to get cached data first for instant loading
+      const cached = billingCache.getCachedBillingData(orderId);
+      
+      if (cached) {
+        console.log('⚡ Using cached billing data - INSTANT LOAD!');
+        setOrder(cached.order);
+        setOrderItems(cached.order.items || []);
+        setBusinessSettings(cached.businessSettings);
+        setMenuItems(cached.menuItems);
+        
+        // Set customer data
+        if (cached.order.customer_phone) setWhatsappPhone(cached.order.customer_phone);
+        if (cached.order.discount || cached.order.discount_amount) {
+          setDiscountType(cached.order.discount_type || 'amount');
+          setDiscountValue(cached.order.discount_value || cached.order.discount || '');
+        }
+        
+        // End timing with cache hit metadata
+        endBillingTimer(orderId, { cacheHit: true, dataSource: 'cache' });
+        
+        // Pre-load payment data for even faster processing
+        preloadPaymentData(orderId).catch(error => {
+          console.warn('⚠️ Failed to preload payment data:', error);
+        });
+        
+        return; // Data loaded instantly from cache!
+      }
+      
+      // Fallback: Fetch fresh data if not cached
+      console.log('🔄 Cache miss - fetching fresh billing data...');
+      const billingData = await billingCache.getBillingData(orderId);
+      
+      setOrder(billingData.order);
+      setOrderItems(billingData.order.items || []);
+      setBusinessSettings(billingData.businessSettings);
+      setMenuItems(billingData.menuItems);
+      
+      // Set customer data
+      if (billingData.order.customer_phone) setWhatsappPhone(billingData.order.customer_phone);
+      if (billingData.order.discount || billingData.order.discount_amount) {
+        setDiscountType(billingData.order.discount_type || 'amount');
+        setDiscountValue(billingData.order.discount_value || billingData.order.discount || '');
+      }
+      
+      // End timing with cache miss metadata
+      endBillingTimer(orderId, { cacheHit: false, dataSource: 'api' });
+      
+      // Pre-load payment data for faster processing
+      preloadPaymentData(orderId).catch(error => {
+        console.warn('⚠️ Failed to preload payment data:', error);
+      });
+      
+    } catch (error) {
+      console.error('❌ Failed to load billing data:', error);
+      endBillingTimer(orderId, { cacheHit: false, dataSource: 'error', error: error.message });
+      toast.error('Failed to load billing data');
+      navigate('/orders');
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -694,6 +753,10 @@ const BillingPage = ({ user }) => {
       
       console.log(`✅ Payment completed in ${result.processingTime.toFixed(0)}ms`);
       
+      // 🗑️ CACHE INVALIDATION: Clear cached billing data after successful payment
+      billingCache.invalidateOrder(orderId);
+      console.log('🗑️ Billing cache invalidated after successful payment');
+      
       toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
       setPaymentCompleted(true);
       
@@ -766,6 +829,11 @@ const BillingPage = ({ user }) => {
         const updatedOrder = verifyResponse.data;
         if (updatedOrder.status === 'completed' || updatedOrder.payment_received > 0) {
           console.log('✅ Payment actually succeeded despite error!');
+          
+          // 🗑️ CACHE INVALIDATION: Clear cached billing data after successful payment
+          billingCache.invalidateOrder(orderId);
+          console.log('🗑️ Billing cache invalidated after payment verification');
+          
           toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
           setPaymentCompleted(true);
           setCompletedPaymentData({
