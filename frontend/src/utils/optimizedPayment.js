@@ -79,20 +79,22 @@ export class OptimizedPaymentProcessor {
         promises.map(p => this.withTimeout(p, 3000)) // 3 second timeout
       );
 
-      // 7. Handle results with detailed error checking
+      // 7. Handle results with improved error checking
       const paymentResult = results[0];
       const orderResult = results[1];
 
-      if (paymentResult.status === 'rejected') {
-        const error = paymentResult.reason;
-        console.error('Payment creation failed:', error);
-        throw new Error(`Payment creation failed: ${error.message || error}`);
-      }
-      
+      // Check if order update succeeded (this is the critical operation)
       if (orderResult.status === 'rejected') {
         const error = orderResult.reason;
         console.error('Order update failed:', error);
         throw new Error(`Order update failed: ${error.message || error}`);
+      }
+
+      // Payment record creation is optional - log warning if it fails but don't fail the whole payment
+      if (paymentResult.status === 'rejected') {
+        const error = paymentResult.reason;
+        console.warn('Payment record creation failed (non-critical):', error);
+        // Don't throw error - payment still succeeded if order was updated
       }
 
       const endTime = performance.now();
@@ -100,9 +102,11 @@ export class OptimizedPaymentProcessor {
 
       return {
         success: true,
-        paymentId: paymentResult.value?.data?.id,
+        paymentId: paymentResult.status === 'fulfilled' ? paymentResult.value?.data?.id : null,
         orderId: orderResult.value?.data?.id,
-        processingTime: endTime - startTime
+        processingTime: endTime - startTime,
+        paymentRecordCreated: paymentResult.status === 'fulfilled',
+        orderUpdated: orderResult.status === 'fulfilled'
       };
 
     } catch (error) {

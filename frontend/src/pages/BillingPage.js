@@ -755,6 +755,38 @@ const BillingPage = ({ user }) => {
         message: error.message
       });
       
+      // Check if payment actually succeeded despite the error
+      try {
+        console.log('🔍 Verifying payment status after error...');
+        const token = localStorage.getItem('token');
+        const verifyResponse = await axios.get(`${API}/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const updatedOrder = verifyResponse.data;
+        if (updatedOrder.status === 'completed' || updatedOrder.payment_received > 0) {
+          console.log('✅ Payment actually succeeded despite error!');
+          toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
+          setPaymentCompleted(true);
+          setCompletedPaymentData({
+            received: received,
+            balance: balance,
+            total: total,
+            isCredit: isCredit,
+            paymentMethod: splitPayment ? 'split' : paymentMethod
+          });
+          
+          // Release table if needed
+          releaseTable().catch(err => {
+            console.warn('⚠️ Table release failed after payment verification:', err);
+          });
+          
+          return; // Exit early - payment was successful
+        }
+      } catch (verifyError) {
+        console.warn('⚠️ Could not verify payment status:', verifyError);
+      }
+      
       let errorMessage = 'Payment failed. Please try again.';
       
       if (error.response?.status === 401) {
