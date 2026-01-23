@@ -43,6 +43,8 @@ const ReportsPage = ({ user }) => {
   const [peakHours, setPeakHours] = useState([]);
   const [categoryAnalysis, setCategoryAnalysis] = useState([]);
   const [forecast, setForecast] = useState(null);
+  const [customerBalances, setCustomerBalances] = useState([]);
+  const [customerBalanceLoading, setCustomerBalanceLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
     start_date: new Date().toISOString().split("T")[0], // Today's date
     end_date: new Date().toISOString().split("T")[0],   // Today's date
@@ -124,7 +126,8 @@ const ReportsPage = ({ user }) => {
           fetchBestSelling(),
           fetchStaffPerformance(),
           fetchPeakHours(),
-          fetchCategoryAnalysis()
+          fetchCategoryAnalysis(),
+          fetchCustomerBalances()
         ]);
         
         // Priority 3: Load AI forecast last (least critical, can be slow)
@@ -213,6 +216,19 @@ const ReportsPage = ({ user }) => {
     }
   }, []);
 
+  const fetchCustomerBalances = useCallback(async () => {
+    setCustomerBalanceLoading(true);
+    try {
+      const response = await axios.get(`${API}/reports/customer-balances`);
+      setCustomerBalances(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch customer balances", error);
+      setCustomerBalances([]);
+    } finally {
+      setCustomerBalanceLoading(false);
+    }
+  }, []);
+
   const fetchForecast = useCallback(async () => {
     try {
       const response = await axios.post(`${API}/ai/sales-forecast`);
@@ -278,6 +294,65 @@ const ReportsPage = ({ user }) => {
     } catch (error) {
       console.error(error);
       toast.error("Failed to export CSV");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleExportCustomerBalances = async () => {
+    setExportLoading(true);
+    try {
+      if (!customerBalances || customerBalances.length === 0) {
+        toast.error("No customer balance data to export");
+        return;
+      }
+
+      // Filter customers with outstanding balances
+      const customersWithBalance = customerBalances.filter(c => c.balance_amount > 0);
+      
+      if (customersWithBalance.length === 0) {
+        toast.error("No customers with outstanding balances");
+        return;
+      }
+
+      // Create CSV content
+      const csvContent = [
+        [
+          "Customer Name",
+          "Phone Number", 
+          "Outstanding Balance",
+          "Total Orders",
+          "Total Amount Ordered",
+          "Total Paid",
+          "Last Order Date",
+          "Days Since Last Order"
+        ],
+        ...customersWithBalance.map((customer) => [
+          customer.customer_name || 'Unknown',
+          customer.customer_phone || 'N/A',
+          customer.balance_amount.toFixed(2),
+          customer.total_orders || 0,
+          customer.total_amount_ordered?.toFixed(2) || '0.00',
+          customer.total_paid?.toFixed(2) || '0.00',
+          customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A',
+          customer.last_order_date ? Math.floor((new Date() - new Date(customer.last_order_date)) / (1000 * 60 * 60 * 24)) : 'N/A'
+        ]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `customer-balances-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Customer balance report exported successfully!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to export customer balance report");
     } finally {
       setExportLoading(false);
     }
@@ -1180,7 +1255,7 @@ const ReportsPage = ({ user }) => {
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           {/* Mobile-optimized scrollable tabs */}
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
-            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-7 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
+            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-8 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
               <TabsTrigger value="overview" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Overview</span>
                 <span className="sm:hidden">📊 Overview</span>
@@ -1200,6 +1275,10 @@ const ReportsPage = ({ user }) => {
               <TabsTrigger value="hours" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Peak Hours</span>
                 <span className="sm:hidden">⏰ Hours</span>
+              </TabsTrigger>
+              <TabsTrigger value="customers" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Customer Balance</span>
+                <span className="sm:hidden">💳 Customers</span>
               </TabsTrigger>
               <TabsTrigger value="daybook" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Day Book</span>
@@ -1732,6 +1811,132 @@ const ReportsPage = ({ user }) => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Customer Balance Tab */}
+          <TabsContent value="customers" className="space-y-4 sm:space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
+                  Customer Balance Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {customerBalanceLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg animate-pulse">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                          <div>
+                            <div className="w-24 h-4 bg-gray-200 rounded mb-1"></div>
+                            <div className="w-16 h-3 bg-gray-200 rounded"></div>
+                          </div>
+                        </div>
+                        <div className="w-16 h-6 bg-gray-200 rounded"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : customerBalances && customerBalances.length > 0 ? (
+                  <div className="space-y-2 sm:space-y-3">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
+                      <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
+                        <p className="text-xs text-gray-600">Total Credit</p>
+                        <p className="text-lg font-bold text-green-600">
+                          ₹{customerBalances.reduce((sum, customer) => sum + (customer.balance_amount > 0 ? customer.balance_amount : 0), 0).toFixed(0)}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg">
+                        <p className="text-xs text-gray-600">Customers</p>
+                        <p className="text-lg font-bold text-blue-600">
+                          {customerBalances.filter(c => c.balance_amount > 0).length}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg">
+                        <p className="text-xs text-gray-600">Avg Balance</p>
+                        <p className="text-lg font-bold text-orange-600">
+                          ₹{customerBalances.length > 0 ? (customerBalances.reduce((sum, c) => sum + (c.balance_amount > 0 ? c.balance_amount : 0), 0) / customerBalances.filter(c => c.balance_amount > 0).length || 0).toFixed(0) : 0}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg">
+                        <p className="text-xs text-gray-600">Last 30 Days</p>
+                        <p className="text-lg font-bold text-violet-600">
+                          {customerBalances.filter(c => {
+                            const lastOrderDate = new Date(c.last_order_date);
+                            const thirtyDaysAgo = new Date();
+                            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                            return lastOrderDate >= thirtyDaysAgo;
+                          }).length}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Customer List */}
+                    <div className="space-y-2">
+                      {customerBalances
+                        .filter(customer => customer.balance_amount > 0) // Only show customers with outstanding balance
+                        .sort((a, b) => b.balance_amount - a.balance_amount) // Sort by balance amount (highest first)
+                        .map((customer, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg hover:shadow-md transition-shadow border border-red-100"
+                        >
+                          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0">
+                              {customer.customer_name ? customer.customer_name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                                {customer.customer_name || 'Unknown Customer'}
+                              </p>
+                              <p className="text-xs sm:text-sm text-gray-500 truncate">
+                                📞 {customer.customer_phone || 'No phone'} • 
+                                🛒 {customer.total_orders} orders • 
+                                📅 {customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className="text-lg sm:text-2xl font-bold text-red-600 truncate">
+                              ₹{customer.balance_amount.toFixed(0)}
+                            </p>
+                            <p className="text-[10px] sm:text-sm text-gray-500">
+                              Outstanding
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Export Customer Balance Report */}
+                    <div className="mt-6 p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg border border-violet-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-sm sm:text-base">Export Customer Balance Report</h4>
+                          <p className="text-xs sm:text-sm text-gray-600">Download detailed customer balance statements</p>
+                        </div>
+                        <Button
+                          onClick={handleExportCustomerBalances}
+                          disabled={exportLoading}
+                          className="bg-gradient-to-r from-violet-600 to-purple-600 text-xs sm:text-sm"
+                        >
+                          <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                          {exportLoading ? "..." : "Export"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 text-sm">No customer balance data available yet</p>
+                    <p className="text-xs text-gray-400 mt-2">Customer balances will appear here when partial payments are made</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Day Book Tab */}

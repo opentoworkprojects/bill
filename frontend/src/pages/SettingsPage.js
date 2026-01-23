@@ -295,13 +295,12 @@ const SettingsPage = ({ user }) => {
     } finally {
       setCampaignLoading(false);
     }
-  };
-    } catch (error) {
-      console.error('Failed to fetch campaigns', error);
-      // Initialize with empty array if endpoint doesn't exist yet
-      setCampaigns([]);
-    }
-  };
+  } catch (error) {
+    console.error('Failed to fetch campaigns', error);
+    // Initialize with empty array if endpoint doesn't exist yet
+    setCampaigns([]);
+  }
+};
 
   const handleSaveCampaign = async () => {
     if (!campaignForm.title) {

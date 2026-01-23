@@ -138,8 +138,6 @@ export class OptimizedPaymentProcessor {
    * Optimized payment record creation
    */
   async createPaymentRecord(paymentData) {
-    const cacheKey = `payment_${paymentData.order_id}`;
-    
     return axios.post(`${API}/payments/create-order`, {
       order_id: paymentData.order_id,
       amount: paymentData.payment_received,
@@ -241,6 +239,31 @@ export class OptimizedPaymentProcessor {
     
     return results;
   }
+
+  /**
+   * Pre-load critical data for faster payments
+   */
+  async preloadPaymentData(orderId) {
+    try {
+      const promises = [
+        axios.get(`${API}/business/settings`),
+        axios.get(`${API}/orders/${orderId}`)
+      ];
+      
+      const [settingsResponse, orderResponse] = await Promise.all(promises);
+      
+      // Cache the results
+      this.cacheBusinessSettings(settingsResponse.data.business_settings);
+      
+      return {
+        businessSettings: settingsResponse.data.business_settings,
+        order: orderResponse.data
+      };
+    } catch (error) {
+      console.warn('Failed to preload payment data:', error);
+      return null;
+    }
+  }
 }
 
 /**
@@ -262,25 +285,7 @@ export async function processPaymentFast(paymentData, callbacks = {}) {
  * Pre-load critical data for faster payments
  */
 export async function preloadPaymentData(orderId) {
-  try {
-    const promises = [
-      axios.get(`${API}/business/settings`),
-      axios.get(`${API}/orders/${orderId}`)
-    ];
-    
-    const [settingsResponse, orderResponse] = await Promise.all(promises);
-    
-    // Cache the results
-    paymentProcessor.cacheBusinessSettings(settingsResponse.data.business_settings);
-    
-    return {
-      businessSettings: settingsResponse.data.business_settings,
-      order: orderResponse.data
-    };
-  } catch (error) {
-    console.warn('Failed to preload payment data:', error);
-    return null;
-  }
+  return paymentProcessor.preloadPaymentData(orderId);
 }
 
 export default paymentProcessor;

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye } from 'lucide-react';
 import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
+import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPayment';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
@@ -102,6 +103,17 @@ const BillingPage = ({ user }) => {
     fetchOrder();
     fetchBusinessSettings();
     fetchMenuItems();
+    
+    // Preload payment data for faster processing
+    if (orderId) {
+      preloadPaymentData(orderId).then(data => {
+        if (data) {
+          console.log('💾 Payment data preloaded successfully');
+        }
+      }).catch(error => {
+        console.warn('⚠️ Failed to preload payment data:', error);
+      });
+    }
     
     // Advanced screen size and keyboard detection
     const handleResize = () => {
@@ -593,8 +605,9 @@ const BillingPage = ({ user }) => {
     const isCredit = balance > 0;
     
     setLoading(true);
+    
     try {
-      console.log('Processing payment:', { total, received, balance, isCredit });
+      console.log('🚀 Starting optimized payment processing:', { total, received, balance, isCredit });
       
       // Prepare payment data - ensure all fields are explicitly set
       // CRITICAL FIX: QR orders (Self-Order) should stay 'pending' until kitchen marks as completed
@@ -602,6 +615,7 @@ const BillingPage = ({ user }) => {
       const shouldStayPending = isQROrder || isCredit;
       
       const paymentData = {
+        order_id: orderId,
         status: shouldStayPending ? 'pending' : 'completed',
         payment_method: splitPayment ? 'split' : paymentMethod,
         payment_received: received,  // Always set explicitly
@@ -616,7 +630,8 @@ const BillingPage = ({ user }) => {
         items: orderItems,
         subtotal: calculateSubtotal() - calculateDiscountAmount(),
         tax: calculateTax(),
-        tax_rate: getEffectiveTaxRate()
+        tax_rate: getEffectiveTaxRate(),
+        table_id: order?.table_id
       };
 
       // Add customer info for partial payments
@@ -635,30 +650,27 @@ const BillingPage = ({ user }) => {
         paymentData.credit_amount = balance;
       }
       
-      console.log('Updating order with payment data:', paymentData);
-      
-      // Parallel processing for better performance
-      const promises = [
-        // Create payment record
-        axios.post(`${API}/payments/create-order`, { 
-          order_id: orderId, 
-          amount: received, 
-          payment_method: splitPayment ? 'split' : paymentMethod 
-        }),
-        // Update order with payment details
-        axios.put(`${API}/orders/${orderId}`, paymentData)
-      ];
-      
-      await Promise.all(promises);
-      
-      // Store completed payment data for UI display (fixes balance showing after full payment)
-      setCompletedPaymentData({
-        received: received,
-        balance: balance,
-        total: total,
-        isCredit: isCredit,
-        paymentMethod: splitPayment ? 'split' : paymentMethod
+      // Use optimized payment processor with callbacks for immediate UI feedback
+      const result = await processPaymentFast(paymentData, {
+        onStart: (data) => {
+          // Optimistic UI update - show success immediately
+          console.log('💫 Optimistic update: Payment processing started');
+          setCompletedPaymentData({
+            received: received,
+            balance: balance,
+            total: total,
+            isCredit: isCredit,
+            paymentMethod: splitPayment ? 'split' : paymentMethod
+          });
+        },
+        onError: (error) => {
+          // Revert optimistic update on error
+          console.log('❌ Reverting optimistic update due to error:', error);
+          setCompletedPaymentData(null);
+        }
       });
+      
+      console.log(`✅ Payment completed in ${result.processingTime.toFixed(0)}ms`);
       
       toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!');
       setPaymentCompleted(true);
