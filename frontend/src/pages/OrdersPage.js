@@ -12,6 +12,9 @@ import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Search, Edit
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
+import OptimizedBillingButton from '../components/OptimizedBillingButton';
+import { billingCache } from '../utils/billingCache';
+import EditOrderModal from '../components/EditOrderModal';
 
 // Sound effects for better UX
 const playSound = (type) => {
@@ -76,30 +79,10 @@ const OrdersPage = ({ user }) => {
   const [printLoading, setPrintLoading] = useState(false);
   const [menuSearch, setMenuSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [editOrderModal, setEditOrderModal] = useState({ 
-    open: false, 
-    order: null,
-    customer_name: '',
-    customer_phone: '',
-    payment_method: 'cash',
-    is_credit: false,
-    payment_received: 0,
-    balance_amount: 0,
-    // Multi-payment support
-    cash_amount: 0,
-    card_amount: 0,
-    upi_amount: 0,
-    credit_amount: 0,
-    use_split_payment: false,
-    tax_rate: 5, // Tax rate for this order
-    // Discount support
-    discount_type: 'amount', // 'amount' or 'percent'
-    discount_value: 0,
-    // Manual item entry
-    manual_item_name: '',
-    manual_item_price: ''
-  });
-  const [editItems, setEditItems] = useState([]);
+  
+  // Simplified edit order state for new EditOrderModal component
+  const [editOrderModal, setEditOrderModal] = useState({ open: false, order: null });
+  
   const [deleteConfirmModal, setDeleteConfirmModal] = useState({ open: false, order: null });
   const [cancelConfirmModal, setCancelConfirmModal] = useState({ open: false, order: null });
   const [actionMenuOpen, setActionMenuOpen] = useState(null);
@@ -253,6 +236,19 @@ const OrdersPage = ({ user }) => {
       setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
       setTodaysBills(validBills.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
       setTables(validTables);
+      
+      // 🚀 PERFORMANCE OPTIMIZATION: Pre-load billing data for active orders
+      const activeOrderIds = validOrders
+        .filter(order => ['ready', 'preparing', 'pending'].includes(order.status))
+        .map(order => order.id)
+        .slice(0, 10); // Limit to first 10 orders to avoid overwhelming the system
+      
+      if (activeOrderIds.length > 0) {
+        console.log(`💾 Pre-loading billing data for ${activeOrderIds.length} active orders...`);
+        billingCache.preloadMultipleOrders(activeOrderIds).catch(error => {
+          console.warn('Batch preload failed:', error);
+        });
+      }
       
       // Load secondary data in background
       Promise.all([
@@ -553,259 +549,23 @@ const OrdersPage = ({ user }) => {
   };
 
   const handleEditOrder = (order) => {
-    const items = (order.items || []).map(item => ({
-      menu_item_id: item.menu_item_id || item.id,
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      notes: item.notes || ''
-    }));
-    setEditItems(items);
-    
-    // Check if order has split payments
-    const hasSplitPayment = (order.cash_amount > 0 && (order.card_amount > 0 || order.upi_amount > 0 || order.credit_amount > 0)) ||
-                           (order.card_amount > 0 && (order.upi_amount > 0 || order.credit_amount > 0)) ||
-                           (order.upi_amount > 0 && order.credit_amount > 0);
-    
-    setEditOrderModal({ 
-      open: true, 
-      order,
-      customer_name: order.customer_name || '',
-      customer_phone: order.customer_phone || '',
-      payment_method: order.payment_method || 'cash',
-      is_credit: order.is_credit || false,
-      payment_received: order.payment_received || 0,
-      balance_amount: order.balance_amount || 0,
-      // Multi-payment fields
-      cash_amount: order.cash_amount || 0,
-      card_amount: order.card_amount || 0,
-      upi_amount: order.upi_amount || 0,
-      credit_amount: order.credit_amount || 0,
-      use_split_payment: hasSplitPayment || order.payment_method === 'split',
-      // Use order's stored tax_rate, fallback to business settings
-      // If order has tax > 0 but no tax_rate, calculate it from tax/subtotal
-      tax_rate: (() => {
-        if (order.tax_rate !== undefined && order.tax_rate !== null) return order.tax_rate;
-        if (order.tax > 0 && order.subtotal > 0) {
-          return Math.round((order.tax / order.subtotal) * 100);
-        }
-        return businessSettings?.tax_rate ?? 5;
-      })(),
-      // Discount fields - load properly based on what was saved
-      // If discount_value exists, use it with its type
-      // Otherwise, load discount_amount as 'amount' type
-      discount_type: order.discount_type || 'amount',
-      discount_value: (() => {
-        // If discount_value was saved (the input value), use it
-        if (order.discount_value !== undefined && order.discount_value !== null && order.discount_value > 0) {
-          return order.discount_value;
-        }
-        // Otherwise use the calculated discount amount
-        return order.discount_amount || order.discount || 0;
-      })(),
-      // Manual item entry
-      manual_item_name: '',
-      manual_item_price: ''
-    });
+    setEditOrderModal({ open: true, order });
     setActionMenuOpen(null);
   };
 
   // Add manual item (not from menu)
-  const handleAddManualItem = () => {
-    const name = editOrderModal.manual_item_name?.trim();
-    const price = parseFloat(editOrderModal.manual_item_price) || 0;
-    
-    if (!name) {
-      toast.error('Enter item name');
-      return;
-    }
-    if (price <= 0) {
-      toast.error('Enter valid price');
-      return;
-    }
-    
-    setEditItems([...editItems, {
-      menu_item_id: `manual_${Date.now()}`,
-      name: name,
-      price: price,
-      quantity: 1,
-      notes: 'Manual entry'
-    }]);
-    
-    setEditOrderModal({ 
-      ...editOrderModal, 
-      manual_item_name: '', 
-      manual_item_price: '' 
-    });
-    toast.success(`Added: ${name}`);
-  };
 
   // Update order items
-  const handleUpdateOrder = async () => {
-    if (editItems.length === 0) {
-      toast.error('Order must have at least one item');
-      return;
-    }
-
-    // Validate customer name is required for credit bills
-    if ((editOrderModal.is_credit || editOrderModal.credit_amount > 0) && !editOrderModal.customer_name?.trim()) {
-      toast.error('Customer name is required for credit bills');
-      return;
-    }
-
+  const handleUpdateOrder = async (payload) => {
     try {
-      const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      
-      // Calculate discount
-      let discountAmount = 0;
-      const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-      if (discountValue > 0) {
-        if (editOrderModal.discount_type === 'percent') {
-          discountAmount = (subtotal * discountValue) / 100;
-        } else {
-          discountAmount = discountValue;
-        }
-      }
-      
-      // Subtotal after discount
-      const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-      
-      // Use the tax_rate from the edit modal (can be changed by user)
-      const orderTaxRate = editOrderModal.tax_rate ?? editOrderModal.order?.tax_rate ?? businessSettings?.tax_rate ?? 5;
-      const taxRate = orderTaxRate / 100;
-      const tax = subtotalAfterDiscount * taxRate;
-      const total = subtotalAfterDiscount + tax;
-
-      let paymentReceived, balanceAmount, isCredit, paymentMethod;
-      let cashAmount = 0, cardAmount = 0, upiAmount = 0, creditAmount = 0;
-
-      if (editOrderModal.use_split_payment) {
-        // Multi-payment / Split payment mode
-        cashAmount = parseFloat(editOrderModal.cash_amount) || 0;
-        cardAmount = parseFloat(editOrderModal.card_amount) || 0;
-        upiAmount = parseFloat(editOrderModal.upi_amount) || 0;
-        creditAmount = parseFloat(editOrderModal.credit_amount) || 0;
-        
-        // Calculate what's been entered
-        const totalEntered = cashAmount + cardAmount + upiAmount + creditAmount;
-        
-        // If total entered doesn't match bill total, auto-adjust
-        // This handles cases where discount was added after payment amounts were set
-        if (Math.abs(totalEntered - total) > 0.01) {
-          // Auto-adjust: put the difference in cash (or reduce cash if discount added)
-          const difference = total - (cardAmount + upiAmount + creditAmount);
-          if (difference >= 0) {
-            cashAmount = difference;
-          } else {
-            // If other payments exceed total, reduce credit first, then others
-            const excess = -difference;
-            if (creditAmount >= excess) {
-              creditAmount -= excess;
-            } else {
-              // Just set cash to 0 and let user fix
-              cashAmount = 0;
-              toast.info('Payment amounts adjusted. Please verify split amounts.');
-            }
-          }
-        }
-        
-        paymentReceived = cashAmount + cardAmount + upiAmount;
-        balanceAmount = creditAmount;
-        isCredit = creditAmount > 0;
-        
-        paymentMethod = 'split';
-      } else {
-        // Single payment mode
-        paymentReceived = parseFloat(editOrderModal.payment_received) || 0;
-        balanceAmount = Math.max(0, total - paymentReceived);
-        isCredit = editOrderModal.is_credit || balanceAmount > 0;
-        paymentMethod = editOrderModal.payment_method || 'cash';
-        
-        // Set single payment amounts
-        if (paymentMethod === 'cash') cashAmount = paymentReceived;
-        else if (paymentMethod === 'card') cardAmount = paymentReceived;
-        else if (paymentMethod === 'upi') upiAmount = paymentReceived;
-        else if (paymentMethod === 'credit') creditAmount = total;
-      }
-
-      await axios.put(`${API}/orders/${editOrderModal.order.id}`, {
-        items: editItems,
-        subtotal: subtotalAfterDiscount,
-        tax,
-        tax_rate: orderTaxRate, // Store the tax rate used
-        total,
-        customer_name: editOrderModal.customer_name || '',
-        customer_phone: editOrderModal.customer_phone || '',
-        payment_method: paymentMethod,
-        is_credit: isCredit,
-        payment_received: paymentReceived,
-        balance_amount: balanceAmount,
-        cash_amount: cashAmount,
-        card_amount: cardAmount,
-        upi_amount: upiAmount,
-        credit_amount: creditAmount,
-        // Discount fields
-        discount: discountAmount,
-        discount_type: editOrderModal.discount_type || 'amount',
-        discount_value: discountValue,
-        discount_amount: discountAmount
-      });
-
-      toast.success('Order updated!');
-      setEditOrderModal({ 
-        open: false, 
-        order: null, 
-        customer_name: '', 
-        customer_phone: '', 
-        payment_method: 'cash', 
-        is_credit: false,
-        payment_received: 0,
-        balance_amount: 0,
-        cash_amount: 0,
-        card_amount: 0,
-        upi_amount: 0,
-        credit_amount: 0,
-        use_split_payment: false,
-        tax_rate: 5,
-        discount_type: 'amount',
-        discount_value: 0,
-        manual_item_name: '',
-        manual_item_price: ''
-      });
-      setEditItems([]);
+      await axios.put(`${API}/orders/${editOrderModal.order.id}`, payload);
+      toast.success('Order updated successfully!');
+      setEditOrderModal({ open: false, order: null });
       await fetchOrders();
     } catch (error) {
       console.error('Update order failed:', error);
       toast.error(error.response?.data?.detail || 'Failed to update order');
     }
-  };
-
-  const handleAddEditItem = (menuItem) => {
-    const existingIndex = editItems.findIndex(item => item.menu_item_id === menuItem.id);
-    if (existingIndex !== -1) {
-      const updated = [...editItems];
-      updated[existingIndex].quantity += 1;
-      setEditItems(updated);
-    } else {
-      setEditItems([...editItems, {
-        menu_item_id: menuItem.id,
-        name: menuItem.name,
-        price: menuItem.price,
-        quantity: 1,
-        notes: ''
-      }]);
-    }
-  };
-
-  const handleRemoveEditItem = (index) => {
-    setEditItems(editItems.filter((_, i) => i !== index));
-  };
-
-  const handleEditQuantityChange = (index, quantity) => {
-    if (quantity < 1) return;
-    const updated = [...editItems];
-    updated[index].quantity = quantity;
-    setEditItems(updated);
   };
 
   const handleCancelOrder = async () => {
@@ -1664,11 +1424,7 @@ const OrdersPage = ({ user }) => {
                         <Printer className="w-4 h-4" /> KOT
                       </button>
                     )}
-                    {['admin', 'cashier'].includes(user?.role) && ['ready', 'preparing', 'pending'].includes(order.status) && (
-                      <button onClick={() => navigate(`/billing/${order.id}`)} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-1.5">
-                        <CreditCard className="w-4 h-4" /> Bill & Pay
-                      </button>
-                    )}
+                    <OptimizedBillingButton order={order} user={user} />
                   </div>
                 </div>
               );
@@ -2096,326 +1852,15 @@ const OrdersPage = ({ user }) => {
           </div>
         )}
 
-        {/* Edit Order Modal - Improved UI/UX */}
-        {editOrderModal.open && editOrderModal.order && (
-          <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
-            <Card className="w-full sm:max-w-lg border-0 shadow-2xl max-h-[85vh] sm:mx-4 sm:rounded-xl rounded-t-2xl rounded-b-none sm:rounded-b-xl overflow-hidden flex flex-col bg-white">
-              {/* Header */}
-              <CardHeader className="bg-blue-600 text-white p-3 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Edit className="w-4 h-4" />
-                    Edit #{editOrderModal.order.id.slice(0, 8)}
-                  </CardTitle>
-                  <button
-                    onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0 }); setEditItems([]); }}
-                    className="p-1 hover:bg-white/20 rounded-full"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </CardHeader>
-
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto">
-                {/* Customer - Compact */}
-                <div className="p-3 border-b bg-gray-50">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-[10px] text-gray-500">Name {editOrderModal.is_credit && <span className="text-red-500">*</span>}</Label>
-                      <Input
-                        value={editOrderModal.customer_name || ''}
-                        onChange={(e) => setEditOrderModal({ ...editOrderModal, customer_name: e.target.value })}
-                        placeholder="Customer"
-                        className={`h-8 text-sm ${editOrderModal.is_credit && !editOrderModal.customer_name?.trim() ? 'border-red-400' : ''}`}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-gray-500">Phone</Label>
-                      <Input
-                        value={editOrderModal.customer_phone || ''}
-                        onChange={(e) => setEditOrderModal({ ...editOrderModal, customer_phone: e.target.value })}
-                        placeholder="+91 9876543210"
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment - Compact */}
-                <div className="p-3 border-b">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-xs font-medium">Payment</Label>
-                    <button
-                      onClick={() => {
-                        const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-                        const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
-                        const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-                        const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
-                        if (editOrderModal.use_split_payment) {
-                          setEditOrderModal({ ...editOrderModal, use_split_payment: false, payment_method: 'cash', payment_received: total, balance_amount: 0, cash_amount: 0, card_amount: 0, upi_amount: 0, credit_amount: 0, is_credit: false });
-                        } else {
-                          setEditOrderModal({ ...editOrderModal, use_split_payment: true, payment_method: 'split', cash_amount: total, card_amount: 0, upi_amount: 0, credit_amount: 0 });
-                        }
-                      }}
-                      className={`px-2 py-1 rounded-full text-[10px] font-medium ${editOrderModal.use_split_payment ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-purple-100'}`}
-                    >
-                      {editOrderModal.use_split_payment ? '✓ Split' : 'Split'}
-                    </button>
-                  </div>
-                  
-                  {!editOrderModal.use_split_payment ? (
-                    <div className="flex gap-1.5">
-                      {['cash', 'card', 'upi', 'credit'].map((method) => (
-                        <button
-                          key={method}
-                          onClick={() => {
-                            const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                            const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-                            const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
-                            const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-                            const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
-                            setEditOrderModal({ ...editOrderModal, payment_method: method, is_credit: method === 'credit', payment_received: method === 'credit' ? 0 : total, balance_amount: method === 'credit' ? total : 0 });
-                          }}
-                          className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium ${
-                            editOrderModal.payment_method === method
-                              ? method === 'credit' ? 'bg-orange-500 text-white' : 'bg-green-600 text-white'
-                              : 'bg-gray-100 hover:bg-gray-200'
-                          }`}
-                        >
-                          {method === 'cash' && '💵'}
-                          {method === 'card' && '💳'}
-                          {method === 'upi' && '📱'}
-                          {method === 'credit' && '⚠️'}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-purple-50 rounded-lg p-2 space-y-2">
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {[
-                          { key: 'cash_amount', label: '💵' },
-                          { key: 'card_amount', label: '💳' },
-                          { key: 'upi_amount', label: '📱' },
-                          { key: 'credit_amount', label: '⚠️' }
-                        ].map(({ key, label }) => (
-                          <div key={key}>
-                            <Label className="text-[9px] text-gray-500 block text-center">{label}</Label>
-                            <Input
-                              type="number"
-                              value={editOrderModal[key] || ''}
-                              onChange={(e) => setEditOrderModal({ ...editOrderModal, [key]: parseFloat(e.target.value) || 0, is_credit: key === 'credit_amount' ? parseFloat(e.target.value) > 0 : editOrderModal.is_credit })}
-                              placeholder="0"
-                              className={`h-7 text-xs text-center px-1 ${key === 'credit_amount' ? 'border-orange-300' : ''}`}
-                              min="0"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      {(() => {
-                        const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-                        const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
-                        const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-                        const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
-                        const paid = (parseFloat(editOrderModal.cash_amount) || 0) + (parseFloat(editOrderModal.card_amount) || 0) + (parseFloat(editOrderModal.upi_amount) || 0);
-                        const credit = parseFloat(editOrderModal.credit_amount) || 0;
-                        const remaining = total - paid - credit;
-                        return (
-                          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-purple-200">
-                            <span>₹{total.toFixed(0)}</span>
-                            <span className="text-green-600">Paid: ₹{paid.toFixed(0)}</span>
-                            {credit > 0 && <span className="text-orange-600">Credit: ₹{credit.toFixed(0)}</span>}
-                            <span className={remaining > 0.5 ? 'text-red-600 font-bold' : 'text-green-600'}>
-                              {remaining > 0.5 ? `⚠️₹${remaining.toFixed(0)}` : '✓'}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => {
-                            const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                            const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-                            const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
-                            const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-                            const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
-                            const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
-                            if (remaining > 0) setEditOrderModal({ ...editOrderModal, cash_amount: (parseFloat(editOrderModal.cash_amount) || 0) + remaining });
-                          }}
-                          className="text-[9px] px-2 py-0.5 bg-white border rounded flex-1"
-                        >
-                          Fill Cash
-                        </button>
-                        <button
-                          onClick={() => {
-                            const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                            const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-                            const discountAmount = editOrderModal.discount_type === 'percent' ? (subtotal * discountValue) / 100 : discountValue;
-                            const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-                            const total = subtotalAfterDiscount * (1 + (editOrderModal.tax_rate || 0) / 100);
-                            const remaining = total - (parseFloat(editOrderModal.cash_amount) || 0) - (parseFloat(editOrderModal.card_amount) || 0) - (parseFloat(editOrderModal.upi_amount) || 0) - (parseFloat(editOrderModal.credit_amount) || 0);
-                            if (remaining > 0) setEditOrderModal({ ...editOrderModal, credit_amount: (parseFloat(editOrderModal.credit_amount) || 0) + remaining, is_credit: true });
-                          }}
-                          className="text-[9px] px-2 py-0.5 bg-orange-100 border-orange-300 border rounded text-orange-700 flex-1"
-                        >
-                          Fill Credit
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {editOrderModal.is_credit && !editOrderModal.customer_name?.trim() && (
-                    <p className="text-[9px] text-red-500 mt-1">⚠️ Name required</p>
-                  )}
-                </div>
-
-                {/* Add Items */}
-                <div className="p-2 border-b bg-gray-50">
-                  <Label className="text-[10px] text-gray-500 mb-1 block">Add Items</Label>
-                  <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
-                    {menuItems.slice(0, 8).map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => handleAddEditItem(item)}
-                        className="flex-shrink-0 px-2 py-1 bg-white border rounded text-[10px] hover:border-blue-400 hover:bg-blue-50 whitespace-nowrap"
-                      >
-                        {item.name} ₹{item.price}
-                      </button>
-                    ))}
-                  </div>
-                  
-                  {/* Manual Item Entry */}
-                  <div className="mt-2 flex gap-1">
-                    <Input
-                      placeholder="Item name"
-                      value={editOrderModal.manual_item_name || ''}
-                      onChange={(e) => setEditOrderModal({ ...editOrderModal, manual_item_name: e.target.value })}
-                      className="h-7 text-xs flex-1"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="₹"
-                      value={editOrderModal.manual_item_price || ''}
-                      onChange={(e) => setEditOrderModal({ ...editOrderModal, manual_item_price: e.target.value })}
-                      className="h-7 text-xs w-16"
-                      min="0"
-                    />
-                    <Button 
-                      size="sm" 
-                      onClick={handleAddManualItem}
-                      className="h-7 px-2 bg-green-600 hover:bg-green-700"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Items List */}
-                <div className="p-2 min-h-[100px]">
-                  {editItems.length > 0 ? (
-                    <div className="space-y-1">
-                      {editItems.map((item, index) => (
-                        <div key={index} className="flex items-center gap-1.5 p-1.5 bg-gray-50 rounded">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium truncate">{item.name}</p>
-                          </div>
-                          <button onClick={() => item.quantity === 1 ? handleRemoveEditItem(index) : handleEditQuantityChange(index, item.quantity - 1)} className="w-6 h-6 bg-gray-200 rounded text-xs">−</button>
-                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                          <button onClick={() => handleEditQuantityChange(index, item.quantity + 1)} className="w-6 h-6 bg-blue-600 text-white rounded text-xs">+</button>
-                          <span className="w-12 text-right text-xs font-bold">₹{(item.price * item.quantity).toFixed(0)}</span>
-                          <button onClick={() => handleRemoveEditItem(index)} className="text-red-400 p-0.5"><Trash2 className="w-3 h-3" /></button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-400 text-xs">No items</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer - Fixed */}
-              <div className="border-t bg-white p-3 flex-shrink-0">
-                {/* Discount Section */}
-                <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                  <span className="text-[10px] text-gray-500">Discount:</span>
-                  <select
-                    value={editOrderModal.discount_type}
-                    onChange={(e) => setEditOrderModal({ ...editOrderModal, discount_type: e.target.value })}
-                    className="text-xs px-1 py-0.5 border rounded bg-gray-50 w-14"
-                  >
-                    <option value="amount">₹</option>
-                    <option value="percent">%</option>
-                  </select>
-                  <Input
-                    type="number"
-                    value={editOrderModal.discount_value || ''}
-                    onChange={(e) => setEditOrderModal({ ...editOrderModal, discount_value: parseFloat(e.target.value) || 0 })}
-                    placeholder="0"
-                    className="h-6 text-xs w-16 px-1"
-                    min="0"
-                  />
-                  {(editOrderModal.discount_value > 0) && (
-                    <span className="text-[10px] text-green-600 font-medium">
-                      -₹{editOrderModal.discount_type === 'percent' 
-                        ? ((editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * editOrderModal.discount_value) / 100).toFixed(0)
-                        : editOrderModal.discount_value}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Tax Rate Selector */}
-                <div className="flex items-center justify-between mb-2 pb-2 border-b">
-                  <span className="text-[10px] text-gray-500">Tax Rate:</span>
-                  <select
-                    value={editOrderModal.tax_rate}
-                    onChange={(e) => setEditOrderModal({ ...editOrderModal, tax_rate: Number(e.target.value) })}
-                    className="text-xs px-2 py-1 border rounded bg-gray-50"
-                  >
-                    <option value="0">No Tax (0%)</option>
-                    <option value="5">5%</option>
-                    <option value="12">12%</option>
-                    <option value="18">18%</option>
-                    <option value="28">28%</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    {(() => {
-                      const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const discountValue = parseFloat(editOrderModal.discount_value) || 0;
-                      const discountAmount = editOrderModal.discount_type === 'percent' 
-                        ? (subtotal * discountValue) / 100 
-                        : discountValue;
-                      const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
-                      const tax = subtotalAfterDiscount * (editOrderModal.tax_rate || 0) / 100;
-                      const total = subtotalAfterDiscount + tax;
-                      
-                      return (
-                        <>
-                          <p className="text-[10px] text-gray-400">
-                            {editItems.reduce((sum, item) => sum + item.quantity, 0)} items 
-                            {discountAmount > 0 && <span className="text-green-600"> • Disc -₹{discountAmount.toFixed(0)}</span>}
-                            {' '}• Tax {editOrderModal.tax_rate}%
-                          </p>
-                          <p className="text-lg font-bold text-blue-600">₹{total.toFixed(0)}</p>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => { setEditOrderModal({ open: false, order: null, customer_name: '', customer_phone: '', payment_method: 'cash', is_credit: false, payment_received: 0, balance_amount: 0, tax_rate: 5, discount_type: 'amount', discount_value: 0, manual_item_name: '', manual_item_price: '' }); setEditItems([]); }}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={handleUpdateOrder} className="bg-blue-600 px-5" disabled={editItems.length === 0}>
-                      Update
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
+        {/* Edit Order Modal - New Responsive Component */}
+        <EditOrderModal 
+          open={editOrderModal.open}
+          order={editOrderModal.order}
+          onClose={() => setEditOrderModal({ open: false, order: null })}
+          onUpdate={handleUpdateOrder}
+          menuItems={menuItems}
+          businessSettings={businessSettings}
+        />
 
         {/* Cancel Order Confirmation Modal */}
         {cancelConfirmModal.open && cancelConfirmModal.order && (
