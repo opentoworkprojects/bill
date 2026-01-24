@@ -2338,6 +2338,84 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return user_data
 
 
+@api_router.get("/dashboard")
+async def get_dashboard(current_user: dict = Depends(get_current_user)):
+    """Get dashboard statistics and metrics"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    try:
+        # Use IST (Indian Standard Time) for "today" calculation
+        from datetime import timedelta
+        IST = timezone(timedelta(hours=5, minutes=30))
+        
+        # Get current time in IST and find start of today in IST
+        now_ist = datetime.now(IST)
+        today_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Convert to UTC for database query
+        today_utc = today_ist.astimezone(timezone.utc)
+        
+        # Get today's orders (all statuses)
+        today_orders = await db.orders.find({
+            "organization_id": user_org_id,
+            "created_at": {"$gte": today_utc.isoformat()}
+        }, {"_id": 0}).to_list(1000)
+        
+        # Get today's completed orders only
+        today_completed_orders = [order for order in today_orders if order.get("status") in ["completed", "paid"]]
+        
+        # Calculate today's revenue (completed orders only)
+        todays_revenue = sum(order.get("total", 0) for order in today_completed_orders)
+        
+        # Get pending orders count
+        pending_orders = await db.orders.count_documents({
+            "organization_id": user_org_id,
+            "status": {"$in": ["pending", "preparing", "confirmed"]}
+        })
+        
+        # Get this month's data
+        month_start = now_ist.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_start_utc = month_start.astimezone(timezone.utc)
+        
+        monthly_orders = await db.orders.find({
+            "organization_id": user_org_id,
+            "created_at": {"$gte": month_start_utc.isoformat()},
+            "status": {"$in": ["completed", "paid"]}
+        }, {"_id": 0}).to_list(5000)
+        
+        monthly_revenue = sum(order.get("total", 0) for order in monthly_orders)
+        
+        # Get total orders count (all time)
+        total_orders = await db.orders.count_documents({
+            "organization_id": user_org_id
+        })
+        
+        return {
+            "todaysRevenue": todays_revenue,
+            "todaysOrders": len(today_orders),
+            "todaysCompletedOrders": len(today_completed_orders),
+            "totalOrders": total_orders,
+            "pendingOrders": pending_orders,
+            "monthlyRevenue": monthly_revenue,
+            "monthlyOrders": len(monthly_orders),
+            "timestamp": now_ist.isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Dashboard error: {e}")
+        return {
+            "todaysRevenue": 0,
+            "todaysOrders": 0,
+            "todaysCompletedOrders": 0,
+            "totalOrders": 0,
+            "pendingOrders": 0,
+            "monthlyRevenue": 0,
+            "monthlyOrders": 0,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 @api_router.put("/users/me/onboarding")
 async def complete_onboarding(
     data: dict,
