@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -23,6 +23,7 @@ const Dashboard = ({ user }) => {
   // Use offline-first hooks
   const { data: dashboardStats, loading: statsLoading, lastUpdated: statsLastUpdated, refresh: refreshStats } = useDashboardStats();
   const { data: orders, loading: ordersLoading, lastUpdated: ordersLastUpdated } = useOrders();
+  const { data: todaysBills, loading: billsLoading } = useOrders({ today: true });
   const { data: businessSettingsData } = useBusinessSettings();
   
   const [recentOrders, setRecentOrders] = useState([]);
@@ -38,42 +39,42 @@ const Dashboard = ({ user }) => {
   const restaurantName = businessSettingsData?.business_settings?.restaurant_name || user?.username || '';
   const isOffline = !navigator.onLine;
   
-  // Calculate stats from dashboard data and orders
+  // Calculate stats from dashboard data, orders, and today's bills
   const stats = React.useMemo(() => {
-    if (!dashboardStats && !orders) {
-      return {
-        todayOrders: 0,
-        todaySales: 0,
-        activeOrders: 0,
-        avgOrderValue: 0,
-        pendingOrders: 0,
-        preparingOrders: 0,
-        readyOrders: 0
-      };
-    }
-    
     const activeOrders = orders ? orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)) : [];
-    const avgValue = dashboardStats?.todaysOrders > 0 
-      ? dashboardStats.todaysRevenue / dashboardStats.todaysOrders 
-      : 0;
+    const completedOrders = todaysBills ? todaysBills.filter(o => o.status === 'completed') : [];
+    
+    // Calculate today's orders from both dashboard stats and completed bills
+    const todayOrdersCount = (dashboardStats?.todaysOrders || 0) + completedOrders.length;
+    
+    // Calculate today's sales from both dashboard stats and completed bills
+    const todaySalesAmount = (dashboardStats?.todaysRevenue || 0) + 
+      completedOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    
+    const avgValue = todayOrdersCount > 0 ? todaySalesAmount / todayOrdersCount : 0;
 
     return {
-      todayOrders: dashboardStats?.todaysOrders || 0,
-      todaySales: dashboardStats?.todaysRevenue || 0,
+      todayOrders: todayOrdersCount,
+      todaySales: todaySalesAmount,
       activeOrders: activeOrders.length,
       avgOrderValue: avgValue,
       pendingOrders: activeOrders.filter(o => o.status === 'pending').length,
       preparingOrders: activeOrders.filter(o => o.status === 'preparing').length,
       readyOrders: activeOrders.filter(o => o.status === 'ready').length
     };
-  }, [dashboardStats, orders]);
+  }, [dashboardStats, orders, todaysBills]);
 
   useEffect(() => {
     fetchRecommendations();
     
-    // Process recent orders when orders data changes
-    if (orders && orders.length > 0) {
-      const recent = orders
+    // Process recent orders from both active orders and today's bills
+    const allOrders = [
+      ...(orders || []),
+      ...(todaysBills || [])
+    ];
+    
+    if (allOrders.length > 0) {
+      const recent = allOrders
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 5);
       setRecentOrders(recent);
@@ -84,7 +85,7 @@ const Dashboard = ({ user }) => {
     return () => {
       clearInterval(clockInterval);
     };
-  }, [orders]);
+  }, [orders, todaysBills]);
 
   const fetchTopItems = async () => {
     try {

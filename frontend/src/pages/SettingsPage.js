@@ -424,6 +424,11 @@ const SettingsPage = ({ user }) => {
     try {
       await axios.put(`${API}/whatsapp/settings`, whatsappSettings);
       toast.success('WhatsApp settings updated successfully!');
+      
+      // Refresh the settings data to ensure UI shows updated values
+      setTimeout(() => {
+        loadAllSettingsData();
+      }, 500);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update WhatsApp settings');
     } finally {
@@ -514,7 +519,11 @@ const SettingsPage = ({ user }) => {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       user.business_settings = businessSettings;
       localStorage.setItem('user', JSON.stringify(user));
-      // DON'T refetch - keep the current state to prevent reverting changes
+      
+      // Refresh the settings data to ensure UI shows updated values
+      setTimeout(() => {
+        loadAllSettingsData();
+      }, 500);
     } catch (error) {
       console.error('Save error:', error);
       toast.error(error.response?.data?.detail || 'Failed to update settings');
@@ -537,7 +546,11 @@ const SettingsPage = ({ user }) => {
     try {
       await axios.post(`${API}/settings/razorpay`, razorpaySettings);
       toast.success('Razorpay settings saved successfully!');
-      fetchRazorpaySettings();
+      
+      // Refresh the settings data to ensure UI shows updated values
+      setTimeout(() => {
+        loadAllSettingsData();
+      }, 500);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to save settings');
     } finally {

@@ -320,7 +320,7 @@ class CapacitorStorage {
         this.Directory = Directory;
         this.Encoding = Encoding;
         this.Device = Device;
-        this.Permissions = Permissions;
+        this.Permissions = null; // Permissions not imported
         
         // Initialize SQLite database only if available
         if (this.SQLite) {

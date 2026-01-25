@@ -953,11 +953,37 @@ const BillingPage = ({ user }) => {
         return;
       }
       
+      // Instant payment processing - no loading states
+      setPaymentCompleted(true);
       await processPayment();
+      
+      // Play success sound for instant feedback
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          const audioContext = new AudioContext();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.setValueAtTime(523, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1);
+          oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2);
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.4);
+        }
+      } catch (e) {
+        // Silently fail if audio not supported
+      }
+      
     } catch (error) {
       console.error('Error in handlePayment:', error);
       toast.error('Payment processing failed. Please try again.');
-      setLoading(false);
+      setPaymentCompleted(false);
     }
   };
 
@@ -1905,11 +1931,16 @@ const BillingPage = ({ user }) => {
               )}
             </div>
             {!paymentCompleted ? (
-              <Button onClick={handlePayment} disabled={loading} className="w-full h-12 mt-3 text-lg font-bold bg-gradient-to-r from-violet-600 to-purple-600 rounded-lg">
-                {loading ? <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" /> : (
+              <Button onClick={handlePayment} disabled={paymentCompleted} className="w-full h-12 mt-3 text-lg font-bold bg-gradient-to-r from-violet-600 to-purple-600 rounded-lg">
+                {paymentCompleted ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Check className="w-5 h-5" />
+                    Payment Complete!
+                  </div>
+                ) : (
                   splitPayment ? (
                     getTotalSplitAmount() === 0 ? 'Enter Split Payment Amounts' :
-                    getTotalSplitAmount() < calculateTotal() ? `Record Split Payment ${currency}${getTotalSplitAmount().toFixed(0)} (Due: ${currency}${(calculateTotal() - getTotalSplitAmount()).toFixed(0)})` :
+                    getTotalSplitAmount() < calculateTotal() ? `Pay ${currency}${getTotalSplitAmount().toFixed(0)}` :
                     getTotalSplitAmount() > calculateTotal() ? `Pay Split ${currency}${getTotalSplitAmount().toFixed(0)} (Change: ${currency}${(getTotalSplitAmount() - calculateTotal()).toFixed(0)})` :
                     `Pay Split ${currency}${getTotalSplitAmount().toFixed(0)}`
                   ) : showReceivedAmount && receivedAmount ? (
@@ -2327,8 +2358,13 @@ const BillingPage = ({ user }) => {
           </div>
           <div className="p-4 flex-1 flex flex-col">
             {!paymentCompleted ? (
-              <Button onClick={handlePayment} disabled={loading} className="w-full h-14 text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 rounded-xl shadow-xl">
-                {loading ? <div className="animate-spin w-5 h-5 border-3 border-white border-t-transparent rounded-full" /> : (
+              <Button onClick={handlePayment} disabled={paymentCompleted} className="w-full h-14 text-xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 rounded-xl shadow-xl">
+                {paymentCompleted ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Check className="w-6 h-6" />
+                    Payment Complete!
+                  </div>
+                ) : (
                   showReceivedAmount ? 
                     `Pay ${currency}${calculateReceivedAmount().toFixed(0)}` : 
                     `Pay ${currency}${calculateTotal().toFixed(0)}`

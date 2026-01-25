@@ -141,7 +141,7 @@ const OrdersPage = ({ user }) => {
     };
   }, []);
 
-  // Real-time polling for active orders and today's bills (every 2 seconds for real-time experience)
+  // Real-time polling for instant updates (every 1 second for true real-time experience)
   useEffect(() => {
     const interval = setInterval(() => {
       if (navigator.onLine) {
@@ -151,8 +151,7 @@ const OrdersPage = ({ user }) => {
           fetchTodaysBills(); // Refresh today's bills when viewing history tab
         }
       }
-      updateSyncStatus(); // Update sync status regardless of online status
-    }, 2000); // Poll every 2 seconds for real-time experience
+    }, 1000); // Reduced to 1 second for instant real-time updates
 
     return () => clearInterval(interval);
   }, [activeTab]);

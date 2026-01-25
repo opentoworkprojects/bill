@@ -105,15 +105,23 @@ class OfflineDataManager {
   }
 
   async fetchFromServer(endpoint, options) {
-    const baseURL = process.env.REACT_APP_API_URL || 'https://billbytekot-backend.onrender.com/api';
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
     const url = `${baseURL}${endpoint}`;
+    
+    // Add auth token if available
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
     
     const response = await fetch(url, {
       method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       timeout: 10000
     });
@@ -241,12 +249,22 @@ class OfflineDataManager {
   }
 
   async mutateOnServer(endpoint, data, method) {
-    const baseURL = process.env.REACT_APP_API_URL || 'https://billbytekot-backend.onrender.com/api';
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
     const url = `${baseURL}${endpoint}`;
+    
+    // Add auth token if available
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
     
     const response = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(data),
       timeout: 15000
     });
