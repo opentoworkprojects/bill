@@ -1614,14 +1614,14 @@ const BillingPage = ({ user }) => {
               {/* Subtotal Row */}
               <div className="flex justify-between">
                 <span className="text-gray-500">Subtotal</span>
-                <span className="font-medium">{currency}{calculateSubtotal().toFixed(0)}</span>
+                <span className="font-medium">{currency}{calculateSubtotal().toFixed(2)}</span>
               </div>
               
               {/* Discount Row - Better Layout */}
               <div className="bg-gray-50 rounded-lg p-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-gray-500">Discount</span>
-                  <span className="text-green-600 font-medium">{discountAmt > 0 ? `-${currency}${discountAmt.toFixed(0)}` : '—'}</span>
+                  <span className="text-green-600 font-medium">{discountAmt > 0 ? `-${currency}${discountAmt.toFixed(2)}` : '—'}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <select value={discountType} onChange={(e) => { setDiscountType(e.target.value); setDiscountValue(''); }} className="h-8 px-2 text-sm border rounded-lg bg-white">
@@ -1666,13 +1666,13 @@ const BillingPage = ({ user }) => {
                     <option value="18">18%</option>
                   </select>
                 </div>
-                <span className="font-medium">{currency}{calculateTax().toFixed(0)}</span>
+                <span className="font-medium">{currency}{calculateTax().toFixed(2)}</span>
               </div>
               
               {/* Total Row */}
               <div className="flex justify-between text-xl font-bold pt-2 border-t">
                 <span>Total</span>
-                <span className="text-violet-600">{currency}{calculateTotal().toFixed(0)}</span>
+                <span className="text-violet-600">{currency}{calculateTotal().toFixed(2)}</span>
               </div>
             </div>
             {/* Payment Method Selection */}

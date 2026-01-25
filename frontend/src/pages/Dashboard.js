@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
-import { useDashboardStats, useOrders, useBusinessSettings } from '../hooks/useOfflineData';
-import OfflineIndicator, { SyncStatusBadge, DataFreshnessIndicator } from '../components/OfflineIndicator';
-import { offlineDataManager } from '../utils/offlineDataManager';
+// import { useDashboardStats, useOrders, useBusinessSettings } from '../hooks/useOfflineData'; // No longer needed
+// import OfflineIndicator, { SyncStatusBadge, DataFreshnessIndicator } from '../components/OfflineIndicator'; // No longer needed
+// import { offlineDataManager } from '../utils/offlineDataManager'; // No longer needed
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
   DollarSign, ShoppingCart, TrendingUp, MessageSquare, Sparkles, 
@@ -20,18 +20,82 @@ import TrialBanner from '../components/TrialBanner';
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
   
-  // Use offline-first hooks
-  const { data: dashboardStats, loading: statsLoading, lastUpdated: statsLastUpdated, refresh: refreshStats } = useDashboardStats();
-  const { data: orders, loading: ordersLoading, lastUpdated: ordersLastUpdated } = useOrders();
-  const { data: todaysBills, loading: billsLoading } = useOrders({ today: true });
-  const { data: businessSettingsData } = useBusinessSettings();
+  // TEMPORARY: Use direct API calls instead of offline hooks to debug dashboard issue
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [todaysBills, setTodaysBills] = useState([]);
+  const [businessSettingsData, setBusinessSettingsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Direct API calls for debugging
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No token found in localStorage');
+          setLoading(false);
+          return;
+        }
+        
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+        
+        console.log('🔍 Dashboard: Fetching data directly from API...');
+        
+        // Fetch all data in parallel
+        const [dashboardRes, ordersRes, billsRes, settingsRes] = await Promise.all([
+          fetch(`${API}/dashboard`, { headers }),
+          fetch(`${API}/orders`, { headers }),
+          fetch(`${API}/orders/today-bills`, { headers }),
+          fetch(`${API}/business/settings`, { headers })
+        ]);
+        
+        if (dashboardRes.ok) {
+          const data = await dashboardRes.json();
+          setDashboardStats(data);
+          console.log('✅ Dashboard: Dashboard data loaded:', data);
+        }
+        
+        if (ordersRes.ok) {
+          const data = await ordersRes.json();
+          setOrders(data);
+          console.log('✅ Dashboard: Orders data loaded:', data.length, 'orders');
+        }
+        
+        if (billsRes.ok) {
+          const data = await billsRes.json();
+          setTodaysBills(data);
+          console.log('✅ Dashboard: Today\'s bills loaded:', data.length, 'bills');
+        }
+        
+        if (settingsRes.ok) {
+          const data = await settingsRes.json();
+          setBusinessSettingsData(data);
+          console.log('✅ Dashboard: Business settings loaded');
+        }
+        
+      } catch (error) {
+        console.error('❌ Dashboard: Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+    
+    // Set up polling for real-time updates
+    const interval = setInterval(fetchDashboardData, 3000); // Poll every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
   
   const [recentOrders, setRecentOrders] = useState([]);
   const [topItems, setTopItems] = useState([]);
   const [chatMessage, setChatMessage] = useState('');
   const [chatResponse, setChatResponse] = useState('');
   const [recommendations, setRecommendations] = useState('');
-  const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -44,6 +108,17 @@ const Dashboard = ({ user }) => {
     const activeOrders = orders ? orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)) : [];
     const completedOrders = todaysBills ? todaysBills.filter(o => o.status === 'completed') : [];
     
+    // DEBUG: Log what data we're receiving
+    console.log('🔍 Dashboard Data Debug:', {
+      dashboardStats,
+      ordersCount: orders?.length || 0,
+      todaysBillsCount: todaysBills?.length || 0,
+      activeOrdersCount: activeOrders.length,
+      completedOrdersCount: completedOrders.length,
+      backendDashboardOrders: dashboardStats?.todaysOrders || 0,
+      backendDashboardRevenue: dashboardStats?.todaysRevenue || 0
+    });
+    
     // Calculate today's orders from both dashboard stats and completed bills
     const todayOrdersCount = (dashboardStats?.todaysOrders || 0) + completedOrders.length;
     
@@ -53,7 +128,7 @@ const Dashboard = ({ user }) => {
     
     const avgValue = todayOrdersCount > 0 ? todaySalesAmount / todayOrdersCount : 0;
 
-    return {
+    const finalStats = {
       todayOrders: todayOrdersCount,
       todaySales: todaySalesAmount,
       activeOrders: activeOrders.length,
@@ -62,6 +137,9 @@ const Dashboard = ({ user }) => {
       preparingOrders: activeOrders.filter(o => o.status === 'preparing').length,
       readyOrders: activeOrders.filter(o => o.status === 'ready').length
     };
+    
+    console.log('📊 Final Dashboard Stats:', finalStats);
+    return finalStats;
   }, [dashboardStats, orders, todaysBills]);
 
   useEffect(() => {
@@ -125,9 +203,9 @@ const Dashboard = ({ user }) => {
     try {
       // Force refresh all data
       await Promise.all([
-        refreshStats(),
+        // refreshStats(), // Removed - function no longer exists
         fetchTopItems(),
-        offlineDataManager.preloadCriticalData()
+        // offlineDataManager.preloadCriticalData() // Removed - using direct API calls now
       ]);
       
       toast.success('Dashboard refreshed!');
@@ -182,7 +260,7 @@ const Dashboard = ({ user }) => {
               <span className="text-violet-600 font-mono font-bold">
                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
-              <DataFreshnessIndicator lastUpdated={statsLastUpdated} />
+              {/* <DataFreshnessIndicator lastUpdated={statsLastUpdated} /> */}
             </p>
           </div>
           <Button 

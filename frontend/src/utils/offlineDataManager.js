@@ -53,54 +53,33 @@ class OfflineDataManager {
     const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
     const now = Date.now();
     
-    // Check memory cache first
-    if (this.dataCache.has(cacheKey)) {
-      const cached = this.dataCache.get(cacheKey);
-      if (now - cached.timestamp < this.cacheTTL) {
-        console.log(`💾 Memory cache hit: ${endpoint}`);
-        return cached.data;
-      }
-    }
-    
+    // TEMPORARY: Force direct server fetch to bypass cache issues
+    console.log(`🌐 FORCED: Fetching from server: ${endpoint}`);
     try {
-      let data;
+      const data = await this.fetchFromServer(endpoint, options);
+      console.log(`✅ FORCED: Server fetch successful: ${endpoint}`);
       
-      if (this.isOnline) {
-        // Try to fetch from server
-        data = await this.fetchFromServer(endpoint, options);
-        
-        // Cache successful response
-        this.dataCache.set(cacheKey, { data, timestamp: now });
-        this.lastFetchTimes.set(endpoint, now);
-        
-        // Store in offline storage
-        await this.storeOfflineData(endpoint, data);
-        
-      } else {
-        // Fetch from offline storage
-        data = await this.fetchFromOfflineStorage(endpoint, options);
-        
-        if (!data) {
-          throw new Error('No offline data available');
-        }
-      }
+      // Cache successful response
+      this.dataCache.set(cacheKey, { data, timestamp: now });
+      this.lastFetchTimes.set(endpoint, now);
+      
+      // Store in offline storage
+      await this.storeOfflineData(endpoint, data);
       
       return data;
-      
     } catch (error) {
-      console.warn(`Failed to fetch ${endpoint}, trying offline storage:`, error);
+      console.warn(`FORCED: Server fetch failed for ${endpoint}:`, error);
       
-      // Fallback to offline storage
-      const offlineData = await this.fetchFromOfflineStorage(endpoint, options);
-      
-      if (offlineData) {
-        if (this.isOnline) {
-          toast.warning('Using cached data - server temporarily unavailable');
+      // Only fallback to offline if explicitly offline
+      if (!this.isOnline) {
+        const offlineData = await this.fetchFromOfflineStorage(endpoint, options);
+        if (offlineData) {
+          console.log(`📴 Using offline data for ${endpoint}`);
+          return offlineData;
         }
-        return offlineData;
       }
       
-      throw new Error(`No data available for ${endpoint}`);
+      throw new Error(`Failed to fetch ${endpoint}: ${error.message}`);
     }
   }
 

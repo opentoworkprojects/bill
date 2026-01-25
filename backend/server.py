@@ -4285,15 +4285,24 @@ async def create_order(
     table_number = order_data.table_number or 0
 
     # ORDER CONSOLIDATION LOGIC - Check for existing pending orders on the same table
-    if kot_mode_enabled and table_id != "counter":
+    if kot_mode_enabled and table_number > 0:  # Changed from table_id != "counter" to table_number > 0
         try:
             # Check for existing pending/preparing orders on this table
-            existing_order = await db.orders.find_one({
+            # Look by table_number for actual tables, or table_id for counter
+            query = {
                 "organization_id": user_org_id,
-                "table_id": table_id,
                 "status": {"$in": ["pending", "preparing"]},
                 "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}  # Only check last 2 hours
-            })
+            }
+            
+            # For actual tables (table_number > 0), check by table_number
+            # For counter orders, check by table_id
+            if table_number > 0:
+                query["table_number"] = table_number
+            else:
+                query["table_id"] = table_id
+            
+            existing_order = await db.orders.find_one(query)
             
             if existing_order:
                 print(f"🔄 Found existing order {existing_order['id']} for table {table_number}, consolidating items...")
