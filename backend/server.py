@@ -10864,64 +10864,245 @@ def verify_super_admin(username: str, password: str) -> bool:
 
 @api_router.get("/super-admin/dashboard")
 async def get_super_admin_dashboard(username: str, password: str):
-    """Get complete system overview - Site Owner Only"""
+    """Get complete system overview - Site Owner Only (Optimized)"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
-    # Get all users
-    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    try:
+        # Use aggregation pipelines for better performance with timeout protection
+        # Get user statistics efficiently
+        user_stats = await asyncio.wait_for(
+            db.users.aggregate([
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_users": {"$sum": 1},
+                        "active_subscriptions": {
+                            "$sum": {"$cond": [{"$eq": ["$subscription_active", True]}, 1, 0]}
+                        },
+                        "trial_users": {
+                            "$sum": {"$cond": [{"$eq": ["$subscription_active", True]}, 0, 1]}
+                        }
+                    }
+                }
+            ]).to_list(1),
+            timeout=5.0
+        )
+        
+        user_data = user_stats[0] if user_stats else {
+            "total_users": 0, "active_subscriptions": 0, "trial_users": 0
+        }
+        
+        # Get ticket statistics efficiently
+        ticket_stats = await asyncio.wait_for(
+            db.support_tickets.aggregate([
+                {
+                    "$group": {
+                        "_id": "$status",
+                        "count": {"$sum": 1}
+                    }
+                }
+            ]).to_list(10),
+            timeout=3.0
+        )
+        
+        ticket_counts = {stat["_id"]: stat["count"] for stat in ticket_stats}
+        open_tickets = ticket_counts.get("open", 0)
+        pending_tickets = ticket_counts.get("pending", 0)
+        resolved_tickets = ticket_counts.get("resolved", 0)
+        
+        # Get recent orders count efficiently (last 30 days)
+        # Use datetime object instead of ISO string for better performance
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        total_orders_30d = await asyncio.wait_for(
+            db.orders.count_documents({
+                "created_at": {"$gte": thirty_days_ago}
+            }),
+            timeout=5.0
+        )
+        
+        # Get lead statistics efficiently
+        lead_stats = await asyncio.wait_for(
+            db.leads.aggregate([
+                {
+                    "$group": {
+                        "_id": "$status",
+                        "count": {"$sum": 1}
+                    }
+                }
+            ]).to_list(10),
+            timeout=3.0
+        )
+        
+        lead_counts = {stat["_id"]: stat["count"] for stat in lead_stats}
+        total_leads = sum(lead_counts.values())
+        new_leads = lead_counts.get("new", 0)
+        
+        # Get sample data for display (limited) with timeout protection
+        recent_users = await asyncio.wait_for(
+            db.users.find(
+                {}, 
+                {"_id": 0, "password": 0, "orders": 0, "menu_items": 0, "tables": 0}
+            ).sort("created_at", -1).limit(10).to_list(10),
+            timeout=3.0
+        )
+        
+        recent_tickets = await asyncio.wait_for(
+            db.support_tickets.find(
+                {}, 
+                {"_id": 0}
+            ).sort("created_at", -1).limit(10).to_list(10),
+            timeout=3.0
+        )
+        
+        recent_orders = await asyncio.wait_for(
+            db.orders.find(
+                {"created_at": {"$gte": thirty_days_ago}},
+                {"_id": 0, "items": 0}  # Exclude large items array
+            ).sort("created_at", -1).limit(20).to_list(20),
+            timeout=5.0
+        )
+        
+        return {
+            "overview": {
+                "total_users": user_data["total_users"],
+                "active_subscriptions": user_data["active_subscriptions"],
+                "trial_users": user_data["trial_users"],
+                "total_orders_30d": total_orders_30d,
+                "open_tickets": open_tickets,
+                "pending_tickets": pending_tickets,
+                "resolved_tickets": resolved_tickets,
+                "total_leads": total_leads,
+                "new_leads": new_leads
+            },
+            "recent_users": recent_users,
+            "recent_tickets": recent_tickets,
+            "recent_orders": recent_orders,
+            "performance": {
+                "query_time": "optimized",
+                "data_size": "reduced"
+            }
+        }
     
-    # Get all tickets
-    tickets = await db.support_tickets.find({}, {"_id": 0}).to_list(1000)
-    
-    # Get recent orders (last 30 days)
-    thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    recent_orders = await db.orders.find(
-        {"created_at": {"$gte": thirty_days_ago}},
-        {"_id": 0}
-    ).to_list(10000)
-    
-    # Calculate statistics
-    total_users = len(users)
-    active_subscriptions = sum(1 for u in users if u.get("subscription_active"))
-    trial_users = sum(1 for u in users if not u.get("subscription_active"))
-    
-    # Ticket statistics
-    open_tickets = sum(1 for t in tickets if t.get("status") == "open")
-    pending_tickets = sum(1 for t in tickets if t.get("status") == "pending")
-    resolved_tickets = sum(1 for t in tickets if t.get("status") == "resolved")
-    
-    # Lead statistics
-    total_leads = await db.leads.count_documents({})
-    new_leads = await db.leads.count_documents({"status": "new"})
-    
-    return {
-        "overview": {
-            "total_users": total_users,
-            "active_subscriptions": active_subscriptions,
-            "trial_users": trial_users,
-            "total_orders_30d": len(recent_orders),
-            "open_tickets": open_tickets,
-            "pending_tickets": pending_tickets,
-            "resolved_tickets": resolved_tickets,
-            "total_leads": total_leads,
-            "new_leads": new_leads
-        },
-        "users": users,
-        "tickets": tickets,
-        "recent_orders": recent_orders[:100]
-    }
+    except asyncio.TimeoutError:
+        # Return basic data if queries timeout
+        return {
+            "overview": {
+                "total_users": 0,
+                "active_subscriptions": 0,
+                "trial_users": 0,
+                "total_orders_30d": 0,
+                "open_tickets": 0,
+                "pending_tickets": 0,
+                "resolved_tickets": 0,
+                "total_leads": 0,
+                "new_leads": 0
+            },
+            "recent_users": [],
+            "recent_tickets": [],
+            "recent_orders": [],
+            "performance": {
+                "query_time": "timeout",
+                "data_size": "fallback"
+            },
+            "error": "Dashboard queries timed out, showing fallback data"
+        }
+    except Exception as e:
+        # Return error response
+        return {
+            "overview": {
+                "total_users": 0,
+                "active_subscriptions": 0,
+                "trial_users": 0,
+                "total_orders_30d": 0,
+                "open_tickets": 0,
+                "pending_tickets": 0,
+                "resolved_tickets": 0,
+                "total_leads": 0,
+                "new_leads": 0
+            },
+            "recent_users": [],
+            "recent_tickets": [],
+            "recent_orders": [],
+            "performance": {
+                "query_time": "error",
+                "data_size": "fallback"
+            },
+            "error": f"Dashboard error: {str(e)}"
+        }
 
 @api_router.get("/super-admin/users")
-async def get_all_users_admin(username: str, password: str, skip: int = 0, limit: int = 100):
-    """Get all users - Site Owner Only"""
+async def get_all_users_admin(username: str, password: str, skip: int = 0, limit: int = 50):
+    """Get all users - Site Owner Only (Optimized with pagination)"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
-    users = await db.users.find({}, {"_id": 0, "password": 0}).skip(skip).limit(limit).to_list(limit)
-    total = await db.users.count_documents({})
+    try:
+        # Optimized query with selective fields for better performance
+        users = await asyncio.wait_for(
+            db.users.find(
+                {}, 
+                {
+                    "_id": 0, 
+                    "password": 0,
+                    "orders": 0,  # Exclude large nested arrays
+                    "menu_items": 0,  # Exclude large nested arrays
+                    "tables": 0,  # Exclude large nested arrays
+                    "business_data": 0  # Exclude large business data
+                }
+            ).skip(skip).limit(limit).to_list(limit),
+            timeout=10.0
+        )
+        
+        # Get total count efficiently with timeout
+        total = await asyncio.wait_for(
+            db.users.count_documents({}),
+            timeout=5.0
+        )
+        
+        # Add computed fields for essential info
+        for user in users:
+            # Add subscription status summary
+            user["subscription_status"] = "active" if user.get("subscription_active") else "trial"
+            
+            # Add basic stats without heavy queries
+            user["has_orders"] = bool(user.get("bill_count", 0) > 0)
+            user["last_activity"] = user.get("last_login") or user.get("created_at")
+        
+        return {
+            "users": users, 
+            "total": total, 
+            "skip": skip, 
+            "limit": limit,
+            "has_more": skip + limit < total,
+            "page": (skip // limit) + 1,
+            "total_pages": (total + limit - 1) // limit
+        }
     
-    return {"users": users, "total": total, "skip": skip, "limit": limit}
+    except asyncio.TimeoutError:
+        # Return fallback data if queries timeout
+        return {
+            "users": [], 
+            "total": 0, 
+            "skip": skip, 
+            "limit": limit,
+            "has_more": False,
+            "page": 1,
+            "total_pages": 1,
+            "error": "Users query timed out"
+        }
+    except Exception as e:
+        # Return error response
+        return {
+            "users": [], 
+            "total": 0, 
+            "skip": skip, 
+            "limit": limit,
+            "has_more": False,
+            "page": 1,
+            "total_pages": 1,
+            "error": f"Users query error: {str(e)}"
+        }
 
 class SubscriptionUpdate(BaseModel):
     subscription_active: bool
@@ -11430,80 +11611,169 @@ async def delete_user_admin(user_id: str, username: str, password: str):
 
 @api_router.get("/super-admin/users/{user_id}/full-data")
 async def get_user_full_data(user_id: str, username: str, password: str):
-    """Get complete user data including all business data - Site Owner Only"""
+    """Get complete user data including all business data - Site Owner Only (Optimized)"""
     if not verify_super_admin(username, password):
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
-    # Get user
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        # Get user with timeout
+        user = await asyncio.wait_for(
+            db.users.find_one({"id": user_id}, {"_id": 0, "password": 0}),
+            timeout=3.0
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get counts efficiently without loading all data (with timeout)
+        staff_count = await asyncio.wait_for(
+            db.users.count_documents({"organization_id": user_id}),
+            timeout=2.0
+        )
+        orders_count = await asyncio.wait_for(
+            db.orders.count_documents({"organization_id": user_id}),
+            timeout=3.0
+        )
+        menu_count = await asyncio.wait_for(
+            db.menu_items.count_documents({"organization_id": user_id}),
+            timeout=2.0
+        )
+        tables_count = await asyncio.wait_for(
+            db.tables.count_documents({"organization_id": user_id}),
+            timeout=2.0
+        )
+        inventory_count = await asyncio.wait_for(
+            db.inventory.count_documents({"organization_id": user_id}),
+            timeout=2.0
+        )
+        payments_count = await asyncio.wait_for(
+            db.payments.count_documents({"organization_id": user_id}),
+            timeout=2.0
+        )
+        
+        # Get recent data samples (limited) with timeout
+        recent_orders = await asyncio.wait_for(
+            db.orders.find(
+                {"organization_id": user_id},
+                {"_id": 0, "items": 0}  # Exclude large items array
+            ).sort("created_at", -1).limit(50).to_list(50),
+            timeout=5.0
+        )
+        
+        recent_staff = await asyncio.wait_for(
+            db.users.find(
+                {"organization_id": user_id},
+                {"_id": 0, "password": 0, "orders": 0, "menu_items": 0}
+            ).limit(20).to_list(20),
+            timeout=3.0
+        )
+        
+        sample_menu = await asyncio.wait_for(
+            db.menu_items.find(
+                {"organization_id": user_id},
+                {"_id": 0}
+            ).limit(20).to_list(20),
+            timeout=3.0
+        )
+        
+        # Calculate stats efficiently using aggregation with timeout
+        revenue_stats = await asyncio.wait_for(
+            db.orders.aggregate([
+                {"$match": {"organization_id": user_id, "status": "completed"}},
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_revenue": {"$sum": "$total"},
+                        "total_orders": {"$sum": 1},
+                        "avg_order_value": {"$avg": "$total"}
+                    }
+                }
+            ]).to_list(1),
+            timeout=5.0
+        )
+        
+        credit_stats = await asyncio.wait_for(
+            db.orders.aggregate([
+                {"$match": {"organization_id": user_id, "is_credit": True}},
+                {
+                    "$group": {
+                        "_id": None,
+                        "credit_orders": {"$sum": 1},
+                        "pending_credit": {"$sum": "$balance_amount"}
+                    }
+                }
+            ]).to_list(1),
+            timeout=3.0
+        )
+        
+        revenue_data = revenue_stats[0] if revenue_stats else {
+            "total_revenue": 0, "total_orders": 0, "avg_order_value": 0
+        }
+        credit_data = credit_stats[0] if credit_stats else {
+            "credit_orders": 0, "pending_credit": 0
+        }
+        
+        return {
+            "user": user,
+            "staff": recent_staff,
+            "staff_count": staff_count,
+            "orders": recent_orders,
+            "orders_count": orders_count,
+            "menu_items": sample_menu,
+            "menu_count": menu_count,
+            "tables_count": tables_count,
+            "inventory_count": inventory_count,
+            "payments_count": payments_count,
+            "stats": {
+                "total_revenue": revenue_data["total_revenue"],
+                "total_orders": revenue_data["total_orders"],
+                "avg_order_value": revenue_data["avg_order_value"],
+                "credit_orders": credit_data["credit_orders"],
+                "pending_credit": credit_data["pending_credit"]
+            },
+            "summary": {
+                "data_optimized": True,
+                "showing_recent_data": True,
+                "full_counts_available": True
+            }
+        }
     
-    # Get all staff members
-    staff = await db.users.find(
-        {"organization_id": user_id},
-        {"_id": 0, "password": 0}
-    ).to_list(100)
+    except asyncio.TimeoutError:
+        # Return basic user data if queries timeout
+        try:
+            user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            return {
+                "user": user,
+                "staff": [],
+                "staff_count": 0,
+                "orders": [],
+                "orders_count": 0,
+                "menu_items": [],
+                "menu_count": 0,
+                "tables_count": 0,
+                "inventory_count": 0,
+                "payments_count": 0,
+                "stats": {
+                    "total_revenue": 0,
+                    "total_orders": 0,
+                    "avg_order_value": 0,
+                    "credit_orders": 0,
+                    "pending_credit": 0
+                },
+                "summary": {
+                    "data_optimized": True,
+                    "showing_recent_data": False,
+                    "full_counts_available": False
+                },
+                "error": "User data queries timed out, showing basic user info only"
+            }
+        except Exception:
+            raise HTTPException(status_code=404, detail="User not found")
     
-    # Get all orders
-    orders = await db.orders.find(
-        {"organization_id": user_id},
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(10000)
-    
-    # Get menu items
-    menu_items = await db.menu_items.find(
-        {"organization_id": user_id},
-        {"_id": 0}
-    ).to_list(1000)
-    
-    # Get tables
-    tables = await db.tables.find(
-        {"organization_id": user_id},
-        {"_id": 0}
-    ).to_list(100)
-    
-    # Get inventory
-    inventory = await db.inventory.find(
-        {"organization_id": user_id},
-        {"_id": 0}
-    ).to_list(1000)
-    
-    # Get payments
-    payments = await db.payments.find(
-        {"organization_id": user_id},
-        {"_id": 0}
-    ).to_list(10000)
-    
-    # Calculate stats
-    total_revenue = sum(o.get("total", 0) for o in orders if o.get("status") == "completed")
-    total_orders = len([o for o in orders if o.get("status") == "completed"])
-    credit_orders = len([o for o in orders if o.get("is_credit")])
-    pending_credit = sum(o.get("balance_amount", 0) for o in orders if o.get("is_credit"))
-    
-    return {
-        "user": user,
-        "staff": staff,
-        "staff_count": len(staff),
-        "orders": orders,
-        "orders_count": len(orders),
-        "menu_items": menu_items,
-        "menu_count": len(menu_items),
-        "tables": tables,
-        "tables_count": len(tables),
-        "inventory": inventory,
-        "inventory_count": len(inventory),
-        "payments": payments,
-        "payments_count": len(payments),
-        "stats": {
-            "total_revenue": total_revenue,
-            "total_orders": total_orders,
-            "credit_orders": credit_orders,
-            "pending_credit": pending_credit,
-            "avg_order_value": total_revenue / total_orders if total_orders > 0 else 0
-        },
-        "exported_at": datetime.now(timezone.utc).isoformat()
-    }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving user data: {str(e)}")
 
 
 def serialize_for_sqlite(obj):
@@ -12427,11 +12697,14 @@ async def get_team_members(username: str, password: str):
     sales_count = sum(1 for m in members if m.get("role") == "sales")
     support_count = sum(1 for m in members if m.get("role") == "support")
     admin_count = sum(1 for m in members if m.get("role") == "admin")
+    active_count = sum(1 for m in members if m.get("active", True))
     
     return {
-        "members": members,
+        "team_members": members,  # Fixed: changed from "members" to "team_members"
         "total": len(members),
         "stats": {
+            "total": len(members),
+            "active": active_count,
             "sales": sales_count,
             "support": support_count,
             "admin": admin_count
@@ -13770,7 +14043,7 @@ async def get_pricing_config(username: str, password: str):
         pricing = await db.pricing_config.find_one({}, {"_id": 0})
         
         if not pricing:
-            # Return default pricing
+            # Return default pricing configuration
             pricing = {
                 "regular_price": 1999.0,
                 "regular_price_display": "₹1999",
@@ -13779,14 +14052,37 @@ async def get_pricing_config(username: str, password: str):
                 "campaign_active": False,
                 "campaign_name": "",
                 "campaign_discount_percent": 10.0,
+                "campaign_start_date": "",
+                "campaign_end_date": "",
                 "trial_expired_discount": 10.0,
                 "trial_days": 7,
-                "subscription_months": 12
+                "subscription_months": 12,
+                "referral_discount": 200.0,
+                "referral_reward": 300.0
             }
+        
+        # Ensure all required fields exist
+        pricing.setdefault("regular_price", 1999.0)
+        pricing.setdefault("campaign_active", False)
+        pricing.setdefault("trial_days", 7)
+        pricing.setdefault("subscription_months", 12)
         
         return pricing
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return default pricing on error
+        return {
+            "regular_price": 1999.0,
+            "regular_price_display": "₹1999",
+            "campaign_price": 1799.0,
+            "campaign_price_display": "₹1799",
+            "campaign_active": False,
+            "campaign_name": "",
+            "campaign_discount_percent": 10.0,
+            "trial_expired_discount": 10.0,
+            "trial_days": 7,
+            "subscription_months": 12,
+            "error": "Using default pricing configuration"
+        }
 
 @api_router.put("/super-admin/pricing")
 async def update_pricing_config(pricing: PricingConfig, username: str, password: str):
