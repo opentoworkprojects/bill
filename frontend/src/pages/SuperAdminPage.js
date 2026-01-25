@@ -314,7 +314,7 @@ const SuperAdminPage = () => {
       setSelectedUsers([]);
       setBulkAction('');
       setShowBulkModal(false);
-      fetchUsers(); // Only refresh users after bulk action
+      fetchUsers(usersPage); // Refresh current page
     } catch (error) {
       toast.error('Bulk action failed: ' + (error.response?.data?.detail || error.message));
     } finally {
@@ -578,22 +578,44 @@ const SuperAdminPage = () => {
   // State for user fetch error and retry (Requirements 3.4)
   const [usersFetchError, setUsersFetchError] = useState(null);
   const [usersLoading, setUsersLoading] = useState(false);
+  
+  // Pagination state for users (30 per page as requested)
+  const [usersPage, setUsersPage] = useState(0);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersHasMore, setUsersHasMore] = useState(false);
+  const USERS_PER_PAGE = 30;
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = usersPage) => {
     try {
       setUsersLoading(true);
       setUsersFetchError(null);
       const usersRes = await axios.get(`${API}/super-admin/users/list`, {
-        params: credentials
+        params: {
+          ...credentials,
+          skip: page * USERS_PER_PAGE,
+          limit: USERS_PER_PAGE
+        }
       });
       setUsers(usersRes.data.users || []);
+      setUsersTotal(usersRes.data.total || 0);
+      setUsersHasMore(usersRes.data.has_more || false);
+      setUsersPage(page);
     } catch (e) {
       console.error('Failed to fetch users', e);
       setUsers([]);
+      setUsersTotal(0);
+      setUsersHasMore(false);
       setUsersFetchError(e.response?.data?.detail || e.message || 'Failed to fetch users');
       toast.error('Failed to fetch users. Click retry to try again.');
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  // Handle user pagination
+  const handleUsersPageChange = (newPage) => {
+    if (newPage >= 0 && (newPage === 0 || newPage * USERS_PER_PAGE < usersTotal)) {
+      fetchUsers(newPage);
     }
   };
 
@@ -908,7 +930,8 @@ const SuperAdminPage = () => {
           await fetchDashboard();
           break;
         case 'users':
-          await fetchUsers();
+          setUsersPage(0); // Reset to first page when switching to users tab
+          await fetchUsers(0);
           break;
         case 'leads':
           await fetchLeads();
@@ -1020,8 +1043,12 @@ const SuperAdminPage = () => {
         toast.success('Invoice email sent to user');
       }
       resetSubscriptionModal();
-      // Refresh current tab data
-      fetchTabData(activeTab);
+      // Refresh current page of users
+      if (activeTab === 'users') {
+        fetchUsers(usersPage);
+      } else {
+        fetchTabData(activeTab);
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to activate subscription');
     }
@@ -1066,7 +1093,7 @@ const SuperAdminPage = () => {
         params: credentials
       });
       toast.success('User deleted');
-      fetchUsers(); // Only refresh users
+      fetchUsers(usersPage); // Refresh current page
     } catch (error) {
       toast.error('Failed to delete user');
     }
@@ -1083,7 +1110,7 @@ const SuperAdminPage = () => {
         { params: credentials }
       );
       toast.success(`Trial extended by ${days} days! Total trial: ${response.data.total_trial_days} days`);
-      fetchUsers(); // Only refresh users
+      fetchUsers(usersPage); // Refresh current page
     } catch (error) {
       toast.error('Failed to extend trial');
     }
@@ -1161,7 +1188,7 @@ const SuperAdminPage = () => {
         params: credentials
       });
       toast.success('Subscription deactivated');
-      fetchUsers(); // Only refresh users
+      fetchUsers(usersPage); // Refresh current page
     } catch (error) {
       toast.error('Failed to deactivate subscription');
     }
@@ -1628,7 +1655,7 @@ const SuperAdminPage = () => {
                       User Management
                     </CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      {getFilteredUsers().length} of {users.length} users
+                      {getFilteredUsers().length} of {users.length} users on this page • {usersTotal} total users
                     </p>
                   </div>
                   
@@ -1661,7 +1688,14 @@ const SuperAdminPage = () => {
                     <Input
                       placeholder="Search users by name or email..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        // Reset to first page when searching
+                        if (e.target.value !== searchQuery) {
+                          setUsersPage(0);
+                          fetchUsers(0);
+                        }
+                      }}
                       className="pl-10"
                     />
                   </div>
@@ -1669,7 +1703,12 @@ const SuperAdminPage = () => {
                   {/* Status Filter */}
                   <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={(e) => {
+                      setFilterStatus(e.target.value);
+                      // Reset to first page when filtering
+                      setUsersPage(0);
+                      fetchUsers(0);
+                    }}
                     className="px-3 py-2 border rounded-lg bg-white min-w-[140px]"
                   >
                     <option value="all">All Status</option>
@@ -1682,7 +1721,12 @@ const SuperAdminPage = () => {
                   <div className="flex items-center gap-2">
                     <select
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
+                      onChange={(e) => {
+                        setSortBy(e.target.value);
+                        // Reset to first page when sorting
+                        setUsersPage(0);
+                        fetchUsers(0);
+                      }}
                       className="px-3 py-2 border rounded-lg bg-white min-w-[120px]"
                     >
                       <option value="created_at">Created</option>
@@ -1694,7 +1738,12 @@ const SuperAdminPage = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      onClick={() => {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        // Reset to first page when changing sort order
+                        setUsersPage(0);
+                        fetchUsers(0);
+                      }}
                       className="p-2"
                     >
                       {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
@@ -1771,6 +1820,9 @@ const SuperAdminPage = () => {
                             setSortBy('created_at');
                             setSortOrder('desc');
                             setDateRange({ start: '', end: '' });
+                            // Reset to first page when clearing filters
+                            setUsersPage(0);
+                            fetchUsers(0);
                           }}
                           className="w-full"
                         >
@@ -1797,7 +1849,7 @@ const SuperAdminPage = () => {
                     </div>
                     <Button
                       variant="outline"
-                      onClick={fetchUsers}
+                      onClick={() => fetchUsers(usersPage)}
                       disabled={usersLoading}
                       className="border-red-300 text-red-700 hover:bg-red-100"
                     >
@@ -2074,6 +2126,9 @@ const SuperAdminPage = () => {
                         onClick={() => {
                           setSearchQuery('');
                           setFilterStatus('all');
+                          // Reset to first page when clearing filters
+                          setUsersPage(0);
+                          fetchUsers(0);
                         }}
                         className="mt-2"
                       >
@@ -2082,6 +2137,74 @@ const SuperAdminPage = () => {
                     </div>
                   )}
                 </div>
+                
+                {/* Pagination Controls */}
+                {!usersLoading && !usersFetchError && usersTotal > 0 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>
+                        Showing {usersPage * USERS_PER_PAGE + 1} to {Math.min((usersPage + 1) * USERS_PER_PAGE, usersTotal)} of {usersTotal} users
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      <span>Page {usersPage + 1} of {Math.ceil(usersTotal / USERS_PER_PAGE)}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUsersPageChange(usersPage - 1)}
+                        disabled={usersPage === 0 || usersLoading}
+                        className="flex items-center gap-1"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                      </Button>
+                      
+                      {/* Page numbers */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, Math.ceil(usersTotal / USERS_PER_PAGE)) }, (_, i) => {
+                          const totalPages = Math.ceil(usersTotal / USERS_PER_PAGE);
+                          let pageNum;
+                          
+                          if (totalPages <= 5) {
+                            pageNum = i;
+                          } else if (usersPage < 3) {
+                            pageNum = i;
+                          } else if (usersPage >= totalPages - 3) {
+                            pageNum = totalPages - 5 + i;
+                          } else {
+                            pageNum = usersPage - 2 + i;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={usersPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleUsersPageChange(pageNum)}
+                              disabled={usersLoading}
+                              className="w-8 h-8 p-0"
+                            >
+                              {pageNum + 1}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUsersPageChange(usersPage + 1)}
+                        disabled={!usersHasMore || usersLoading}
+                        className="flex items-center gap-1"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
             )}
