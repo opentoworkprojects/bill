@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
-// import { useDashboardStats, useOrders, useBusinessSettings } from '../hooks/useOfflineData'; // No longer needed
-// import OfflineIndicator, { SyncStatusBadge, DataFreshnessIndicator } from '../components/OfflineIndicator'; // No longer needed
-// import { offlineDataManager } from '../utils/offlineDataManager'; // No longer needed
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
   DollarSign, ShoppingCart, TrendingUp, MessageSquare, Sparkles, 
@@ -108,17 +105,6 @@ const Dashboard = ({ user }) => {
     const activeOrders = orders ? orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)) : [];
     const completedOrders = todaysBills ? todaysBills.filter(o => o.status === 'completed') : [];
     
-    // DEBUG: Log what data we're receiving
-    console.log('🔍 Dashboard Data Debug:', {
-      dashboardStats,
-      ordersCount: orders?.length || 0,
-      todaysBillsCount: todaysBills?.length || 0,
-      activeOrdersCount: activeOrders.length,
-      completedOrdersCount: completedOrders.length,
-      backendDashboardOrders: dashboardStats?.todaysOrders || 0,
-      backendDashboardRevenue: dashboardStats?.todaysRevenue || 0
-    });
-    
     // Calculate today's orders from both dashboard stats and completed bills
     const todayOrdersCount = (dashboardStats?.todaysOrders || 0) + completedOrders.length;
     
@@ -128,7 +114,7 @@ const Dashboard = ({ user }) => {
     
     const avgValue = todayOrdersCount > 0 ? todaySalesAmount / todayOrdersCount : 0;
 
-    const finalStats = {
+    return {
       todayOrders: todayOrdersCount,
       todaySales: todaySalesAmount,
       activeOrders: activeOrders.length,
@@ -137,9 +123,6 @@ const Dashboard = ({ user }) => {
       preparingOrders: activeOrders.filter(o => o.status === 'preparing').length,
       readyOrders: activeOrders.filter(o => o.status === 'ready').length
     };
-    
-    console.log('📊 Final Dashboard Stats:', finalStats);
-    return finalStats;
   }, [dashboardStats, orders, todaysBills]);
 
   useEffect(() => {
@@ -248,8 +231,8 @@ const Dashboard = ({ user }) => {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <p className="text-gray-500 text-sm font-medium">{getGreeting()}</p>
-              <OfflineIndicator />
-              <SyncStatusBadge />
+              {/* <OfflineIndicator /> */}
+              {/* <SyncStatusBadge /> */}
             </div>
             <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
               {restaurantName || user?.username}
