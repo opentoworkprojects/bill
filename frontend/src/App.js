@@ -48,7 +48,6 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import HelpPage from './pages/HelpPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import OpsPanel from './pages/OpsPanel';
-import InstantPOSPage from './pages/InstantPOSPage';
 import ReferEarnPage from './pages/ReferEarnPage';
 import RestaurantBillingSoftwarePage from './pages/RestaurantBillingSoftwarePage';
 import KOTSoftwarePage from './pages/KOTSoftwarePage';
@@ -922,14 +921,6 @@ function App() {
             element={
               <PrivateRoute isAuthChecking={isAuthChecking}>
                 <ReferEarnPage user={user} />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/instant-pos"
-            element={
-              <PrivateRoute isAuthChecking={isAuthChecking}>
-                <InstantPOSPage user={user} />
               </PrivateRoute>
             }
           />

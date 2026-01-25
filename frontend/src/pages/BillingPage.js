@@ -14,6 +14,9 @@ import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPaymen
 import billingCache from '../utils/billingCache';
 import { startBillingTimer, endBillingTimer } from '../utils/performanceMonitor';
 import { OrderValidator } from '../utils/validation';
+import posDataManager from '../utils/posDataManager';
+import instantMenuCache from '../utils/instantMenuCache';
+import wsManager from '../utils/websocket';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
@@ -51,6 +54,10 @@ const BillingPage = ({ user }) => {
   // Add preview functionality
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
+  
+  // 🚀 Performance monitoring state
+  const [performanceMetrics, setPerformanceMetrics] = useState(null);
+  const [showPerformancePanel, setShowPerformancePanel] = useState(false);
   
   // Advanced UI state for better UX
   const [dropdownPosition, setDropdownPosition] = useState('bottom');
@@ -105,6 +112,55 @@ const BillingPage = ({ user }) => {
   useEffect(() => {
     loadBillingDataOptimized();
     
+    // 🚀 Initialize ultra-fast POS data manager
+    posDataManager.init().catch(error => {
+      console.warn('⚠️ Failed to initialize POS data manager:', error);
+    });
+    
+    // 🚀 Warm up instant menu cache for instant access
+    instantMenuCache.warmUpCache().catch(error => {
+      console.warn('⚠️ Failed to warm up menu cache:', error);
+    });
+    
+    // 🔄 Setup WebSocket real-time listeners
+    const setupWebSocketListeners = () => {
+      // Listen for menu updates
+      posDataManager.addListener('menu', (data) => {
+        console.log('🍽️ Menu updated in real-time');
+        setMenuItems(data);
+        instantMenuCache.updateCache('menu_all', data);
+      });
+
+      // Listen for order updates
+      posDataManager.addListener('orders', (data) => {
+        if (data.id === orderId) {
+          console.log('📋 Current order updated in real-time');
+          setOrder(data);
+          setOrderItems(data.items || []);
+        }
+      });
+
+      // Listen for settings updates
+      posDataManager.addListener('settings', (data) => {
+        console.log('⚙️ Business settings updated in real-time');
+        setBusinessSettings(data);
+      });
+    };
+
+    setupWebSocketListeners();
+    
+    // 🚀 Update performance metrics periodically
+    const metricsInterval = setInterval(() => {
+      const metrics = posDataManager.getMetrics();
+      const cacheMetrics = instantMenuCache.getPerformanceMetrics();
+      
+      setPerformanceMetrics({
+        posData: metrics,
+        menuCache: cacheMetrics,
+        isOnline: navigator.onLine
+      });
+    }, 5000); // Update every 5 seconds
+    
     // Advanced screen size and keyboard detection
     const handleResize = () => {
       setScreenHeight(window.innerHeight);
@@ -123,6 +179,7 @@ const BillingPage = ({ user }) => {
     }
     
     return () => {
+      clearInterval(metricsInterval);
       window.removeEventListener('resize', handleResize);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
@@ -245,8 +302,8 @@ const BillingPage = ({ user }) => {
     }
   }, [showMenuDropdown, calculateDropdownPosition]);
 
-  // Debounced search for better performance with improved logic
-  const handleSearchChange = useCallback((value) => {
+  // 🚀 Ultra-fast instant search with debouncing
+  const handleSearchChange = useCallback(async (value) => {
     setSearchQuery(value);
     setLastSearchTime(Date.now());
     
@@ -255,21 +312,43 @@ const BillingPage = ({ user }) => {
       clearTimeout(searchDebounceTimer);
     }
     
-    // Set new timer for dropdown show/hide with better logic
-    const timer = setTimeout(() => {
-      if (value.trim().length >= 1) { // Show dropdown after 1 character
+    // Set new timer for instant search with ultra-fast response
+    const timer = setTimeout(async () => {
+      if (value.trim().length >= 1) {
         setShowMenuDropdown(true);
         setIsDropdownAnimating(true);
         setTimeout(() => setIsDropdownAnimating(false), 200);
+        
+        // 🚀 Use instant search for ultra-fast results
+        try {
+          const searchStartTime = performance.now();
+          const searchResults = await instantMenuCache.searchMenuItems(value);
+          const searchTime = performance.now() - searchStartTime;
+          
+          console.log(`⚡ Instant search completed in ${searchTime.toFixed(2)}ms for "${value}"`);
+          
+          // Update dropdown with search results
+          if (searchResults.length > 0) {
+            // Filter current menu items to show only search results
+            const filteredResults = menuItems.filter(item => 
+              searchResults.some(result => result.id === item.id)
+            );
+            // You could update a separate state for search results here
+          }
+          
+        } catch (searchError) {
+          console.warn('⚠️ Instant search failed, using fallback:', searchError);
+        }
+        
         console.log('🔍 Showing dropdown for query:', value);
       } else {
         setShowMenuDropdown(false);
         console.log('🔍 Hiding dropdown - query too short');
       }
-    }, 100); // Reduced debounce for faster response
+    }, 50); // Ultra-fast 50ms debounce for instant feel
     
     setSearchDebounceTimer(timer);
-  }, [searchDebounceTimer]);
+  }, [searchDebounceTimer, menuItems]);
   
   // Handle menu item selection with improved feedback
   const handleAddMenuItem = useCallback((item) => {
@@ -361,7 +440,7 @@ const BillingPage = ({ user }) => {
     setMenuError(null);
     
     try {
-      console.log('🔄 Fetching menu items silently...');
+      console.log('🚀 Loading menu items with ultra-fast cache...');
       
       // Check if user is authenticated
       const token = localStorage.getItem('token');
@@ -372,29 +451,30 @@ const BillingPage = ({ user }) => {
         return;
       }
       
-      // Try to use cached menu items for instant display (if not force refresh)
-      const cacheKey = `menu_items_${user?.organization_id || user?.id || 'default'}`;
-      const cachedData = localStorage.getItem(cacheKey);
+      // 🚀 Use ultra-fast instant menu cache for instant loading
+      const startTime = performance.now();
       
-      if (!forceRefresh && cachedData) {
-        try {
-          const { items, timestamp } = JSON.parse(cachedData);
-          const cacheAge = Date.now() - timestamp;
-          const CACHE_TTL = 2 * 60 * 1000; // 2 minutes for faster updates
-          
-          if (cacheAge < CACHE_TTL && items.length > 0) {
-            console.log('📦 Using cached menu items:', items.length, 'items');
-            setMenuItems(items);
-            setMenuLoading(false);
-            
-            // Refresh in background after showing cached data
-            setTimeout(() => fetchMenuItems(true), 500);
-            return;
-          }
-        } catch (e) {
-          console.warn('⚠️ Cache parse error:', e);
+      try {
+        const menuData = await instantMenuCache.getMenuItems();
+        setMenuItems(menuData);
+        setMenuLoading(false);
+        
+        const loadTime = performance.now() - startTime;
+        console.log(`⚡ Menu loaded in ${loadTime.toFixed(2)}ms with instant cache!`);
+        
+        // Background refresh if needed
+        if (!forceRefresh) {
+          setTimeout(() => fetchMenuItems(true), 10000); // Refresh after 10 seconds
         }
+        
+        return;
+        
+      } catch (cacheError) {
+        console.warn('⚠️ Instant cache failed, falling back to API:', cacheError);
       }
+      
+      // Fallback to API if instant cache fails
+      console.log('🔄 Fetching menu items from API...');
       
       // Add timeout and retry logic
       const controller = new AbortController();
@@ -2563,6 +2643,50 @@ const BillingPage = ({ user }) => {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* 🚀 Performance Panel - Development Only */}
+      {process.env.NODE_ENV === 'development' && performanceMetrics && (
+        <div className="fixed bottom-4 right-4 bg-black bg-opacity-90 text-white p-3 rounded-lg text-xs max-w-xs">
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-bold">⚡ Performance</span>
+            <button 
+              onClick={() => setShowPerformancePanel(!showPerformancePanel)}
+              className="text-gray-300 hover:text-white"
+            >
+              {showPerformancePanel ? '−' : '+'}
+            </button>
+          </div>
+          
+          {showPerformancePanel && (
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Cache Hits:</span>
+                <span className="text-green-400">{performanceMetrics.posData?.cacheHits || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Avg Response:</span>
+                <span className={performanceMetrics.posData?.avgResponseTime < 50 ? 'text-green-400' : 'text-yellow-400'}>
+                  {(performanceMetrics.posData?.avgResponseTime || 0).toFixed(1)}ms
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Memory Cache:</span>
+                <span className="text-blue-400">{performanceMetrics.posData?.memoryCacheSize || 0} items</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Status:</span>
+                <span className={performanceMetrics.isOnline ? 'text-green-400' : 'text-red-400'}>
+                  {performanceMetrics.isOnline ? '🟢 Online' : '🔴 Offline'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Menu Cache:</span>
+                <span className="text-purple-400">{performanceMetrics.menuCache?.cacheSize || 0}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Layout>
