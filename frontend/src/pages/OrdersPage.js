@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
 import OptimizedBillingButton from '../components/OptimizedBillingButton';
-import { billingCache } from '../utils/billingCache';
+import billingCache from '../utils/billingCache';
 import EditOrderModal from '../components/EditOrderModal';
 
 // Sound effects for better UX

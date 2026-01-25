@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { billingCache } from '../utils/billingCache';
+import billingCache from '../utils/billingCache';
 import { toast } from 'sonner';
 
 const OptimizedBillingButton = ({ order, user, className = "" }) => {

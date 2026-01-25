@@ -11,7 +11,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye } from 'lucide-react';
 import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
 import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPayment';
-import { billingCache } from '../utils/billingCache';
+import billingCache from '../utils/billingCache';
 import { startBillingTimer, endBillingTimer } from '../utils/performanceMonitor';
 import { OrderValidator } from '../utils/validation';
 

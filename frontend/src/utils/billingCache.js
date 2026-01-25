@@ -214,4 +214,6 @@ export function useBillingCache() {
   };
 }
 
+// Export both as named and default for compatibility
+export { billingCache };
 export default billingCache;
