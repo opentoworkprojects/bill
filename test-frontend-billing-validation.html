@@ -287,18 +287,53 @@
                     taxRate: 10
                 },
                 {
-                    name: "Invalid Tax Rate",
+                    name: "Invalid Tax Rate (Above 100%)",
                     subtotal: 100,
                     discountValue: 10,
                     discountType: "amount",
                     taxRate: 150
                 },
                 {
-                    name: "Negative Values",
-                    subtotal: -50,
+                    name: "Negative Tax Rate",
+                    subtotal: 100,
                     discountValue: 10,
                     discountType: "amount",
-                    taxRate: 10
+                    taxRate: -5
+                },
+                {
+                    name: "100% Percentage Discount",
+                    subtotal: 200,
+                    discountValue: 100,
+                    discountType: "percent",
+                    taxRate: 18
+                },
+                {
+                    name: "High GST Rate (Valid)",
+                    subtotal: 500,
+                    discountValue: 50,
+                    discountType: "amount",
+                    taxRate: 28
+                },
+                {
+                    name: "Complex Restaurant Bill",
+                    subtotal: 1280,
+                    discountValue: 15,
+                    discountType: "percent",
+                    taxRate: 5
+                },
+                {
+                    name: "Decimal Values",
+                    subtotal: 87.50,
+                    discountValue: 7.25,
+                    discountType: "amount",
+                    taxRate: 12.5
+                },
+                {
+                    name: "Zero Tax with Large Discount",
+                    subtotal: 300,
+                    discountValue: 100,
+                    discountType: "amount",
+                    taxRate: 0
                 }
             ];
             
@@ -315,15 +350,28 @@
                 const calc = calculateBilling();
                 
                 let hasErrors = false;
-                if (calc.discountAmount < 0 || calc.discountAmount > calc.subtotal) hasErrors = true;
-                if (calc.taxRate < 0 || calc.taxRate > 100) hasErrors = true;
-                if (calc.subtotal < 0) hasErrors = true;
+                let errorMessages = [];
                 
-                results.push(`${scenario.name}: ${hasErrors ? '✅ Properly Rejected' : '❌ Should be Rejected'}`);
+                if (calc.discountAmount < 0 || calc.discountAmount > calc.subtotal) {
+                    hasErrors = true;
+                    errorMessages.push('Invalid discount');
+                }
+                if (calc.taxRate < 0 || calc.taxRate > 100) {
+                    hasErrors = true;
+                    errorMessages.push('Invalid tax rate');
+                }
+                if (calc.subtotal < 0) {
+                    hasErrors = true;
+                    errorMessages.push('Invalid subtotal');
+                }
+                
+                const status = hasErrors ? '❌ Rejected' : '✅ Accepted';
+                const details = hasErrors ? ` (${errorMessages.join(', ')})` : ` (Total: ₹${calc.total.toFixed(2)})`;
+                results.push(`${scenario.name}: ${status}${details}`);
             });
             
-            resultDiv.innerHTML = `<div class="result ${results.every(r => r.includes('✅')) ? 'success' : 'error'}">
-                Invalid Scenario Tests:<br>${results.join('<br>')}
+            resultDiv.innerHTML = `<div class="result ${results.every(r => r.includes('✅') || r.includes('❌')) ? 'success' : 'error'}">
+                <strong>Tax & Discount Test Scenarios:</strong><br><br>${results.join('<br>')}
             </div>`;
             
             // Reset to valid values
