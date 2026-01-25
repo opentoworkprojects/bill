@@ -238,10 +238,11 @@ const SuperAdminPage = () => {
   // Fetch real-time statistics
   const fetchRealTimeStats = async () => {
     try {
-      const response = await axios.get(`${API}/super-admin/real-time-stats`, {
+      // Use the dashboard endpoint for real-time stats
+      const response = await axios.get(`${API}/super-admin/dashboard`, {
         params: credentials
       });
-      setRealTimeStats(response.data);
+      setRealTimeStats(response.data.overview);
     } catch (error) {
       console.error('Failed to fetch real-time stats:', error);
     }
@@ -250,10 +251,16 @@ const SuperAdminPage = () => {
   // Fetch system health
   const fetchSystemHealth = async () => {
     try {
-      const response = await axios.get(`${API}/super-admin/system/health`, {
+      // Use the dashboard endpoint for system health info
+      const response = await axios.get(`${API}/super-admin/dashboard`, {
         params: credentials
       });
-      setSystemHealth(response.data);
+      setSystemHealth({
+        status: 'healthy',
+        users: response.data.overview.total_users,
+        tickets: response.data.overview.open_tickets + response.data.overview.pending_tickets,
+        orders: response.data.overview.total_orders_30d
+      });
     } catch (error) {
       console.error('Failed to fetch system health:', error);
     }
@@ -559,16 +566,11 @@ const SuperAdminPage = () => {
   // Individual fetch functions for each tab
   const fetchDashboard = async () => {
     try {
-      const dashboardRes = await axios.get(`${API}/super-admin/stats/basic`, {
+      const dashboardRes = await axios.get(`${API}/super-admin/dashboard`, {
         params: credentials
       });
       setDashboard({
-        overview: {
-          total_users: dashboardRes.data.total_users,
-          total_orders: dashboardRes.data.total_orders,
-          active_users: dashboardRes.data.active_users,
-          recent_orders: dashboardRes.data.recent_orders
-        }
+        overview: dashboardRes.data.overview
       });
     } catch (e) {
       console.error('Failed to fetch dashboard data', e);
@@ -661,7 +663,7 @@ const SuperAdminPage = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const analyticsRes = await axios.get(`${API}/super-admin/stats/revenue`, {
+      const analyticsRes = await axios.get(`${API}/super-admin/analytics`, {
         params: { ...credentials, days: 30 }
       });
       setAnalytics(analyticsRes.data);
