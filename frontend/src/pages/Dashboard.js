@@ -42,10 +42,25 @@ const Dashboard = ({ user }) => {
     fetchRecentOrders();
     fetchTopItems();
     const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
-    const refreshInterval = setInterval(fetchStats, 30000); // Auto refresh every 30s
+    const refreshInterval = setInterval(() => {
+      fetchStats();
+      fetchRecentOrders();
+      fetchTopItems();
+    }, 15000); // Auto refresh every 15s for more responsive dashboard
+    
+    // Refresh when window gains focus
+    const handleFocus = () => {
+      fetchStats();
+      fetchRecentOrders();
+      fetchTopItems();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
     return () => {
       clearInterval(clockInterval);
       clearInterval(refreshInterval);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

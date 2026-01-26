@@ -4004,6 +4004,15 @@ async def create_table(
 
     table_obj = Table(**table.model_dump(), organization_id=user_org_id)
     await db.tables.insert_one(table_obj.model_dump())
+    
+    # Invalidate table cache after creation to ensure fresh data on next fetch
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_table_caches(user_org_id)
+        print(f"🗑️ Table cache invalidated for org {user_org_id} after creating table {table_obj.table_number}")
+    except Exception as e:
+        print(f"⚠️ Table cache invalidation error after creation: {e}")
+    
     return table_obj
 
 
@@ -4096,6 +4105,14 @@ async def delete_table(
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Table not found")
+    
+    # Invalidate table cache after deletion to ensure fresh data on next fetch
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_table_caches(user_org_id)
+        print(f"🗑️ Table cache invalidated for org {user_org_id} after deleting table {table_id}")
+    except Exception as e:
+        print(f"⚠️ Table cache invalidation error after deletion: {e}")
     
     return {"message": "Table deleted successfully"}
 
