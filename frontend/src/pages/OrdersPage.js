@@ -707,7 +707,7 @@ const OrdersPage = ({ user }) => {
           }
         }
         
-        /* Enhanced modal responsiveness */
+        /* Enhanced modal responsiveness for small screens */
         .modal-content {
           max-height: calc(100vh - 2rem);
           overflow-y: auto;
@@ -717,6 +717,25 @@ const OrdersPage = ({ user }) => {
           .modal-content {
             max-height: calc(100vh - 1rem);
             margin: 0.5rem;
+          }
+        }
+        
+        /* Ensure modal fits on very small screens like iPhone 17 */
+        @media (max-height: 700px) {
+          .modal-content {
+            max-height: calc(100vh - 0.5rem);
+            margin: 0.25rem;
+          }
+        }
+        
+        /* Fixed bottom button area for small screens */
+        @media (max-width: 640px) and (max-height: 700px) {
+          .fixed-bottom-button {
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+            background: white;
+            border-top: 1px solid #e5e7eb;
           }
         }
       `}</style>
@@ -1122,10 +1141,10 @@ const OrdersPage = ({ user }) => {
 
         {/* Unified New Order Dialog - Works for both KOT enabled/disabled */}
         {dialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
-                  <div className="bg-white rounded-2xl w-full max-w-md sm:max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[95vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-md sm:max-w-lg shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh] sm:max-h-[90vh]">
                     {/* Header with Icon */}
-                    <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-4 sm:p-5 text-center relative">
+                    <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-4 sm:p-5 text-center relative flex-shrink-0">
                       <button 
                         onClick={() => { setDialogOpen(false); resetForm(); }}
                         className="absolute top-3 right-3 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-colors touch-target"
@@ -1147,8 +1166,8 @@ const OrdersPage = ({ user }) => {
                       </p>
                     </div>
                     
-                    {/* Form */}
-                    <div className="p-4 sm:p-5 space-y-4">
+                    {/* Form - Scrollable */}
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0">
                       {/* Table-wise Ordering Toggle - Only show when KOT is enabled */}
                       {businessSettings?.kot_mode_enabled !== false && (
                         <div className="mb-4">
@@ -1302,14 +1321,8 @@ const OrdersPage = ({ user }) => {
                       )}
                     </div>
                     
-                    {/* Buttons - Improved responsive layout */}
-                    <div className="p-4 sm:p-5 pt-0 flex flex-col sm:flex-row gap-3">
-                      <button 
-                        onClick={() => { setDialogOpen(false); resetForm(); }}
-                        className="w-full sm:flex-1 h-12 border-2 border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-colors touch-target"
-                      >
-                        Cancel
-                      </button>
+                    {/* Fixed Bottom Button - Always visible */}
+                    <div className="flex-shrink-0 p-4 sm:p-5 pt-3 border-t border-gray-100 bg-white">
                       <button 
                         onClick={() => {
                           // Only require table selection if KOT is enabled AND table-wise ordering is on
@@ -1321,7 +1334,7 @@ const OrdersPage = ({ user }) => {
                           setDialogOpen(false);
                           setShowMenuPage(true);
                         }}
-                        className="w-full sm:flex-1 h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/25 touch-target"
+                        className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-500/25 touch-target"
                       >
                         {businessSettings?.kot_mode_enabled !== false ? (
                           <>
