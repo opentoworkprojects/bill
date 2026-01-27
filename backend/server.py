@@ -4698,10 +4698,41 @@ async def create_order(
     table_id = order_data.table_id or "counter"
     table_number = order_data.table_number or 0
 
-    # ORDER CONSOLIDATION LOGIC - Check for existing pending orders on the same table
+    # ENHANCED DUPLICATE PREVENTION - Check for exact duplicate orders
     if kot_mode_enabled and table_id != "counter":
         try:
-            # Check for existing pending/preparing orders on this table
+            # Check for exact duplicate orders (same table, same items, within last 30 seconds)
+            recent_cutoff = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+            
+            # Create signature of current order items for comparison
+            current_items_signature = sorted([
+                f"{item.menu_item_id}_{item.quantity}_{item.price}" 
+                for item in order_data.items
+            ])
+            
+            # Find recent orders on same table
+            recent_orders = await db.orders.find({
+                "organization_id": user_org_id,
+                "table_id": table_id,
+                "created_at": {"$gte": recent_cutoff}
+            }).to_list(10)
+            
+            for recent_order in recent_orders:
+                # Create signature of recent order items
+                recent_items_signature = sorted([
+                    f"{item.get('menu_item_id', 'unknown')}_{item.get('quantity', 0)}_{item.get('price', 0)}" 
+                    for item in recent_order.get("items", [])
+                ])
+                
+                # Check if signatures match (exact duplicate)
+                if current_items_signature == recent_items_signature:
+                    print(f"🚫 Duplicate order detected for table {table_number} - rejecting")
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Duplicate order detected for Table {table_number}. Please wait 30 seconds before placing the same order again."
+                    )
+            
+            # ORDER CONSOLIDATION LOGIC - Check for existing pending orders on the same table
             existing_order = await db.orders.find_one({
                 "organization_id": user_org_id,
                 "table_id": table_id,

@@ -117,6 +117,10 @@ const OrdersPage = ({ user }) => {
   // Tab state for Active Orders vs Today's Bills
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
   const [loading, setLoading] = useState(true);
+  
+  // Add state for preventing duplicate orders
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [lastOrderCreated, setLastOrderCreated] = useState(null);
   const navigate = useNavigate();
   const dataLoadedRef = useRef(false);
 
@@ -570,21 +574,53 @@ const OrdersPage = ({ user }) => {
       return;
     }
 
-    // Instant feedback - play sound and show success immediately
-    playSound('success');
-    toast.success('🎉 Order created successfully!');
-    
-    // Instant UI update - close menu and reset form immediately
-    setShowMenuPage(false);
-    setCartExpanded(false);
-    resetForm();
+    // Prevent duplicate order creation
+    if (isCreatingOrder) {
+      toast.warning('Order is being created, please wait...');
+      return;
+    }
 
-    // Background order creation - no loading states visible to user
+    // Check for recent duplicate order (same table, same items within 10 seconds)
+    const orderSignature = `${formData.table_id || 'counter'}_${selectedItems.map(i => `${i.id}_${i.quantity}`).join('_')}`;
+    const now = Date.now();
+    if (lastOrderCreated && lastOrderCreated.signature === orderSignature && (now - lastOrderCreated.timestamp) < 10000) {
+      toast.error('Duplicate order detected! Please wait 10 seconds before creating the same order again.');
+      return;
+    }
+
+    setIsCreatingOrder(true);
+
     try {
       const selectedTable = formData.table_id ? tables.find(t => t.id === formData.table_id) : null;
-      // Use "Cash Sale" if no customer name provided (for counter sales)
       const customerName = formData.customer_name?.trim() || (businessSettings?.kot_mode_enabled === false ? 'Cash Sale' : '');
       
+      // Create optimistic order for instant display
+      const optimisticOrder = {
+        id: `temp_${Date.now()}`,
+        table_id: formData.table_id || null,
+        table_number: selectedTable?.table_number || 0,
+        items: selectedItems,
+        customer_name: customerName,
+        customer_phone: formData.customer_phone || '',
+        status: 'pending',
+        total: selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        created_at: new Date().toISOString(),
+        is_optimistic: true // Flag to identify optimistic orders
+      };
+
+      // Instant UI update - show order immediately
+      setOrders(prevOrders => [optimisticOrder, ...prevOrders]);
+      
+      // Instant feedback
+      playSound('success');
+      toast.success('🎉 Order created successfully!');
+      
+      // Close menu and reset form
+      setShowMenuPage(false);
+      setCartExpanded(false);
+      resetForm();
+
+      // Create actual order on server
       const response = await axios.post(`${API}/orders`, {
         table_id: formData.table_id || null,
         table_number: selectedTable?.table_number || 0,
@@ -593,12 +629,37 @@ const OrdersPage = ({ user }) => {
         customer_phone: formData.customer_phone || '',
         frontend_origin: window.location.origin
       });
-      
-      // Silent background refresh to sync with server
+
+      // Replace optimistic order with real order
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === optimisticOrder.id 
+            ? { ...response.data, created_at: response.data.created_at || new Date().toISOString() }
+            : order
+        )
+      );
+
+      // Update last order created to prevent duplicates
+      setLastOrderCreated({
+        signature: orderSignature,
+        timestamp: now
+      });
+
+      // Update table status if needed
+      if (selectedTable && selectedTable.status === 'available') {
+        setTables(prevTables => 
+          prevTables.map(table => 
+            table.id === selectedTable.id 
+              ? { ...table, status: 'occupied' }
+              : table
+          )
+        );
+      }
+
+      // Background refresh for consistency (but don't override optimistic updates)
       setTimeout(() => {
-        fetchOrders();
         fetchTables(true);
-      }, 1000);
+      }, 2000);
       
       // Offer WhatsApp notification
       if (response.data?.whatsapp_link && formData.customer_phone) {
@@ -608,13 +669,17 @@ const OrdersPage = ({ user }) => {
           }
         }, 500);
       }
+
     } catch (error) {
       console.error('Order creation failed:', error);
-      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create order';
-      toast.error(errorMsg);
       
-      // If order creation failed, user can try again - no need to revert UI
-      // since they're already back to the orders page
+      // Remove optimistic order on failure
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== `temp_${now}`));
+      
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create order';
+      toast.error(`Order creation failed: ${errorMsg}`);
+    } finally {
+      setIsCreatingOrder(false);
     }
   };
 
