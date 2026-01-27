@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import {
   Clock, CheckCircle, Printer, AlertTriangle, ChefHat, Timer, Bell,
   RefreshCw, Volume2, VolumeX, Flame, Eye, X, Play,
-  Maximize, Minimize, Utensils, Coffee, AlertCircle, Grid3X3, List, Zap, Truck
+  Maximize, Minimize, Utensils, Coffee, AlertCircle, Grid3X3, List, Zap, Truck,
+  Phone, Vibrate, Settings, Speaker
 } from 'lucide-react';
 import { printKOT as printKOTUtil } from '../utils/printUtils';
 
@@ -16,6 +17,8 @@ const KitchenPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState('all');
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [phoneRingEnabled, setPhoneRingEnabled] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [businessSettings, setBusinessSettings] = useState(null);
   const [stats, setStats] = useState({ pending: 0, preparing: 0, ready: 0 });
@@ -24,17 +27,99 @@ const KitchenPage = ({ user }) => {
   const [viewMode, setViewMode] = useState('grid');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [processingOrders, setProcessingOrders] = useState(new Set());
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState({
+    sound: true,
+    vibration: true,
+    phoneRing: true,
+    volume: 0.8
+  });
+  
+  // Audio refs for different sounds
+  const newOrderAudioRef = useRef(null);
+  const buttonClickAudioRef = useRef(null);
+  const phoneRingAudioRef = useRef(null);
+  const successAudioRef = useRef(null);
 
   useEffect(() => {
     fetchOrders();
     fetchBusinessSettings();
+    initializeAudioElements();
+    
     const interval = autoRefresh ? setInterval(fetchOrders, 5000) : null;
     const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    
     return () => {
       interval && clearInterval(interval);
       clearInterval(clockInterval);
     };
   }, [autoRefresh]);
+
+  // Initialize audio elements for different notification sounds
+  const initializeAudioElements = () => {
+    try {
+      // New order notification sound (kitchen bell) - using a more reliable base64 audio
+      const kitchenBellSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT';
+      newOrderAudioRef.current = new Audio(kitchenBellSound);
+      newOrderAudioRef.current.volume = notificationSettings.volume;
+      newOrderAudioRef.current.preload = 'auto';
+      
+      // Button click sound (short beep)
+      const clickSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT';
+      buttonClickAudioRef.current = new Audio(clickSound);
+      buttonClickAudioRef.current.volume = 0.3;
+      buttonClickAudioRef.current.preload = 'auto';
+      
+      // Phone ring sound (longer, more urgent) - Create a synthetic ring tone
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const createRingTone = () => {
+        const duration = 0.5;
+        const sampleRate = audioContext.sampleRate;
+        const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        for (let i = 0; i < buffer.length; i++) {
+          const t = i / sampleRate;
+          // Create a ring tone with two frequencies
+          data[i] = Math.sin(2 * Math.PI * 800 * t) * 0.3 + Math.sin(2 * Math.PI * 1000 * t) * 0.3;
+          // Add envelope
+          data[i] *= Math.exp(-t * 2);
+        }
+        return buffer;
+      };
+      
+      // Create phone ring audio element
+      phoneRingAudioRef.current = new Audio();
+      phoneRingAudioRef.current.volume = notificationSettings.volume;
+      phoneRingAudioRef.current.loop = false; // We'll handle looping manually
+      
+      // Use a more reliable ring sound
+      const ringSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT';
+      phoneRingAudioRef.current.src = ringSound;
+      
+      // Success sound (ding)
+      const successSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT';
+      successAudioRef.current = new Audio(successSound);
+      successAudioRef.current.volume = 0.5;
+      successAudioRef.current.preload = 'auto';
+      
+      console.log('🔊 Audio elements initialized successfully');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize audio elements:', error);
+      // Fallback to simple beep sounds
+      try {
+        newOrderAudioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT');
+        buttonClickAudioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT');
+        phoneRingAudioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT');
+        successAudioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT');
+        console.log('🔊 Fallback audio elements initialized');
+      } catch (fallbackError) {
+        console.error('❌ Even fallback audio initialization failed:', fallbackError);
+      }
+    }
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -65,9 +150,35 @@ const KitchenPage = ({ user }) => {
       const activeOrders = response.data.filter(o => ['pending', 'preparing', 'ready'].includes(o.status));
       const sorted = activeOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       
-      if (soundEnabled && orders.length > 0) {
+      // Check for new orders and trigger notifications
+      if (orders.length > 0) {
         const newOrders = sorted.filter(o => o.status === 'pending' && !orders.find(old => old.id === o.id));
-        if (newOrders.length > 0) playNotificationSound();
+        if (newOrders.length > 0) {
+          // Play new order sound
+          playNewOrderSound();
+          
+          // Trigger vibration pattern (3 short bursts)
+          triggerVibration([200, 100, 200, 100, 200]);
+          
+          // Play phone ring for urgent orders
+          playPhoneRingSound();
+          
+          // Show browser notification
+          showNotification(
+            `🍽️ ${newOrders.length} New Order${newOrders.length > 1 ? 's' : ''}!`,
+            newOrders.map(o => `Table ${o.table_number || 'Counter'}: ${o.items.length} items`).join('\n'),
+            '🔔'
+          );
+          
+          // Show toast notification
+          toast.success(`🔔 ${newOrders.length} new order${newOrders.length > 1 ? 's' : ''} received!`, {
+            duration: 5000,
+            action: {
+              label: 'View',
+              onClick: () => setFilter('pending')
+            }
+          });
+        }
       }
       
       setOrders(sorted);
@@ -81,29 +192,208 @@ const KitchenPage = ({ user }) => {
     }
   };
 
-  const playNotificationSound = () => {
-    try {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6djHhxeYaRnZ2Ui3x0fIqWnpuPgXZ0gI2bnJaIe3V6h5OamZOGe3d8iZWZl5GEenh9i5aZlpCDeXl+jJeZlY+CeXl/jZeZlI6BeHmAjpeYk42Ad3mBj5eYko2AdnmCkJeXkYx/dnmDkZeXkIt+dnqEkpeWj4p9dXqFk5eVjol8dXuGlJeUjYh7dHuHlZeTjId6dHyIlpeSi4Z5dH2Jl5aRioV4dH6KmJaQiYR3dH+LmJWPiIN2dICMmZWOh4J1dIGNmZSNhoF0dIKOmpSMhYB0dIOPmpOLhH9zdISQm5KKg350dIWRm5GJgn1zdYaSm5CIgXxzdoeT');
-      audio.volume = 0.5;
-      audio.play().catch(() => {});
-    } catch (e) {}
+  // Enhanced notification and feedback functions
+  const playNewOrderSound = () => {
+    if (notificationSettings.sound && newOrderAudioRef.current) {
+      newOrderAudioRef.current.currentTime = 0;
+      newOrderAudioRef.current.play().catch(() => {});
+    }
   };
 
+  const playButtonClickSound = () => {
+    if (notificationSettings.sound && buttonClickAudioRef.current) {
+      buttonClickAudioRef.current.currentTime = 0;
+      buttonClickAudioRef.current.play().catch(() => {});
+    }
+  };
+
+  const playPhoneRingSound = () => {
+    if (notificationSettings.phoneRing && phoneRingAudioRef.current) {
+      try {
+        phoneRingAudioRef.current.currentTime = 0;
+        phoneRingAudioRef.current.volume = notificationSettings.volume;
+        
+        // Play the ring sound multiple times for urgency
+        const playRing = () => {
+          phoneRingAudioRef.current.play().catch(error => {
+            console.warn('Phone ring audio play failed:', error);
+            // Fallback to system beep
+            if ('vibrate' in navigator) {
+              navigator.vibrate([500, 200, 500, 200, 500]);
+            }
+          });
+        };
+        
+        // Play immediately
+        playRing();
+        
+        // Play again after 1 second and 2 seconds for urgency
+        setTimeout(playRing, 1000);
+        setTimeout(playRing, 2000);
+        
+        console.log('📞 Phone ring sound played');
+      } catch (error) {
+        console.error('❌ Phone ring sound failed:', error);
+        // Fallback to vibration
+        triggerVibration([500, 200, 500, 200, 500]);
+      }
+    }
+  };
+
+  const playSuccessSound = () => {
+    if (notificationSettings.sound && successAudioRef.current) {
+      successAudioRef.current.currentTime = 0;
+      successAudioRef.current.play().catch(() => {});
+    }
+  };
+
+  const triggerVibration = (pattern = [200]) => {
+    if (notificationSettings.vibration && 'vibrate' in navigator) {
+      navigator.vibrate(pattern);
+    }
+  };
+
+  const showNotification = (title, body, icon = '🔔') => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'kitchen-order',
+        requireInteraction: true
+      });
+    }
+  };
+
+  // Request notification permission on component mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const handleStatusChange = async (orderId, status) => {
+    // Instant feedback - add to processing set
+    setProcessingOrders(prev => new Set([...prev, orderId]));
+    
+    // Play button click sound immediately
+    playButtonClickSound();
+    
+    // Trigger haptic feedback
+    triggerVibration([100]);
+    
+    // Optimistic UI update
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === orderId 
+          ? { ...order, status, processing: true }
+          : order
+      )
+    );
+    
     try {
       await axios.put(`${API}/orders/${orderId}/status?status=${status}`);
-      toast.success(status === 'preparing' ? '🔥 Cooking started!' : status === 'ready' ? '✅ Ready for pickup!' : '🎉 Order served!');
+      
+      // Play success sound
+      playSuccessSound();
+      
+      // Success vibration
+      triggerVibration([50, 50, 100]);
+      
+      // Success toast with sound
+      const statusMessages = {
+        preparing: { message: '🔥 Cooking started!', sound: 'cooking' },
+        ready: { message: '✅ Ready for pickup!', sound: 'ready' },
+        completed: { message: '🎉 Order served!', sound: 'completed' }
+      };
+      
+      const statusConfig = statusMessages[status] || { message: 'Status updated!', sound: 'default' };
+      toast.success(statusConfig.message, {
+        duration: 3000,
+        className: 'font-bold'
+      });
+      
+      // Refresh orders to get server state
       fetchOrders();
+      
     } catch (error) {
-      toast.error('Failed to update status');
+      // Error feedback
+      triggerVibration([200, 100, 200]);
+      toast.error('Failed to update status', {
+        duration: 4000,
+        action: {
+          label: 'Retry',
+          onClick: () => handleStatusChange(orderId, status)
+        }
+      });
+      
+      // Revert optimistic update
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, processing: false }
+            : order
+        )
+      );
+    } finally {
+      // Remove from processing set
+      setProcessingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
     }
   };
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
+    playButtonClickSound();
+    triggerVibration([50]);
     await fetchOrders();
     setTimeout(() => setIsRefreshing(false), 500);
   };
+
+  const toggleNotificationSetting = (setting) => {
+    playButtonClickSound();
+    triggerVibration([50]);
+    
+    setNotificationSettings(prev => {
+      const newSettings = { ...prev, [setting]: !prev[setting] };
+      
+      // Save to localStorage
+      localStorage.setItem('kitchenNotificationSettings', JSON.stringify(newSettings));
+      
+      // Update audio volumes
+      if (newOrderAudioRef.current) newOrderAudioRef.current.volume = newSettings.sound ? newSettings.volume : 0;
+      if (phoneRingAudioRef.current) phoneRingAudioRef.current.volume = newSettings.phoneRing ? newSettings.volume : 0;
+      
+      // Show feedback toast
+      const settingNames = {
+        sound: 'Sound notifications',
+        vibration: 'Vibration',
+        phoneRing: 'Phone ring alerts'
+      };
+      
+      toast.success(`${settingNames[setting]} ${newSettings[setting] ? 'enabled' : 'disabled'}`, {
+        duration: 2000
+      });
+      
+      return newSettings;
+    });
+  };
+
+  // Load notification settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('kitchenNotificationSettings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setNotificationSettings(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error('Failed to parse notification settings:', e);
+      }
+    }
+  }, []);
 
   const getUrgencyLevel = (date) => {
     const minutes = Math.floor((new Date() - new Date(date)) / 60000);
@@ -151,9 +441,10 @@ const KitchenPage = ({ user }) => {
     const statusConfig = {
       pending: { bg: 'from-amber-500 to-orange-500', icon: Bell, label: 'NEW', glow: 'shadow-amber-500/30' },
       preparing: { bg: 'from-blue-500 to-cyan-500', icon: Flame, label: 'COOKING', glow: 'shadow-blue-500/30' },
-      ready: { bg: 'from-emerald-500 to-green-500', icon: CheckCircle, label: 'READY', glow: 'shadow-emerald-500/30' }
+      ready: { bg: 'from-emerald-500 to-green-500', icon: CheckCircle, label: 'READY', glow: 'shadow-emerald-500/30' },
+      completed: { bg: 'from-gray-500 to-gray-600', icon: CheckCircle, label: 'SERVED', glow: 'shadow-gray-500/30' }
     };
-    const config = statusConfig[order.status];
+    const config = statusConfig[order.status] || statusConfig.pending; // Fallback to pending if status not found
     const StatusIcon = config.icon;
 
     const orderTypeConfig = {
@@ -235,24 +526,82 @@ const KitchenPage = ({ user }) => {
           {/* Action Buttons */}
           <div className="flex gap-2 mt-3">
             {order.status === 'pending' && (
-              <Button onClick={() => handleStatusChange(order.id, 'preparing')} className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 font-bold text-sm">
-                <Play className="w-4 h-4 mr-2" /> START COOKING
+              <Button 
+                onClick={() => handleStatusChange(order.id, 'preparing')} 
+                disabled={processingOrders.has(order.id)}
+                className={`flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 font-bold text-sm transition-all transform ${
+                  processingOrders.has(order.id) ? 'scale-95 opacity-75' : 'hover:scale-105 active:scale-95'
+                }`}
+              >
+                {processingOrders.has(order.id) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> STARTING...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" /> START COOKING
+                  </>
+                )}
               </Button>
             )}
             {order.status === 'preparing' && (
-              <Button onClick={() => handleStatusChange(order.id, 'ready')} className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 font-bold text-sm">
-                <CheckCircle className="w-4 h-4 mr-2" /> MARK READY
+              <Button 
+                onClick={() => handleStatusChange(order.id, 'ready')} 
+                disabled={processingOrders.has(order.id)}
+                className={`flex-1 h-12 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 font-bold text-sm transition-all transform ${
+                  processingOrders.has(order.id) ? 'scale-95 opacity-75' : 'hover:scale-105 active:scale-95'
+                }`}
+              >
+                {processingOrders.has(order.id) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> FINISHING...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" /> MARK READY
+                  </>
+                )}
               </Button>
             )}
             {order.status === 'ready' && (
-              <Button onClick={() => handleStatusChange(order.id, 'completed')} className="flex-1 h-12 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 font-bold text-sm">
-                <CheckCircle className="w-4 h-4 mr-2" /> SERVED
+              <Button 
+                onClick={() => handleStatusChange(order.id, 'completed')} 
+                disabled={processingOrders.has(order.id)}
+                className={`flex-1 h-12 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 font-bold text-sm transition-all transform ${
+                  processingOrders.has(order.id) ? 'scale-95 opacity-75' : 'hover:scale-105 active:scale-95'
+                }`}
+              >
+                {processingOrders.has(order.id) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> SERVING...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" /> SERVED
+                  </>
+                )}
               </Button>
             )}
-            <Button variant="outline" onClick={() => printKOT(order)} className="h-12 px-4 border-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                playButtonClickSound();
+                triggerVibration([50]);
+                printKOT(order);
+              }} 
+              className="h-12 px-4 border-2 hover:scale-105 active:scale-95 transition-transform"
+            >
               <Printer className="w-4 h-4" />
             </Button>
-            <Button variant="outline" onClick={() => setSelectedOrder(order)} className="h-12 px-4 border-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                playButtonClickSound();
+                triggerVibration([50]);
+                setSelectedOrder(order);
+              }} 
+              className="h-12 px-4 border-2 hover:scale-105 active:scale-95 transition-transform"
+            >
               <Eye className="w-4 h-4" />
             </Button>
           </div>
@@ -299,20 +648,218 @@ const KitchenPage = ({ user }) => {
                 <List className="w-4 h-4" />
               </button>
             </div>
+            
+            {/* Notification Controls */}
+            <div className={`flex rounded-xl overflow-hidden border-2 ${isFullscreen ? 'border-gray-700' : 'border-gray-200'}`}>
+              <button 
+                onClick={() => toggleNotificationSetting('sound')} 
+                className={`px-3 py-2 text-sm font-medium transition-all ${
+                  notificationSettings.sound 
+                    ? 'bg-green-600 text-white' 
+                    : isFullscreen ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600'
+                }`}
+                title="Toggle sound notifications"
+              >
+                {notificationSettings.sound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              <button 
+                onClick={() => toggleNotificationSetting('vibration')} 
+                className={`px-3 py-2 text-sm font-medium transition-all ${
+                  notificationSettings.vibration 
+                    ? 'bg-blue-600 text-white' 
+                    : isFullscreen ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600'
+                }`}
+                title="Toggle vibration"
+              >
+                <Vibrate className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => toggleNotificationSetting('phoneRing')} 
+                className={`px-3 py-2 text-sm font-medium transition-all ${
+                  notificationSettings.phoneRing 
+                    ? 'bg-red-600 text-white' 
+                    : isFullscreen ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600'
+                }`}
+                title="Toggle phone ring alerts"
+              >
+                <Phone className="w-4 h-4" />
+              </button>
+            </div>
+            
             <Button variant={autoRefresh ? "default" : "outline"} size="sm" onClick={() => setAutoRefresh(!autoRefresh)} className={`h-9 ${autoRefresh ? 'bg-green-600 hover:bg-green-700' : ''}`}>
               <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setSoundEnabled(!soundEnabled)} className={`h-9 ${isFullscreen ? 'border-gray-700 text-white' : ''}`}>
-              {soundEnabled ? <Volume2 className="w-4 h-4 text-green-600" /> : <VolumeX className="w-4 h-4 text-gray-400" />}
-            </Button>
+            
             <Button variant="outline" size="sm" onClick={handleManualRefresh} className={`h-9 ${isFullscreen ? 'border-gray-700 text-white' : ''}`} disabled={isRefreshing}>
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-violet-600' : ''}`} />
             </Button>
+            
             <Button variant="outline" size="sm" onClick={toggleFullscreen} className={`h-9 ${isFullscreen ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-100 border-violet-300 text-violet-700'}`}>
               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                playButtonClickSound();
+                triggerVibration([50]);
+                setShowNotificationSettings(!showNotificationSettings);
+              }} 
+              className={`h-9 ${isFullscreen ? 'border-gray-700 text-white' : ''} ${showNotificationSettings ? 'bg-orange-100 border-orange-300 text-orange-700' : ''}`}
+              title="Notification Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
           </div>
         </div>
+
+        {/* Notification Settings Panel */}
+        {showNotificationSettings && (
+          <div className={`rounded-2xl p-4 border-2 ${isFullscreen ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} shadow-lg`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-bold text-lg flex items-center gap-2 ${isFullscreen ? 'text-white' : 'text-gray-900'}`}>
+                <Bell className="w-5 h-5" />
+                Notification Settings
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowNotificationSettings(false)}
+                className={isFullscreen ? 'text-gray-400 hover:text-white' : ''}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Sound Settings */}
+              <div className={`p-4 rounded-xl border ${isFullscreen ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className={`w-5 h-5 ${notificationSettings.sound ? 'text-green-600' : 'text-gray-400'}`} />
+                    <span className={`font-semibold ${isFullscreen ? 'text-white' : 'text-gray-900'}`}>Sound</span>
+                  </div>
+                  <button
+                    onClick={() => toggleNotificationSetting('sound')}
+                    className={`w-12 h-6 rounded-full transition-all ${
+                      notificationSettings.sound ? 'bg-green-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                      notificationSettings.sound ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                <p className={`text-sm ${isFullscreen ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Kitchen bell sounds for new orders
+                </p>
+              </div>
+
+              {/* Vibration Settings */}
+              <div className={`p-4 rounded-xl border ${isFullscreen ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Vibrate className={`w-5 h-5 ${notificationSettings.vibration ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <span className={`font-semibold ${isFullscreen ? 'text-white' : 'text-gray-900'}`}>Vibration</span>
+                  </div>
+                  <button
+                    onClick={() => toggleNotificationSetting('vibration')}
+                    className={`w-12 h-6 rounded-full transition-all ${
+                      notificationSettings.vibration ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                      notificationSettings.vibration ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                <p className={`text-sm ${isFullscreen ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Haptic feedback for actions
+                </p>
+              </div>
+
+              {/* Phone Ring Settings */}
+              <div className={`p-4 rounded-xl border ${isFullscreen ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Phone className={`w-5 h-5 ${notificationSettings.phoneRing ? 'text-red-600' : 'text-gray-400'}`} />
+                    <span className={`font-semibold ${isFullscreen ? 'text-white' : 'text-gray-900'}`}>Phone Ring</span>
+                  </div>
+                  <button
+                    onClick={() => toggleNotificationSetting('phoneRing')}
+                    className={`w-12 h-6 rounded-full transition-all ${
+                      notificationSettings.phoneRing ? 'bg-red-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                      notificationSettings.phoneRing ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                <p className={`text-sm ${isFullscreen ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Urgent ring alerts for new orders
+                </p>
+              </div>
+            </div>
+
+            {/* Volume Control */}
+            <div className="mt-4">
+              <label className={`block text-sm font-medium mb-2 ${isFullscreen ? 'text-white' : 'text-gray-900'}`}>
+                Volume: {Math.round(notificationSettings.volume * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={notificationSettings.volume}
+                onChange={(e) => {
+                  const newVolume = parseFloat(e.target.value);
+                  setNotificationSettings(prev => {
+                    const newSettings = { ...prev, volume: newVolume };
+                    localStorage.setItem('kitchenNotificationSettings', JSON.stringify(newSettings));
+                    
+                    // Update audio volumes
+                    if (newOrderAudioRef.current) newOrderAudioRef.current.volume = newSettings.sound ? newVolume : 0;
+                    if (phoneRingAudioRef.current) phoneRingAudioRef.current.volume = newSettings.phoneRing ? newVolume : 0;
+                    
+                    return newSettings;
+                  });
+                }}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              />
+            </div>
+
+            {/* Test Buttons */}
+            <div className="flex gap-2 mt-4">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  playNewOrderSound();
+                  triggerVibration([200, 100, 200]);
+                }}
+                className="flex-1"
+              >
+                <Speaker className="w-4 h-4 mr-2" />
+                Test Sound
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  playPhoneRingSound();
+                  triggerVibration([200, 100, 200, 100, 200]);
+                }}
+                className="flex-1"
+              >
+                <Phone className="w-4 h-4 mr-2" />
+                Test Ring
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reservation Flow Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Reservation Flow Test</h1>
+    
+    <div class="test-section info">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Open browser developer tools (F12) and go to Console tab</li>
+            <li>Go to your app and login</li>
+            <li>Copy the token from localStorage and paste it below</li>
+            <li>Run the tests to verify reservation functionality</li>
+        </ol>
+        <p><strong>To get token:</strong> In browser console, type: <code>localStorage.getItem('token')</code></p>
+    </div>
+
+    <div class="test-section">
+        <h3>Configuration</h3>
+        <label>API Base URL: </label>
+        <input type="text" id="apiBase" value="http://localhost:10000/api" style="width: 300px;">
+        <br><br>
+        <label>Auth Token: </label>
+        <input type="text" id="authToken" placeholder="Paste your token here" style="width: 500px;">
+        <br><br>
+        <button onclick="testConnection()">🔗 Test Connection</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Tests</h3>
+        <button onclick="testGetTables()">🍽️ Test Get Tables</button>
+        <button onclick="testGetReservations()">📅 Test Get Reservations</button>
+        <button onclick="testCreateReservation()">➕ Test Create Reservation</button>
+        <button onclick="runAllTests()">🚀 Run All Tests</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = () => document.getElementById('apiBase').value;
+        const AUTH_TOKEN = () => document.getElementById('authToken').value;
+        
+        function getHeaders() {
+            const token = AUTH_TOKEN();
+            if (!token) {
+                throw new Error('Please provide auth token');
+            }
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+        
+        function logResult(title, success, data) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-section ${success ? 'success' : 'error'}`;
+            div.innerHTML = `
+                <h4>${success ? '✅' : '❌'} ${title}</h4>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE()}/auth/me`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                logResult('Connection Test', response.ok, { status: response.status, data });
+            } catch (error) {
+                logResult('Connection Test', false, { error: error.message });
+            }
+        }
+        
+        async function testGetTables() {
+            try {
+                const response = await fetch(`${API_BASE()}/tables?fresh=true`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                logResult('Get Tables', response.ok, { 
+                    status: response.status, 
+                    count: data.length,
+                    tables: data.map(t => ({ 
+                        id: t.id, 
+                        table_number: t.table_number, 
+                        status: t.status,
+                        capacity: t.capacity 
+                    }))
+                });
+            } catch (error) {
+                logResult('Get Tables', false, { error: error.message });
+            }
+        }
+        
+        async function testGetReservations() {
+            try {
+                const response = await fetch(`${API_BASE()}/tables/reservations?_t=${Date.now()}`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                logResult('Get Reservations', response.ok, { 
+                    status: response.status, 
+                    count: data.length,
+                    reservations: data.map(r => ({ 
+                        id: r.id,
+                        table_id: r.table_id,
+                        table_number: r.table_number,
+                        customer_name: r.customer_name,
+                        reservation_date: r.reservation_date,
+                        reservation_time: r.reservation_time,
+                        status: r.status
+                    }))
+                });
+            } catch (error) {
+                logResult('Get Reservations', false, { error: error.message });
+            }
+        }
+        
+        async function testCreateReservation() {
+            try {
+                // First get available tables
+                const tablesResponse = await fetch(`${API_BASE()}/tables?fresh=true`, {
+                    headers: getHeaders()
+                });
+                const tables = await tablesResponse.json();
+                const availableTable = tables.find(t => t.status === 'available');
+                
+                if (!availableTable) {
+                    logResult('Create Reservation', false, { error: 'No available tables found' });
+                    return;
+                }
+                
+                // Create test reservation
+                const reservationData = {
+                    table_id: availableTable.id,
+                    customer_name: 'Test Customer',
+                    customer_phone: '+91 9876543210',
+                    party_size: 4,
+                    reservation_date: new Date().toISOString().split('T')[0], // Today
+                    reservation_time: '19:00',
+                    duration: 120,
+                    status: 'confirmed',
+                    notes: 'Test reservation from automated test'
+                };
+                
+                const response = await fetch(`${API_BASE()}/tables/reservations`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(reservationData)
+                });
+                
+                const data = await response.json();
+                logResult('Create Reservation', response.ok, { 
+                    status: response.status, 
+                    data,
+                    table_used: availableTable.table_number
+                });
+                
+                // If successful, test if table status was updated
+                if (response.ok) {
+                    setTimeout(async () => {
+                        const updatedTablesResponse = await fetch(`${API_BASE()}/tables?fresh=true&_t=${Date.now()}`, {
+                            headers: getHeaders()
+                        });
+                        const updatedTables = await updatedTablesResponse.json();
+                        const updatedTable = updatedTables.find(t => t.id === availableTable.id);
+                        
+                        logResult('Table Status Update Check', updatedTable.status === 'reserved', {
+                            table_number: updatedTable.table_number,
+                            old_status: availableTable.status,
+                            new_status: updatedTable.status,
+                            expected: 'reserved'
+                        });
+                    }, 1000);
+                }
+                
+            } catch (error) {
+                logResult('Create Reservation', false, { error: error.message });
+            }
+        }
+        
+        async function runAllTests() {
+            document.getElementById('results').innerHTML = '';
+            await testConnection();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testGetTables();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testGetReservations();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testCreateReservation();
+        }
+    </script>
+</body>
+</html>

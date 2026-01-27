@@ -38,7 +38,13 @@ const TablesPage = ({ user }) => {
   const [reservationFormData, setReservationFormData] = useState({
     table_id: '', customer_name: '', customer_phone: '', customer_email: '',
     party_size: '', reservation_date: '', reservation_time: '', duration: '120',
-    notes: '', status: 'confirmed'
+    notes: '', status: 'confirmed', pre_arrival_minutes: '15'
+  });
+  const [editingReservation, setEditingReservation] = useState(null);
+  const [reservationSettings, setReservationSettings] = useState({
+    pre_arrival_minutes: 15,
+    auto_clear_minutes: 30,
+    grace_period_minutes: 15
   });
 
   // Force refresh on mount to ensure fresh data (fixes stale table status after payment)
@@ -84,6 +90,9 @@ const TablesPage = ({ user }) => {
 
   const fetchTables = async (forceRefresh = false) => {
     try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
       // Always use fresh=true parameter to bypass cache and get direct DB data
       // Add cache-busting timestamp when force refresh is requested
       const params = new URLSearchParams();
@@ -93,45 +102,240 @@ const TablesPage = ({ user }) => {
       }
       const url = `${API}/tables?${params.toString()}`;
       console.log(`🍽️ Fetching tables${forceRefresh ? ' (force refresh)' : ''} with fresh=true...`);
-      const response = await axios.get(url);
+      
+      const response = await axios.get(url, { headers });
       setTables(response.data.sort((a, b) => a.table_number - b.table_number));
       console.log(`✅ Fetched ${response.data.length} tables`);
     } catch (error) { 
       console.error('Failed to fetch tables:', error);
-      toast.error('Failed to fetch tables'); 
+      
+      if (error.response?.status === 401) {
+        toast.error('Please login again');
+      } else {
+        toast.error('Failed to fetch tables');
+      }
     }
   };
 
   const fetchReservations = async () => {
     try {
-      const response = await axios.get(`${API}/tables/reservations`);
-      setReservations(response.data || []);
-    } catch (error) { console.error('Failed to fetch reservations:', error); setReservations([]); }
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // Add cache-busting timestamp to ensure fresh data
+      const response = await axios.get(`${API}/tables/reservations?_t=${Date.now()}`, { headers });
+      const reservationsData = response.data || [];
+      
+      console.log(`📅 Fetched ${reservationsData.length} reservations:`, reservationsData);
+      setReservations(reservationsData);
+    } catch (error) { 
+      console.error('Failed to fetch reservations:', error); 
+      setReservations([]);
+      
+      if (error.response?.status === 401) {
+        toast.error('Please login again');
+      } else {
+        toast.error('Failed to fetch reservations');
+      }
+    }
   };
 
   const generateQRUrl = (tableNumber) => `${window.location.origin}/order/${user?.id}?table=${tableNumber}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form data
+    if (!formData.table_number || !formData.capacity) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    if (parseInt(formData.capacity) <= 0) {
+      toast.error('Capacity must be greater than 0');
+      return;
+    }
+    
     try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
       if (editingTable) {
-        await axios.put(`${API}/tables/${editingTable.id}`, formData);
-        toast.success('Table updated!');
+        await axios.put(`${API}/tables/${editingTable.id}`, formData, { headers });
+        toast.success('Table updated successfully!');
       } else {
-        await axios.post(`${API}/tables`, formData);
-        toast.success('Table created!');
+        await axios.post(`${API}/tables`, formData, { headers });
+        toast.success('Table created successfully!');
       }
-      setDialogOpen(false); fetchTables(); resetForm();
-    } catch (error) { toast.error(error.response?.data?.detail || 'Failed to save table'); }
+      
+      setDialogOpen(false);
+      fetchTables(true); // Force refresh to get latest data
+      resetForm();
+      
+    } catch (error) {
+      console.error('Error saving table:', error);
+      
+      let errorMessage = 'Failed to save table';
+      if (error.response?.status === 400) {
+        errorMessage = error.response.data?.detail || 'Table number already exists';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to create tables';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Please login again';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
+      toast.error(errorMessage);
+    }
   };
 
   const handleReservationSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form data
+    if (!reservationFormData.table_id || !reservationFormData.customer_name || 
+        !reservationFormData.party_size || !reservationFormData.reservation_date || 
+        !reservationFormData.reservation_time) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    if (parseInt(reservationFormData.party_size) <= 0) {
+      toast.error('Party size must be greater than 0');
+      return;
+    }
+    
     try {
-      await axios.post(`${API}/tables/reservations`, reservationFormData);
-      toast.success('Reservation created!');
-      setReservationDialogOpen(false); fetchReservations(); resetReservationForm();
-    } catch (error) { toast.error(error.response?.data?.detail || 'Failed to create reservation'); }
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      if (editingReservation) {
+        await axios.put(`${API}/tables/reservations/${editingReservation.id}`, reservationFormData, { headers });
+        toast.success('Reservation updated successfully!');
+      } else {
+        await axios.post(`${API}/tables/reservations`, reservationFormData, { headers });
+        toast.success('Reservation created successfully!');
+      }
+      
+      setReservationDialogOpen(false);
+      
+      // Refresh both reservations and tables with cache-busting
+      await Promise.all([
+        fetchReservations(),
+        fetchTables(true) // Force refresh to update table status
+      ]);
+      
+      resetReservationForm();
+      
+    } catch (error) {
+      console.error('Error saving reservation:', error);
+      
+      let errorMessage = 'Failed to save reservation';
+      if (error.response?.status === 400) {
+        errorMessage = error.response.data?.detail || 'Table is already reserved for this date';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Selected table not found';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to create reservations';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleEditReservation = (reservation) => {
+    setEditingReservation(reservation);
+    setReservationFormData({
+      table_id: reservation.table_id,
+      customer_name: reservation.customer_name,
+      customer_phone: reservation.customer_phone || '',
+      customer_email: reservation.customer_email || '',
+      party_size: reservation.party_size.toString(),
+      reservation_date: reservation.reservation_date,
+      reservation_time: reservation.reservation_time,
+      duration: reservation.duration?.toString() || '120',
+      notes: reservation.notes || '',
+      status: reservation.status,
+      pre_arrival_minutes: reservation.pre_arrival_minutes?.toString() || '15'
+    });
+    setReservationDialogOpen(true);
+  };
+
+  const handleCancelReservation = async (reservation) => {
+    if (!window.confirm(`Cancel reservation for ${reservation.customer_name}?`)) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      await axios.delete(`${API}/tables/reservations/${reservation.id}`, { headers });
+      toast.success('Reservation cancelled successfully!');
+      
+      // Refresh both reservations and tables
+      await Promise.all([
+        fetchReservations(),
+        fetchTables(true)
+      ]);
+      
+    } catch (error) {
+      console.error('Error cancelling reservation:', error);
+      toast.error('Failed to cancel reservation');
+    }
+  };
+
+  const handleAutoClearReservations = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const response = await axios.post(`${API}/tables/reservations/auto-clear`, {}, { headers });
+      const { cleared_reservations, updated_tables } = response.data;
+      
+      if (cleared_reservations.length > 0) {
+        toast.success(`Auto-cleared ${cleared_reservations.length} expired reservations`);
+        
+        // Refresh both reservations and tables
+        await Promise.all([
+          fetchReservations(),
+          fetchTables(true)
+        ]);
+      } else {
+        toast.info('No expired reservations to clear');
+      }
+      
+    } catch (error) {
+      console.error('Error auto-clearing reservations:', error);
+      toast.error('Failed to auto-clear reservations');
+    }
+  };
+
+  const handleActivatePendingReservations = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const response = await axios.post(`${API}/tables/reservations/activate-pending`, {}, { headers });
+      const { activated_tables } = response.data;
+      
+      if (activated_tables.length > 0) {
+        toast.success(`Activated reservations for ${activated_tables.length} tables`);
+        
+        // Refresh both reservations and tables
+        await Promise.all([
+          fetchReservations(),
+          fetchTables(true)
+        ]);
+      } else {
+        toast.info('No reservations to activate at this time');
+      }
+      
+    } catch (error) {
+      console.error('Error activating reservations:', error);
+      toast.error('Failed to activate reservations');
+    }
   };
 
   const resetForm = () => {
@@ -141,7 +345,8 @@ const TablesPage = ({ user }) => {
 
   const resetReservationForm = () => {
     setReservationFormData({ table_id: '', customer_name: '', customer_phone: '', customer_email: '',
-      party_size: '', reservation_date: '', reservation_time: '', duration: '120', notes: '', status: 'confirmed' });
+      party_size: '', reservation_date: '', reservation_time: '', duration: '120', notes: '', status: 'confirmed', pre_arrival_minutes: '15' });
+    setEditingReservation(null);
   };
 
   const handleEdit = (table) => {
@@ -427,44 +632,101 @@ const TablesPage = ({ user }) => {
 
           {/* Reservations Tab */}
           <TabsContent value="reservations" className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-4">
               <h2 className="text-2xl font-bold flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-violet-600" />Today's Reservations
+                <Calendar className="w-6 h-6 text-violet-600" />Reservations ({reservations.length})
               </h2>
-              {['admin', 'cashier'].includes(user?.role) && (
-                <Button className="bg-gradient-to-r from-violet-600 to-purple-600" onClick={() => { resetReservationForm(); setReservationDialogOpen(true); }}>
-                  <Plus className="w-4 h-4 mr-2" />New Reservation
-                </Button>
-              )}
+              <div className="flex gap-2 flex-wrap">
+                {['admin', 'cashier'].includes(user?.role) && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={handleActivatePendingReservations}>
+                      <Clock className="w-4 h-4 mr-2" />Activate Pending
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleAutoClearReservations}>
+                      <RefreshCw className="w-4 h-4 mr-2" />Auto Clear
+                    </Button>
+                    <Button className="bg-gradient-to-r from-violet-600 to-purple-600" onClick={() => { resetReservationForm(); setReservationDialogOpen(true); }}>
+                      <Plus className="w-4 h-4 mr-2" />New Reservation
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {reservations.map((reservation, index) => (
-                <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-all">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold">
-                        {reservation.table_number || 'T'}
+              {reservations.map((reservation, index) => {
+                // Find the table info to get table_number if missing
+                const tableInfo = tables.find(t => t.id === reservation.table_id);
+                const displayTableNumber = reservation.table_number || tableInfo?.table_number || 'N/A';
+                
+                // Calculate timing info
+                const reservationDateTime = new Date(`${reservation.reservation_date} ${reservation.reservation_time}`);
+                const now = new Date();
+                const preArrivalMinutes = reservation.pre_arrival_minutes || 15;
+                const preArrivalTime = new Date(reservationDateTime.getTime() - (preArrivalMinutes * 60000));
+                const isActive = now >= preArrivalTime && now <= new Date(reservationDateTime.getTime() + (reservation.duration || 120) * 60000);
+                const isPending = now < preArrivalTime;
+                const isExpired = now > new Date(reservationDateTime.getTime() + (reservation.duration || 120) * 60000 + (30 * 60000)); // 30 min grace
+                
+                return (
+                  <Card key={reservation.id || index} className="border-0 shadow-lg hover:shadow-xl transition-all">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold ${
+                          isActive ? 'bg-gradient-to-br from-green-500 to-emerald-600' :
+                          isPending ? 'bg-gradient-to-br from-yellow-500 to-amber-600' :
+                          isExpired ? 'bg-gradient-to-br from-red-500 to-rose-600' :
+                          'bg-gradient-to-br from-violet-500 to-purple-600'
+                        }`}>
+                          {displayTableNumber}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold">{reservation.customer_name}</p>
+                          <p className="text-sm text-gray-500">{reservation.party_size} guests • {reservation.reservation_time}</p>
+                          <p className="text-xs text-gray-400">{reservation.reservation_date}</p>
+                          {reservation.pre_arrival_minutes && (
+                            <p className="text-xs text-blue-500">Activates {reservation.pre_arrival_minutes}min before</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Badge className={
+                            reservation.status === 'confirmed' ? 'bg-green-100 text-green-700' : 
+                            reservation.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
+                            reservation.status === 'expired' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                          }>
+                            {reservation.status}
+                          </Badge>
+                          {isActive && <Badge className="bg-blue-100 text-blue-700 text-xs">ACTIVE</Badge>}
+                          {isPending && <Badge className="bg-orange-100 text-orange-700 text-xs">PENDING</Badge>}
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-semibold">{reservation.customer_name}</p>
-                        <p className="text-sm text-gray-500">{reservation.party_size} guests • {reservation.reservation_time}</p>
-                      </div>
-                      <Badge className={reservation.status === 'confirmed' ? 'bg-green-100 text-green-700' : reservation.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}>
-                        {reservation.status}
-                      </Badge>
-                    </div>
-                    {reservation.customer_phone && (
-                      <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
-                        <Phone className="w-4 h-4" />{reservation.customer_phone}
-                      </div>
-                    )}
-                    {reservation.notes && (
-                      <p className="text-xs text-gray-400 mt-2 italic">"{reservation.notes}"</p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      
+                      {reservation.customer_phone && (
+                        <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
+                          <Phone className="w-4 h-4" />{reservation.customer_phone}
+                        </div>
+                      )}
+                      
+                      {reservation.notes && (
+                        <p className="text-xs text-gray-400 mt-2 italic">"{reservation.notes}"</p>
+                      )}
+                      
+                      {/* Management buttons */}
+                      {['admin', 'cashier'].includes(user?.role) && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                          <Button size="sm" variant="outline" onClick={() => handleEditReservation(reservation)} title="Edit Reservation">
+                            <Edit className="w-3 h-3 mr-1" />Edit
+                          </Button>
+                          <Button size="sm" variant="outline" className="border-red-500 text-red-600" onClick={() => handleCancelReservation(reservation)} title="Cancel Reservation">
+                            <X className="w-3 h-3 mr-1" />Cancel
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
               {reservations.length === 0 && (
                 <div className="col-span-full text-center py-12">
                   <Calendar className="w-16 h-16 mx-auto text-gray-300 mb-4" />
@@ -591,42 +853,86 @@ const TablesPage = ({ user }) => {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />New Reservation
+                <Calendar className="w-5 h-5" />{editingReservation ? 'Edit Reservation' : 'New Reservation'}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleReservationSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Table</Label>
-                  <Select value={reservationFormData.table_id} onValueChange={(value) => setReservationFormData({ ...reservationFormData, table_id: value })}>
-                    <SelectTrigger><SelectValue placeholder="Select table" /></SelectTrigger>
-                    <SelectContent>
-                      {tables.filter(t => t.status === 'available').map(table => (
-                        <SelectItem key={table.id} value={table.id}>Table {table.table_number} ({table.capacity} seats)</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Customer Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><Label>Customer Name *</Label><Input value={reservationFormData.customer_name} onChange={(e) => setReservationFormData({ ...reservationFormData, customer_name: e.target.value })} required /></div>
+                  <div><Label>Phone</Label><Input value={reservationFormData.customer_phone} onChange={(e) => setReservationFormData({ ...reservationFormData, customer_phone: e.target.value })} placeholder="+91 1234567890" /></div>
+                  <div><Label>Email</Label><Input type="email" value={reservationFormData.customer_email} onChange={(e) => setReservationFormData({ ...reservationFormData, customer_email: e.target.value })} /></div>
+                  <div><Label>Party Size *</Label><Input type="number" value={reservationFormData.party_size} onChange={(e) => setReservationFormData({ ...reservationFormData, party_size: e.target.value })} required /></div>
                 </div>
-                <div><Label>Party Size</Label><Input type="number" value={reservationFormData.party_size} onChange={(e) => setReservationFormData({ ...reservationFormData, party_size: e.target.value })} required /></div>
-                <div><Label>Customer Name *</Label><Input value={reservationFormData.customer_name} onChange={(e) => setReservationFormData({ ...reservationFormData, customer_name: e.target.value })} required /></div>
-                <div><Label>Phone</Label><Input value={reservationFormData.customer_phone} onChange={(e) => setReservationFormData({ ...reservationFormData, customer_phone: e.target.value })} placeholder="+91 1234567890" /></div>
-                <div><Label>Date *</Label><Input type="date" value={reservationFormData.reservation_date} onChange={(e) => setReservationFormData({ ...reservationFormData, reservation_date: e.target.value })} required /></div>
-                <div><Label>Time *</Label><Input type="time" value={reservationFormData.reservation_time} onChange={(e) => setReservationFormData({ ...reservationFormData, reservation_time: e.target.value })} required /></div>
-                <div><Label>Duration</Label>
-                  <Select value={reservationFormData.duration} onValueChange={(value) => setReservationFormData({ ...reservationFormData, duration: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="60">1 hour</SelectItem>
-                      <SelectItem value="90">1.5 hours</SelectItem>
-                      <SelectItem value="120">2 hours</SelectItem>
-                      <SelectItem value="180">3 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Email</Label><Input type="email" value={reservationFormData.customer_email} onChange={(e) => setReservationFormData({ ...reservationFormData, customer_email: e.target.value })} /></div>
               </div>
+              
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Reservation Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><Label>Table *</Label>
+                    <Select value={reservationFormData.table_id} onValueChange={(value) => setReservationFormData({ ...reservationFormData, table_id: value })}>
+                      <SelectTrigger><SelectValue placeholder="Select table" /></SelectTrigger>
+                      <SelectContent>
+                        {tables.filter(t => editingReservation ? true : t.status === 'available').map(table => (
+                          <SelectItem key={table.id} value={table.id}>Table {table.table_number} ({table.capacity} seats)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label>Status</Label>
+                    <Select value={reservationFormData.status} onValueChange={(value) => setReservationFormData({ ...reservationFormData, status: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label>Date *</Label><Input type="date" value={reservationFormData.reservation_date} onChange={(e) => setReservationFormData({ ...reservationFormData, reservation_date: e.target.value })} required /></div>
+                  <div><Label>Time *</Label><Input type="time" value={reservationFormData.reservation_time} onChange={(e) => setReservationFormData({ ...reservationFormData, reservation_time: e.target.value })} required /></div>
+                </div>
+              </div>
+              
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Timing Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><Label>Duration</Label>
+                    <Select value={reservationFormData.duration} onValueChange={(value) => setReservationFormData({ ...reservationFormData, duration: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="60">1 hour</SelectItem>
+                        <SelectItem value="90">1.5 hours</SelectItem>
+                        <SelectItem value="120">2 hours</SelectItem>
+                        <SelectItem value="180">3 hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label>Reserve Table (minutes before)</Label>
+                    <Select value={reservationFormData.pre_arrival_minutes} onValueChange={(value) => setReservationFormData({ ...reservationFormData, pre_arrival_minutes: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 minutes</SelectItem>
+                        <SelectItem value="10">10 minutes</SelectItem>
+                        <SelectItem value="15">15 minutes</SelectItem>
+                        <SelectItem value="20">20 minutes</SelectItem>
+                        <SelectItem value="30">30 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  ℹ️ Table will be marked as "reserved" {reservationFormData.pre_arrival_minutes} minutes before the reservation time
+                </p>
+              </div>
+              
               <div><Label>Special Notes</Label><Input value={reservationFormData.notes} onChange={(e) => setReservationFormData({ ...reservationFormData, notes: e.target.value })} placeholder="Birthday, dietary restrictions..." /></div>
+              
               <div className="flex gap-3">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600">Create Reservation</Button>
+                <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600">
+                  {editingReservation ? 'Update Reservation' : 'Create Reservation'}
+                </Button>
                 <Button type="button" variant="outline" onClick={() => { setReservationDialogOpen(false); resetReservationForm(); }}>Cancel</Button>
               </div>
             </form>

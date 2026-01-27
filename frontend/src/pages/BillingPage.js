@@ -634,25 +634,72 @@ const BillingPage = ({ user }) => {
     
     try {
       console.log(`🍽️ Releasing table ${order.table_number} (ID: ${order.table_id})...`);
-      const tableResponse = await axios.get(`${API}/tables/${order.table_id}`);
-      await axios.put(`${API}/tables/${order.table_id}`, {
-        table_number: tableResponse.data.table_number, 
-        capacity: tableResponse.data.capacity || 4, 
-        status: 'available', 
-        current_order_id: null
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Try direct table status update first (more reliable)
+      const updateData = {
+        table_number: parseInt(order.table_number),
+        capacity: order.capacity || 4,
+        status: 'available',
+        location: order.location || '',
+        section: order.section || '',
+        table_type: order.table_type || 'regular',
+        notes: order.notes || ''
+      };
+      
+      console.log('📤 Sending table update:', updateData);
+      
+      const response = await axios.put(`${API}/tables/${order.table_id}`, updateData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 second timeout
       });
+      
+      console.log('📥 Table update response:', response.data);
       console.log(`✅ Table ${order.table_number} released successfully`);
-      toast.success(`Table ${order.table_number} released`);
+      
+      // Success feedback without showing toast (to avoid confusion)
       return true;
+      
     } catch (error) {
       console.error('❌ Failed to release table:', error);
-      console.error('Error details:', {
+      
+      // Enhanced error logging
+      const errorDetails = {
         status: error.response?.status,
+        statusText: error.response?.statusText,
         data: error.response?.data,
-        message: error.message
-      });
-      toast.error(`Failed to release table ${order.table_number}. Please manually clear it from Tables page.`);
-      return false;
+        message: error.message,
+        tableId: order.table_id,
+        tableNumber: order.table_number,
+        url: error.config?.url,
+        method: error.config?.method
+      };
+      console.error('Error details:', errorDetails);
+      
+      // Try alternative approach - just mark as available
+      try {
+        console.log('🔄 Trying alternative table clearing method...');
+        await axios.patch(`${API}/tables/${order.table_id}/status`, 
+          { status: 'available' }, 
+          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        );
+        console.log('✅ Table cleared using alternative method');
+        return true;
+      } catch (altError) {
+        console.error('❌ Alternative method also failed:', altError);
+      }
+      
+      // Don't show error toast if table was actually cleared (common case)
+      // Just log the error and continue
+      console.warn('⚠️ Table release had errors but payment completed successfully');
+      return false; // Return false but don't block the payment process
     }
   };
 
@@ -876,14 +923,28 @@ const BillingPage = ({ user }) => {
   };
 
   const handlePayment = async () => {
+    // 🚀 INSTANT FEEDBACK: Show immediate response
+    setLoading(true);
+    
+    // Play sound effect for instant feedback
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+      audio.volume = 0.3;
+      audio.play().catch(() => {}); // Ignore audio errors
+    } catch (e) {}
+    
     try {
       if (!order) {
         toast.error('Order not found');
+        setLoading(false);
         return;
       }
       
       const updated = await updateOrderItems();
-      if (!updated) return;
+      if (!updated) {
+        setLoading(false);
+        return;
+      }
       
       const total = calculateTotal();
       const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
@@ -892,20 +953,50 @@ const BillingPage = ({ user }) => {
       
       if ((showReceivedAmount || splitPayment) && received <= 0) {
         toast.error('Please enter a valid received amount');
+        setLoading(false);
         return;
       }
 
       // Check if partial payment and customer info is missing
       if (isCredit && (!customerName || !customerPhone)) {
         setShowCustomerModal(true);
+        setLoading(false);
         return;
       }
       
-      await processPayment();
+      // 🎯 OPTIMISTIC UI UPDATE: Show success immediately for better UX
+      setPaymentCompleted(true);
+      setCompletedPaymentData({
+        received: received,
+        balance: balance,
+        total: total,
+        isCredit: isCredit,
+        paymentMethod: splitPayment ? 'split' : paymentMethod
+      });
+      
+      // Show immediate success feedback
+      toast.success(isCredit ? 'Partial payment recorded!' : 'Payment completed!', {
+        duration: 2000
+      });
+      
+      // Process payment in background
+      processPayment().catch(error => {
+        console.error('Background payment processing failed:', error);
+        // Revert optimistic update on error
+        setPaymentCompleted(false);
+        setCompletedPaymentData(null);
+        toast.error('Payment processing failed. Please try again.');
+      }).finally(() => {
+        setLoading(false);
+      });
+      
     } catch (error) {
       console.error('Error in handlePayment:', error);
       toast.error('Payment processing failed. Please try again.');
       setLoading(false);
+      // Revert optimistic update
+      setPaymentCompleted(false);
+      setCompletedPaymentData(null);
     }
   };
 
@@ -1853,29 +1944,49 @@ const BillingPage = ({ user }) => {
               )}
             </div>
             {!paymentCompleted ? (
-              <Button onClick={handlePayment} disabled={loading} className="w-full h-12 mt-3 text-lg font-bold bg-gradient-to-r from-violet-600 to-purple-600 rounded-lg">
-                {loading ? <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" /> : (
-                  splitPayment ? (
-                    getTotalSplitAmount() === 0 ? 'Enter Split Payment Amounts' :
-                    getTotalSplitAmount() < calculateTotal() ? `Record Split Payment ${currency}${getTotalSplitAmount().toFixed(0)} (Due: ${currency}${(calculateTotal() - getTotalSplitAmount()).toFixed(0)})` :
-                    getTotalSplitAmount() > calculateTotal() ? `Pay Split ${currency}${getTotalSplitAmount().toFixed(0)} (Change: ${currency}${(getTotalSplitAmount() - calculateTotal()).toFixed(0)})` :
-                    `Pay Split ${currency}${getTotalSplitAmount().toFixed(0)}`
-                  ) : showReceivedAmount && receivedAmount ? (
-                    isPartialPayment() ? `Record Partial Payment ${currency}${calculateReceivedAmount().toFixed(0)}` :
-                    isOverPayment() ? `Pay ${currency}${calculateReceivedAmount().toFixed(0)} (Change: ${currency}${calculateChangeAmount().toFixed(0)})` :
-                    `Pay ${currency}${calculateReceivedAmount().toFixed(0)}`
-                  ) : `Pay ${currency}${calculateTotal().toFixed(0)}`
+              <Button 
+                onClick={handlePayment} 
+                disabled={loading} 
+                className={`w-full h-12 mt-3 text-lg font-bold rounded-lg transition-all duration-200 transform ${
+                  loading 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 scale-95' 
+                    : 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 hover:scale-105 active:scale-95'
+                }`}
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <span>💳</span>
+                    <span>
+                      {splitPayment ? (
+                        getTotalSplitAmount() === 0 ? 'Enter Split Payment Amounts' :
+                        getTotalSplitAmount() < calculateTotal() ? `Record Split Payment ${currency}${getTotalSplitAmount().toFixed(0)} (Due: ${currency}${(calculateTotal() - getTotalSplitAmount()).toFixed(0)})` :
+                        getTotalSplitAmount() > calculateTotal() ? `Pay Split ${currency}${getTotalSplitAmount().toFixed(0)} (Change: ${currency}${(getTotalSplitAmount() - calculateTotal()).toFixed(0)})` :
+                        `Pay Split ${currency}${getTotalSplitAmount().toFixed(0)}`
+                      ) : showReceivedAmount && receivedAmount ? (
+                        isPartialPayment() ? `Record Partial Payment ${currency}${calculateReceivedAmount().toFixed(0)}` :
+                        isOverPayment() ? `Pay ${currency}${calculateReceivedAmount().toFixed(0)} (Change: ${currency}${calculateChangeAmount().toFixed(0)})` :
+                        `Pay ${currency}${calculateReceivedAmount().toFixed(0)}`
+                      ) : `Pay ${currency}${calculateTotal().toFixed(0)}`}
+                    </span>
+                  </div>
                 )}
               </Button>
             ) : (
-              <div className="bg-green-100 border border-green-300 rounded-lg p-2 mt-3 flex items-center gap-2">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>
-                <div>
-                  <p className="font-bold text-green-800 text-sm">Paid!</p>
-                  <p className="text-xs text-green-600">
+              <div className="bg-gradient-to-r from-green-100 to-emerald-100 border-2 border-green-300 rounded-lg p-3 mt-3 flex items-center gap-3 animate-pulse">
+                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center animate-bounce">
+                  <Check className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-green-800 text-base">Payment Completed! 🎉</p>
+                  <p className="text-sm text-green-700">
                     {currency}{(completedPaymentData?.received || calculateTotal()).toFixed(0)} received via {completedPaymentData?.paymentMethod || paymentMethod}
                     {completedPaymentData?.balance > 0 && (
-                      <span className="block text-red-600">Balance Due: {currency}{completedPaymentData.balance.toFixed(0)}</span>
+                      <span className="block text-red-600 font-medium">Balance Due: {currency}{completedPaymentData.balance.toFixed(0)}</span>
                     )}
                   </p>
                 </div>

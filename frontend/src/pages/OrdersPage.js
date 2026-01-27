@@ -209,16 +209,49 @@ const OrdersPage = ({ user }) => {
   const handleManualRefresh = async () => {
     console.log('🔄 Manual refresh triggered');
     setLoading(true);
+    
     try {
+      // Clear caches for fresh data
+      sessionStorage.removeItem(`orders_${user?.id}`);
+      localStorage.removeItem('billbyte_menu_cache');
+      
+      // Play feedback sound and vibration
+      if ('vibrate' in navigator) {
+        navigator.vibrate([50]);
+      }
+      
       if (activeTab === 'active') {
-        await fetchOrders();
+        await fetchOrders(true); // Force refresh
       } else if (activeTab === 'history') {
         await fetchTodaysBills();
       }
+      
       // Also refresh tables for real-time table status
-      await fetchTables();
+      await fetchTables(true); // Force refresh
+      
+      // Reload menu with fresh data
+      try {
+        const menuRes = await axios.get(`${API}/menu?_t=${Date.now()}`, { timeout: 8000 });
+        const menuData = Array.isArray(menuRes.data) ? menuRes.data : [];
+        const validMenuItems = menuData.filter(item => item && item.id && item.name);
+        
+        // Cache fresh menu data
+        localStorage.setItem('billbyte_menu_cache', JSON.stringify({
+          data: validMenuItems,
+          timestamp: Date.now()
+        }));
+        
+        setMenuItems(validMenuItems);
+        console.log(`✅ Refreshed ${validMenuItems.length} menu items`);
+      } catch (menuError) {
+        console.error('Menu refresh failed:', menuError);
+      }
+      
+      toast.success('Data refreshed successfully!', { duration: 2000 });
+      
     } catch (error) {
       console.error('Manual refresh failed:', error);
+      toast.error('Refresh failed - please try again');
     } finally {
       setLoading(false);
     }
@@ -249,8 +282,8 @@ const OrdersPage = ({ user }) => {
         axios.get(`${API}/orders/today-bills`).catch(() => ({ data: [] })),
         // Use fresh=true and cache-busting for tables to get real-time status
         axios.get(`${API}/tables?fresh=true&_t=${Date.now()}`).catch(() => ({ data: [] })),
-        // Load menu items as priority data (not secondary)
-        axios.get(`${API}/menu`).catch(() => ({ data: [] }))
+        // Load menu items with timeout and caching
+        axios.get(`${API}/menu`, { timeout: 8000 }).catch(() => ({ data: [] }))
       ]);
       
       // Process orders data
@@ -341,9 +374,32 @@ const OrdersPage = ({ user }) => {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (forceRefresh = false) => {
     try {
-      const response = await axios.get(`${API}/orders`);
+      // Use cache for faster loading unless force refresh
+      const cacheKey = `orders_${user?.id}`;
+      const cachedData = !forceRefresh ? sessionStorage.getItem(cacheKey) : null;
+      
+      if (cachedData && !forceRefresh) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          if (Date.now() - parsed.timestamp < 30000) { // 30 second cache
+            setOrders(parsed.data);
+            console.log('📦 Orders loaded from cache');
+            return;
+          }
+        } catch (e) {
+          console.warn('Cache parse error:', e);
+        }
+      }
+      
+      console.log(`📋 Fetching orders${forceRefresh ? ' (force refresh)' : ''}...`);
+      
+      const params = forceRefresh ? `?_t=${Date.now()}` : '';
+      const response = await axios.get(`${API}/orders${params}`, {
+        timeout: 10000 // 10 second timeout
+      });
+      
       const ordersData = Array.isArray(response.data) ? response.data : [];
       
       // Validate and clean order data
@@ -368,7 +424,17 @@ const OrdersPage = ({ user }) => {
         created_at: order.created_at || new Date().toISOString()
       }));
       
-      setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      const sortedOrders = validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      // Cache the response for faster subsequent loads
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: sortedOrders,
+        timestamp: Date.now()
+      }));
+      
+      setOrders(sortedOrders);
+      console.log(`✅ Fetched ${sortedOrders.length} orders`);
+      
     } catch (error) {
       console.error('Failed to fetch orders', error);
       setOrders([]);
@@ -377,6 +443,10 @@ const OrdersPage = ({ user }) => {
         toast.error('Session expired. Please login again.');
       } else if (error.response?.status >= 500) {
         toast.error('Server error. Please try again later.');
+      } else if (error.code === 'ECONNABORTED') {
+        toast.error('Request timeout - please try again');
+      } else {
+        toast.error('Failed to load orders');
       }
     }
   };

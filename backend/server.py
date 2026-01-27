@@ -573,12 +573,62 @@ class Table(BaseModel):
     status: str = "available"
     current_order_id: Optional[str] = None
     organization_id: Optional[str] = None
+    location: Optional[str] = None
+    section: Optional[str] = None
+    table_type: Optional[str] = "regular"
+    notes: Optional[str] = None
+    created_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 class TableCreate(BaseModel):
     table_number: int
     capacity: int
     status: str = "available"
+    location: Optional[str] = None
+    section: Optional[str] = None
+    table_type: Optional[str] = "regular"
+    notes: Optional[str] = None
+
+
+class Reservation(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    table_id: str
+    table_number: int
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: int
+    reservation_date: str
+    reservation_time: str
+    duration: int = 120  # minutes
+    status: str = "confirmed"  # confirmed, pending, cancelled, completed, expired
+    notes: Optional[str] = None
+    pre_arrival_minutes: int = 15  # Minutes before reservation to mark table as reserved
+    organization_id: Optional[str] = None
+    created_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class ReservationCreate(BaseModel):
+    table_id: str
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: int
+    reservation_date: str
+    reservation_time: str
+    duration: int = 120
+    status: str = "confirmed"
+    notes: Optional[str] = None
+    pre_arrival_minutes: int = 15  # Minutes before reservation to mark table as reserved
+
+
+class ReservationSettings(BaseModel):
+    pre_arrival_minutes: int = 15  # Default 15 minutes before
+    auto_clear_minutes: int = 30   # Auto-clear if no-show after 30 minutes
+    grace_period_minutes: int = 15 # Grace period for late arrivals
 
 
 class OrderItem(BaseModel):
@@ -4002,7 +4052,26 @@ async def create_table(
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
 
-    table_obj = Table(**table.model_dump(), organization_id=user_org_id)
+    # Check if table number already exists for this organization
+    existing_table = await db.tables.find_one({
+        "table_number": table.table_number,
+        "organization_id": user_org_id
+    })
+    
+    if existing_table:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Table number {table.table_number} already exists"
+        )
+
+    # Create table object with all fields
+    table_data = table.model_dump()
+    table_data["organization_id"] = user_org_id
+    table_data["id"] = str(uuid.uuid4())
+    table_data["created_at"] = datetime.now().isoformat()
+    table_data["updated_at"] = datetime.now().isoformat()
+    
+    table_obj = Table(**table_data)
     await db.tables.insert_one(table_obj.model_dump())
     
     # Invalidate table cache after creation to ensure fresh data on next fetch
@@ -4115,6 +4184,396 @@ async def delete_table(
         print(f"⚠️ Table cache invalidation error after deletion: {e}")
     
     return {"message": "Table deleted successfully"}
+
+
+@api_router.patch("/tables/{table_id}/status")
+async def update_table_status(
+    table_id: str,
+    status_update: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Quick table status update endpoint for better performance"""
+    if current_user["role"] not in ["admin", "cashier", "waiter"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get user's organization_id
+    user_org_id = get_secure_org_id(current_user)
+    
+    # Validate status
+    valid_statuses = ["available", "occupied", "reserved", "maintenance", "cleaning"]
+    new_status = status_update.get("status")
+    
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+    try:
+        # Update only the status field for better performance
+        result = await db.tables.update_one(
+            {"id": table_id, "organization_id": user_org_id},
+            {"$set": {"status": new_status, "updated_at": datetime.now().isoformat()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Table not found")
+        
+        # Invalidate table cache
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_table_caches(user_org_id)
+        except Exception as e:
+            print(f"⚠️ Table cache invalidation error: {e}")
+        
+        print(f"✅ Table {table_id} status updated to '{new_status}'")
+        return {"message": f"Table status updated to {new_status}", "status": new_status}
+        
+    except Exception as e:
+        print(f"❌ Error updating table status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update table status")
+
+
+# ==================== RESERVATION ENDPOINTS ====================
+
+@api_router.post("/tables/reservations", response_model=Reservation)
+async def create_reservation(
+    reservation: ReservationCreate, current_user: dict = Depends(get_current_user)
+):
+    """Create a new table reservation"""
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get user's organization_id
+    user_org_id = get_secure_org_id(current_user)
+
+    # Verify table exists and belongs to organization
+    table = await db.tables.find_one({
+        "id": reservation.table_id,
+        "organization_id": user_org_id
+    })
+    
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    # Check for conflicting reservations
+    reservation_datetime = f"{reservation.reservation_date} {reservation.reservation_time}"
+    existing_reservation = await db.reservations.find_one({
+        "table_id": reservation.table_id,
+        "reservation_date": reservation.reservation_date,
+        "status": {"$in": ["confirmed", "pending"]},
+        "organization_id": user_org_id
+    })
+    
+    if existing_reservation:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Table {table['table_number']} is already reserved for {reservation.reservation_date}"
+        )
+
+    # Create reservation object
+    reservation_data = reservation.model_dump()
+    reservation_data["organization_id"] = user_org_id
+    reservation_data["table_number"] = table["table_number"]
+    reservation_data["id"] = str(uuid.uuid4())
+    reservation_data["created_at"] = datetime.now().isoformat()
+    reservation_data["updated_at"] = datetime.now().isoformat()
+    
+    reservation_obj = Reservation(**reservation_data)
+    await db.reservations.insert_one(reservation_obj.model_dump())
+    print(f"✅ Created reservation: Table {table['table_number']} for {reservation.customer_name} on {reservation.reservation_date}")
+    
+    # Smart table status update based on timing
+    from datetime import date, datetime as dt, timedelta
+    reservation_datetime = dt.fromisoformat(f"{reservation.reservation_date} {reservation.reservation_time}")
+    current_time = dt.now()
+    pre_arrival_time = reservation_datetime - timedelta(minutes=reservation.pre_arrival_minutes)
+    
+    # Only mark table as reserved if we're within the pre-arrival window
+    if reservation.reservation_date == date.today().isoformat() and current_time >= pre_arrival_time:
+        print(f"🔄 Updating table {table['table_number']} status to 'reserved' (within {reservation.pre_arrival_minutes} min window)")
+        await db.tables.update_one(
+            {"id": reservation.table_id, "organization_id": user_org_id},
+            {"$set": {"status": "reserved", "updated_at": datetime.now().isoformat()}}
+        )
+        print(f"✅ Table {table['table_number']} status updated to 'reserved'")
+        
+        # Invalidate table cache
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_table_caches(user_org_id)
+            print(f"🗑️ Table cache invalidated for org {user_org_id}")
+        except Exception as e:
+            print(f"⚠️ Table cache invalidation error: {e}")
+    else:
+        if reservation.reservation_date == date.today().isoformat():
+            minutes_until_activation = int((pre_arrival_time - current_time).total_seconds() / 60)
+            print(f"ℹ️ Table {table['table_number']} will be reserved in {minutes_until_activation} minutes")
+        else:
+            print(f"ℹ️ Table {table['table_number']} status not updated (reservation is for {reservation.reservation_date})")
+    
+    return reservation_obj
+
+
+@api_router.get("/tables/reservations", response_model=List[Reservation])
+async def get_reservations(
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get reservations for the organization"""
+    # Get user's organization_id
+    user_org_id = get_secure_org_id(current_user)
+
+    # Build query
+    query = {"organization_id": user_org_id}
+    
+    # Only filter by date if explicitly provided
+    if date is not None:
+        query["reservation_date"] = date
+        print(f"📅 Fetching reservations for date: {date}")
+    else:
+        print(f"📅 Fetching all reservations for org: {user_org_id}")
+
+    try:
+        reservations = await db.reservations.find(query, {"_id": 0}).to_list(1000)
+        print(f"✅ Found {len(reservations)} reservations")
+        
+        # Log first few reservations for debugging
+        for i, res in enumerate(reservations[:3]):
+            print(f"  {i+1}. Table {res.get('table_number', 'N/A')} - {res.get('customer_name', 'N/A')} - {res.get('reservation_date', 'N/A')}")
+        
+        return reservations
+    except Exception as e:
+        print(f"❌ Error fetching reservations: {e}")
+        return []
+
+
+@api_router.put("/tables/reservations/{reservation_id}", response_model=Reservation)
+async def update_reservation(
+    reservation_id: str,
+    reservation_update: ReservationCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a reservation"""
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get user's organization_id
+    user_org_id = get_secure_org_id(current_user)
+
+    # Check if reservation exists
+    existing = await db.reservations.find_one({
+        "id": reservation_id,
+        "organization_id": user_org_id
+    })
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    # Update reservation
+    update_data = reservation_update.model_dump()
+    update_data["updated_at"] = datetime.now().isoformat()
+    
+    await db.reservations.update_one(
+        {"id": reservation_id, "organization_id": user_org_id},
+        {"$set": update_data}
+    )
+    
+    # Get updated reservation
+    updated = await db.reservations.find_one({
+        "id": reservation_id,
+        "organization_id": user_org_id
+    }, {"_id": 0})
+    
+    return updated
+
+
+@api_router.delete("/tables/reservations/{reservation_id}")
+async def delete_reservation(
+    reservation_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cancel/Delete a reservation"""
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get user's organization_id
+    user_org_id = get_secure_org_id(current_user)
+
+    # Check if reservation exists
+    existing = await db.reservations.find_one({
+        "id": reservation_id,
+        "organization_id": user_org_id
+    })
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    # Delete reservation
+    result = await db.reservations.delete_one({
+        "id": reservation_id,
+        "organization_id": user_org_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    
+    # Clear table status if it was reserved for this reservation
+    table_id = existing.get("table_id")
+    if table_id:
+        await db.tables.update_one(
+            {"id": table_id, "organization_id": user_org_id, "status": "reserved"},
+            {"$set": {"status": "available", "updated_at": datetime.now().isoformat()}}
+        )
+        print(f"✅ Table {existing.get('table_number', 'N/A')} status cleared to 'available'")
+        
+        # Invalidate table cache
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_table_caches(user_org_id)
+        except Exception as e:
+            print(f"⚠️ Table cache invalidation error: {e}")
+    
+    print(f"✅ Reservation cancelled: {existing.get('customer_name', 'N/A')} - Table {existing.get('table_number', 'N/A')}")
+    return {"message": "Reservation cancelled successfully"}
+
+
+@api_router.post("/tables/reservations/auto-clear")
+async def auto_clear_expired_reservations(
+    current_user: dict = Depends(get_current_user)
+):
+    """Auto-clear expired reservations and update table statuses"""
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = get_secure_org_id(current_user)
+    
+    from datetime import datetime as dt, timedelta, date
+    current_time = dt.now()
+    today = date.today().isoformat()
+    
+    # Find expired reservations (30 minutes past reservation time + duration)
+    expired_reservations = []
+    reservations = await db.reservations.find({
+        "organization_id": user_org_id,
+        "reservation_date": today,
+        "status": {"$in": ["confirmed", "pending"]}
+    }).to_list(1000)
+    
+    cleared_count = 0
+    updated_tables = []
+    
+    for reservation in reservations:
+        try:
+            reservation_datetime = dt.fromisoformat(f"{reservation['reservation_date']} {reservation['reservation_time']}")
+            reservation_end = reservation_datetime + timedelta(minutes=reservation.get('duration', 120))
+            grace_period_end = reservation_end + timedelta(minutes=30)  # 30 min grace period
+            
+            if current_time > grace_period_end:
+                # Mark as expired and clear table
+                await db.reservations.update_one(
+                    {"id": reservation["id"]},
+                    {"$set": {"status": "expired", "updated_at": current_time.isoformat()}}
+                )
+                
+                # Clear table status
+                table_result = await db.tables.update_one(
+                    {"id": reservation["table_id"], "organization_id": user_org_id, "status": "reserved"},
+                    {"$set": {"status": "available", "updated_at": current_time.isoformat()}}
+                )
+                
+                if table_result.modified_count > 0:
+                    updated_tables.append(reservation.get("table_number", "N/A"))
+                
+                expired_reservations.append({
+                    "customer_name": reservation.get("customer_name"),
+                    "table_number": reservation.get("table_number"),
+                    "reservation_time": reservation.get("reservation_time")
+                })
+                cleared_count += 1
+                
+        except Exception as e:
+            print(f"⚠️ Error processing reservation {reservation.get('id', 'N/A')}: {e}")
+    
+    # Invalidate table cache if any tables were updated
+    if updated_tables:
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_table_caches(user_org_id)
+        except Exception as e:
+            print(f"⚠️ Table cache invalidation error: {e}")
+    
+    print(f"🧹 Auto-cleared {cleared_count} expired reservations, freed tables: {updated_tables}")
+    
+    return {
+        "message": f"Auto-cleared {cleared_count} expired reservations",
+        "cleared_reservations": expired_reservations,
+        "updated_tables": updated_tables
+    }
+
+
+@api_router.post("/tables/reservations/activate-pending")
+async def activate_pending_reservations(
+    current_user: dict = Depends(get_current_user)
+):
+    """Activate reservations that are within their pre-arrival window"""
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = get_secure_org_id(current_user)
+    
+    from datetime import datetime as dt, timedelta, date
+    current_time = dt.now()
+    today = date.today().isoformat()
+    
+    # Find reservations for today that should be activated
+    reservations = await db.reservations.find({
+        "organization_id": user_org_id,
+        "reservation_date": today,
+        "status": {"$in": ["confirmed", "pending"]}
+    }).to_list(1000)
+    
+    activated_count = 0
+    activated_tables = []
+    
+    for reservation in reservations:
+        try:
+            reservation_datetime = dt.fromisoformat(f"{reservation['reservation_date']} {reservation['reservation_time']}")
+            pre_arrival_minutes = reservation.get('pre_arrival_minutes', 15)
+            pre_arrival_time = reservation_datetime - timedelta(minutes=pre_arrival_minutes)
+            
+            # Check if we're within the pre-arrival window
+            if current_time >= pre_arrival_time and current_time <= reservation_datetime + timedelta(minutes=reservation.get('duration', 120)):
+                # Check if table is still available
+                table = await db.tables.find_one({
+                    "id": reservation["table_id"],
+                    "organization_id": user_org_id
+                })
+                
+                if table and table.get("status") == "available":
+                    # Mark table as reserved
+                    await db.tables.update_one(
+                        {"id": reservation["table_id"], "organization_id": user_org_id},
+                        {"$set": {"status": "reserved", "updated_at": current_time.isoformat()}}
+                    )
+                    
+                    activated_tables.append(reservation.get("table_number", "N/A"))
+                    activated_count += 1
+                    
+        except Exception as e:
+            print(f"⚠️ Error processing reservation {reservation.get('id', 'N/A')}: {e}")
+    
+    # Invalidate table cache if any tables were updated
+    if activated_tables:
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_table_caches(user_org_id)
+        except Exception as e:
+            print(f"⚠️ Table cache invalidation error: {e}")
+    
+    print(f"🎯 Activated {activated_count} reservations, reserved tables: {activated_tables}")
+    
+    return {
+        "message": f"Activated {activated_count} reservations",
+        "activated_tables": activated_tables
+    }
 
 
 # Helper function to generate WhatsApp notification link
@@ -13963,4 +14422,4 @@ async def shutdown_db_client():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=10000)
