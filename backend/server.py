@@ -7976,6 +7976,96 @@ async def category_analysis_report(current_user: dict = Depends(get_current_user
     return sorted(result, key=lambda x: x["total_revenue"], reverse=True)
 
 
+@api_router.get("/reports/customer-balances")
+async def customer_balances_report(current_user: dict = Depends(get_current_user)):
+    """Get customer balance report showing outstanding credit amounts"""
+    user_org_id = get_secure_org_id(current_user)
+    
+    # Find all orders with outstanding balances (credit orders)
+    credit_orders = await db.orders.find({
+        "organization_id": user_org_id,
+        "$or": [
+            {"is_credit": True, "balance_amount": {"$gt": 0}},
+            {"balance_amount": {"$gt": 0}}
+        ]
+    }, {"_id": 0}).to_list(1000)
+    
+    # Also get all orders for each customer to calculate total statistics
+    all_orders = await db.orders.find({
+        "organization_id": user_org_id,
+        "customer_phone": {"$exists": True, "$ne": None, "$ne": ""}
+    }, {"_id": 0}).to_list(2000)
+    
+    from collections import defaultdict
+    customer_stats = defaultdict(lambda: {
+        "customer_name": "",
+        "customer_phone": "",
+        "balance_amount": 0,
+        "total_orders": 0,
+        "total_amount_ordered": 0,
+        "total_paid": 0,
+        "last_order_date": None,
+        "credit_orders": []
+    })
+    
+    # Process all orders to get complete customer statistics
+    for order in all_orders:
+        phone = order.get("customer_phone", "").strip()
+        if not phone:
+            continue
+            
+        customer_stats[phone]["customer_name"] = order.get("customer_name", "Unknown")
+        customer_stats[phone]["customer_phone"] = phone
+        customer_stats[phone]["total_orders"] += 1
+        customer_stats[phone]["total_amount_ordered"] += order.get("total", 0)
+        customer_stats[phone]["total_paid"] += order.get("payment_received", 0)
+        
+        # Track last order date
+        order_date = order.get("created_at")
+        if order_date:
+            if not customer_stats[phone]["last_order_date"] or order_date > customer_stats[phone]["last_order_date"]:
+                customer_stats[phone]["last_order_date"] = order_date
+    
+    # Process credit orders to get outstanding balances
+    for order in credit_orders:
+        phone = order.get("customer_phone", "").strip()
+        if not phone:
+            continue
+            
+        balance = order.get("balance_amount", 0)
+        if balance > 0:
+            customer_stats[phone]["balance_amount"] += balance
+            customer_stats[phone]["credit_orders"].append({
+                "order_id": order.get("id"),
+                "date": order.get("created_at"),
+                "total": order.get("total", 0),
+                "paid": order.get("payment_received", 0),
+                "balance": balance,
+                "table_number": order.get("table_number", "N/A")
+            })
+    
+    # Convert to list and filter only customers with outstanding balances
+    result = []
+    for phone, stats in customer_stats.items():
+        if stats["balance_amount"] > 0:  # Only include customers with outstanding balance
+            result.append({
+                "customer_name": stats["customer_name"],
+                "customer_phone": stats["customer_phone"],
+                "balance_amount": round(stats["balance_amount"], 2),
+                "total_orders": stats["total_orders"],
+                "total_amount_ordered": round(stats["total_amount_ordered"], 2),
+                "total_paid": round(stats["total_paid"], 2),
+                "last_order_date": stats["last_order_date"],
+                "credit_orders_count": len(stats["credit_orders"]),
+                "credit_orders": stats["credit_orders"][-5:]  # Last 5 credit orders
+            })
+    
+    # Sort by balance amount (highest first)
+    result.sort(key=lambda x: x["balance_amount"], reverse=True)
+    
+    return result
+
+
 # Thermal printer route
 @api_router.post("/print")
 async def print_receipt(

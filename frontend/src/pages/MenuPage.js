@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
@@ -8,10 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Search, Upload, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Upload, X, Filter, Grid, List, Eye, EyeOff, Star, Clock, DollarSign, TrendingUp, RefreshCw } from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
 import TrialBanner from '../components/TrialBanner';
 import ValidationAlert from '../components/ValidationAlert';
+import { apiWithRetry, apiSilent } from '../utils/apiClient';
 
 const MenuPage = ({ user }) => {
   const [menuItems, setMenuItems] = useState([]);
@@ -25,6 +25,15 @@ const MenuPage = ({ user }) => {
   const [validationErrors, setValidationErrors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [sortBy, setSortBy] = useState('name'); // 'name', 'price', 'category', 'created'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [bulkEditMode, setBulkEditMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -32,34 +41,115 @@ const MenuPage = ({ user }) => {
     description: '',
     image_url: '',
     available: true,
-    preparation_time: 15
+    preparation_time: 15,
+    is_popular: false,
+    is_vegetarian: false,
+    is_spicy: false,
+    allergens: ''
   });
 
-  // Memoized filtered items for better performance
-  const filteredItems = useMemo(() => {
-    if (!debouncedSearchTerm.trim()) return menuItems;
-    
-    const searchLower = debouncedSearchTerm.toLowerCase();
-    return menuItems.filter(item =>
-      item.name.toLowerCase().includes(searchLower) ||
-      item.category.toLowerCase().includes(searchLower) ||
-      item.description?.toLowerCase().includes(searchLower)
-    );
-  }, [debouncedSearchTerm, menuItems]);
+  // Enhanced filtered and sorted items with multiple filters
+  const filteredAndSortedItems = useMemo(() => {
+    let filtered = menuItems;
+
+    // Search filter
+    if (debouncedSearchTerm.trim()) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchLower) ||
+        item.category.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower) ||
+        item.allergens?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
+
+    // Availability filter
+    if (showAvailableOnly) {
+      filtered = filtered.filter(item => item.available);
+    }
+
+    // Price range filter
+    if (priceRange.min !== '') {
+      filtered = filtered.filter(item => parseFloat(item.price) >= parseFloat(priceRange.min));
+    }
+    if (priceRange.max !== '') {
+      filtered = filtered.filter(item => parseFloat(item.price) <= parseFloat(priceRange.max));
+    }
+
+    // Sort items
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'price':
+          aValue = parseFloat(a.price) || 0;
+          bValue = parseFloat(b.price) || 0;
+          break;
+        case 'category':
+          aValue = a.category.toLowerCase();
+          bValue = b.category.toLowerCase();
+          break;
+        case 'created':
+          aValue = new Date(a.created_at || 0);
+          bValue = new Date(b.created_at || 0);
+          break;
+        case 'popularity':
+          aValue = a.is_popular ? 1 : 0;
+          bValue = b.is_popular ? 1 : 0;
+          break;
+        default: // name
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [debouncedSearchTerm, menuItems, selectedCategory, showAvailableOnly, priceRange, sortBy, sortOrder]);
 
   // Memoized categories for better performance
   const categories = useMemo(() => {
-    return [...new Set(filteredItems.map(item => item.category))].sort();
-  }, [filteredItems]);
+    const allCategories = [...new Set(menuItems.map(item => item.category))].sort();
+    return [{ value: 'all', label: 'All Categories', count: menuItems.length }, 
+            ...allCategories.map(cat => ({
+              value: cat,
+              label: cat,
+              count: menuItems.filter(item => item.category === cat).length
+            }))];
+  }, [menuItems]);
 
   // Memoized category items to avoid recalculation
   const categoryItemsMap = useMemo(() => {
     const map = {};
     categories.forEach(category => {
-      map[category] = filteredItems.filter(item => item.category === category);
+      if (category.value === 'all') {
+        map[category.value] = filteredAndSortedItems;
+      } else {
+        map[category.value] = filteredAndSortedItems.filter(item => item.category === category.value);
+      }
     });
     return map;
-  }, [categories, filteredItems]);
+  }, [categories, filteredAndSortedItems]);
+
+  // Menu statistics
+  const menuStats = useMemo(() => {
+    const total = menuItems.length;
+    const available = menuItems.filter(item => item.available).length;
+    const avgPrice = menuItems.length > 0 
+      ? (menuItems.reduce((sum, item) => sum + parseFloat(item.price || 0), 0) / menuItems.length).toFixed(2)
+      : 0;
+    const popular = menuItems.filter(item => item.is_popular).length;
+    
+    return { total, available, avgPrice, popular };
+  }, [menuItems]);
 
   // Debounced search for better performance
   useEffect(() => {
@@ -75,20 +165,18 @@ const MenuPage = ({ user }) => {
   }, []);
 
   // Optimized fetch function with better error handling and caching
-  const fetchMenuItems = useCallback(async () => {
+  const fetchMenuItems = useCallback(async (showRefreshIndicator = false) => {
     // Don't show loading spinner for subsequent fetches
     if (initialLoad) {
       setLoading(true);
     }
     
     try {
-      console.log('🔄 Fetching menu items...');
-      
-      // Use lightweight endpoint for faster loading
-      const response = await axios.get(`${API}/menu/lightweight`, {
-        headers: {
-          'Cache-Control': 'max-age=300', // Cache for 5 minutes
-        }
+      // Use the new API client with retry logic
+      const response = await apiWithRetry({
+        method: 'get',
+        url: `${API}/menu`,
+        timeout: 10000
       });
       
       const items = Array.isArray(response.data) ? response.data : [];
@@ -97,27 +185,13 @@ const MenuPage = ({ user }) => {
       
       if (items.length === 0 && initialLoad) {
         toast.info('No menu items found. Add your first menu item below!');
-      } else {
-        console.log('✅ Menu items loaded:', items.length);
+      }
+      
+      if (showRefreshIndicator) {
+        toast.success('Menu refreshed successfully!');
       }
       
     } catch (error) {
-      console.error('❌ Failed to fetch menu items:', error);
-      
-      // Fallback to full menu endpoint if lightweight fails
-      if (error.response?.status !== 404) {
-        try {
-          console.log('🔄 Falling back to full menu endpoint...');
-          const fallbackResponse = await axios.get(`${API}/menu`);
-          const items = Array.isArray(fallbackResponse.data) ? fallbackResponse.data : [];
-          setMenuItems(items);
-          console.log('✅ Fallback menu items loaded:', items.length);
-          return;
-        } catch (fallbackError) {
-          console.error('❌ Fallback also failed:', fallbackError);
-        }
-      }
-      
       let errorMessage = 'Failed to fetch menu items';
       
       if (error.response?.status === 401) {
@@ -160,8 +234,12 @@ const MenuPage = ({ user }) => {
       const formDataUpload = new FormData();
       formDataUpload.append('file', file);
 
-      const response = await axios.post(`${API}/upload/image`, formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await apiWithRetry({
+        method: 'post',
+        url: `${API}/upload/image`,
+        data: formDataUpload,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000 // Longer timeout for file uploads
       });
 
       setFormData({ ...formData, image_url: response.data.image_url });
@@ -177,7 +255,7 @@ const MenuPage = ({ user }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
+    // Enhanced validation
     const errors = [];
     if (!formData.name || formData.name.trim() === '') {
       errors.push('Item Name is required');
@@ -188,6 +266,9 @@ const MenuPage = ({ user }) => {
     if (!formData.price || formData.price <= 0) {
       errors.push('Price must be greater than 0');
     }
+    if (formData.preparation_time && formData.preparation_time < 1) {
+      errors.push('Preparation time must be at least 1 minute');
+    }
     
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -196,12 +277,28 @@ const MenuPage = ({ user }) => {
     }
     
     try {
+      const submitData = {
+        ...formData,
+        price: parseFloat(formData.price),
+        preparation_time: parseInt(formData.preparation_time) || 15
+      };
+
       if (editingItem) {
-        await axios.put(`${API}/menu/${editingItem.id}`, formData);
-        toast.success('Menu item updated!');
+        await apiWithRetry({
+          method: 'put',
+          url: `${API}/menu/${editingItem.id}`,
+          data: submitData,
+          timeout: 10000
+        });
+        toast.success('Menu item updated successfully!');
       } else {
-        await axios.post(`${API}/menu`, formData);
-        toast.success('Menu item created!');
+        await apiWithRetry({
+          method: 'post',
+          url: `${API}/menu`,
+          data: submitData,
+          timeout: 10000
+        });
+        toast.success('Menu item created successfully!');
       }
       setDialogOpen(false);
       fetchMenuItems();
@@ -214,11 +311,63 @@ const MenuPage = ({ user }) => {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
-      await axios.delete(`${API}/menu/${id}`);
-      toast.success('Menu item deleted!');
+      await apiWithRetry({
+        method: 'delete',
+        url: `${API}/menu/${id}`,
+        timeout: 10000
+      });
+      toast.success('Menu item deleted successfully!');
       fetchMenuItems();
     } catch (error) {
       toast.error('Failed to delete menu item');
+    }
+  };
+
+  // Bulk operations
+  const handleBulkDelete = async () => {
+    if (selectedItems.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedItems.size} items?`)) return;
+    
+    try {
+      const deletePromises = Array.from(selectedItems).map(id =>
+        apiWithRetry({
+          method: 'delete',
+          url: `${API}/menu/${id}`,
+          timeout: 10000
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      toast.success(`${selectedItems.size} items deleted successfully!`);
+      setSelectedItems(new Set());
+      setBulkEditMode(false);
+      fetchMenuItems();
+    } catch (error) {
+      toast.error('Failed to delete some items');
+    }
+  };
+
+  const handleBulkAvailabilityToggle = async (available) => {
+    if (selectedItems.size === 0) return;
+    
+    try {
+      const updatePromises = Array.from(selectedItems).map(id => {
+        const item = menuItems.find(item => item.id === id);
+        return apiWithRetry({
+          method: 'put',
+          url: `${API}/menu/${id}`,
+          data: { ...item, available },
+          timeout: 10000
+        });
+      });
+      
+      await Promise.all(updatePromises);
+      toast.success(`${selectedItems.size} items updated successfully!`);
+      setSelectedItems(new Set());
+      setBulkEditMode(false);
+      fetchMenuItems();
+    } catch (error) {
+      toast.error('Failed to update some items');
     }
   };
 
@@ -230,7 +379,11 @@ const MenuPage = ({ user }) => {
       description: '',
       image_url: '',
       available: true,
-      preparation_time: 15
+      preparation_time: 15,
+      is_popular: false,
+      is_vegetarian: false,
+      is_spicy: false,
+      allergens: ''
     });
     setEditingItem(null);
     setImagePreview('');
@@ -248,10 +401,45 @@ const MenuPage = ({ user }) => {
       description: item.description || '',
       image_url: item.image_url || '',
       available: item.available,
-      preparation_time: item.preparation_time || 15
+      preparation_time: item.preparation_time || 15,
+      is_popular: item.is_popular || false,
+      is_vegetarian: item.is_vegetarian || false,
+      is_spicy: item.is_spicy || false,
+      allergens: item.allergens || ''
     });
     setImagePreview(item.image_url || '');
     setDialogOpen(true);
+  };
+
+  // Quick actions
+  const toggleItemAvailability = async (item) => {
+    try {
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/menu/${item.id}`,
+        data: { ...item, available: !item.available },
+        timeout: 10000
+      });
+      toast.success(`${item.name} is now ${!item.available ? 'available' : 'unavailable'}`);
+      fetchMenuItems();
+    } catch (error) {
+      toast.error('Failed to update item availability');
+    }
+  };
+
+  const toggleItemPopularity = async (item) => {
+    try {
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/menu/${item.id}`,
+        data: { ...item, is_popular: !item.is_popular },
+        timeout: 10000
+      });
+      toast.success(`${item.name} ${!item.is_popular ? 'marked as popular' : 'removed from popular'}`);
+      fetchMenuItems();
+    } catch (error) {
+      toast.error('Failed to update item popularity');
+    }
   };
 
   // Loading skeleton component
@@ -287,206 +475,607 @@ const MenuPage = ({ user }) => {
     </div>
   );
 
-  // Memoized menu item component for better performance
-  const MenuItemCard = useCallback(({ item }) => (
-    <Card key={item.id} className={`card-hover border-0 shadow-lg transition-all duration-200 ${!item.available ? 'opacity-60' : ''}`} data-testid={`menu-item-${item.id}`}>
-      {item.image_url && (
-        <div className="h-40 overflow-hidden rounded-t-lg">
-          <img 
-            src={item.image_url} 
-            alt={item.name} 
-            className="w-full h-full object-cover transition-transform duration-200 hover:scale-105" 
-            onError={(e) => e.target.style.display = 'none'}
-            loading="lazy" // Lazy load images for better performance
+  // Enhanced menu item component with more features
+  const MenuItemCard = useCallback(({ item, isSelected, onSelect }) => (
+    <Card 
+      key={item.id} 
+      className={`card-hover border-0 shadow-lg transition-all duration-200 relative ${
+        !item.available ? 'opacity-60' : ''
+      } ${isSelected ? 'ring-2 ring-violet-500' : ''} ${
+        viewMode === 'list' ? 'flex-row' : ''
+      }`} 
+      data-testid={`menu-item-${item.id}`}
+    >
+      {/* Bulk edit checkbox */}
+      {bulkEditMode && (
+        <div className="absolute top-2 left-2 z-10">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onSelect(item.id)}
+            className="w-4 h-4 text-violet-600 rounded focus:ring-violet-500"
           />
         </div>
       )}
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <CardTitle className="text-lg">{item.name}</CardTitle>
-            <p className="text-sm text-gray-500 capitalize">{item.category}</p>
+
+      {/* Popular badge */}
+      {item.is_popular && (
+        <div className="absolute top-2 right-2 z-10">
+          <div className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+            <Star className="w-3 h-3" />
+            Popular
           </div>
-          <span className="text-lg font-bold text-violet-600">₹{item.price}</span>
         </div>
-      </CardHeader>
-      <CardContent>
-        {item.description && <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>}
-        <div className="flex justify-between items-center">
-          <span className={`text-xs px-2 py-1 rounded-full ${item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {item.available ? 'Available' : 'Unavailable'}
-          </span>
-          {['admin', 'cashier'].includes(user?.role) && (
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => handleEdit(item)} data-testid={`edit-menu-${item.id}`}>
-                <Edit className="w-4 h-4" />
-              </Button>
-              {user?.role === 'admin' && (
-                <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item.id)} data-testid={`delete-menu-${item.id}`}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+      )}
+
+      <div className={`${viewMode === 'list' ? 'flex w-full' : ''}`}>
+        {/* Image section */}
+        {item.image_url && (
+          <div className={`overflow-hidden ${
+            viewMode === 'list' 
+              ? 'w-32 h-32 rounded-l-lg flex-shrink-0' 
+              : 'h-40 rounded-t-lg'
+          }`}>
+            <img 
+              src={item.image_url} 
+              alt={item.name} 
+              className="w-full h-full object-cover transition-transform duration-200 hover:scale-105" 
+              onError={(e) => e.target.style.display = 'none'}
+              loading="lazy"
+            />
+          </div>
+        )}
+
+        {/* Content section */}
+        <div className={`${viewMode === 'list' ? 'flex-1 flex flex-col' : ''}`}>
+          <CardHeader className={`${viewMode === 'list' ? 'pb-2 flex-shrink-0' : 'pb-2'}`}>
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <CardTitle className={`${viewMode === 'list' ? 'text-base' : 'text-lg'} flex items-center gap-2`}>
+                  {item.name}
+                  {item.is_vegetarian && <span className="text-green-600 text-sm">🌱</span>}
+                  {item.is_spicy && <span className="text-red-600 text-sm">🌶️</span>}
+                </CardTitle>
+                <p className="text-sm text-gray-500 capitalize">{item.category}</p>
+                {item.preparation_time && (
+                  <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                    <Clock className="w-3 h-3" />
+                    {item.preparation_time} mins
+                  </div>
+                )}
+              </div>
+              <div className="text-right">
+                <span className={`${viewMode === 'list' ? 'text-lg' : 'text-lg'} font-bold text-violet-600`}>
+                  ₹{item.price}
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className={`${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
+            <div>
+              {item.description && (
+                <p className={`text-sm text-gray-600 mb-3 ${
+                  viewMode === 'list' ? 'line-clamp-2' : 'line-clamp-2'
+                }`}>
+                  {item.description}
+                </p>
+              )}
+              
+              {item.allergens && (
+                <p className="text-xs text-orange-600 mb-2">
+                  <strong>Allergens:</strong> {item.allergens}
+                </p>
               )}
             </div>
-          )}
+
+            <div className="flex justify-between items-center mt-auto">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {item.available ? 'Available' : 'Unavailable'}
+                </span>
+              </div>
+
+              {['admin', 'cashier'].includes(user?.role) && (
+                <div className="flex gap-1">
+                  {/* Quick availability toggle */}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => toggleItemAvailability(item)}
+                    className="p-1 h-8 w-8"
+                    title={`Mark as ${item.available ? 'unavailable' : 'available'}`}
+                  >
+                    {item.available ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </Button>
+
+                  {/* Quick popularity toggle */}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => toggleItemPopularity(item)}
+                    className={`p-1 h-8 w-8 ${item.is_popular ? 'bg-yellow-100 text-yellow-700' : ''}`}
+                    title={`${item.is_popular ? 'Remove from' : 'Mark as'} popular`}
+                  >
+                    <Star className="w-3 h-3" />
+                  </Button>
+
+                  {/* Edit button */}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => handleEdit(item)} 
+                    className="p-1 h-8 w-8"
+                    data-testid={`edit-menu-${item.id}`}
+                  >
+                    <Edit className="w-3 h-3" />
+                  </Button>
+
+                  {/* Delete button - admin only */}
+                  {user?.role === 'admin' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-red-600 p-1 h-8 w-8" 
+                      onClick={() => handleDelete(item.id)} 
+                      data-testid={`delete-menu-${item.id}`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
         </div>
-      </CardContent>
+      </div>
     </Card>
-  ), [user?.role]);
+  ), [user?.role, viewMode, bulkEditMode]);
+
+  // Stats cards component
+  const StatsCards = () => (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
+            <Grid className="w-5 h-5 text-violet-600" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Total Items</p>
+            <p className="text-xl font-bold">{menuStats.total}</p>
+          </div>
+        </div>
+      </Card>
+      
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+            <Eye className="w-5 h-5 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Available</p>
+            <p className="text-xl font-bold">{menuStats.available}</p>
+          </div>
+        </div>
+      </Card>
+      
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+            <Star className="w-5 h-5 text-yellow-600" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Popular</p>
+            <p className="text-xl font-bold">{menuStats.popular}</p>
+          </div>
+        </div>
+      </Card>
+      
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+            <DollarSign className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Avg Price</p>
+            <p className="text-xl font-bold">₹{menuStats.avgPrice}</p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
 
   return (
     <Layout user={user}>
       <ValidationAlert errors={validationErrors} onClose={() => setValidationErrors([])} />
       <div className="space-y-6" data-testid="menu-page">
         <TrialBanner user={user} />
+        
+        {/* Header with enhanced actions */}
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Menu Management</h1>
-            <p className="text-gray-600 mt-2">Manage your restaurant menu items</p>
+            <p className="text-gray-600 mt-2">Manage your restaurant menu items • {menuStats.total} items total</p>
           </div>
-          {['admin', 'cashier'].includes(user?.role) && (
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-violet-600 to-purple-600" data-testid="add-menu-button">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Menu Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="menu-dialog">
-                <DialogHeader>
-                  <DialogTitle>{editingItem ? 'Edit Menu Item' : 'Add Menu Item'}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Name</Label>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        required
-                        data-testid="menu-name-input"
-                      />
-                    </div>
-                    <div>
-                      <Label>Category</Label>
-                      <Input
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        required
-                        data-testid="menu-category-input"
-                      />
-                    </div>
-                    <div>
-                      <Label>Price (₹)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        required
-                        data-testid="menu-price-input"
-                      />
-                    </div>
-                    <div>
-                      <Label>Prep Time (mins)</Label>
-                      <Input
-                        type="number"
-                        value={formData.preparation_time}
-                        onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Description</Label>
-                    <Input
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      data-testid="menu-description-input"
-                    />
-                  </div>
-                  <div>
-                    <Label>Menu Image</Label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploading}
-                          className="flex-1"
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          {uploading ? 'Uploading...' : 'Upload Image'}
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
+          
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Refresh button */}
+            <Button 
+              variant="outline" 
+              onClick={() => fetchMenuItems(true)}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+
+            {/* Bulk edit toggle */}
+            {['admin', 'cashier'].includes(user?.role) && menuItems.length > 0 && (
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setBulkEditMode(!bulkEditMode);
+                  setSelectedItems(new Set());
+                }}
+                className={bulkEditMode ? 'bg-violet-100 text-violet-700' : ''}
+              >
+                {bulkEditMode ? 'Exit Bulk Edit' : 'Bulk Edit'}
+              </Button>
+            )}
+
+            {/* Add menu item button */}
+            {['admin', 'cashier'].includes(user?.role) && (
+              <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-to-r from-violet-600 to-purple-600" data-testid="add-menu-button">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Menu Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="menu-dialog">
+                  <DialogHeader>
+                    <DialogTitle>{editingItem ? 'Edit Menu Item' : 'Add Menu Item'}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Name *</Label>
+                        <Input
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          required
+                          data-testid="menu-name-input"
                         />
                       </div>
-                      {imagePreview && (
-                        <div className="relative">
-                          <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setImagePreview('');
-                              setFormData({ ...formData, image_url: '' });
-                              if (fileInputRef.current) fileInputRef.current.value = '';
-                            }}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                      <p className="text-xs text-gray-500">Or enter image URL below (optional)</p>
+                      <div>
+                        <Label>Category *</Label>
+                        <Input
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          required
+                          data-testid="menu-category-input"
+                        />
+                      </div>
+                      <div>
+                        <Label>Price (₹) *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.price}
+                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          required
+                          data-testid="menu-price-input"
+                        />
+                      </div>
+                      <div>
+                        <Label>Prep Time (mins)</Label>
+                        <Input
+                          type="number"
+                          value={formData.preparation_time}
+                          onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Description</Label>
                       <Input
-                        value={formData.image_url}
-                        onChange={(e) => {
-                          setFormData({ ...formData, image_url: e.target.value });
-                          setImagePreview(e.target.value);
-                        }}
-                        placeholder="https://example.com/image.jpg"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        data-testid="menu-description-input"
                       />
                     </div>
+
+                    <div>
+                      <Label>Allergens (comma separated)</Label>
+                      <Input
+                        value={formData.allergens}
+                        onChange={(e) => setFormData({ ...formData, allergens: e.target.value })}
+                        placeholder="nuts, dairy, gluten"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label>Menu Image</Label>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploading}
+                            className="flex-1"
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            {uploading ? 'Uploading...' : 'Upload Image'}
+                          </Button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                        </div>
+                        {imagePreview && (
+                          <div className="relative">
+                            <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImagePreview('');
+                                setFormData({ ...formData, image_url: '' });
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                              }}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500">Or enter image URL below (optional)</p>
+                        <Input
+                          value={formData.image_url}
+                          onChange={(e) => {
+                            setFormData({ ...formData, image_url: e.target.value });
+                            setImagePreview(e.target.value);
+                          }}
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Enhanced checkboxes */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="available"
+                          checked={formData.available}
+                          onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor="available" className="cursor-pointer">Available</Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="popular"
+                          checked={formData.is_popular}
+                          onChange={(e) => setFormData({ ...formData, is_popular: e.target.checked })}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor="popular" className="cursor-pointer">Popular</Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="vegetarian"
+                          checked={formData.is_vegetarian}
+                          onChange={(e) => setFormData({ ...formData, is_vegetarian: e.target.checked })}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor="vegetarian" className="cursor-pointer">Vegetarian</Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="spicy"
+                          checked={formData.is_spicy}
+                          onChange={(e) => setFormData({ ...formData, is_spicy: e.target.checked })}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor="spicy" className="cursor-pointer">Spicy</Label>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" data-testid="save-menu-button">
+                        {editingItem ? 'Update' : 'Create'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+
+        {/* Stats cards */}
+        <StatsCards />
+
+        {/* Enhanced search and filters */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="Search menu items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="menu-search-input"
+              />
+            </div>
+            
+            {/* View mode toggle */}
+            <div className="flex items-center border rounded-lg">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-r-none"
+              >
+                <Grid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-l-none"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            {/* Filters toggle */}
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className={showFilters ? 'bg-violet-100 text-violet-700' : ''}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters
+            </Button>
+          </div>
+
+          {/* Advanced filters */}
+          {showFilters && (
+            <Card className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label>Category</Label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label} ({cat.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <Label>Sort By</Label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="name">Name</option>
+                    <option value="price">Price</option>
+                    <option value="category">Category</option>
+                    <option value="popularity">Popularity</option>
+                    <option value="created">Date Added</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <Label>Price Range</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Min"
+                      value={priceRange.min}
+                      onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
+                      className="w-full"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max"
+                      value={priceRange.max}
+                      onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
+                      className="w-full"
+                    />
                   </div>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <Label>Options</Label>
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      id="available"
-                      checked={formData.available}
-                      onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+                      id="availableOnly"
+                      checked={showAvailableOnly}
+                      onChange={(e) => setShowAvailableOnly(e.target.checked)}
                       className="w-4 h-4"
                     />
-                    <Label htmlFor="available" className="cursor-pointer">Available</Label>
+                    <Label htmlFor="availableOnly" className="cursor-pointer text-sm">Available only</Label>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" data-testid="save-menu-button">
-                      {editingItem ? 'Update' : 'Create'}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setSortBy('name');
+                      setSortOrder('asc');
+                      setShowAvailableOnly(false);
+                      setPriceRange({ min: '', max: '' });
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              </div>
+            </Card>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search menu items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="menu-search-input"
-            />
-          </div>
-        </div>
+        {/* Bulk edit actions */}
+        {bulkEditMode && selectedItems.size > 0 && (
+          <Card className="p-4 bg-violet-50 border-violet-200">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{selectedItems.size} items selected</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAvailabilityToggle(true)}
+                >
+                  Mark Available
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAvailabilityToggle(false)}
+                >
+                  Mark Unavailable
+                </Button>
+                {user?.role === 'admin' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600"
+                    onClick={handleBulkDelete}
+                  >
+                    Delete Selected
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Bulk Upload Component */}
         {['admin', 'manager'].includes(user?.role) && (
@@ -509,34 +1098,89 @@ const MenuPage = ({ user }) => {
               </div>
             )}
             
-            {/* Render categories and items */}
-            {categories.map((category) => {
-              const categoryItems = categoryItemsMap[category];
-              if (!categoryItems || categoryItems.length === 0) return null;
+            {/* Render items based on view mode */}
+            {viewMode === 'grid' ? (
+              // Grid view - grouped by category
+              categories.map((category) => {
+                const categoryItems = categoryItemsMap[category.value];
+                if (!categoryItems || categoryItems.length === 0) return null;
 
-              return (
-                <div key={category} className="space-y-4">
-                  <h2 className="text-2xl font-bold capitalize text-gray-800">{category}</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {categoryItems.map((item) => (
-                      <MenuItemCard key={item.id} item={item} />
-                    ))}
+                return (
+                  <div key={category.value} className="space-y-4">
+                    <h2 className="text-2xl font-bold capitalize text-gray-800 flex items-center gap-2">
+                      {category.label}
+                      <span className="text-sm font-normal text-gray-500">({category.count})</span>
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {categoryItems.map((item) => (
+                        <MenuItemCard 
+                          key={item.id} 
+                          item={item}
+                          isSelected={selectedItems.has(item.id)}
+                          onSelect={(id) => {
+                            const newSelected = new Set(selectedItems);
+                            if (newSelected.has(id)) {
+                              newSelected.delete(id);
+                            } else {
+                              newSelected.add(id);
+                            }
+                            setSelectedItems(newSelected);
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              // List view - all items in a single list
+              <div className="space-y-3">
+                {filteredAndSortedItems.map((item) => (
+                  <MenuItemCard 
+                    key={item.id} 
+                    item={item}
+                    isSelected={selectedItems.has(item.id)}
+                    onSelect={(id) => {
+                      const newSelected = new Set(selectedItems);
+                      if (newSelected.has(id)) {
+                        newSelected.delete(id);
+                      } else {
+                        newSelected.add(id);
+                      }
+                      setSelectedItems(newSelected);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Empty state */}
-            {!loading && filteredItems.length === 0 && (
+            {!loading && filteredAndSortedItems.length === 0 && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Search className="w-8 h-8 text-gray-400" />
                 </div>
                 <p className="text-gray-500 text-lg mb-2">
-                  {searchTerm ? 'No menu items match your search' : 'No menu items found'}
+                  {searchTerm || selectedCategory !== 'all' || showAvailableOnly || priceRange.min || priceRange.max
+                    ? 'No menu items match your filters' 
+                    : 'No menu items found'}
                 </p>
-                {!searchTerm && (
+                {!searchTerm && selectedCategory === 'all' && !showAvailableOnly && !priceRange.min && !priceRange.max && (
                   <p className="text-gray-400 text-sm">Add your first menu item to get started</p>
+                )}
+                {(searchTerm || selectedCategory !== 'all' || showAvailableOnly || priceRange.min || priceRange.max) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCategory('all');
+                      setShowAvailableOnly(false);
+                      setPriceRange({ min: '', max: '' });
+                    }}
+                    className="mt-4"
+                  >
+                    Clear All Filters
+                  </Button>
                 )}
               </div>
             )}

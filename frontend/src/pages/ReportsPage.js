@@ -31,7 +31,11 @@ import {
   FileSpreadsheet,
   Printer,
   RefreshCw,
-  CalendarDays
+  CalendarDays,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Layers
 } from "lucide-react";
 
 const ReportsPage = ({ user }) => {
@@ -45,6 +49,14 @@ const ReportsPage = ({ user }) => {
   const [forecast, setForecast] = useState(null);
   const [customerBalances, setCustomerBalances] = useState([]);
   const [customerBalanceLoading, setCustomerBalanceLoading] = useState(false);
+  
+  // Stock Report State
+  const [stockReport, setStockReport] = useState(null);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockCategories, setStockCategories] = useState([]);
+  const [stockSuppliers, setStockSuppliers] = useState([]);
+  const [stockMovements, setStockMovements] = useState([]);
+  
   const [dateRange, setDateRange] = useState({
     start_date: new Date().toISOString().split("T")[0], // Today's date
     end_date: new Date().toISOString().split("T")[0],   // Today's date
@@ -127,7 +139,10 @@ const ReportsPage = ({ user }) => {
           fetchStaffPerformance(),
           fetchPeakHours(),
           fetchCategoryAnalysis(),
-          fetchCustomerBalances()
+          fetchCustomerBalances(),
+          fetchStockReport(),
+          fetchStockCategories(),
+          fetchStockSuppliers()
         ]);
         
         // Priority 3: Load AI forecast last (least critical, can be slow)
@@ -220,9 +235,66 @@ const ReportsPage = ({ user }) => {
     setCustomerBalanceLoading(true);
     try {
       const response = await axios.get(`${API}/reports/customer-balances`);
-      setCustomerBalances(response.data || []);
+      const data = response.data || [];
+      
+      // Log for debugging
+      console.log("Customer balance data received:", data);
+      
+      setCustomerBalances(data);
+      
+      if (data.length > 0) {
+        toast.success(`Found ${data.length} customers with outstanding balances`);
+      } else {
+        console.log("No customers with outstanding balances found");
+        // Show info message instead of error when no data
+        toast.info("No customers with outstanding balances found");
+      }
     } catch (error) {
       console.error("Failed to fetch customer balances", error);
+      
+      // More detailed error handling
+      if (error.response?.status === 404) {
+        toast.error("Customer balance endpoint not found. Please check backend.");
+        console.log("💡 Backend endpoint /reports/customer-balances not found");
+      } else if (error.response?.status === 401) {
+        toast.error("Authentication required for customer balances");
+      } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        toast.error("Cannot connect to backend server");
+        console.log("💡 Backend server might not be running");
+        
+        // Optional: Load mock data for testing
+        if (process.env.NODE_ENV === 'development') {
+          console.log("🎭 Loading mock data for development testing...");
+          const mockData = [
+            {
+              customer_name: "John Doe",
+              customer_phone: "+91-9876543210",
+              balance_amount: 250.50,
+              total_orders: 5,
+              total_amount_ordered: 1250.00,
+              total_paid: 999.50,
+              last_order_date: new Date().toISOString(),
+              credit_orders_count: 2
+            },
+            {
+              customer_name: "Jane Smith", 
+              customer_phone: "+91-9876543211",
+              balance_amount: 180.00,
+              total_orders: 3,
+              total_amount_ordered: 680.00,
+              total_paid: 500.00,
+              last_order_date: new Date(Date.now() - 86400000).toISOString(),
+              credit_orders_count: 1
+            }
+          ];
+          setCustomerBalances(mockData);
+          toast.info("Using mock data for testing (development mode)");
+          return;
+        }
+      } else {
+        toast.error("Failed to load customer balances");
+      }
+      
       setCustomerBalances([]);
     } finally {
       setCustomerBalanceLoading(false);
@@ -238,6 +310,299 @@ const ReportsPage = ({ user }) => {
       setForecast(null);
     }
   }, []);
+
+  // Stock Report Functions
+  const fetchStockReport = useCallback(async () => {
+    setStockLoading(true);
+    try {
+      const response = await axios.get(`${API}/inventory`);
+      const inventory = response.data || [];
+      
+      // Calculate stock statistics
+      const totalItems = inventory.length;
+      const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0);
+      const lowStockItems = inventory.filter(item => item.quantity <= item.min_quantity);
+      const outOfStockItems = inventory.filter(item => item.quantity <= 0);
+      const healthyStockItems = inventory.filter(item => item.quantity > item.min_quantity);
+      
+      // Calculate expiry statistics
+      const today = new Date();
+      const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+      const expiringItems = inventory.filter(item => {
+        if (!item.expiry_date) return false;
+        const expiryDate = new Date(item.expiry_date);
+        return expiryDate > today && expiryDate <= thirtyDaysFromNow;
+      });
+      const expiredItems = inventory.filter(item => {
+        if (!item.expiry_date) return false;
+        const expiryDate = new Date(item.expiry_date);
+        return expiryDate <= today;
+      });
+      
+      setStockReport({
+        inventory,
+        totalItems,
+        totalValue,
+        lowStockItems,
+        outOfStockItems,
+        healthyStockItems,
+        expiringItems,
+        expiredItems,
+        lowStockCount: lowStockItems.length,
+        outOfStockCount: outOfStockItems.length,
+        healthyStockCount: healthyStockItems.length,
+        expiringCount: expiringItems.length,
+        expiredCount: expiredItems.length
+      });
+    } catch (error) {
+      console.error("Failed to fetch stock report", error);
+      setStockReport(null);
+    } finally {
+      setStockLoading(false);
+    }
+  }, []);
+
+  const fetchStockCategories = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/categories`);
+      setStockCategories(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch stock categories", error);
+      setStockCategories([]);
+    }
+  }, []);
+
+  const fetchStockSuppliers = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/suppliers`);
+      setStockSuppliers(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch stock suppliers", error);
+      setStockSuppliers([]);
+    }
+  }, []);
+
+  const fetchStockMovements = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/inventory/movements`);
+      setStockMovements(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch stock movements", error);
+      setStockMovements([]);
+    }
+  }, []);
+
+  // Stock Report Export Function
+  const handleExportStockReport = useCallback(async (format) => {
+    if (!stockReport) {
+      toast.error("No stock data to export");
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      if (format === 'csv') {
+        // Export Stock Report as CSV
+        const csvContent = [
+          [
+            "Item Name",
+            "Category", 
+            "Current Stock",
+            "Unit",
+            "Min Quantity",
+            "Price per Unit",
+            "Total Value",
+            "Status",
+            "Supplier",
+            "Expiry Date",
+            "Last Updated"
+          ],
+          ...stockReport.inventory.map((item) => [
+            item.name || 'Unknown',
+            item.category_name || 'N/A',
+            item.quantity || 0,
+            item.unit || 'pcs',
+            item.min_quantity || 0,
+            item.price_per_unit?.toFixed(2) || '0.00',
+            (item.quantity * item.price_per_unit)?.toFixed(2) || '0.00',
+            item.quantity <= 0 ? 'Out of Stock' : 
+            item.quantity <= item.min_quantity ? 'Low Stock' : 'Healthy',
+            item.supplier_name || 'N/A',
+            item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A',
+            item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
+          ]),
+        ]
+          .map((row) => row.join(","))
+          .join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `stock-report-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Stock report CSV exported successfully!");
+      } else if (format === 'pdf') {
+        // Export Stock Report as PDF
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Stock Report - ${new Date().toLocaleDateString()}</title>
+            <style>
+              @page { size: A4 landscape; margin: 10mm; }
+              body {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 10px;
+                line-height: 1.4;
+                color: #1f2937;
+                margin: 0;
+                padding: 10px;
+              }
+              .header {
+                text-align: center;
+                padding: 15px;
+                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+                color: white;
+                border-radius: 8px;
+                margin-bottom: 15px;
+              }
+              .header h1 { margin: 0 0 5px 0; font-size: 20px; }
+              .header p { margin: 2px 0; opacity: 0.9; }
+              .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+                margin-bottom: 15px;
+              }
+              .summary-card {
+                padding: 12px;
+                border-radius: 8px;
+                text-align: center;
+              }
+              .summary-card.total { background: #dbeafe; }
+              .summary-card.healthy { background: #dcfce7; }
+              .summary-card.low { background: #fef3c7; }
+              .summary-card.out { background: #fee2e2; }
+              .summary-card h4 { margin: 0 0 5px 0; font-size: 9px; text-transform: uppercase; color: #666; }
+              .summary-card p { margin: 0; font-size: 16px; font-weight: bold; }
+              .summary-card.total p { color: #1d4ed8; }
+              .summary-card.healthy p { color: #15803d; }
+              .summary-card.low p { color: #d97706; }
+              .summary-card.out p { color: #dc2626; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+              th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; font-size: 9px; }
+              th { background: #7c3aed; color: white; font-weight: 600; }
+              tr:nth-child(even) { background: #f9fafb; }
+              tr.low-stock { background: #fef3c7; }
+              tr.out-of-stock { background: #fee2e2; }
+              .status-healthy { color: #15803d; font-weight: bold; }
+              .status-low { color: #d97706; font-weight: bold; }
+              .status-out { color: #dc2626; font-weight: bold; }
+              .footer { text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 8px; color: #666; }
+              @media print { body { padding: 0; } .no-print { display: none; } }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>📦 Stock Report</h1>
+              <p>Generated: ${new Date().toLocaleString()}</p>
+              <p>Total Items: ${stockReport.totalItems} | Total Value: ₹${stockReport.totalValue.toFixed(2)}</p>
+            </div>
+
+            <div class="summary-grid">
+              <div class="summary-card total">
+                <h4>Total Items</h4>
+                <p>${stockReport.totalItems}</p>
+                <small>₹${stockReport.totalValue.toFixed(0)} value</small>
+              </div>
+              <div class="summary-card healthy">
+                <h4>Healthy Stock</h4>
+                <p>${stockReport.healthyStockCount}</p>
+                <small>${stockReport.totalItems > 0 ? Math.round((stockReport.healthyStockCount / stockReport.totalItems) * 100) : 0}% of total</small>
+              </div>
+              <div class="summary-card low">
+                <h4>Low Stock</h4>
+                <p>${stockReport.lowStockCount}</p>
+                <small>Needs attention</small>
+              </div>
+              <div class="summary-card out">
+                <h4>Out of Stock</h4>
+                <p>${stockReport.outOfStockCount}</p>
+                <small>Urgent action</small>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Current Stock</th>
+                  <th>Min Qty</th>
+                  <th>Unit Price</th>
+                  <th>Total Value</th>
+                  <th>Status</th>
+                  <th>Expiry</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${stockReport.inventory.map(item => {
+                  const status = item.quantity <= 0 ? 'Out of Stock' : 
+                               item.quantity <= item.min_quantity ? 'Low Stock' : 'Healthy';
+                  const rowClass = item.quantity <= 0 ? 'out-of-stock' : 
+                                 item.quantity <= item.min_quantity ? 'low-stock' : '';
+                  const statusClass = item.quantity <= 0 ? 'status-out' : 
+                                    item.quantity <= item.min_quantity ? 'status-low' : 'status-healthy';
+                  
+                  return `
+                    <tr class="${rowClass}">
+                      <td><strong>${item.name || 'Unknown'}</strong></td>
+                      <td>${item.category_name || 'N/A'}</td>
+                      <td>${item.quantity || 0} ${item.unit || 'pcs'}</td>
+                      <td>${item.min_quantity || 0}</td>
+                      <td>₹${(item.price_per_unit || 0).toFixed(2)}</td>
+                      <td>₹${((item.quantity || 0) * (item.price_per_unit || 0)).toFixed(2)}</td>
+                      <td class="${statusClass}">${status}</td>
+                      <td>${item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              <p><strong>BillByteKOT</strong> - Restaurant Management System</p>
+              <p>Stock Report generated on ${new Date().toLocaleString()}</p>
+            </div>
+
+            <div class="no-print" style="text-align: center; margin-top: 15px;">
+              <button onclick="window.print(); setTimeout(() => window.close(), 100);" 
+                style="padding: 10px 20px; background: #7c3aed; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">
+                Save as PDF
+              </button>
+              <button onclick="window.close()" 
+                style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; margin-left: 10px;">
+                Close
+              </button>
+            </div>
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+        
+        toast.success("Stock report PDF preview opened! Use Print dialog to save as PDF");
+      }
+    } catch (error) {
+      console.error("Failed to export stock report:", error);
+      toast.error("Failed to export stock report");
+    } finally {
+      setExportLoading(false);
+    }
+  }, [stockReport]);
 
   const handleExportCSV = async () => {
     setExportLoading(true);
@@ -1255,7 +1620,7 @@ const ReportsPage = ({ user }) => {
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           {/* Mobile-optimized scrollable tabs */}
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
-            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-8 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
+            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-9 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
               <TabsTrigger value="overview" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Overview</span>
                 <span className="sm:hidden">📊 Overview</span>
@@ -1267,6 +1632,10 @@ const ReportsPage = ({ user }) => {
               <TabsTrigger value="items" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Best Sellers</span>
                 <span className="sm:hidden">🏆 Top Items</span>
+              </TabsTrigger>
+              <TabsTrigger value="stock" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <span className="hidden sm:inline">Stock Report</span>
+                <span className="sm:hidden">📦 Stock</span>
               </TabsTrigger>
               <TabsTrigger value="staff" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Staff Performance</span>
@@ -1671,6 +2040,300 @@ const ReportsPage = ({ user }) => {
             )}
           </TabsContent>
 
+          {/* Stock Report Tab */}
+          <TabsContent value="stock" className="space-y-4 sm:space-y-6">
+            {/* Stock Overview Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <Package className="w-5 h-5" />
+                    <span className="text-sm font-medium">Total Items</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-700">
+                    {stockReport?.totalItems || 0}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    ₹{(stockReport?.totalValue || 0).toFixed(0)} value
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-green-600 mb-2">
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Healthy Stock</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-700">
+                    {stockReport?.healthyStockCount || 0}
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {stockReport?.totalItems > 0 ? Math.round((stockReport?.healthyStockCount / stockReport?.totalItems) * 100) : 0}% of total
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-orange-600 mb-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Low Stock</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-700">
+                    {stockReport?.lowStockCount || 0}
+                  </p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Needs attention
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-pink-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-red-600 mb-2">
+                    <XCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Out of Stock</span>
+                  </div>
+                  <p className="text-2xl font-bold text-red-700">
+                    {stockReport?.outOfStockCount || 0}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Urgent action needed
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Expiry Alerts */}
+            {stockReport && (stockReport.expiringCount > 0 || stockReport.expiredCount > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {stockReport.expiredCount > 0 && (
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-pink-50 border-l-4 border-l-red-500">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                        <AlertTriangle className="w-5 h-5" />
+                        Expired Items ({stockReport.expiredCount})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {stockReport.expiredItems.slice(0, 5).map((item, index) => (
+                          <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-red-200">
+                            <div>
+                              <p className="font-medium text-sm">{item.name}</p>
+                              <p className="text-xs text-gray-500">Expired: {new Date(item.expiry_date).toLocaleDateString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-red-600">{item.quantity} {item.unit}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {stockReport.expiredItems.length > 5 && (
+                          <p className="text-xs text-gray-500 text-center">+{stockReport.expiredItems.length - 5} more expired items</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {stockReport.expiringCount > 0 && (
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-yellow-50 to-orange-50 border-l-4 border-l-yellow-500">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2 text-yellow-700">
+                        <Clock className="w-5 h-5" />
+                        Expiring Soon ({stockReport.expiringCount})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {stockReport.expiringItems.slice(0, 5).map((item, index) => (
+                          <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-yellow-200">
+                            <div>
+                              <p className="font-medium text-sm">{item.name}</p>
+                              <p className="text-xs text-gray-500">Expires: {new Date(item.expiry_date).toLocaleDateString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-yellow-600">{item.quantity} {item.unit}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {stockReport.expiringItems.length > 5 && (
+                          <p className="text-xs text-gray-500 text-center">+{stockReport.expiringItems.length - 5} more expiring items</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Low Stock Items */}
+            {stockReport && stockReport.lowStockCount > 0 && (
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
+                    Low Stock Items ({stockReport.lowStockCount})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 sm:space-y-3">
+                    {stockReport.lowStockItems.slice(0, 10).map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200"
+                      >
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
+                            !
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">{item.name}</p>
+                            <p className="text-xs sm:text-sm text-gray-500 truncate">
+                              Min required: {item.min_quantity} {item.unit}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-2">
+                          <p className="text-lg sm:text-2xl font-bold text-orange-600">
+                            {item.quantity} {item.unit}
+                          </p>
+                          <p className="text-[10px] sm:text-sm text-gray-500">
+                            ₹{(item.quantity * item.price_per_unit).toFixed(0)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {stockReport.lowStockItems.length > 10 && (
+                      <p className="text-center text-gray-500 text-sm">+{stockReport.lowStockItems.length - 10} more low stock items</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Stock by Category */}
+            {stockCategories && stockCategories.length > 0 && stockReport && (
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
+                    Stock by Category
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 sm:space-y-4">
+                    {stockCategories.map((category, index) => {
+                      const categoryItems = stockReport.inventory.filter(item => String(item.category_id) === String(category.id));
+                      const categoryValue = categoryItems.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0);
+                      const maxValue = Math.max(...stockCategories.map(cat => {
+                        const items = stockReport.inventory.filter(item => String(item.category_id) === String(cat.id));
+                        return items.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0);
+                      }));
+                      
+                      return (
+                        <div key={index} className="space-y-1.5 sm:space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }}></div>
+                              <span className="font-medium text-gray-900 truncate flex-1">{category.name}</span>
+                            </div>
+                            <span className="text-xs sm:text-sm text-gray-600 ml-2 flex-shrink-0">
+                              {categoryItems.length} items • ₹{categoryValue.toFixed(0)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="h-2 rounded-full"
+                              style={{
+                                backgroundColor: category.color,
+                                width: `${maxValue > 0 ? (categoryValue / maxValue) * 100 : 0}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Stock Export Options */}
+            <Card className="border-0 shadow-lg bg-gradient-to-r from-violet-50 to-purple-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
+                  Export Stock Report
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => handleExportStockReport('csv')}
+                    disabled={exportLoading || !stockReport}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600"
+                    size="sm"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
+                  <Button
+                    onClick={() => handleExportStockReport('pdf')}
+                    disabled={exportLoading || !stockReport}
+                    className="bg-gradient-to-r from-red-600 to-pink-600"
+                    size="sm"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export PDF
+                  </Button>
+                  <Button
+                    onClick={fetchStockReport}
+                    disabled={stockLoading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    {stockLoading ? 'Loading...' : 'Refresh'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Loading State */}
+            {stockLoading && (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="border-0 shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="animate-pulse space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                        <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!stockLoading && !stockReport && (
+              <Card className="border-0 shadow-lg">
+                <CardContent className="p-8 text-center">
+                  <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Stock Data Available</h3>
+                  <p className="text-gray-500 mb-4">Stock report will appear here once inventory data is available</p>
+                  <Button onClick={fetchStockReport} className="bg-gradient-to-r from-violet-600 to-purple-600">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Load Stock Report
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           {/* Staff Performance Tab */}
           <TabsContent value="staff" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
@@ -1817,9 +2480,21 @@ const ReportsPage = ({ user }) => {
           <TabsContent value="customers" className="space-y-4 sm:space-y-6">
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-2 sm:pb-4">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
-                  Customer Balance Management
+                <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
+                    Customer Balance Management
+                  </div>
+                  <Button
+                    onClick={fetchCustomerBalances}
+                    disabled={customerBalanceLoading}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${customerBalanceLoading ? 'animate-spin' : ''}`} />
+                    {customerBalanceLoading ? 'Loading...' : 'Refresh'}
+                  </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1840,6 +2515,11 @@ const ReportsPage = ({ user }) => {
                   </div>
                 ) : customerBalances && customerBalances.length > 0 ? (
                   <div className="space-y-2 sm:space-y-3">
+                    {/* Debug Info */}
+                    <div className="p-2 bg-blue-50 rounded-lg text-xs text-blue-700 mb-4">
+                      <strong>Debug:</strong> Found {customerBalances.length} customers with outstanding balances
+                    </div>
+
                     {/* Summary Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
                       <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
@@ -1931,8 +2611,31 @@ const ReportsPage = ({ user }) => {
                 ) : (
                   <div className="text-center py-8">
                     <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-sm">No customer balance data available yet</p>
-                    <p className="text-xs text-gray-400 mt-2">Customer balances will appear here when partial payments are made</p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Outstanding Customer Balances</h3>
+                    <div className="text-sm text-gray-500 space-y-2 max-w-md mx-auto">
+                      <p>Customer balances appear here when:</p>
+                      <ul className="text-left space-y-1">
+                        <li>• Customers make partial payments on orders</li>
+                        <li>• Orders are marked as "Credit" with pending amounts</li>
+                        <li>• Payment received is less than the total bill amount</li>
+                      </ul>
+                      <p className="mt-4 text-xs text-gray-400">
+                        Create credit orders from the Billing page to see customer balances here
+                      </p>
+                    </div>
+                    
+                    {/* Manual refresh button */}
+                    <div className="mt-6">
+                      <Button
+                        onClick={fetchCustomerBalances}
+                        disabled={customerBalanceLoading}
+                        variant="outline"
+                        className="mx-auto"
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${customerBalanceLoading ? 'animate-spin' : ''}`} />
+                        {customerBalanceLoading ? 'Checking...' : 'Check Again'}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

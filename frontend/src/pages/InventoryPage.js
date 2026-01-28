@@ -1,5 +1,4 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from 'react';
-import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import TrialBanner from '../components/TrialBanner';
@@ -20,9 +19,11 @@ import {
   Eye, Edit, Trash2, History, Bell, Target, Zap, Package2,
   ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, XCircle,
   Settings, Users, MapPin, Phone, Mail, Globe, Minus, X,
-  Sparkles, Activity, PieChart, Layers
+  Sparkles, Activity, PieChart, Layers, Grid, List, Star,
+  ExternalLink, Copy, QrCode, Warehouse, ShoppingBag
 } from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
+import { apiWithRetry, apiSilent } from '../utils/apiClient';
 
 const InventoryPage = ({ user }) => {
   const [inventory, setInventory] = useState([]);
@@ -46,6 +47,7 @@ const InventoryPage = ({ user }) => {
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [filterCategory, setFilterCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name');
@@ -58,18 +60,25 @@ const InventoryPage = ({ user }) => {
   const [stockAdjustQty, setStockAdjustQty] = useState('');
   const [stockAdjustReason, setStockAdjustReason] = useState('');
   const [businessSettings, setBusinessSettings] = useState(null);
+  const [bulkEditMode, setBulkEditMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+  const [expiryFilter, setExpiryFilter] = useState('all'); // 'all', 'expiring', 'expired'
+  const [stockLevelFilter, setStockLevelFilter] = useState('all'); // 'all', 'low', 'out', 'healthy'
   const [formData, setFormData] = useState({
     name: '', quantity: '', unit: '', min_quantity: '', max_quantity: '',
     price_per_unit: '', cost_price: '', category_id: '', supplier_id: '',
     sku: '', barcode: '', description: '', location: '', expiry_date: '',
-    batch_number: '', reorder_point: '', reorder_quantity: ''
+    batch_number: '', reorder_point: '', reorder_quantity: '', is_perishable: false,
+    storage_temperature: '', shelf_life_days: '', alert_before_expiry: 7
   });
   const [supplierFormData, setSupplierFormData] = useState({
     name: '', contact_person: '', phone: '', email: '', address: '',
-    website: '', payment_terms: '', notes: ''
+    website: '', payment_terms: '', notes: '', tax_id: '', credit_limit: ''
   });
   const [categoryFormData, setCategoryFormData] = useState({
-    name: '', description: '', color: '#7c3aed'
+    name: '', description: '', color: '#7c3aed', is_perishable: false, default_shelf_life: ''
   });
   const [movementFormData, setMovementFormData] = useState({
     item_id: '', type: 'in', quantity: '', reason: '', reference: '', notes: ''
@@ -77,18 +86,33 @@ const InventoryPage = ({ user }) => {
   const [purchaseFormData, setPurchaseFormData] = useState({
     supplier_id: '',
     purchase_date: new Date().toISOString().split('T')[0],
+    expected_delivery: '',
     notes: '',
-    items: [{ inventory_item_id: '', item_name: '', quantity: '', unit_cost: '' }]
+    items: [{ inventory_item_id: '', item_name: '', quantity: '', unit_cost: '', expiry_date: '', discount_percent: 0, discount_amount: 0, tax_percent: 0, tax_amount: 0 }],
+    // Additional charges and discounts
+    additional_charges: [{ description: '', amount: 0, tax_percent: 0 }],
+    overall_discount_percent: 0,
+    overall_discount_amount: 0,
+    shipping_charges: 0,
+    handling_charges: 0,
+    other_charges: 0,
+    // Tax settings
+    tax_inclusive: false,
+    round_off: 0,
+    payment_terms: '',
+    reference_number: ''
   });
 
+  // Debounced search for better performance
   useEffect(() => {
-    console.log('InventoryPage mounted, user:', user);
-    console.log('User role:', user?.role);
-    console.log('Auth token exists:', !!localStorage.getItem('token'));
-    
-    // Check if user is authenticated
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
     if (!user) {
-      console.warn('InventoryPage: No user provided');
       setError('Please login to access inventory');
       setLoading(false);
       return;
@@ -100,7 +124,6 @@ const InventoryPage = ({ user }) => {
         Promise.all([fetchCategories(), fetchSuppliers(), fetchBusinessSettings()]);
         setTimeout(() => { fetchLowStock(); fetchStockMovements(); fetchAnalytics(); fetchPurchases(); }, 100);
       } catch (err) {
-        console.error('Error loading inventory data:', err);
         setError('Failed to load inventory data');
         setLoading(false);
       }
@@ -110,50 +133,44 @@ const InventoryPage = ({ user }) => {
 
   const fetchBusinessSettings = async () => {
     try {
-      const response = await axios.get(`${API}/business/settings`);
+      const response = await apiWithRetry({
+        method: 'get',
+        url: `${API}/business/settings`,
+        timeout: 10000
+      });
       setBusinessSettings(response.data.business_settings);
-    } catch (error) { console.error('Failed to fetch business settings', error); }
+    } catch (error) {
+      // Business settings are optional
+    }
   };
 
-  const fetchInventory = async () => {
+  const fetchInventory = async (showRefreshIndicator = false) => {
     try {
-      console.log('Fetching inventory...');
-      setLoading(true); setError(null);
+      setLoading(true);
+      setError(null);
       
-      // Check if user is authenticated
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required. Please login again.');
-      }
-      
-      const response = await axios.get(`${API}/inventory`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await apiWithRetry({
+        method: 'get',
+        url: `${API}/inventory`,
+        timeout: 15000
       });
       
-      console.log('Inventory fetch successful:', response.data.length, 'items');
       setInventory(response.data);
+      
+      if (showRefreshIndicator) {
+        toast.success('Inventory refreshed successfully!');
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Inventory fetch error:', error);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
-      
       let errorMessage = 'Failed to fetch inventory';
       
       if (error.response?.status === 401) {
         errorMessage = 'Authentication required. Please login again.';
-        // Optionally redirect to login
-        // window.location.href = '/login';
       } else if (error.response?.status === 403) {
         errorMessage = 'Not authorized to view inventory.';
-      } else if (error.response?.status === 500) {
-        errorMessage = 'Server error. Please try again later.';
       } else if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
       }
       
       setError(errorMessage);
@@ -164,78 +181,80 @@ const InventoryPage = ({ user }) => {
     }
   };
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  };
-
   const fetchLowStock = async () => {
     try {
-      const response = await axios.get(`${API}/inventory/low-stock`, {
-        headers: getAuthHeaders()
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/inventory/low-stock`,
+        timeout: 10000
       });
       setLowStock(response.data);
-    } catch (error) { 
-      console.error('Failed to fetch low stock:', error.response?.status, error.response?.data);
+    } catch (error) {
+      // Low stock is optional data
     }
   };
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get(`${API}/inventory/suppliers`, {
-        headers: getAuthHeaders()
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/inventory/suppliers`,
+        timeout: 10000
       });
       setSuppliers(response.data || []);
-    } catch (error) { 
-      console.error('Failed to fetch suppliers:', error.response?.status, error.response?.data);
+    } catch (error) {
       setSuppliers([]); 
     }
   };
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API}/inventory/categories`, {
-        headers: getAuthHeaders()
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/inventory/categories`,
+        timeout: 10000
       });
       setCategories(response.data || []);
-    } catch (error) { 
-      console.error('Failed to fetch categories:', error.response?.status, error.response?.data);
+    } catch (error) {
       setCategories([]); 
     }
   };
 
   const fetchStockMovements = async () => {
     try {
-      const response = await axios.get(`${API}/inventory/movements`, {
-        headers: getAuthHeaders()
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/inventory/movements`,
+        timeout: 10000
       });
       setStockMovements(response.data || []);
-    } catch (error) { 
-      console.error('Failed to fetch stock movements:', error.response?.status, error.response?.data);
+    } catch (error) {
       setStockMovements([]); 
     }
   };
 
   const fetchAnalytics = async () => {
     try {
-      const response = await axios.get(`${API}/inventory/analytics`, {
-        headers: getAuthHeaders()
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/inventory/analytics`,
+        timeout: 10000
       });
       setAnalytics(response.data || {});
-    } catch (error) { 
-      console.error('Failed to fetch analytics:', error.response?.status, error.response?.data);
+    } catch (error) {
       setAnalytics({}); 
     }
   };
 
   const fetchPurchases = async () => {
     try {
-      const response = await axios.get(`${API}/inventory/purchases`, {
-        headers: getAuthHeaders()
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/inventory/purchases`,
+        timeout: 10000
       });
       setPurchases(response.data || []);
-    } catch (error) { 
-      console.error('Failed to fetch purchases:', error.response?.status, error.response?.data);
+    } catch (error) {
       setPurchases([]); 
     }
   };
@@ -243,84 +262,48 @@ const InventoryPage = ({ user }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    console.log('Form submission started', formData);
-    console.log('User role:', user?.role);
-    
-    // Comprehensive validation with specific error messages
+    // Enhanced validation
     const validationErrors = [];
     
-    // Validate name (required, non-empty)
     if (!formData.name?.trim()) {
       validationErrors.push('Item name is required');
     } else if (formData.name.trim().length < 2) {
       validationErrors.push('Item name must be at least 2 characters');
     }
     
-    // Validate quantity (required, non-negative number)
     const quantity = parseFloat(formData.quantity);
-    if (formData.quantity === '' || formData.quantity === null || formData.quantity === undefined) {
-      validationErrors.push('Quantity is required');
-    } else if (isNaN(quantity)) {
-      validationErrors.push('Quantity must be a valid number');
-    } else if (quantity < 0) {
-      validationErrors.push('Quantity cannot be negative');
+    if (formData.quantity === '' || isNaN(quantity) || quantity < 0) {
+      validationErrors.push('Valid quantity is required');
     }
     
-    // Validate unit (required, non-empty)
     if (!formData.unit?.trim()) {
       validationErrors.push('Unit is required (e.g., kg, liters, pieces)');
     }
     
-    // Validate min_quantity (required, non-negative number)
     const minQuantity = parseFloat(formData.min_quantity);
-    if (formData.min_quantity === '' || formData.min_quantity === null || formData.min_quantity === undefined) {
-      validationErrors.push('Minimum quantity is required');
-    } else if (isNaN(minQuantity)) {
-      validationErrors.push('Minimum quantity must be a valid number');
-    } else if (minQuantity < 0) {
-      validationErrors.push('Minimum quantity cannot be negative');
+    if (formData.min_quantity === '' || isNaN(minQuantity) || minQuantity < 0) {
+      validationErrors.push('Valid minimum quantity is required');
     }
     
-    // Validate price_per_unit (required, positive number)
     const pricePerUnit = parseFloat(formData.price_per_unit);
-    if (formData.price_per_unit === '' || formData.price_per_unit === null || formData.price_per_unit === undefined) {
-      validationErrors.push('Selling price is required');
-    } else if (isNaN(pricePerUnit)) {
-      validationErrors.push('Selling price must be a valid number');
-    } else if (pricePerUnit <= 0) {
-      validationErrors.push('Selling price must be greater than 0');
+    if (formData.price_per_unit === '' || isNaN(pricePerUnit) || pricePerUnit <= 0) {
+      validationErrors.push('Valid selling price is required');
     }
     
-    // Validate optional numeric fields if provided
+    // Validate optional numeric fields
     if (formData.max_quantity && isNaN(parseFloat(formData.max_quantity))) {
       validationErrors.push('Maximum quantity must be a valid number');
     }
     if (formData.cost_price && isNaN(parseFloat(formData.cost_price))) {
       validationErrors.push('Cost price must be a valid number');
     }
-    if (formData.reorder_point && isNaN(parseFloat(formData.reorder_point))) {
-      validationErrors.push('Reorder point must be a valid number');
-    }
-    if (formData.reorder_quantity && isNaN(parseFloat(formData.reorder_quantity))) {
-      validationErrors.push('Reorder quantity must be a valid number');
-    }
     
-    // Display validation errors
     if (validationErrors.length > 0) {
       validationErrors.forEach(error => toast.error(error));
-      console.error('Validation errors:', validationErrors);
       return;
     }
 
     try {
-      // Check authentication
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-
-      // Prepare data with proper type conversion
       const submitData = {
         name: formData.name.trim(),
         quantity: parseFloat(formData.quantity) || 0,
@@ -339,24 +322,27 @@ const InventoryPage = ({ user }) => {
         location: formData.location?.trim() || null,
         expiry_date: formData.expiry_date || null,
         batch_number: formData.batch_number?.trim() || null,
-      };
-
-      console.log('Submitting data:', submitData);
-
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        is_perishable: formData.is_perishable || false,
+        storage_temperature: formData.storage_temperature?.trim() || null,
+        shelf_life_days: formData.shelf_life_days ? parseInt(formData.shelf_life_days) : null,
+        alert_before_expiry: formData.alert_before_expiry ? parseInt(formData.alert_before_expiry) : 7
       };
 
       if (editingItem) {
-        const response = await axios.put(`${API}/inventory/${editingItem.id}`, submitData, config);
-        console.log('Update response:', response.data);
+        await apiWithRetry({
+          method: 'put',
+          url: `${API}/inventory/${editingItem.id}`,
+          data: submitData,
+          timeout: 15000
+        });
         toast.success('Inventory item updated successfully!');
       } else {
-        const response = await axios.post(`${API}/inventory`, submitData, config);
-        console.log('Create response:', response.data);
+        await apiWithRetry({
+          method: 'post',
+          url: `${API}/inventory`,
+          data: submitData,
+          timeout: 15000
+        });
         toast.success('Inventory item created successfully!');
       }
       
@@ -366,27 +352,15 @@ const InventoryPage = ({ user }) => {
       setLowStock(lowStockItems);
       resetForm();
       
-    } catch (error) { 
-      console.error('Inventory save error:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
+    } catch (error) {
       let errorMessage = 'Failed to save inventory item';
       
       if (error.response?.status === 401) {
         errorMessage = 'Authentication required. Please login again.';
       } else if (error.response?.status === 403) {
-        errorMessage = 'Not authorized to perform this action. Check your user role.';
-      } else if (error.response?.status === 422) {
-        errorMessage = 'Invalid data provided. Please check all fields.';
-      } else if (error.response?.status === 500) {
-        errorMessage = 'Server error. Please try again later.';
+        errorMessage = 'Not authorized to perform this action.';
       } else if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
       }
       
       toast.error(errorMessage);
@@ -395,100 +369,165 @@ const InventoryPage = ({ user }) => {
 
   const handleSupplierSubmit = async (e) => {
     e.preventDefault();
+    
+    // Enhanced validation
+    if (!supplierFormData.name?.trim()) {
+      toast.error('Supplier name is required');
+      return;
+    }
+    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-      
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const submitData = {
+        name: supplierFormData.name.trim(),
+        contact_person: supplierFormData.contact_person?.trim() || null,
+        phone: supplierFormData.phone?.trim() || null,
+        email: supplierFormData.email?.trim() || null,
+        address: supplierFormData.address?.trim() || null,
+        website: supplierFormData.website?.trim() || null,
+        payment_terms: supplierFormData.payment_terms || null,
+        notes: supplierFormData.notes?.trim() || null,
+        tax_id: supplierFormData.tax_id?.trim() || null,
+        credit_limit: supplierFormData.credit_limit ? parseFloat(supplierFormData.credit_limit) : null
       };
       
       if (editingSupplier) {
-        await axios.put(`${API}/inventory/suppliers/${editingSupplier.id}`, supplierFormData, config);
-        toast.success('Supplier updated!');
+        await apiWithRetry({
+          method: 'put',
+          url: `${API}/inventory/suppliers/${editingSupplier.id}`,
+          data: submitData,
+          timeout: 15000
+        });
+        toast.success('Supplier updated successfully!');
       } else {
-        await axios.post(`${API}/inventory/suppliers`, supplierFormData, config);
-        toast.success('Supplier created!');
+        await apiWithRetry({
+          method: 'post',
+          url: `${API}/inventory/suppliers`,
+          data: submitData,
+          timeout: 15000
+        });
+        toast.success('Supplier created successfully!');
       }
+      
       setSupplierDialogOpen(false);
       fetchSuppliers();
       resetSupplierForm();
     } catch (error) { 
-      console.error('Supplier save error:', error.response?.status, error.response?.data);
-      let errorMessage = error.response?.data?.detail || 'Failed to save supplier';
-      if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-      if (error.response?.status === 403) errorMessage = 'Not authorized to perform this action.';
+      let errorMessage = 'Failed to save supplier';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to perform this action.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       toast.error(errorMessage);
     }
   };
 
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
+    
+    // Enhanced validation
+    if (!categoryFormData.name?.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-      
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const submitData = {
+        name: categoryFormData.name.trim(),
+        description: categoryFormData.description?.trim() || null,
+        color: categoryFormData.color || '#7c3aed',
+        is_perishable: categoryFormData.is_perishable || false,
+        default_shelf_life: categoryFormData.default_shelf_life ? parseInt(categoryFormData.default_shelf_life) : null
       };
       
       if (editingCategory) {
-        await axios.put(`${API}/inventory/categories/${editingCategory.id}`, categoryFormData, config);
-        toast.success('Category updated!');
+        await apiWithRetry({
+          method: 'put',
+          url: `${API}/inventory/categories/${editingCategory.id}`,
+          data: submitData,
+          timeout: 15000
+        });
+        toast.success('Category updated successfully!');
       } else {
-        await axios.post(`${API}/inventory/categories`, categoryFormData, config);
-        toast.success('Category created!');
+        await apiWithRetry({
+          method: 'post',
+          url: `${API}/inventory/categories`,
+          data: submitData,
+          timeout: 15000
+        });
+        toast.success('Category created successfully!');
       }
+      
       setCategoryDialogOpen(false);
       fetchCategories();
       resetCategoryForm();
     } catch (error) { 
-      console.error('Category save error:', error.response?.status, error.response?.data);
-      let errorMessage = error.response?.data?.detail || 'Failed to save category';
-      if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-      if (error.response?.status === 403) errorMessage = 'Not authorized to perform this action.';
+      let errorMessage = 'Failed to save category';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to perform this action.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       toast.error(errorMessage);
     }
   };
 
   const handleMovementSubmit = async (e) => {
     e.preventDefault();
+    
+    // Enhanced validation
+    if (!movementFormData.item_id) {
+      toast.error('Please select an item');
+      return;
+    }
+    
+    if (!movementFormData.quantity || parseFloat(movementFormData.quantity) <= 0) {
+      toast.error('Please enter a valid quantity');
+      return;
+    }
+    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-      
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const submitData = {
+        item_id: movementFormData.item_id,
+        type: movementFormData.type,
+        quantity: parseFloat(movementFormData.quantity),
+        reason: movementFormData.reason?.trim() || null,
+        reference: movementFormData.reference?.trim() || null,
+        notes: movementFormData.notes?.trim() || null
       };
       
-      await axios.post(`${API}/inventory/movements`, movementFormData, config);
-      toast.success('Stock movement recorded!');
+      await apiWithRetry({
+        method: 'post',
+        url: `${API}/inventory/movements`,
+        data: submitData,
+        timeout: 15000
+      });
+      
+      toast.success('Stock movement recorded successfully!');
       setMovementDialogOpen(false);
-      fetchInventory(); fetchStockMovements(); fetchAnalytics();
+      fetchInventory(); 
+      fetchStockMovements(); 
+      fetchAnalytics();
       resetMovementForm();
     } catch (error) { 
-      console.error('Movement save error:', error.response?.status, error.response?.data);
-      let errorMessage = error.response?.data?.detail || 'Failed to record movement';
-      if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-      if (error.response?.status === 403) errorMessage = 'Not authorized to perform this action.';
+      let errorMessage = 'Failed to record movement';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to perform this action.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       toast.error(errorMessage);
     }
   };
@@ -496,7 +535,7 @@ const InventoryPage = ({ user }) => {
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate form
+    // Enhanced validation
     if (!purchaseFormData.supplier_id) {
       toast.error('Please select a supplier');
       return;
@@ -518,36 +557,64 @@ const InventoryPage = ({ user }) => {
     }
     
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-      
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      };
+      // Calculate totals
+      const calculations = calculatePurchaseTotal();
       
       // Prepare submission data
       const submitData = {
         supplier_id: purchaseFormData.supplier_id,
         purchase_date: purchaseFormData.purchase_date,
-        notes: purchaseFormData.notes || null,
+        expected_delivery: purchaseFormData.expected_delivery || null,
+        reference_number: purchaseFormData.reference_number?.trim() || null,
+        payment_terms: purchaseFormData.payment_terms || null,
+        tax_inclusive: purchaseFormData.tax_inclusive || false,
+        notes: purchaseFormData.notes?.trim() || null,
+        
+        // Financial details
+        items_subtotal: calculations.itemsSubtotal,
+        total_item_discounts: calculations.totalItemDiscounts,
+        overall_discount_percent: parseFloat(purchaseFormData.overall_discount_percent) || 0,
+        overall_discount_amount: calculations.overallDiscount,
+        total_taxes: calculations.totalItemTaxes,
+        shipping_charges: parseFloat(purchaseFormData.shipping_charges) || 0,
+        handling_charges: parseFloat(purchaseFormData.handling_charges) || 0,
+        other_charges: parseFloat(purchaseFormData.other_charges) || 0,
+        additional_charges_total: calculations.totalAdditionalCharges,
+        round_off: parseFloat(purchaseFormData.round_off) || 0,
+        final_total: calculations.finalTotal,
+        
+        // Items with detailed calculations
         items: validItems.map(item => ({
           inventory_item_id: item.inventory_item_id,
           item_name: item.item_name,
           quantity: parseFloat(item.quantity),
-          unit_cost: parseFloat(item.unit_cost)
+          unit_cost: parseFloat(item.unit_cost),
+          subtotal: parseFloat(item.quantity) * parseFloat(item.unit_cost),
+          discount_percent: parseFloat(item.discount_percent) || 0,
+          discount_amount: parseFloat(item.discount_amount) || 0,
+          tax_percent: parseFloat(item.tax_percent) || 0,
+          tax_amount: parseFloat(item.tax_amount) || 0,
+          taxable_amount: (parseFloat(item.quantity) * parseFloat(item.unit_cost)) - (parseFloat(item.discount_amount) || 0),
+          line_total: (parseFloat(item.quantity) * parseFloat(item.unit_cost)) - (parseFloat(item.discount_amount) || 0) + (parseFloat(item.tax_amount) || 0),
+          expiry_date: item.expiry_date || null
+        })),
+        
+        // Additional charges
+        additional_charges: purchaseFormData.additional_charges.filter(charge => charge.description && charge.amount).map(charge => ({
+          description: charge.description.trim(),
+          amount: parseFloat(charge.amount),
+          tax_percent: parseFloat(charge.tax_percent) || 0,
+          tax_amount: (parseFloat(charge.amount) * (parseFloat(charge.tax_percent) || 0)) / 100,
+          total_amount: parseFloat(charge.amount) + ((parseFloat(charge.amount) * (parseFloat(charge.tax_percent) || 0)) / 100)
         }))
       };
       
-      console.log('Submitting purchase order:', submitData);
-      
-      const response = await axios.post(`${API}/inventory/purchases`, submitData, config);
-      console.log('Purchase order created:', response.data);
+      const response = await apiWithRetry({
+        method: 'post',
+        url: `${API}/inventory/purchases`,
+        data: submitData,
+        timeout: 20000
+      });
       
       toast.success('Purchase order created successfully! Stock quantities updated.');
       setPurchaseDialogOpen(false);
@@ -560,30 +627,43 @@ const InventoryPage = ({ user }) => {
       fetchStockMovements();
       
     } catch (error) {
-      console.error('Purchase order error:', error.response?.status, error.response?.data);
-      let errorMessage = error.response?.data?.detail || 'Failed to create purchase order';
-      if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-      if (error.response?.status === 403) errorMessage = 'Not authorized to create purchase orders.';
+      let errorMessage = 'Failed to create purchase order';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to create purchase orders.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       toast.error(errorMessage);
     }
   };
 
   const resetForm = () => {
-    setFormData({ name: '', quantity: '', unit: '', min_quantity: '', max_quantity: '',
+    setFormData({ 
+      name: '', quantity: '', unit: '', min_quantity: '', max_quantity: '',
       price_per_unit: '', cost_price: '', category_id: '', supplier_id: '', sku: '',
       barcode: '', description: '', location: '', expiry_date: '', batch_number: '',
-      reorder_point: '', reorder_quantity: '' });
+      reorder_point: '', reorder_quantity: '', is_perishable: false,
+      storage_temperature: '', shelf_life_days: '', alert_before_expiry: 7
+    });
     setEditingItem(null);
   };
 
   const resetSupplierForm = () => {
-    setSupplierFormData({ name: '', contact_person: '', phone: '', email: '', address: '',
-      website: '', payment_terms: '', notes: '' });
+    setSupplierFormData({ 
+      name: '', contact_person: '', phone: '', email: '', address: '',
+      website: '', payment_terms: '', notes: '', tax_id: '', credit_limit: ''
+    });
     setEditingSupplier(null);
   };
 
   const resetCategoryForm = () => {
-    setCategoryFormData({ name: '', description: '', color: '#7c3aed' });
+    setCategoryFormData({ 
+      name: '', description: '', color: '#7c3aed', is_perishable: false, default_shelf_life: ''
+    });
     setEditingCategory(null);
   };
 
@@ -595,16 +675,47 @@ const InventoryPage = ({ user }) => {
     setPurchaseFormData({
       supplier_id: '',
       purchase_date: new Date().toISOString().split('T')[0],
+      expected_delivery: '',
       notes: '',
-      items: [{ inventory_item_id: '', item_name: '', quantity: '', unit_cost: '' }]
+      items: [{ inventory_item_id: '', item_name: '', quantity: '', unit_cost: '', expiry_date: '', discount_percent: 0, discount_amount: 0, tax_percent: 0, tax_amount: 0 }],
+      additional_charges: [{ description: '', amount: 0, tax_percent: 0 }],
+      overall_discount_percent: 0,
+      overall_discount_amount: 0,
+      shipping_charges: 0,
+      handling_charges: 0,
+      other_charges: 0,
+      tax_inclusive: false,
+      round_off: 0,
+      payment_terms: '',
+      reference_number: ''
     });
   };
 
   const addPurchaseItem = () => {
     setPurchaseFormData({
       ...purchaseFormData,
-      items: [...purchaseFormData.items, { inventory_item_id: '', item_name: '', quantity: '', unit_cost: '' }]
+      items: [...purchaseFormData.items, { inventory_item_id: '', item_name: '', quantity: '', unit_cost: '', expiry_date: '', discount_percent: 0, discount_amount: 0, tax_percent: 0, tax_amount: 0 }]
     });
+  };
+
+  const addAdditionalCharge = () => {
+    setPurchaseFormData({
+      ...purchaseFormData,
+      additional_charges: [...purchaseFormData.additional_charges, { description: '', amount: 0, tax_percent: 0 }]
+    });
+  };
+
+  const removeAdditionalCharge = (index) => {
+    if (purchaseFormData.additional_charges.length > 1) {
+      const newCharges = purchaseFormData.additional_charges.filter((_, i) => i !== index);
+      setPurchaseFormData({ ...purchaseFormData, additional_charges: newCharges });
+    }
+  };
+
+  const updateAdditionalCharge = (index, field, value) => {
+    const newCharges = [...purchaseFormData.additional_charges];
+    newCharges[index] = { ...newCharges[index], [field]: value };
+    setPurchaseFormData({ ...purchaseFormData, additional_charges: newCharges });
   };
 
   const removePurchaseItem = (index) => {
@@ -623,31 +734,127 @@ const InventoryPage = ({ user }) => {
       const selectedItem = inventory.find(item => String(item.id) === String(value));
       if (selectedItem) {
         newItems[index].item_name = selectedItem.name;
+        // Auto-fill tax rate if available
+        newItems[index].tax_percent = selectedItem.tax_rate || 0;
       }
+    }
+    
+    // Calculate item-wise discount and tax
+    if (field === 'quantity' || field === 'unit_cost' || field === 'discount_percent' || field === 'discount_amount' || field === 'tax_percent') {
+      const item = newItems[index];
+      const quantity = parseFloat(item.quantity) || 0;
+      const unitCost = parseFloat(item.unit_cost) || 0;
+      const subtotal = quantity * unitCost;
+      
+      // Calculate discount
+      if (field === 'discount_percent') {
+        item.discount_amount = (subtotal * parseFloat(value)) / 100;
+      } else if (field === 'discount_amount') {
+        item.discount_percent = subtotal > 0 ? (parseFloat(value) / subtotal) * 100 : 0;
+      }
+      
+      const discountAmount = parseFloat(item.discount_amount) || 0;
+      const taxableAmount = subtotal - discountAmount;
+      
+      // Calculate tax
+      const taxPercent = parseFloat(item.tax_percent) || 0;
+      item.tax_amount = (taxableAmount * taxPercent) / 100;
     }
     
     setPurchaseFormData({ ...purchaseFormData, items: newItems });
   };
 
   const calculatePurchaseTotal = () => {
-    return purchaseFormData.items.reduce((sum, item) => {
+    // Calculate items subtotal
+    const itemsSubtotal = purchaseFormData.items.reduce((sum, item) => {
       const qty = parseFloat(item.quantity) || 0;
       const cost = parseFloat(item.unit_cost) || 0;
       return sum + (qty * cost);
     }, 0);
+    
+    // Calculate total item discounts
+    const totalItemDiscounts = purchaseFormData.items.reduce((sum, item) => {
+      return sum + (parseFloat(item.discount_amount) || 0);
+    }, 0);
+    
+    // Calculate taxable amount after item discounts
+    const taxableAmountAfterItemDiscounts = itemsSubtotal - totalItemDiscounts;
+    
+    // Apply overall discount
+    const overallDiscountPercent = parseFloat(purchaseFormData.overall_discount_percent) || 0;
+    const overallDiscountAmount = parseFloat(purchaseFormData.overall_discount_amount) || 0;
+    
+    let finalOverallDiscount = 0;
+    if (overallDiscountPercent > 0) {
+      finalOverallDiscount = (taxableAmountAfterItemDiscounts * overallDiscountPercent) / 100;
+    } else {
+      finalOverallDiscount = overallDiscountAmount;
+    }
+    
+    const taxableAmountAfterAllDiscounts = taxableAmountAfterItemDiscounts - finalOverallDiscount;
+    
+    // Calculate total item taxes
+    const totalItemTaxes = purchaseFormData.items.reduce((sum, item) => {
+      return sum + (parseFloat(item.tax_amount) || 0);
+    }, 0);
+    
+    // Calculate additional charges
+    const shippingCharges = parseFloat(purchaseFormData.shipping_charges) || 0;
+    const handlingCharges = parseFloat(purchaseFormData.handling_charges) || 0;
+    const otherCharges = parseFloat(purchaseFormData.other_charges) || 0;
+    
+    const additionalChargesTotal = purchaseFormData.additional_charges.reduce((sum, charge) => {
+      const amount = parseFloat(charge.amount) || 0;
+      const taxPercent = parseFloat(charge.tax_percent) || 0;
+      const taxAmount = (amount * taxPercent) / 100;
+      return sum + amount + taxAmount;
+    }, 0);
+    
+    const totalAdditionalCharges = shippingCharges + handlingCharges + otherCharges + additionalChargesTotal;
+    
+    // Calculate round off
+    const roundOff = parseFloat(purchaseFormData.round_off) || 0;
+    
+    // Final total
+    const finalTotal = taxableAmountAfterAllDiscounts + totalItemTaxes + totalAdditionalCharges + roundOff;
+    
+    return {
+      itemsSubtotal,
+      totalItemDiscounts,
+      overallDiscount: finalOverallDiscount,
+      taxableAmount: taxableAmountAfterAllDiscounts,
+      totalItemTaxes,
+      totalAdditionalCharges,
+      roundOff,
+      finalTotal
+    };
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
-    setFormData({ name: item.name, quantity: item.quantity, unit: item.unit,
-      min_quantity: item.min_quantity, max_quantity: item.max_quantity || '',
-      price_per_unit: item.price_per_unit, cost_price: item.cost_price || '',
+    setFormData({ 
+      name: item.name, 
+      quantity: item.quantity, 
+      unit: item.unit,
+      min_quantity: item.min_quantity, 
+      max_quantity: item.max_quantity || '',
+      price_per_unit: item.price_per_unit, 
+      cost_price: item.cost_price || '',
       category_id: item.category_id ? String(item.category_id) : '', 
       supplier_id: item.supplier_id ? String(item.supplier_id) : '',
-      sku: item.sku || '', barcode: item.barcode || '', description: item.description || '',
-      location: item.location || '', expiry_date: item.expiry_date || '',
-      batch_number: item.batch_number || '', reorder_point: item.reorder_point || '',
-      reorder_quantity: item.reorder_quantity || '' });
+      sku: item.sku || '', 
+      barcode: item.barcode || '', 
+      description: item.description || '',
+      location: item.location || '', 
+      expiry_date: item.expiry_date || '',
+      batch_number: item.batch_number || '', 
+      reorder_point: item.reorder_point || '',
+      reorder_quantity: item.reorder_quantity || '',
+      is_perishable: item.is_perishable || false,
+      storage_temperature: item.storage_temperature || '',
+      shelf_life_days: item.shelf_life_days || '',
+      alert_before_expiry: item.alert_before_expiry || 7
+    });
     setDialogOpen(true);
   };
 
@@ -670,24 +877,27 @@ const InventoryPage = ({ user }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Authentication required. Please login again.');
-          return;
-        }
-        
-        await axios.delete(`${API}/inventory/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        await apiWithRetry({
+          method: 'delete',
+          url: `${API}/inventory/${id}`,
+          timeout: 15000
         });
+        
         toast.success('Item deleted successfully');
         const updatedInventory = inventory.filter(item => item.id !== id);
         setInventory(updatedInventory);
         setLowStock(updatedInventory.filter(item => item.quantity <= item.min_quantity));
       } catch (error) { 
-        console.error('Delete error:', error.response?.status, error.response?.data);
         let errorMessage = 'Failed to delete item';
-        if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-        if (error.response?.status === 403) errorMessage = 'Not authorized to delete this item.';
+        
+        if (error.response?.status === 401) {
+          errorMessage = 'Authentication required. Please login again.';
+        } else if (error.response?.status === 403) {
+          errorMessage = 'Not authorized to delete this item.';
+        } else if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail;
+        }
+        
         toast.error(errorMessage);
       }
     }
@@ -696,22 +906,25 @@ const InventoryPage = ({ user }) => {
   const handleDeleteSupplier = async (id) => {
     if (window.confirm('Delete this supplier?')) {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Authentication required. Please login again.');
-          return;
-        }
-        
-        await axios.delete(`${API}/inventory/suppliers/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        await apiWithRetry({
+          method: 'delete',
+          url: `${API}/inventory/suppliers/${id}`,
+          timeout: 15000
         });
-        toast.success('Supplier deleted!');
+        
+        toast.success('Supplier deleted successfully!');
         fetchSuppliers();
       } catch (error) { 
-        console.error('Delete supplier error:', error.response?.status, error.response?.data);
         let errorMessage = 'Failed to delete supplier';
-        if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-        if (error.response?.status === 403) errorMessage = 'Not authorized to delete this supplier.';
+        
+        if (error.response?.status === 401) {
+          errorMessage = 'Authentication required. Please login again.';
+        } else if (error.response?.status === 403) {
+          errorMessage = 'Not authorized to delete this supplier.';
+        } else if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail;
+        }
+        
         toast.error(errorMessage);
       }
     }
@@ -720,47 +933,141 @@ const InventoryPage = ({ user }) => {
   const handleDeleteCategory = async (id) => {
     if (window.confirm('Delete this category?')) {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Authentication required. Please login again.');
-          return;
-        }
-        
-        await axios.delete(`${API}/inventory/categories/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        await apiWithRetry({
+          method: 'delete',
+          url: `${API}/inventory/categories/${id}`,
+          timeout: 15000
         });
-        toast.success('Category deleted!');
+        
+        toast.success('Category deleted successfully!');
         fetchCategories();
       } catch (error) { 
-        console.error('Delete category error:', error.response?.status, error.response?.data);
         let errorMessage = 'Failed to delete category';
-        if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-        if (error.response?.status === 403) errorMessage = 'Not authorized to delete this category.';
+        
+        if (error.response?.status === 401) {
+          errorMessage = 'Authentication required. Please login again.';
+        } else if (error.response?.status === 403) {
+          errorMessage = 'Not authorized to delete this category.';
+        } else if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail;
+        }
+        
         toast.error(errorMessage);
       }
     }
   };
 
+  // Enhanced filtered and sorted inventory with multiple filters
   const filteredAndSortedInventory = useMemo(() => {
-    return inventory
-      .filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (item.barcode && item.barcode.includes(searchTerm));
-        const matchesLowStock = filterLowStock ? item.quantity <= item.min_quantity : true;
-        // Compare as strings to handle type mismatches
-        const matchesCategory = filterCategory && filterCategory !== 'all' 
-          ? String(item.category_id) === String(filterCategory) 
-          : true;
-        return matchesSearch && matchesLowStock && matchesCategory;
-      })
-      .sort((a, b) => {
-        let aValue = a[sortBy], bValue = b[sortBy];
-        if (sortBy === 'total_value') { aValue = a.quantity * a.price_per_unit; bValue = b.quantity * b.price_per_unit; }
-        if (typeof aValue === 'string') { aValue = aValue.toLowerCase(); bValue = bValue.toLowerCase(); }
-        return sortOrder === 'asc' ? (aValue > bValue ? 1 : -1) : (aValue < bValue ? 1 : -1);
+    let filtered = inventory;
+
+    // Search filter
+    if (debouncedSearchTerm.trim()) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchLower) ||
+        (item.sku && item.sku.toLowerCase().includes(searchLower)) ||
+        (item.barcode && item.barcode.includes(searchLower)) ||
+        (item.description && item.description.toLowerCase().includes(searchLower)) ||
+        (item.location && item.location.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Category filter
+    if (filterCategory && filterCategory !== 'all') {
+      filtered = filtered.filter(item => String(item.category_id) === String(filterCategory));
+    }
+
+    // Stock level filter
+    if (stockLevelFilter !== 'all') {
+      filtered = filtered.filter(item => {
+        switch (stockLevelFilter) {
+          case 'low':
+            return item.quantity <= item.min_quantity && item.quantity > 0;
+          case 'out':
+            return item.quantity <= 0;
+          case 'healthy':
+            return item.quantity > item.min_quantity;
+          default:
+            return true;
+        }
       });
-  }, [inventory, searchTerm, filterLowStock, filterCategory, sortBy, sortOrder]);
+    }
+
+    // Legacy low stock filter (for backward compatibility)
+    if (filterLowStock) {
+      filtered = filtered.filter(item => item.quantity <= item.min_quantity);
+    }
+
+    // Price range filter
+    if (priceRange.min !== '') {
+      filtered = filtered.filter(item => parseFloat(item.price_per_unit) >= parseFloat(priceRange.min));
+    }
+    if (priceRange.max !== '') {
+      filtered = filtered.filter(item => parseFloat(item.price_per_unit) <= parseFloat(priceRange.max));
+    }
+
+    // Expiry filter
+    if (expiryFilter !== 'all') {
+      const today = new Date();
+      const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+      
+      filtered = filtered.filter(item => {
+        if (!item.expiry_date) return expiryFilter === 'all';
+        const expiryDate = new Date(item.expiry_date);
+        
+        switch (expiryFilter) {
+          case 'expiring':
+            return expiryDate > today && expiryDate <= thirtyDaysFromNow;
+          case 'expired':
+            return expiryDate <= today;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Sort items
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'price_per_unit':
+          aValue = parseFloat(a.price_per_unit) || 0;
+          bValue = parseFloat(b.price_per_unit) || 0;
+          break;
+        case 'quantity':
+          aValue = parseFloat(a.quantity) || 0;
+          bValue = parseFloat(b.quantity) || 0;
+          break;
+        case 'total_value':
+          aValue = (parseFloat(a.quantity) || 0) * (parseFloat(a.price_per_unit) || 0);
+          bValue = (parseFloat(b.quantity) || 0) * (parseFloat(b.price_per_unit) || 0);
+          break;
+        case 'expiry_date':
+          aValue = a.expiry_date ? new Date(a.expiry_date) : new Date('9999-12-31');
+          bValue = b.expiry_date ? new Date(b.expiry_date) : new Date('9999-12-31');
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at || 0);
+          bValue = new Date(b.created_at || 0);
+          break;
+        case 'stock_status':
+          aValue = a.quantity <= 0 ? 0 : a.quantity <= a.min_quantity ? 1 : 2;
+          bValue = b.quantity <= 0 ? 0 : b.quantity <= b.min_quantity ? 1 : 2;
+          break;
+        default: // name
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [inventory, debouncedSearchTerm, filterLowStock, filterCategory, sortBy, sortOrder, stockLevelFilter, priceRange, expiryFilter]);
 
   const handlePrintInventory = () => {
     const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0);
@@ -798,41 +1105,59 @@ const InventoryPage = ({ user }) => {
   };
 
   const handleStockAdjust = async () => {
-    if (!stockAdjustQty || parseFloat(stockAdjustQty) <= 0) { toast.error('Enter valid quantity'); return; }
+    if (!stockAdjustQty || parseFloat(stockAdjustQty) <= 0) { 
+      toast.error('Enter valid quantity'); 
+      return; 
+    }
+    
     const qty = parseFloat(stockAdjustQty);
     const newQty = stockAdjustType === 'add' ? stockAdjustItem.quantity + qty : stockAdjustItem.quantity - qty;
-    if (newQty < 0) { toast.error('Cannot reduce below 0'); return; }
+    
+    if (newQty < 0) { 
+      toast.error('Cannot reduce below 0'); 
+      return; 
+    }
     
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
+      // Update inventory item quantity
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/inventory/${stockAdjustItem.id}`,
+        data: { ...stockAdjustItem, quantity: newQty },
+        timeout: 15000
+      });
       
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      };
+      // Record stock movement
+      await apiWithRetry({
+        method: 'post',
+        url: `${API}/inventory/movements`,
+        data: { 
+          item_id: stockAdjustItem.id,
+          type: stockAdjustType === 'add' ? 'in' : 'out', 
+          quantity: qty,
+          reason: stockAdjustReason || (stockAdjustType === 'add' ? 'Stock Added' : 'Stock Reduced'),
+          reference: `Manual ${stockAdjustType === 'add' ? 'Addition' : 'Reduction'}`,
+          notes: `${stockAdjustType === 'add' ? 'Added' : 'Reduced'} ${qty}. Previous: ${stockAdjustItem.quantity}, New: ${newQty}` 
+        },
+        timeout: 15000
+      });
       
-      await axios.put(`${API}/inventory/${stockAdjustItem.id}`, { ...stockAdjustItem, quantity: newQty }, config);
-      await axios.post(`${API}/inventory/movements`, { item_id: stockAdjustItem.id,
-        type: stockAdjustType === 'add' ? 'in' : 'out', quantity: qty,
-        reason: stockAdjustReason || (stockAdjustType === 'add' ? 'Stock Added' : 'Stock Reduced'),
-        reference: `Manual ${stockAdjustType === 'add' ? 'Addition' : 'Reduction'}`,
-        notes: `${stockAdjustType === 'add' ? 'Added' : 'Reduced'} ${qty}. Previous: ${stockAdjustItem.quantity}, New: ${newQty}` }, config);
-      toast.success(`Stock ${stockAdjustType === 'add' ? 'added' : 'reduced'}!`);
+      toast.success(`Stock ${stockAdjustType === 'add' ? 'added' : 'reduced'} successfully!`);
       setStockAdjustOpen(false);
       const updatedInventory = await fetchInventory();
       setLowStock(updatedInventory.filter(item => item.quantity <= item.min_quantity));
       fetchStockMovements();
     } catch (error) { 
-      console.error('Stock adjust error:', error.response?.status, error.response?.data);
-      let errorMessage = error.response?.data?.detail || 'Failed to adjust stock';
-      if (error.response?.status === 401) errorMessage = 'Authentication required. Please login again.';
-      if (error.response?.status === 403) errorMessage = 'Not authorized to adjust stock.';
+      let errorMessage = 'Failed to adjust stock';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please login again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Not authorized to adjust stock.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       toast.error(errorMessage);
     }
   };
@@ -972,6 +1297,15 @@ const InventoryPage = ({ user }) => {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={stockLevelFilter} onValueChange={setStockLevelFilter}>
+                  <SelectTrigger className="w-[150px]"><SelectValue placeholder="Stock Level" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Stock</SelectItem>
+                    <SelectItem value="healthy">Healthy Stock</SelectItem>
+                    <SelectItem value="low">Low Stock</SelectItem>
+                    <SelectItem value="out">Out of Stock</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -979,18 +1313,19 @@ const InventoryPage = ({ user }) => {
                     <SelectItem value="quantity">Quantity</SelectItem>
                     <SelectItem value="price_per_unit">Price</SelectItem>
                     <SelectItem value="total_value">Total Value</SelectItem>
+                    <SelectItem value="expiry_date">Expiry Date</SelectItem>
+                    <SelectItem value="stock_status">Stock Status</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
                   {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
                 </Button>
-                <Button variant={filterLowStock ? "default" : "outline"} size="sm" onClick={() => setFilterLowStock(!filterLowStock)}
-                  className={filterLowStock ? "bg-orange-500 hover:bg-orange-600" : ""}>
-                  <Filter className="w-4 h-4 mr-2" />{filterLowStock ? 'Low Stock' : 'All Items'}
+                <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+                  <Filter className="w-4 h-4 mr-2" />
+                  {showFilters ? 'Hide Filters' : 'More Filters'}
                 </Button>
                 {['admin', 'cashier'].includes(user?.role) && (
                   <Button className="bg-gradient-to-r from-violet-600 to-purple-600" onClick={() => { 
-                    console.log('Add Item button clicked');
                     resetForm(); 
                     setDialogOpen(true); 
                   }}>
@@ -998,6 +1333,62 @@ const InventoryPage = ({ user }) => {
                   </Button>
                 )}
               </div>
+              
+              {/* Advanced Filters */}
+              {showFilters && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Price Range (₹)</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input 
+                          type="number" 
+                          placeholder="Min" 
+                          value={priceRange.min} 
+                          onChange={(e) => setPriceRange({...priceRange, min: e.target.value})}
+                          className="h-8"
+                        />
+                        <Input 
+                          type="number" 
+                          placeholder="Max" 
+                          value={priceRange.max} 
+                          onChange={(e) => setPriceRange({...priceRange, max: e.target.value})}
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Expiry Status</Label>
+                      <Select value={expiryFilter} onValueChange={setExpiryFilter}>
+                        <SelectTrigger className="h-8 mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Items</SelectItem>
+                          <SelectItem value="expiring">Expiring Soon (30 days)</SelectItem>
+                          <SelectItem value="expired">Expired</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setPriceRange({ min: '', max: '' });
+                          setExpiryFilter('all');
+                          setStockLevelFilter('all');
+                          setFilterCategory('all');
+                          setSearchTerm('');
+                        }}
+                        className="h-8"
+                      >
+                        <X className="w-4 h-4 mr-1" />Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bulk Upload */}
@@ -1024,56 +1415,145 @@ const InventoryPage = ({ user }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredAndSortedInventory.map((item) => {
                   const isLowStock = item.quantity <= item.min_quantity;
+                  const isOutOfStock = item.quantity <= 0;
                   const category = categories.find(c => String(c.id) === String(item.category_id));
                   const supplier = suppliers.find(s => String(s.id) === String(item.supplier_id));
                   const totalValue = item.quantity * item.price_per_unit;
+                  
+                  // Check expiry status
+                  const today = new Date();
+                  const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+                  const expiryDate = item.expiry_date ? new Date(item.expiry_date) : null;
+                  const isExpired = expiryDate && expiryDate <= today;
+                  const isExpiringSoon = expiryDate && expiryDate > today && expiryDate <= thirtyDaysFromNow;
+                  
+                  // Determine card border color based on status
+                  let borderColor = '';
+                  if (isExpired) borderColor = 'border-l-4 border-l-red-600';
+                  else if (isOutOfStock) borderColor = 'border-l-4 border-l-red-500';
+                  else if (isExpiringSoon) borderColor = 'border-l-4 border-l-yellow-500';
+                  else if (isLowStock) borderColor = 'border-l-4 border-l-orange-500';
+                  
                   return (
-                    <Card key={item.id} className={`border-0 shadow-lg hover:shadow-xl transition-all ${isLowStock ? 'border-l-4 border-l-orange-500' : ''}`}>
+                    <Card key={item.id} className={`border-0 shadow-lg hover:shadow-xl transition-all ${borderColor}`}>
                       <CardHeader className="pb-3">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isLowStock ? 'bg-gradient-to-br from-orange-500 to-red-500' : 'bg-gradient-to-br from-violet-500 to-purple-600'}`}>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                              isExpired ? 'bg-gradient-to-br from-red-600 to-red-700' :
+                              isOutOfStock ? 'bg-gradient-to-br from-red-500 to-red-600' :
+                              isExpiringSoon ? 'bg-gradient-to-br from-yellow-500 to-orange-500' :
+                              isLowStock ? 'bg-gradient-to-br from-orange-500 to-red-500' : 
+                              'bg-gradient-to-br from-violet-500 to-purple-600'
+                            }`}>
                               <Package className="w-6 h-6 text-white" />
                             </div>
                             <div>
                               <CardTitle className="text-lg">{item.name}</CardTitle>
-                              <div className="flex gap-1 mt-1">
+                              <div className="flex gap-1 mt-1 flex-wrap">
                                 {item.sku && <Badge variant="outline" className="text-xs">{item.sku}</Badge>}
-                                {category && <Badge variant="outline" className="text-xs" style={{ borderColor: category.color, color: category.color }}>{category.name}</Badge>}
+                                {category && (
+                                  <Badge variant="outline" className="text-xs" style={{ borderColor: category.color, color: category.color }}>
+                                    {category.name}
+                                  </Badge>
+                                )}
+                                {item.is_perishable && <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600">Perishable</Badge>}
                               </div>
                             </div>
                           </div>
-                          {isLowStock && <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>}
+                          <div className="flex flex-col items-end gap-1">
+                            {isExpired && <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" title="Expired"></div>}
+                            {isExpiringSoon && <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" title="Expiring Soon"></div>}
+                            {isLowStock && !isExpired && !isExpiringSoon && <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" title="Low Stock"></div>}
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
+                        {/* Status Alerts */}
+                        {(isExpired || isExpiringSoon || isOutOfStock) && (
+                          <div className={`p-2 rounded-lg text-xs font-medium ${
+                            isExpired ? 'bg-red-50 text-red-700 border border-red-200' :
+                            isExpiringSoon ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                            'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                            {isExpired ? `⚠️ Expired on ${expiryDate.toLocaleDateString()}` :
+                             isExpiringSoon ? `⏰ Expires on ${expiryDate.toLocaleDateString()}` :
+                             '🚫 Out of Stock'}
+                          </div>
+                        )}
+                        
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div className="bg-gray-50 p-2 rounded">
                             <div className="text-gray-600 text-xs">Current Stock</div>
-                            <div className={`font-bold ${isLowStock ? 'text-orange-600' : 'text-green-600'}`}>{item.quantity} {item.unit}</div>
+                            <div className={`font-bold ${
+                              isOutOfStock ? 'text-red-600' :
+                              isLowStock ? 'text-orange-600' : 'text-green-600'
+                            }`}>
+                              {item.quantity} {item.unit}
+                            </div>
                           </div>
                           <div className="bg-gray-50 p-2 rounded">
                             <div className="text-gray-600 text-xs">Min Required</div>
                             <div className="font-medium">{item.min_quantity} {item.unit}</div>
                           </div>
                         </div>
+                        
                         <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div><span className="text-gray-600">Unit Price:</span><span className="font-medium ml-1">₹{item.price_per_unit}</span></div>
-                          <div><span className="text-gray-600">Total:</span><span className="font-bold text-green-600 ml-1">₹{totalValue.toFixed(2)}</span></div>
+                          <div>
+                            <span className="text-gray-600">Unit Price:</span>
+                            <span className="font-medium ml-1">₹{item.price_per_unit}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Total:</span>
+                            <span className="font-bold text-green-600 ml-1">₹{totalValue.toFixed(2)}</span>
+                          </div>
                         </div>
-                        {(item.location || supplier) && (
+                        
+                        {/* Additional Info */}
+                        {(item.location || supplier || item.batch_number || expiryDate) && (
                           <div className="text-xs text-gray-500 space-y-1">
-                            {item.location && <div className="flex items-center gap-1"><MapPin className="w-3 h-3" />{item.location}</div>}
-                            {supplier && <div className="flex items-center gap-1"><Truck className="w-3 h-3" />{supplier.name}</div>}
+                            {item.location && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {item.location}
+                              </div>
+                            )}
+                            {supplier && (
+                              <div className="flex items-center gap-1">
+                                <Truck className="w-3 h-3" />
+                                {supplier.name}
+                              </div>
+                            )}
+                            {item.batch_number && (
+                              <div className="flex items-center gap-1">
+                                <Package2 className="w-3 h-3" />
+                                Batch: {item.batch_number}
+                              </div>
+                            )}
+                            {expiryDate && (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Expires: {expiryDate.toLocaleDateString()}
+                              </div>
+                            )}
                           </div>
                         )}
+                        
                         {['admin', 'cashier'].includes(user?.role) && (
                           <div className="flex gap-2 pt-2 border-t">
-                            <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEdit(item)}><Edit className="w-3 h-3 mr-1" />Edit</Button>
-                            <Button size="sm" variant="outline" className="border-green-500 text-green-600" onClick={() => openStockAdjust(item, 'add')}><Plus className="w-3 h-3" /></Button>
-                            <Button size="sm" variant="outline" className="border-orange-500 text-orange-600" onClick={() => openStockAdjust(item, 'reduce')}><Minus className="w-3 h-3" /></Button>
+                            <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEdit(item)}>
+                              <Edit className="w-3 h-3 mr-1" />Edit
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-green-500 text-green-600" onClick={() => openStockAdjust(item, 'add')}>
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-orange-500 text-orange-600" onClick={() => openStockAdjust(item, 'reduce')}>
+                              <Minus className="w-3 h-3" />
+                            </Button>
                             {['admin'].includes(user?.role) && (
-                              <Button size="sm" variant="outline" className="border-red-500 text-red-600" onClick={() => handleDelete(item.id)}><Trash2 className="w-3 h-3" /></Button>
+                              <Button size="sm" variant="outline" className="border-red-500 text-red-600" onClick={() => handleDelete(item.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
                             )}
                           </div>
                         )}
@@ -1507,6 +1987,34 @@ const InventoryPage = ({ user }) => {
                   <div><Label>Barcode</Label><Input value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} /></div>
                   <div><Label>Batch Number</Label><Input value={formData.batch_number} onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })} /></div>
                   <div><Label>Expiry Date</Label><Input type="date" value={formData.expiry_date} onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })} /></div>
+                  <div>
+                    <Label>Alert Before Expiry (days)</Label>
+                    <Input type="number" min="1" value={formData.alert_before_expiry} onChange={(e) => setFormData({ ...formData, alert_before_expiry: e.target.value })} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="is_perishable" 
+                        checked={formData.is_perishable} 
+                        onChange={(e) => setFormData({ ...formData, is_perishable: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="is_perishable">This is a perishable item</Label>
+                    </div>
+                  </div>
+                  {formData.is_perishable && (
+                    <>
+                      <div>
+                        <Label>Storage Temperature</Label>
+                        <Input value={formData.storage_temperature} onChange={(e) => setFormData({ ...formData, storage_temperature: e.target.value })} placeholder="e.g., 2-8°C, Room temperature" />
+                      </div>
+                      <div>
+                        <Label>Shelf Life (days)</Label>
+                        <Input type="number" min="1" value={formData.shelf_life_days} onChange={(e) => setFormData({ ...formData, shelf_life_days: e.target.value })} />
+                      </div>
+                    </>
+                  )}
                   <div className="md:col-span-2"><Label>Description</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} /></div>
                 </div>
               </div>
@@ -1674,16 +2182,17 @@ const InventoryPage = ({ user }) => {
 
         {/* Purchase Order Dialog */}
         <Dialog open={purchaseDialogOpen} onOpenChange={(open) => { setPurchaseDialogOpen(open); if (!open) resetPurchaseForm(); }}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5" />Create Purchase Order
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handlePurchaseSubmit} className="space-y-6">
+              {/* Basic Details */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="font-semibold mb-3">Order Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label>Supplier *</Label>
                     <Select value={purchaseFormData.supplier_id || ''} onValueChange={(value) => setPurchaseFormData({ ...purchaseFormData, supplier_id: value })}>
@@ -1697,9 +2206,41 @@ const InventoryPage = ({ user }) => {
                     <Label>Purchase Date *</Label>
                     <Input type="date" value={purchaseFormData.purchase_date} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, purchase_date: e.target.value })} required />
                   </div>
+                  <div>
+                    <Label>Expected Delivery</Label>
+                    <Input type="date" value={purchaseFormData.expected_delivery} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, expected_delivery: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Reference Number</Label>
+                    <Input value={purchaseFormData.reference_number} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, reference_number: e.target.value })} placeholder="PO-001" />
+                  </div>
+                  <div>
+                    <Label>Payment Terms</Label>
+                    <Select value={purchaseFormData.payment_terms} onValueChange={(value) => setPurchaseFormData({ ...purchaseFormData, payment_terms: value })}>
+                      <SelectTrigger><SelectValue placeholder="Select terms" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="immediate">Immediate</SelectItem>
+                        <SelectItem value="net15">Net 15</SelectItem>
+                        <SelectItem value="net30">Net 30</SelectItem>
+                        <SelectItem value="net60">Net 60</SelectItem>
+                        <SelectItem value="cod">Cash on Delivery</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="checkbox" 
+                      id="tax_inclusive" 
+                      checked={purchaseFormData.tax_inclusive} 
+                      onChange={(e) => setPurchaseFormData({ ...purchaseFormData, tax_inclusive: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="tax_inclusive">Tax Inclusive Pricing</Label>
+                  </div>
                 </div>
               </div>
               
+              {/* Line Items */}
               <div className="bg-blue-50 p-4 rounded-lg">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-semibold">Line Items</h3>
@@ -1709,9 +2250,9 @@ const InventoryPage = ({ user }) => {
                 </div>
                 <div className="space-y-3">
                   {purchaseFormData.items.map((item, index) => (
-                    <div key={index} className="bg-white p-3 rounded-lg border">
-                      <div className="grid grid-cols-12 gap-2 items-end">
-                        <div className="col-span-5">
+                    <div key={index} className="bg-white p-4 rounded-lg border">
+                      <div className="grid grid-cols-12 gap-2 items-end mb-3">
+                        <div className="col-span-3">
                           <Label className="text-xs">Item *</Label>
                           <Select value={item.inventory_item_id || ''} onValueChange={(value) => updatePurchaseItem(index, 'inventory_item_id', value)}>
                             <SelectTrigger className="h-9"><SelectValue placeholder="Select item" /></SelectTrigger>
@@ -1729,10 +2270,12 @@ const InventoryPage = ({ user }) => {
                           <Input type="number" step="0.01" min="0" className="h-9" placeholder="Cost" value={item.unit_cost} onChange={(e) => updatePurchaseItem(index, 'unit_cost', e.target.value)} />
                         </div>
                         <div className="col-span-2">
-                          <Label className="text-xs">Total</Label>
-                          <div className="h-9 flex items-center font-bold text-green-600">
-                            ₹{((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0)).toFixed(2)}
-                          </div>
+                          <Label className="text-xs">Discount %</Label>
+                          <Input type="number" step="0.01" min="0" max="100" className="h-9" placeholder="0" value={item.discount_percent} onChange={(e) => updatePurchaseItem(index, 'discount_percent', e.target.value)} />
+                        </div>
+                        <div className="col-span-2">
+                          <Label className="text-xs">Tax %</Label>
+                          <Input type="number" step="0.01" min="0" className="h-9" placeholder="0" value={item.tax_percent} onChange={(e) => updatePurchaseItem(index, 'tax_percent', e.target.value)} />
                         </div>
                         <div className="col-span-1">
                           {purchaseFormData.items.length > 1 && (
@@ -1742,21 +2285,151 @@ const InventoryPage = ({ user }) => {
                           )}
                         </div>
                       </div>
+                      
+                      {/* Item calculations display */}
+                      <div className="grid grid-cols-6 gap-2 text-xs bg-gray-50 p-2 rounded">
+                        <div>
+                          <span className="text-gray-600">Subtotal:</span>
+                          <div className="font-medium">₹{((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0)).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Discount:</span>
+                          <div className="font-medium text-orange-600">₹{(parseFloat(item.discount_amount) || 0).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Taxable:</span>
+                          <div className="font-medium">₹{(((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0)) - (parseFloat(item.discount_amount) || 0)).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Tax:</span>
+                          <div className="font-medium text-blue-600">₹{(parseFloat(item.tax_amount) || 0).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Total:</span>
+                          <div className="font-bold text-green-600">₹{(((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0)) - (parseFloat(item.discount_amount) || 0) + (parseFloat(item.tax_amount) || 0)).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Expiry</Label>
+                          <Input type="date" className="h-7 text-xs" value={item.expiry_date} onChange={(e) => updatePurchaseItem(index, 'expiry_date', e.target.value)} />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-              
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-lg">Total Amount:</span>
-                  <span className="text-2xl font-bold text-green-600">₹{calculatePurchaseTotal().toFixed(2)}</span>
+
+              {/* Overall Discounts */}
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Overall Discounts</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Overall Discount %</Label>
+                    <Input type="number" step="0.01" min="0" max="100" value={purchaseFormData.overall_discount_percent} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, overall_discount_percent: e.target.value, overall_discount_amount: 0 })} />
+                  </div>
+                  <div>
+                    <Label>Overall Discount Amount (₹)</Label>
+                    <Input type="number" step="0.01" min="0" value={purchaseFormData.overall_discount_amount} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, overall_discount_amount: e.target.value, overall_discount_percent: 0 })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Charges */}
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-semibold">Additional Charges</h3>
+                  <Button type="button" size="sm" variant="outline" onClick={addAdditionalCharge}>
+                    <Plus className="w-4 h-4 mr-1" />Add Charge
+                  </Button>
+                </div>
+                
+                {/* Standard charges */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <Label>Shipping Charges (₹)</Label>
+                    <Input type="number" step="0.01" min="0" value={purchaseFormData.shipping_charges} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, shipping_charges: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Handling Charges (₹)</Label>
+                    <Input type="number" step="0.01" min="0" value={purchaseFormData.handling_charges} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, handling_charges: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Other Charges (₹)</Label>
+                    <Input type="number" step="0.01" min="0" value={purchaseFormData.other_charges} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, other_charges: e.target.value })} />
+                  </div>
+                </div>
+
+                {/* Custom additional charges */}
+                <div className="space-y-2">
+                  {purchaseFormData.additional_charges.map((charge, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-end bg-white p-2 rounded border">
+                      <div className="col-span-6">
+                        <Label className="text-xs">Description</Label>
+                        <Input className="h-8" placeholder="e.g., Insurance, Packaging" value={charge.description} onChange={(e) => updateAdditionalCharge(index, 'description', e.target.value)} />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-xs">Amount (₹)</Label>
+                        <Input type="number" step="0.01" min="0" className="h-8" value={charge.amount} onChange={(e) => updateAdditionalCharge(index, 'amount', e.target.value)} />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs">Tax %</Label>
+                        <Input type="number" step="0.01" min="0" className="h-8" value={charge.tax_percent} onChange={(e) => updateAdditionalCharge(index, 'tax_percent', e.target.value)} />
+                      </div>
+                      <div className="col-span-1">
+                        {purchaseFormData.additional_charges.length > 1 && (
+                          <Button type="button" size="sm" variant="outline" className="h-8 w-8 p-0 border-red-300 text-red-500" onClick={() => removeAdditionalCharge(index)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Round Off */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Round Off (₹)</Label>
+                    <Input type="number" step="0.01" value={purchaseFormData.round_off} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, round_off: e.target.value })} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <Label>Notes</Label>
+                    <Textarea value={purchaseFormData.notes} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, notes: e.target.value })} rows={2} placeholder="Additional notes about this purchase..." />
+                  </div>
                 </div>
               </div>
               
-              <div>
-                <Label>Notes (optional)</Label>
-                <Textarea value={purchaseFormData.notes} onChange={(e) => setPurchaseFormData({ ...purchaseFormData, notes: e.target.value })} rows={2} placeholder="Additional notes about this purchase..." />
+              {/* Purchase Summary */}
+              <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                <h3 className="font-semibold mb-3 text-green-800">Purchase Summary</h3>
+                {(() => {
+                  const calculations = calculatePurchaseTotal();
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-sm text-gray-600">Items Subtotal</div>
+                        <div className="text-lg font-bold">₹{calculations.itemsSubtotal.toFixed(2)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm text-gray-600">Total Discounts</div>
+                        <div className="text-lg font-bold text-orange-600">-₹{(calculations.totalItemDiscounts + calculations.overallDiscount).toFixed(2)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm text-gray-600">Total Taxes</div>
+                        <div className="text-lg font-bold text-blue-600">₹{calculations.totalItemTaxes.toFixed(2)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm text-gray-600">Additional Charges</div>
+                        <div className="text-lg font-bold text-purple-600">₹{calculations.totalAdditionalCharges.toFixed(2)}</div>
+                      </div>
+                      <div className="col-span-2 md:col-span-4 text-center border-t pt-3 mt-3">
+                        <div className="text-lg text-gray-600">Final Total Amount</div>
+                        <div className="text-3xl font-bold text-green-600">₹{calculations.finalTotal.toFixed(2)}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               
               <div className="flex gap-3">
@@ -1771,15 +2444,16 @@ const InventoryPage = ({ user }) => {
 
         {/* Purchase Detail Dialog */}
         <Dialog open={purchaseDetailOpen} onOpenChange={(open) => { setPurchaseDetailOpen(open); if (!open) setSelectedPurchase(null); }}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Eye className="w-5 h-5" />Purchase Order Details
               </DialogTitle>
             </DialogHeader>
             {selectedPurchase && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-6">
+                {/* Header Information */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <div className="text-sm text-gray-500">Supplier</div>
                     <div className="font-semibold">{selectedPurchase.supplier_name || 'Unknown'}</div>
@@ -1787,6 +2461,10 @@ const InventoryPage = ({ user }) => {
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <div className="text-sm text-gray-500">Purchase Date</div>
                     <div className="font-semibold">{selectedPurchase.purchase_date ? new Date(selectedPurchase.purchase_date).toLocaleDateString() : '-'}</div>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <div className="text-sm text-gray-500">Reference</div>
+                    <div className="font-semibold">{selectedPurchase.reference_number || 'N/A'}</div>
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <div className="text-sm text-gray-500">Status</div>
@@ -1799,12 +2477,36 @@ const InventoryPage = ({ user }) => {
                        selectedPurchase.status === 'pending' ? '⏳ Pending' : '✗ Cancelled'}
                     </Badge>
                   </div>
-                  <div className="bg-green-50 p-3 rounded-lg">
-                    <div className="text-sm text-gray-500">Total Amount</div>
-                    <div className="font-bold text-green-600 text-xl">₹{(selectedPurchase.total_amount || 0).toFixed(2)}</div>
+                </div>
+
+                {/* Financial Summary */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+                  <h4 className="font-semibold mb-3 text-green-800">Financial Summary</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Items Subtotal</div>
+                      <div className="text-lg font-bold">₹{(selectedPurchase.items_subtotal || 0).toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Total Discounts</div>
+                      <div className="text-lg font-bold text-orange-600">-₹{((selectedPurchase.total_item_discounts || 0) + (selectedPurchase.overall_discount_amount || 0)).toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Total Taxes</div>
+                      <div className="text-lg font-bold text-blue-600">₹{(selectedPurchase.total_taxes || 0).toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Additional Charges</div>
+                      <div className="text-lg font-bold text-purple-600">₹{(selectedPurchase.additional_charges_total || 0).toFixed(2)}</div>
+                    </div>
+                  </div>
+                  <div className="text-center border-t pt-3 mt-3">
+                    <div className="text-lg text-gray-600">Final Total</div>
+                    <div className="text-3xl font-bold text-green-600">₹{(selectedPurchase.final_total || selectedPurchase.total_amount || 0).toFixed(2)}</div>
                   </div>
                 </div>
                 
+                {/* Items Table */}
                 <div>
                   <h4 className="font-semibold mb-2">Items</h4>
                   <div className="border rounded-lg overflow-hidden">
@@ -1814,23 +2516,120 @@ const InventoryPage = ({ user }) => {
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Item</th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Qty</th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Unit Cost</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Discount</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Tax</th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {(selectedPurchase.items || []).map((item, idx) => (
                           <tr key={idx}>
-                            <td className="px-3 py-2 text-sm">{item.item_name}</td>
+                            <td className="px-3 py-2 text-sm">
+                              <div className="font-medium">{item.item_name}</div>
+                              {item.expiry_date && (
+                                <div className="text-xs text-gray-500">Expires: {new Date(item.expiry_date).toLocaleDateString()}</div>
+                              )}
+                            </td>
                             <td className="px-3 py-2 text-sm text-right">{item.quantity}</td>
-                            <td className="px-3 py-2 text-sm text-right">₹{item.unit_cost}</td>
-                            <td className="px-3 py-2 text-sm text-right font-medium">₹{(item.total_cost || item.quantity * item.unit_cost).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-sm text-right">₹{(item.unit_cost || 0).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-sm text-right">
+                              {item.discount_amount > 0 ? (
+                                <div>
+                                  <div className="text-orange-600">₹{item.discount_amount.toFixed(2)}</div>
+                                  <div className="text-xs text-gray-500">({item.discount_percent}%)</div>
+                                </div>
+                              ) : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-sm text-right">
+                              {item.tax_amount > 0 ? (
+                                <div>
+                                  <div className="text-blue-600">₹{item.tax_amount.toFixed(2)}</div>
+                                  <div className="text-xs text-gray-500">({item.tax_percent}%)</div>
+                                </div>
+                              ) : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-sm text-right font-medium">₹{(item.line_total || item.total_cost || item.quantity * item.unit_cost).toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
+
+                {/* Additional Charges */}
+                {selectedPurchase.additional_charges && selectedPurchase.additional_charges.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Additional Charges</h4>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Description</th>
+                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Amount</th>
+                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Tax</th>
+                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {selectedPurchase.additional_charges.map((charge, idx) => (
+                            <tr key={idx}>
+                              <td className="px-3 py-2 text-sm">{charge.description}</td>
+                              <td className="px-3 py-2 text-sm text-right">₹{charge.amount.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-sm text-right">
+                                {charge.tax_amount > 0 ? `₹${charge.tax_amount.toFixed(2)} (${charge.tax_percent}%)` : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-right font-medium">₹{charge.total_amount.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Standard Charges */}
+                {(selectedPurchase.shipping_charges > 0 || selectedPurchase.handling_charges > 0 || selectedPurchase.other_charges > 0) && (
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h4 className="font-semibold mb-2">Standard Charges</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      {selectedPurchase.shipping_charges > 0 && (
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600">Shipping</div>
+                          <div className="font-bold">₹{selectedPurchase.shipping_charges.toFixed(2)}</div>
+                        </div>
+                      )}
+                      {selectedPurchase.handling_charges > 0 && (
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600">Handling</div>
+                          <div className="font-bold">₹{selectedPurchase.handling_charges.toFixed(2)}</div>
+                        </div>
+                      )}
+                      {selectedPurchase.other_charges > 0 && (
+                        <div className="text-center">
+                          <div className="text-sm text-gray-600">Other</div>
+                          <div className="font-bold">₹{selectedPurchase.other_charges.toFixed(2)}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 
+                {/* Additional Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedPurchase.payment_terms && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="text-sm text-gray-500">Payment Terms</div>
+                      <div className="font-semibold capitalize">{selectedPurchase.payment_terms}</div>
+                    </div>
+                  )}
+                  {selectedPurchase.expected_delivery && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="text-sm text-gray-500">Expected Delivery</div>
+                      <div className="font-semibold">{new Date(selectedPurchase.expected_delivery).toLocaleDateString()}</div>
+                    </div>
+                  )}
+                </div>
+
                 {selectedPurchase.notes && (
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <div className="text-sm text-gray-500">Notes</div>
