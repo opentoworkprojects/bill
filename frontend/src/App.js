@@ -5,13 +5,12 @@ import axios from 'axios';
 
 // ✅ Import Performance Optimization Modules
 import {
-  apiClient,
   lazyImageLoader,
   expiringCache,
   ServiceWorkerManager,
   ResourcePrefetcher,
   MemoryManager
-} from './utils/apiClient';
+} from './utils/frontendPerformanceOptimization';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';

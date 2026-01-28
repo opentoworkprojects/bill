@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
@@ -8,13 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, CreditCard, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw } from 'lucide-react';
+import { Plus, Eye, Printer, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
 import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
 import OptimizedBillingButton from '../components/OptimizedBillingButton';
 import { billingCache } from '../utils/billingCache';
 import EditOrderModal from '../components/EditOrderModal';
+import { apiWithRetry, apiSilent } from '../utils/apiClient';
 
 // Enhanced sound effects for better UX
 const playSound = (type) => {
@@ -119,6 +119,7 @@ const OrdersPage = ({ user }) => {
   const [loading, setLoading] = useState(true);
   
   // Add state for preventing duplicate orders
+  // Add state for preventing duplicate orders
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [lastOrderCreated, setLastOrderCreated] = useState(null);
   const navigate = useNavigate();
@@ -134,28 +135,24 @@ const OrdersPage = ({ user }) => {
     }
   }, []);
 
-  // Real-time polling for active orders and today's bills (every 2 seconds for real-time experience)
+  // Real-time polling for active orders and today's bills (every 5 seconds to avoid overriding optimistic updates)
   useEffect(() => {
     const interval = setInterval(() => {
+      // Skip polling if there are active status changes to avoid conflicts
+      if (processingStatusChanges.size > 0) {
+        console.log('⏸️ Skipping polling due to active status changes');
+        return;
+      }
+      
       if (activeTab === 'active') {
         fetchOrders(); // Refresh orders when viewing active tab
-        
-        // Background sync cached data for active orders
-        const activeOrderIds = orders
-          .filter(order => ['ready', 'preparing', 'pending'].includes(order.status))
-          .map(order => order.id)
-          .slice(0, 10);
-        
-        if (activeOrderIds.length > 0) {
-          billingCache.backgroundSync(activeOrderIds);
-        }
       } else if (activeTab === 'history') {
         fetchTodaysBills(); // Refresh today's bills when viewing history tab
       }
-    }, 2000); // Poll every 2 seconds for real-time experience
+    }, 5000); // Poll every 5 seconds to avoid overriding optimistic updates
 
     return () => clearInterval(interval);
-  }, [activeTab, orders]); // Added orders dependency for background sync
+  }, [activeTab]); // Only depend on activeTab to prevent infinite loops
 
   // Aggressive real-time refresh on window focus (when user returns to tab)
   useEffect(() => {
@@ -235,18 +232,25 @@ const OrdersPage = ({ user }) => {
       
       // Reload menu with fresh data
       try {
-        const menuRes = await axios.get(`${API}/menu?_t=${Date.now()}`, { timeout: 8000 });
-        const menuData = Array.isArray(menuRes.data) ? menuRes.data : [];
-        const validMenuItems = menuData.filter(item => item && item.id && item.name);
+        const menuRes = await apiSilent({ 
+          method: 'get', 
+          url: `${API}/menu?_t=${Date.now()}`, 
+          timeout: 8000 
+        });
         
-        // Cache fresh menu data
-        localStorage.setItem('billbyte_menu_cache', JSON.stringify({
-          data: validMenuItems,
-          timestamp: Date.now()
-        }));
-        
-        setMenuItems(validMenuItems);
-        console.log(`✅ Refreshed ${validMenuItems.length} menu items`);
+        if (menuRes?.data) {
+          const menuData = Array.isArray(menuRes.data) ? menuRes.data : [];
+          const validMenuItems = menuData.filter(item => item && item.id && item.name);
+          
+          // Cache fresh menu data
+          localStorage.setItem('billbyte_menu_cache', JSON.stringify({
+            data: validMenuItems,
+            timestamp: Date.now()
+          }));
+          
+          setMenuItems(validMenuItems);
+          console.log(`✅ Refreshed ${validMenuItems.length} menu items`);
+        }
       } catch (menuError) {
         console.error('Menu refresh failed:', menuError);
       }
@@ -282,16 +286,16 @@ const OrdersPage = ({ user }) => {
 
       // Load critical data first (orders, today's bills, tables, and menu items)
       const [ordersRes, todaysBillsRes, tablesRes, menuRes] = await Promise.all([
-        axios.get(`${API}/orders`).catch(() => ({ data: [] })),
-        axios.get(`${API}/orders/today-bills`).catch(() => ({ data: [] })),
+        apiSilent({ method: 'get', url: `${API}/orders` }),
+        apiSilent({ method: 'get', url: `${API}/orders/today-bills` }),
         // Use fresh=true and cache-busting for tables to get real-time status
-        axios.get(`${API}/tables?fresh=true&_t=${Date.now()}`).catch(() => ({ data: [] })),
+        apiSilent({ method: 'get', url: `${API}/tables?fresh=true&_t=${Date.now()}` }),
         // Load menu items with timeout and caching
-        axios.get(`${API}/menu`, { timeout: 8000 }).catch(() => ({ data: [] }))
+        apiSilent({ method: 'get', url: `${API}/menu`, timeout: 8000 })
       ]);
       
       // Process orders data
-      const ordersData = Array.isArray(ordersRes.data) ? ordersRes.data : [];
+      const ordersData = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
       const validOrders = ordersData.filter(order => {
         return order && order.id && order.created_at && order.status && typeof order.total === 'number';
       }).map(order => ({
@@ -303,7 +307,7 @@ const OrdersPage = ({ user }) => {
       }));
       
       // Process today's bills data
-      const billsData = Array.isArray(todaysBillsRes.data) ? todaysBillsRes.data : [];
+      const billsData = Array.isArray(todaysBillsRes?.data) ? todaysBillsRes.data : [];
       const validBills = billsData.filter(order => {
         return order && order.id && order.created_at && order.status && typeof order.total === 'number';
       }).map(order => ({
@@ -315,13 +319,13 @@ const OrdersPage = ({ user }) => {
       }));
       
       // Process tables data
-      const tablesData = Array.isArray(tablesRes.data) ? tablesRes.data : [];
+      const tablesData = Array.isArray(tablesRes?.data) ? tablesRes.data : [];
       const validTables = tablesData.filter(table => {
         return table && table.id && typeof table.table_number === 'number';
       });
       
       // Process menu items data - now loaded as priority
-      const menuData = Array.isArray(menuRes.data) ? menuRes.data : [];
+      const menuData = Array.isArray(menuRes?.data) ? menuRes.data : [];
       const validMenuItems = menuData.filter(item => item && item.id && item.name && item.available);
       
       setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
@@ -359,9 +363,11 @@ const OrdersPage = ({ user }) => {
       }
       
       // Load business settings in background (less critical)
-      axios.get(`${API}/business/settings`).catch(() => ({ data: { business_settings: {} } }))
+      apiSilent({ method: 'get', url: `${API}/business/settings` })
         .then((settingsRes) => {
-          setBusinessSettings(settingsRes.data.business_settings || {});
+          if (settingsRes?.data) {
+            setBusinessSettings(settingsRes.data.business_settings || {});
+          }
         });
       
     } catch (error) {
@@ -388,8 +394,13 @@ const OrdersPage = ({ user }) => {
         try {
           const parsed = JSON.parse(cachedData);
           if (Date.now() - parsed.timestamp < 30000) { // 30 second cache
-            setOrders(parsed.data);
-            console.log('📦 Orders loaded from cache');
+            // Preserve optimistic orders when loading from cache
+            setOrders(prevOrders => {
+              const optimisticOrders = prevOrders.filter(order => order.is_optimistic);
+              const cachedOrders = parsed.data.filter(order => !order.is_optimistic);
+              return [...optimisticOrders, ...cachedOrders];
+            });
+            console.log('� Orders loaded from cache (preserving optimistic orders)');
             return;
           }
         } catch (e) {
@@ -400,7 +411,9 @@ const OrdersPage = ({ user }) => {
       console.log(`📋 Fetching orders${forceRefresh ? ' (force refresh)' : ''}...`);
       
       const params = forceRefresh ? `?_t=${Date.now()}` : '';
-      const response = await axios.get(`${API}/orders${params}`, {
+      const response = await apiWithRetry({
+        method: 'get',
+        url: `${API}/orders${params}`,
         timeout: 10000 // 10 second timeout
       });
       
@@ -436,7 +449,34 @@ const OrdersPage = ({ user }) => {
         timestamp: Date.now()
       }));
       
-      setOrders(sortedOrders);
+      // 🚀 PRESERVE OPTIMISTIC ORDERS: Merge server data with local changes
+      setOrders(prevOrders => {
+        try {
+          const optimisticOrders = prevOrders.filter(order => order.is_optimistic);
+          const serverOrders = sortedOrders.filter(order => !order.is_optimistic);
+          
+          // Remove optimistic orders that now exist on server (successful creation)
+          const finalOptimisticOrders = optimisticOrders.filter(optimisticOrder => {
+            // Check if this optimistic order has been created on server
+            const existsOnServer = serverOrders.some(serverOrder => {
+              // Match by table and items (since temp IDs won't match)
+              return serverOrder.table_id === optimisticOrder.table_id &&
+                     serverOrder.items?.length === optimisticOrder.items?.length &&
+                     Math.abs(serverOrder.total - optimisticOrder.total) < 0.01;
+            });
+            return !existsOnServer;
+          });
+          
+          const mergedOrders = [...finalOptimisticOrders, ...serverOrders];
+          console.log(`✅ Fetched ${serverOrders.length} orders (${finalOptimisticOrders.length} optimistic preserved)`);
+          
+          return mergedOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        } catch (mergeError) {
+          console.error('Error merging orders:', mergeError);
+          // Fallback to just server orders if merging fails
+          return sortedOrders;
+        }
+      });
       console.log(`✅ Fetched ${sortedOrders.length} orders`);
       
     } catch (error) {
@@ -457,7 +497,12 @@ const OrdersPage = ({ user }) => {
 
   const fetchTodaysBills = async () => {
     try {
-      const response = await axios.get(`${API}/orders/today-bills`);
+      const response = await apiWithRetry({
+        method: 'get',
+        url: `${API}/orders/today-bills`,
+        timeout: 10000
+      });
+      
       const billsData = Array.isArray(response.data) ? response.data : [];
       
       // Validate and clean bills data
@@ -486,12 +531,7 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Failed to fetch today\'s bills', error);
       setTodaysBills([]);
-      // Show user-friendly error
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-      } else if (error.response?.status >= 500) {
-        toast.error('Server error. Please try again later.');
-      }
+      // Error handling is done by apiWithRetry
     }
   };
 
@@ -507,7 +547,12 @@ const OrdersPage = ({ user }) => {
       const url = `${API}/tables?${params.toString()}`;
       console.log(`🍽️ Fetching tables${forceRefresh ? ' (force refresh)' : ''} with fresh=true...`);
       
-      const response = await axios.get(url);
+      const response = await apiWithRetry({
+        method: 'get',
+        url: url,
+        timeout: 8000
+      });
+      
       const tablesData = Array.isArray(response.data) ? response.data : [];
       
       // Validate and clean table data
@@ -525,9 +570,7 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Failed to fetch tables', error);
       setTables([]);
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-      }
+      // Error handling is done by apiWithRetry
     }
   };
 
@@ -621,13 +664,18 @@ const OrdersPage = ({ user }) => {
       resetForm();
 
       // Create actual order on server
-      const response = await axios.post(`${API}/orders`, {
-        table_id: formData.table_id || null,
-        table_number: selectedTable?.table_number || 0,
-        items: selectedItems,
-        customer_name: customerName,
-        customer_phone: formData.customer_phone || '',
-        frontend_origin: window.location.origin
+      const response = await apiWithRetry({
+        method: 'post',
+        url: `${API}/orders`,
+        data: {
+          table_id: formData.table_id || null,
+          table_number: selectedTable?.table_number || 0,
+          items: selectedItems,
+          customer_name: customerName,
+          customer_phone: formData.customer_phone || '',
+          frontend_origin: window.location.origin
+        },
+        timeout: 12000 // Longer timeout for order creation
       });
 
       // Replace optimistic order with real order
@@ -659,7 +707,11 @@ const OrdersPage = ({ user }) => {
       // Background refresh for consistency (but don't override optimistic updates)
       setTimeout(() => {
         fetchTables(true);
-      }, 2000);
+        // Delay the first order refresh to let optimistic update be visible
+        setTimeout(() => {
+          fetchOrders(true);
+        }, 1000);
+      }, 3000); // Increased delay to let optimistic update be visible
       
       // Offer WhatsApp notification
       if (response.data?.whatsapp_link && formData.customer_phone) {
@@ -690,7 +742,19 @@ const OrdersPage = ({ user }) => {
     setActiveCategory('all');
   };
 
+  // Add state for preventing double-clicks on status change buttons
+  const [processingStatusChanges, setProcessingStatusChanges] = useState(new Set());
+
   const handleStatusChange = async (orderId, status) => {
+    // 🚫 PREVENT DOUBLE-CLICKS: Check if already processing this order
+    if (processingStatusChanges.has(orderId)) {
+      console.log('⚠️ Status change already in progress for order:', orderId);
+      return;
+    }
+
+    // Add to processing set immediately
+    setProcessingStatusChanges(prev => new Set([...prev, orderId]));
+
     // Immediate visual feedback - optimistic update
     const statusSounds = {
       'preparing': 'cooking',
@@ -703,16 +767,33 @@ const OrdersPage = ({ user }) => {
       playSound(statusSounds[status]);
     }
     
+    // 📳 ENHANCED VIBRATION FEEDBACK
+    try {
+      if (navigator.vibrate) {
+        if (status === 'preparing') {
+          navigator.vibrate([100, 50, 100]); // Cooking pattern
+        } else if (status === 'ready') {
+          navigator.vibrate([200, 100, 200]); // Success pattern
+        } else if (status === 'completed') {
+          navigator.vibrate([150, 50, 150, 50, 150]); // Completion pattern
+        }
+      }
+    } catch (e) {}
+    
+    // Store original status for potential rollback
+    const originalOrder = orders.find(order => order.id === orderId);
+    const originalStatus = originalOrder?.status;
+    
     // Optimistic UI update - update local state immediately
     setOrders(prevOrders => 
       prevOrders.map(order => 
         order.id === orderId 
-          ? { ...order, status, updated_at: new Date().toISOString() }
+          ? { ...order, status }
           : order
       )
     );
     
-    // Show immediate success feedback
+    // Show immediate success feedback with enhanced styling
     const statusMessages = {
       'preparing': '👨‍🍳 Started cooking!',
       'ready': '✅ Marked as ready!',
@@ -720,18 +801,31 @@ const OrdersPage = ({ user }) => {
     };
     
     if (statusMessages[status]) {
-      toast.success(statusMessages[status]);
+      toast.success(statusMessages[status], {
+        duration: 2000,
+        style: {
+          background: status === 'preparing' ? 'linear-gradient(135deg, #f59e0b, #d97706)' :
+                     status === 'ready' ? 'linear-gradient(135deg, #10b981, #059669)' :
+                     'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+          color: 'white',
+          fontWeight: 'bold'
+        }
+      });
     }
 
     // Silent background server update - no loading states
     try {
-      const response = await axios.put(`${API}/orders/${orderId}/status?status=${status}&frontend_origin=${encodeURIComponent(window.location.origin)}`);
+      const response = await apiWithRetry({
+        method: 'put',
+        url: `${API}/orders/${orderId}/status?status=${status}&frontend_origin=${encodeURIComponent(window.location.origin)}`,
+        timeout: 8000 // Shorter timeout for status updates
+      });
       
-      // Silent background refresh to sync with server
+      // Delay background refresh to let optimistic update be visible longer
       setTimeout(() => {
         fetchOrders();
         fetchTables();
-      }, 1000);
+      }, 1000); // Reduced delay for better sync
       
       if (response.data?.whatsapp_link && response.data?.customer_phone) {
         setTimeout(() => {
@@ -748,13 +842,36 @@ const OrdersPage = ({ user }) => {
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
-            ? { ...order, status: order.original_status || order.status }
+            ? { ...order, status: originalStatus || order.status }
             : order
         )
       );
       
+      // Error vibration
+      try {
+        if (navigator.vibrate) {
+          navigator.vibrate([300, 100, 300]);
+        }
+      } catch (e) {}
+      
       // Only show error if something actually failed
-      toast.error('Failed to update status - please try again');
+      toast.error('❌ Failed to update status - please try again', {
+        duration: 3000,
+        style: {
+          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+          color: 'white',
+          fontWeight: 'bold'
+        }
+      });
+    } finally {
+      // Remove from processing set after completion
+      setTimeout(() => {
+        setProcessingStatusChanges(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(orderId);
+          return newSet;
+        });
+      }, 500); // Reduced delay
     }
   };
 
@@ -775,9 +892,14 @@ const OrdersPage = ({ user }) => {
     }
     
     try {
-      const response = await axios.post(`${API}/whatsapp/send-receipt/${whatsappModal.orderId}`, {
-        phone_number: whatsappPhone,
-        customer_name: whatsappModal.customerName || ''
+      const response = await apiWithRetry({
+        method: 'post',
+        url: `${API}/whatsapp/send-receipt/${whatsappModal.orderId}`,
+        data: {
+          phone_number: whatsappPhone,
+          customer_name: whatsappModal.customerName || ''
+        },
+        timeout: 10000
       });
       
       if (response.data?.whatsapp_link) {
@@ -834,39 +956,52 @@ const OrdersPage = ({ user }) => {
   // Update order items
   const handleUpdateOrder = async (payload) => {
     try {
-      await axios.put(`${API}/orders/${editOrderModal.order.id}`, payload);
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/orders/${editOrderModal.order.id}`,
+        data: payload,
+        timeout: 10000
+      });
       toast.success('Order updated successfully!');
       setEditOrderModal({ open: false, order: null });
       await fetchOrders();
     } catch (error) {
       console.error('Update order failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to update order');
+      // Error handling is done by apiWithRetry
     }
   };
 
   const handleCancelOrder = async () => {
     if (!cancelConfirmModal.order?.id) return;
     try {
-      await axios.put(`${API}/orders/${cancelConfirmModal.order.id}/cancel`);
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/orders/${cancelConfirmModal.order.id}/cancel`,
+        timeout: 10000
+      });
       toast.success('Order cancelled');
       setCancelConfirmModal({ open: false, order: null });
       await Promise.all([fetchOrders(), fetchTables()]);
     } catch (error) {
       console.error('Cancel order failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to cancel order');
+      // Error handling is done by apiWithRetry
     }
   };
 
   const handleDeleteOrder = async () => {
     if (!deleteConfirmModal.order?.id) return;
     try {
-      await axios.delete(`${API}/orders/${deleteConfirmModal.order.id}`);
+      await apiWithRetry({
+        method: 'delete',
+        url: `${API}/orders/${deleteConfirmModal.order.id}`,
+        timeout: 10000
+      });
       toast.success('Order deleted');
       setDeleteConfirmModal({ open: false, order: null });
       await Promise.all([fetchOrders(), fetchTables()]);
     } catch (error) {
       console.error('Delete order failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to delete order');
+      // Error handling is done by apiWithRetry
     }
   };
 
@@ -882,18 +1017,23 @@ const OrdersPage = ({ user }) => {
     }
     
     try {
-      await axios.put(`${API}/orders/${order.id}`, {
-        is_credit: true,
-        payment_method: 'credit',
-        payment_received: 0,
-        balance_amount: order.total
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/orders/${order.id}`,
+        data: {
+          is_credit: true,
+          payment_method: 'credit',
+          payment_received: 0,
+          balance_amount: order.total
+        },
+        timeout: 10000
       });
       toast.success('Marked as credit bill');
       setActionMenuOpen(null);
       await fetchOrders();
     } catch (error) {
       console.error('Mark as credit failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to mark as credit');
+      // Error handling is done by apiWithRetry
     }
   };
 
@@ -901,18 +1041,23 @@ const OrdersPage = ({ user }) => {
   const handleMarkAsPaid = async (order) => {
     if (!order?.id) return;
     try {
-      await axios.put(`${API}/orders/${order.id}`, {
-        is_credit: false,
-        payment_method: 'cash',
-        payment_received: order.total,
-        balance_amount: 0
+      await apiWithRetry({
+        method: 'put',
+        url: `${API}/orders/${order.id}`,
+        data: {
+          is_credit: false,
+          payment_method: 'cash',
+          payment_received: order.total,
+          balance_amount: 0
+        },
+        timeout: 10000
       });
       toast.success('Marked as paid');
       setActionMenuOpen(null);
       await fetchOrders();
     } catch (error) {
       console.error('Mark as paid failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to mark as paid');
+      // Error handling is done by apiWithRetry
     }
   };
 
@@ -1349,7 +1494,7 @@ const OrdersPage = ({ user }) => {
                 Live
               </div>
             </div>
-            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage restaurant orders • Updates every 2 seconds</p>
+            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Manage restaurant orders • Updates every 5 seconds</p>
           </div>
           {['admin', 'waiter', 'cashier'].includes(user?.role) && (
             <div className="flex items-center gap-3">
@@ -1823,17 +1968,55 @@ const OrdersPage = ({ user }) => {
                     {['admin', 'kitchen'].includes(user?.role) && order.status === 'pending' && (
                       <button 
                         onClick={() => handleStatusChange(order.id, 'preparing')} 
-                        className="flex-1 h-10 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95 shadow-lg hover:shadow-xl"
+                        disabled={processingStatusChanges.has(order.id)}
+                        className={`flex-1 h-10 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 transition-all duration-150 shadow-lg hover:shadow-xl ${
+                          processingStatusChanges.has(order.id)
+                            ? 'bg-green-500 text-white scale-95 cursor-not-allowed animate-pulse'
+                            : 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white active:scale-95 transform hover:scale-105'
+                        }`}
+                        style={{
+                          boxShadow: processingStatusChanges.has(order.id) 
+                            ? '0 0 20px rgba(34, 197, 94, 0.5)' 
+                            : undefined
+                        }}
                       >
-                        <span className="animate-bounce">👨‍🍳</span> Start Cooking
+                        {processingStatusChanges.has(order.id) ? (
+                          <>
+                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="animate-bounce">👨‍🍳</span> Start Cooking
+                          </>
+                        )}
                       </button>
                     )}
                     {['admin', 'kitchen'].includes(user?.role) && order.status === 'preparing' && (
                       <button 
                         onClick={() => handleStatusChange(order.id, 'ready')} 
-                        className="flex-1 h-10 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95 shadow-lg hover:shadow-xl"
+                        disabled={processingStatusChanges.has(order.id)}
+                        className={`flex-1 h-10 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 transition-all duration-150 shadow-lg hover:shadow-xl ${
+                          processingStatusChanges.has(order.id)
+                            ? 'bg-green-600 text-white scale-95 cursor-not-allowed animate-pulse'
+                            : 'bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white active:scale-95 transform hover:scale-105'
+                        }`}
+                        style={{
+                          boxShadow: processingStatusChanges.has(order.id) 
+                            ? '0 0 20px rgba(34, 197, 94, 0.5)' 
+                            : undefined
+                        }}
                       >
-                        <span className="animate-pulse">✅</span> Mark Ready
+                        {processingStatusChanges.has(order.id) ? (
+                          <>
+                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="animate-pulse">✅</span> Mark Ready
+                          </>
+                        )}
                       </button>
                     )}
                     {['admin', 'waiter', 'cashier'].includes(user?.role) && order.status !== 'completed' && (

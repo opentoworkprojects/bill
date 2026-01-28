@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { VirtualScroller } from '../utils/apiClient'
+import { VirtualScroller } from '../utils/frontendPerformanceOptimization'
 
 /**
  * VirtualOrdersList Component
