@@ -857,6 +857,12 @@ const OrdersPage = ({ user }) => {
       
       // Success feedback
       toast.success('✅ Order created successfully!');
+      
+      // 💾 PRELOAD BILLING DATA: Prepare billing cache for new order
+      billingCache.preloadBillingData(response.data.id).catch(error => {
+        console.warn('Failed to preload billing data for new order:', error);
+      });
+      console.log('💾 Billing data preload initiated for new order:', response.data.id);
 
       // Update last order created to prevent duplicates
       setLastOrderCreated({
@@ -1032,6 +1038,10 @@ const OrdersPage = ({ user }) => {
       });
       
       console.log('✅ Server status update successful:', orderId, status);
+      
+      // 🗑️ CRITICAL: Invalidate billing cache after status change
+      billingCache.invalidateOrder(orderId);
+      console.log('🔄 Status changed and billing cache invalidated:', orderId, status);
       
       // ✅ SUCCESS: Update order with server response but preserve instant update
       setOrders(prevOrders => 
@@ -1232,6 +1242,11 @@ const OrdersPage = ({ user }) => {
         data: payload,
         timeout: 10000
       });
+      
+      // 🗑️ CRITICAL: Invalidate billing cache after order update
+      billingCache.invalidateOrder(editOrderModal.order.id);
+      console.log('🔄 Order updated and billing cache invalidated:', editOrderModal.order.id);
+      
       toast.success('Order updated successfully!');
       setEditOrderModal({ open: false, order: null });
       await fetchOrders();
@@ -1249,6 +1264,11 @@ const OrdersPage = ({ user }) => {
         url: `${API}/orders/${cancelConfirmModal.order.id}/cancel`,
         timeout: 10000
       });
+      
+      // 🗑️ CRITICAL: Invalidate billing cache after order cancellation
+      billingCache.invalidateOrder(cancelConfirmModal.order.id);
+      console.log('🔄 Order cancelled and billing cache invalidated:', cancelConfirmModal.order.id);
+      
       toast.success('Order cancelled');
       setCancelConfirmModal({ open: false, order: null });
       await Promise.all([fetchOrders(), fetchTables()]);

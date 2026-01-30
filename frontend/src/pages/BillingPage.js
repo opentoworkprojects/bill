@@ -129,7 +129,7 @@ const BillingPage = ({ user }) => {
     };
   }, [orderId]);
 
-  // 🚀 OPTIMIZED DATA LOADING - Uses cache for instant loading
+  // 🚀 OPTIMIZED DATA LOADING - Force fresh data for updated orders
   const loadBillingDataOptimized = async () => {
     if (!orderId) return;
 
@@ -138,50 +138,9 @@ const BillingPage = ({ user }) => {
 
     try {
       
-      // Try to get cached data first for instant loading
-      const cached = billingCache.getCachedBillingData(orderId);
-      
-      if (cached) {
-        setOrder(cached.order);
-        setOrderItems(cached.order.items || []);
-        setBusinessSettings(cached.businessSettings);
-        setMenuItems(cached.menuItems);
-        
-        // 🚀 CHECK PAYMENT STATUS: Set payment completed based on order status
-        const isOrderPaid = cached.order.status === 'completed' || 
-                           cached.order.status === 'paid' || 
-                           (cached.order.payment_received > 0 && cached.order.balance_amount === 0);
-        
-        if (isOrderPaid) {
-          setPaymentCompleted(true);
-          setCompletedPaymentData({
-            received: cached.order.payment_received || cached.order.total,
-            paymentMethod: cached.order.payment_method || 'cash',
-            balance: cached.order.balance_amount || 0,
-            isCredit: cached.order.is_credit || false
-          });
-        }
-        
-        // Set customer data
-        if (cached.order.customer_phone) setWhatsappPhone(cached.order.customer_phone);
-        if (cached.order.discount || cached.order.discount_amount) {
-          setDiscountType(cached.order.discount_type || 'amount');
-          setDiscountValue(cached.order.discount_value || cached.order.discount || '');
-        }
-        
-        // End timing with cache hit metadata
-        endBillingTimer(orderId, { cacheHit: true, dataSource: 'cache' });
-        
-        // Pre-load payment data for even faster processing
-        preloadPaymentData(orderId).catch(error => {
-          // Failed to preload payment data - continue without preloading
-        });
-        
-        return; // Data loaded instantly from cache!
-      }
-      
-      // Fallback: Fetch fresh data if not cached
-      const billingData = await billingCache.getBillingData(orderId);
+      // FORCE FRESH DATA: Always fetch latest order data to ensure updates are reflected
+      console.log('🔄 Loading fresh billing data for order:', orderId);
+      const billingData = await billingCache.getBillingData(orderId, true); // Force fresh
       
       setOrder(billingData.order);
       setOrderItems(billingData.order.items || []);

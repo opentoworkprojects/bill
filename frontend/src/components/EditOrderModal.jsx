@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { Plus, Trash2, X, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, X, ChevronDown, Search } from 'lucide-react';
 
 /**
  * EditOrderModal Component - Compact, Responsive UI/UX
@@ -57,6 +57,13 @@ const EditOrderModal = ({
   const [manualItemName, setManualItemName] = useState('');
   const [manualItemPrice, setManualItemPrice] = useState('');
   
+  // Searchable dropdown state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const searchInputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  
   // UI state
   const [showAdvancedPayment, setShowAdvancedPayment] = useState(false);
   const [expandedSection, setExpandedSection] = useState('items'); // 'items', 'payment', 'totals'
@@ -80,7 +87,73 @@ const EditOrderModal = ({
     setUseSplitPayment(order.payment_method === 'split');
     setShowAdvancedPayment(false);
     setExpandedSection('items');
+    
+    // Reset search state
+    setSearchTerm('');
+    setShowDropdown(false);
+    setSelectedIndex(-1);
   }, [open, order, businessSettings]);
+
+  // Filter menu items based on search term
+  const filteredMenuItems = menuItems.filter(item => 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Handle keyboard navigation in dropdown
+  const handleKeyDown = (e) => {
+    if (!showDropdown || filteredMenuItems.length === 0) return;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev < filteredMenuItems.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev > 0 ? prev - 1 : filteredMenuItems.length - 1
+        );
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedIndex >= 0 && selectedIndex < filteredMenuItems.length) {
+          handleAddItem(filteredMenuItems[selectedIndex]);
+          setSearchTerm('');
+          setShowDropdown(false);
+          setSelectedIndex(-1);
+        }
+        break;
+      case 'Escape':
+        setShowDropdown(false);
+        setSelectedIndex(-1);
+        break;
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setShowDropdown(value.length > 0);
+    setSelectedIndex(-1);
+  };
+
+  // Handle clicking outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+          searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowDropdown(false);
+        setSelectedIndex(-1);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Calculate totals
   const subtotal = editItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -106,6 +179,7 @@ const EditOrderModal = ({
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
+      toast.success(`${menuItem.name} quantity increased`);
     } else {
       setEditItems([...editItems, {
         menu_item_id: menuItem.id,
@@ -114,6 +188,7 @@ const EditOrderModal = ({
         quantity: 1,
         notes: ''
       }]);
+      toast.success(`${menuItem.name} added to order`);
     }
   };
 
@@ -269,81 +344,185 @@ const EditOrderModal = ({
 
             {/* Items Content */}
             {expandedSection === 'items' && (
-              <div className="p-2 sm:p-3 space-y-2">
+              <div className="p-2 sm:p-3 space-y-3">
                 
-                {/* Add Items Buttons - Scrollable */}
-                <div className="flex gap-1 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-                  {menuItems.slice(0, 6).map(item => (
-                    <button 
-                      key={item.id}
-                      onClick={() => handleAddItem(item)}
-                      className="flex-shrink-0 px-2 py-1 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg text-xs font-medium hover:from-blue-100 hover:to-blue-200 transition-colors whitespace-nowrap"
-                    >
-                      {item.name.split(' ')[0]} ₹{item.price}
-                    </button>
-                  ))}
+                {/* Searchable Dropdown for Adding Items */}
+                <div className="relative">
+                  <Label className="text-xs text-gray-600 font-bold">🔍 Search & Add Items</Label>
+                  <div className="relative mt-1">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                      <Input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Type to search menu items..."
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        onKeyDown={handleKeyDown}
+                        onFocus={() => searchTerm && setShowDropdown(true)}
+                        className="h-8 pl-7 pr-3 text-sm border-2 border-blue-200 focus:border-blue-400 bg-white"
+                      />
+                    </div>
+                    
+                    {/* Dropdown Results */}
+                    {showDropdown && filteredMenuItems.length > 0 && (
+                      <div 
+                        ref={dropdownRef}
+                        className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                      >
+                        {filteredMenuItems.slice(0, 10).map((item, index) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              handleAddItem(item);
+                              setSearchTerm('');
+                              setShowDropdown(false);
+                              setSelectedIndex(-1);
+                            }}
+                            className={`w-full px-3 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors ${
+                              index === selectedIndex ? 'bg-blue-100 border-blue-200' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                                {item.category && (
+                                  <p className="text-xs text-gray-500">{item.category}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 ml-2">
+                                <span className="text-sm font-bold text-green-600">₹{item.price}</span>
+                                {editItems.find(editItem => editItem.menu_item_id === item.id) && (
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">
+                                    {editItems.find(editItem => editItem.menu_item_id === item.id)?.quantity}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                        
+                        {filteredMenuItems.length > 10 && (
+                          <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t">
+                            Showing 10 of {filteredMenuItems.length} items. Keep typing to narrow down...
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* No Results */}
+                    {showDropdown && searchTerm && filteredMenuItems.length === 0 && (
+                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                        <div className="text-center text-gray-500 text-sm">
+                          <p>No items found for "{searchTerm}"</p>
+                          <p className="text-xs mt-1">Try a different search term</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Add Buttons - Popular Items */}
+                <div>
+                  <Label className="text-xs text-gray-600 font-bold">⚡ Quick Add</Label>
+                  <div className="flex gap-1 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide mt-1">
+                    {menuItems.slice(0, 8).map(item => (
+                      <button 
+                        key={item.id}
+                        onClick={() => handleAddItem(item)}
+                        className="flex-shrink-0 px-2 py-1.5 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg text-xs font-medium hover:from-green-100 hover:to-green-200 transition-colors whitespace-nowrap"
+                      >
+                        <div className="text-center">
+                          <div className="font-bold">{item.name.split(' ')[0]}</div>
+                          <div className="text-green-600">₹{item.price}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Manual Item Entry */}
-                <div className="flex gap-1 text-xs">
-                  <Input 
-                    placeholder="Item"
-                    value={manualItemName}
-                    onChange={(e) => setManualItemName(e.target.value)}
-                    className="h-7 flex-1 text-xs"
-                  />
-                  <Input 
-                    type="number"
-                    placeholder="₹"
-                    value={manualItemPrice}
-                    onChange={(e) => setManualItemPrice(e.target.value)}
-                    className="h-7 w-16 text-xs"
-                    min="0"
-                  />
-                  <button 
-                    onClick={handleAddManualItem}
-                    className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
+                <div>
+                  <Label className="text-xs text-gray-600 font-bold">➕ Add Custom Item</Label>
+                  <div className="flex gap-1 text-xs mt-1">
+                    <Input 
+                      placeholder="Custom item name"
+                      value={manualItemName}
+                      onChange={(e) => setManualItemName(e.target.value)}
+                      className="h-8 flex-1 text-xs"
+                    />
+                    <Input 
+                      type="number"
+                      placeholder="Price"
+                      value={manualItemPrice}
+                      onChange={(e) => setManualItemPrice(e.target.value)}
+                      className="h-8 w-20 text-xs"
+                      min="0"
+                      step="0.01"
+                    />
+                    <button 
+                      onClick={handleAddManualItem}
+                      className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center transition-colors font-bold"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Items List */}
-                <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {editItems.length === 0 ? (
-                    <div className="text-center py-4 text-gray-400 text-xs">No items added</div>
-                  ) : (
-                    editItems.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-1 p-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
-                          <p className="text-[10px] text-gray-500">₹{item.price}</p>
-                        </div>
-                        <div className="flex items-center gap-0.5 bg-white rounded border border-gray-200">
-                          <button 
-                            onClick={() => handleQuantityChange(idx, item.quantity - 1)}
-                            className="w-5 h-5 flex items-center justify-center text-xs font-bold text-red-500 hover:bg-red-50"
-                          >
-                            −
-                          </button>
-                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                          <button 
-                            onClick={() => handleQuantityChange(idx, item.quantity + 1)}
-                            className="w-5 h-5 flex items-center justify-center text-xs font-bold text-blue-600 hover:bg-blue-50"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="text-xs font-bold text-gray-700 w-12 text-right">₹{(item.price * item.quantity).toFixed(0)}</span>
-                        <button 
-                          onClick={() => handleRemoveItem(idx)}
-                          className="w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-red-500"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                <div>
+                  <Label className="text-xs text-gray-600 font-bold">📦 Order Items ({editItems.length})</Label>
+                  <div className="space-y-1 max-h-48 overflow-y-auto mt-1 border border-gray-200 rounded-lg">
+                    {editItems.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400 text-sm">
+                        <div className="text-2xl mb-2">🛒</div>
+                        <p>No items added yet</p>
+                        <p className="text-xs">Search and add items above</p>
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      editItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200 last:border-b-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-gray-500">₹{item.price} each</span>
+                              {item.notes && (
+                                <span className="text-xs text-blue-600 bg-blue-50 px-1 rounded">{item.notes}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-300 shadow-sm">
+                            <button 
+                              onClick={() => handleQuantityChange(idx, item.quantity - 1)}
+                              className="w-7 h-7 flex items-center justify-center text-sm font-bold text-red-500 hover:bg-red-50 rounded-l-lg transition-colors"
+                            >
+                              −
+                            </button>
+                            <span className="w-8 text-center text-sm font-bold bg-gray-50 py-1">{item.quantity}</span>
+                            <button 
+                              onClick={() => handleQuantityChange(idx, item.quantity + 1)}
+                              className="w-7 h-7 flex items-center justify-center text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-r-lg transition-colors"
+                            >
+                              +
+                            </button>
+                          </div>
+                          
+                          {/* Item Total */}
+                          <span className="text-sm font-bold text-gray-700 w-16 text-right">₹{(item.price * item.quantity).toFixed(0)}</span>
+                          
+                          {/* Remove Button */}
+                          <button 
+                            onClick={() => handleRemoveItem(idx)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             )}

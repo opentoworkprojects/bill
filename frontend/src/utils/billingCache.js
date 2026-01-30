@@ -140,16 +140,21 @@ class BillingCache {
 
   /**
    * Get billing data with cache-first strategy
+   * @param {string} orderId - Order ID
+   * @param {boolean} forceRefresh - Skip cache and fetch fresh data
    */
-  async getBillingData(orderId) {
-    // Try cache first
-    const cached = this.getCachedBillingData(orderId);
-    if (cached) {
-      return cached;
+  async getBillingData(orderId, forceRefresh = false) {
+    // Skip cache if force refresh is requested
+    if (!forceRefresh) {
+      // Try cache first
+      const cached = this.getCachedBillingData(orderId);
+      if (cached) {
+        return cached;
+      }
     }
 
     // Fetch fresh data
-    console.log(`🔄 Fetching fresh billing data for order ${orderId}`);
+    console.log(`🔄 Fetching ${forceRefresh ? 'FRESH' : 'fresh'} billing data for order ${orderId}`);
     const data = await this._fetchBillingData(orderId);
     this._cacheData(orderId, data);
     return data;
