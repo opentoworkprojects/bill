@@ -126,6 +126,9 @@ const OrdersPage = ({ user }) => {
   const [needsImmediateRefresh, setNeedsImmediateRefresh] = useState(false);
   // Add state to track recent payment completions to prevent polling override
   const [recentPaymentCompletions, setRecentPaymentCompletions] = useState(new Set());
+  // Add global payment protection flag to disable ALL refresh mechanisms  
+  const [paymentProtectionActive, setPaymentProtectionActive] = useState(false);
+  console.log('🔧 PaymentProtectionActive state initialized:', paymentProtectionActive);
   // Add state for global polling disable during order creation
   const [globalPollingDisabled, setGlobalPollingDisabled] = useState(false);
   const dataLoadedRef = useRef(false);
@@ -202,14 +205,20 @@ const OrdersPage = ({ user }) => {
             return newSet;
           });
           
-          // Remove from tracking after 10 seconds (longer than polling interval)
+          // NUCLEAR PROTECTION: Disable ALL refresh mechanisms for 15 seconds
+          setPaymentProtectionActive(true);
+          console.log('🛡️ PAYMENT PROTECTION ACTIVATED - All refreshes disabled for 15 seconds');
+          
+          // Remove from tracking after 15 seconds (extended from 10)
           setTimeout(() => {
             setRecentPaymentCompletions(prev => {
               const newSet = new Set(prev);
               newSet.delete(paidOrderId);
               return newSet;
             });
-          }, 10000);
+            setPaymentProtectionActive(false);
+            console.log('✅ Payment protection deactivated - Normal polling resumed');
+          }, 15000);
           
           // Show confirmation toast
           if (orderData.is_credit) {
@@ -268,6 +277,13 @@ const OrdersPage = ({ user }) => {
     const interval = setInterval(() => {
       // Force immediate refresh if needed
       if (needsImmediateRefresh) {
+        // NUCLEAR PROTECTION: Skip if payment protection is active
+        if (paymentProtectionActive) {
+          console.log('🛡️ Skipping immediate refresh - payment protection active');
+          setNeedsImmediateRefresh(false);
+          return;
+        }
+        
         console.log('🚀 Immediate refresh triggered');
         setNeedsImmediateRefresh(false);
         if (activeTab === 'active') {
@@ -281,6 +297,12 @@ const OrdersPage = ({ user }) => {
       // Skip polling if there are active status changes to avoid conflicts
       if (processingStatusChanges.size > 0) {
         console.log('⏸️ Skipping polling - status changes in progress:', Array.from(processingStatusChanges));
+        return;
+      }
+      
+      // Skip polling if payment protection is active (NUCLEAR PROTECTION)
+      if (paymentProtectionActive) {
+        console.log('🛡️ Skipping polling - payment protection active');
         return;
       }
       
@@ -306,7 +328,7 @@ const OrdersPage = ({ user }) => {
     }, 2000); // Reduced to 2 seconds for faster updates
 
     return () => clearInterval(interval);
-  }, [activeTab, processingStatusChanges, needsImmediateRefresh, recentPaymentCompletions]); // Added recentPaymentCompletions dependency
+  }, [activeTab, processingStatusChanges, needsImmediateRefresh, recentPaymentCompletions, paymentProtectionActive]); // Removed recentOrderCreation dependency
 
   // Track user interactions to pause polling
   useEffect(() => {
@@ -329,6 +351,12 @@ const OrdersPage = ({ user }) => {
   // Aggressive real-time refresh on window focus (when user returns to tab)
   useEffect(() => {
     const handleFocus = () => {
+      // NUCLEAR PROTECTION: Skip if payment protection is active
+      if (paymentProtectionActive) {
+        console.log('🛡️ Skipping focus refresh - payment protection active');
+        return;
+      }
+      
       if (activeTab === 'active') {
         fetchOrders();
       } else if (activeTab === 'history') {
@@ -338,11 +366,17 @@ const OrdersPage = ({ user }) => {
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [activeTab]);
+  }, [activeTab, paymentProtectionActive]);
 
   // Real-time refresh on tab visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // NUCLEAR PROTECTION: Skip if payment protection is active
+      if (paymentProtectionActive) {
+        console.log('🛡️ Skipping visibility refresh - payment protection active');
+        return;
+      }
+      
       if (!document.hidden) {
         if (activeTab === 'active') {
           fetchOrders();
@@ -354,12 +388,18 @@ const OrdersPage = ({ user }) => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [activeTab]);
+  }, [activeTab, paymentProtectionActive]);
 
   // Real-time refresh on mouse movement (user is active)
   useEffect(() => {
     let lastRefresh = Date.now();
     const handleMouseMove = () => {
+      // NUCLEAR PROTECTION: Skip if payment protection is active
+      if (paymentProtectionActive) {
+        console.log('🛡️ Skipping mouse movement refresh - payment protection active');
+        return;
+      }
+      
       const now = Date.now();
       // Only refresh if it's been more than 2 seconds since last refresh
       if (now - lastRefresh > 2000) {
@@ -374,16 +414,22 @@ const OrdersPage = ({ user }) => {
 
     document.addEventListener('mousemove', handleMouseMove);
     return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, [activeTab]);
+  }, [activeTab, paymentProtectionActive]);
 
   // Manual refresh function for real-time updates
   const handleManualRefresh = async () => {
+    // NUCLEAR PROTECTION: Skip if payment protection is active
+    if (paymentProtectionActive) {
+      console.log('🛡️ Skipping manual refresh - payment protection active');
+      toast.info('⏳ Please wait - processing recent payment...');
+      return;
+    }
+    
     setLoading(true);
     
     try {
-      // Clear caches for fresh data
-      sessionStorage.removeItem(`orders_${user?.id}`);
-      localStorage.removeItem('billbyte_menu_cache');
+      // NO CACHES TO CLEAR - Always fetch fresh data
+      console.log('🔄 Manual refresh - fetching fresh data from database');
       
       // Play feedback sound and vibration
       if ('vibrate' in navigator) {
@@ -411,12 +457,7 @@ const OrdersPage = ({ user }) => {
           const menuData = Array.isArray(menuRes.data) ? menuRes.data : [];
           const validMenuItems = menuData.filter(item => item && item.id && item.name);
           
-          // Cache fresh menu data
-          localStorage.setItem('billbyte_menu_cache', JSON.stringify({
-            data: validMenuItems,
-            timestamp: Date.now()
-          }));
-          
+          // NO CACHING - Use fresh menu data directly
           setMenuItems(validMenuItems);
         }
       } catch (menuError) {
@@ -435,30 +476,22 @@ const OrdersPage = ({ user }) => {
 
   const loadInitialData = async () => {
     try {
-      // Try to load menu from cache first for instant display
-      const cachedMenu = localStorage.getItem('billbyte_menu_cache');
-      if (cachedMenu) {
-        try {
-          const { data: cachedMenuData, timestamp } = JSON.parse(cachedMenu);
-          // Use cached menu if less than 5 minutes old
-          if (Date.now() - timestamp < 300000 && Array.isArray(cachedMenuData)) {
-            const validCachedItems = cachedMenuData.filter(item => item && item.id && item.name && item.available);
-            setMenuItems(validCachedItems);
-            setMenuLoading(false);
-          }
-        } catch (e) {
-          console.warn('Failed to parse cached menu:', e);
-        }
-      }
+      // CLEAR ALL CACHES for fresh data
+      console.log('🧹 Clearing all caches for fresh data');
+      sessionStorage.removeItem(`orders_${user?.id}`);
+      localStorage.removeItem('billbyte_menu_cache');
+      
+      // NO CACHE LOADING - Always fetch fresh data from database
+      console.log('🚀 Loading all data fresh from database');
 
-      // Load critical data first (orders, today's bills, tables, and menu items)
+      // Load critical data first (orders, today's bills, tables, and menu items) - ALL FRESH
       const [ordersRes, todaysBillsRes, tablesRes, menuRes] = await Promise.all([
-        apiSilent({ method: 'get', url: `${API}/orders` }),
-        apiSilent({ method: 'get', url: `${API}/orders/today-bills` }),
+        apiSilent({ method: 'get', url: `${API}/orders?fresh=true&_t=${Date.now()}` }),
+        apiSilent({ method: 'get', url: `${API}/orders/today-bills?fresh=true&_t=${Date.now()}` }),
         // Use fresh=true and cache-busting for tables to get real-time status
         apiSilent({ method: 'get', url: `${API}/tables?fresh=true&_t=${Date.now()}` }),
-        // Load menu items with timeout and caching
-        apiSilent({ method: 'get', url: `${API}/menu`, timeout: 8000 })
+        // Load menu items fresh
+        apiSilent({ method: 'get', url: `${API}/menu?fresh=true&_t=${Date.now()}`, timeout: 8000 })
       ]);
       
       // Process orders data
@@ -503,12 +536,10 @@ const OrdersPage = ({ user }) => {
       
       // Cache menu items for next time
       try {
-        localStorage.setItem('billbyte_menu_cache', JSON.stringify({
-          data: validMenuItems,
-          timestamp: Date.now()
-        }));
+        // NO CACHING - Use fresh menu data directly
+        console.log('📋 Fresh menu items loaded:', validMenuItems.length);
       } catch (e) {
-        console.warn('Failed to cache menu items:', e);
+        console.warn('Failed to set menu items:', e);
       }
       
       // 🚀 PERFORMANCE OPTIMIZATION: Smart pre-loading with persistent cache
@@ -550,30 +581,17 @@ const OrdersPage = ({ user }) => {
   };
 
   const fetchOrders = async (forceRefresh = false) => {
+    // NUCLEAR PROTECTION: Skip if payment protection is active
+    if (paymentProtectionActive && !forceRefresh) {
+      console.log('🛡️ Skipping fetchOrders - payment protection active');
+      return;
+    }
+    
     try {
-      // Use cache for faster loading unless force refresh
-      const cacheKey = `orders_${user?.id}`;
-      const cachedData = !forceRefresh ? sessionStorage.getItem(cacheKey) : null;
+      // DISABLE CACHING COMPLETELY - Always fetch fresh data from server/database
+      console.log('🚀 Fetching fresh orders directly from database (no cache)');
       
-      if (cachedData && !forceRefresh) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          if (Date.now() - parsed.timestamp < 30000) { // 30 second cache
-            // Preserve optimistic orders when loading from cache
-            setOrders(prevOrders => {
-              const optimisticOrders = prevOrders.filter(order => order.is_optimistic);
-              const cachedOrders = parsed.data.filter(order => !order.is_optimistic);
-              return [...optimisticOrders, ...cachedOrders];
-            });
-            console.log('� Orders loaded from cache (preserving optimistic orders)');
-            return;
-          }
-        } catch (e) {
-          console.warn('Cache parse error:', e);
-        }
-      }
-      
-      const params = forceRefresh ? `?_t=${Date.now()}` : '';
+      const params = `?_t=${Date.now()}&fresh=true`; // Always force fresh data
       const response = await apiWithRetry({
         method: 'get',
         url: `${API}/orders${params}`,
@@ -606,113 +624,42 @@ const OrdersPage = ({ user }) => {
       
       const sortedOrders = validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
-      // Cache the response for faster subsequent loads
-      sessionStorage.setItem(cacheKey, JSON.stringify({
-        data: sortedOrders,
-        timestamp: Date.now()
-      }));
+      // NO CACHING - Always use fresh server data
+      console.log('📋 Using fresh server data, no caching');
       
-      // 🚀 PRESERVE OPTIMISTIC ORDERS: Merge server data with local changes
+      // SIMPLIFIED: Just use server data directly, no complex merging
       setOrders(prevOrders => {
-        try {
-          const optimisticOrders = prevOrders.filter(order => order.is_optimistic);
-          const instantUpdates = prevOrders.filter(order => order.instant_update);
-          const serverOrders = sortedOrders.filter(order => !order.is_optimistic);
-          
-          // Remove optimistic orders that now exist on server (successful creation)
-          const finalOptimisticOrders = optimisticOrders.filter(optimisticOrder => {
-            // Check if this optimistic order has been created on server
-            const existsOnServer = serverOrders.some(serverOrder => {
-              // Match by table and items (since temp IDs won't match)
-              return serverOrder.table_id === optimisticOrder.table_id &&
-                     serverOrder.items?.length === optimisticOrder.items?.length &&
-                     Math.abs(serverOrder.total - optimisticOrder.total) < 0.01;
-            });
-            return !existsOnServer;
-          });
-          
-          // Preserve instant status updates with improved logic to prevent flickering
-          const mergedServerOrders = serverOrders.map(serverOrder => {
-            const instantUpdate = instantUpdates.find(local => local.id === serverOrder.id);
-            
-            if (instantUpdate) {
-              // Use timestamp-based preservation for better accuracy
-              if (instantUpdate.instant_update_timestamp) {
-                const timeSinceUpdate = Date.now() - instantUpdate.instant_update_timestamp;
-                // Preserve instant updates for 8 seconds (matching handleStatusChange)
-                if (timeSinceUpdate < 8000 && instantUpdate.status !== serverOrder.status) {
-                  console.log('🔒 Preserving instant update:', serverOrder.id, instantUpdate.status, 'over server:', serverOrder.status);
-                  return {
-                    ...serverOrder,
-                    status: instantUpdate.status,
-                    updated_at: instantUpdate.updated_at,
-                    instant_update: true,
-                    instant_update_timestamp: instantUpdate.instant_update_timestamp,
-                    processing_status: instantUpdate.processing_status || false
-                  };
-                }
-              } else if (instantUpdate.updated_at) {
-                // Fallback to date-based preservation
-                try {
-                  const timeSinceUpdate = Date.now() - new Date(instantUpdate.updated_at).getTime();
-                  // Preserve instant updates for 8 seconds
-                  if (timeSinceUpdate < 8000 && instantUpdate.status !== serverOrder.status) {
-                    console.log('🔒 Preserving instant update (fallback):', serverOrder.id, instantUpdate.status);
-                    return {
-                      ...serverOrder,
-                      status: instantUpdate.status,
-                      updated_at: instantUpdate.updated_at,
-                      instant_update: true,
-                      processing_status: instantUpdate.processing_status || false
-                    };
-                  }
-                } catch (dateError) {
-                  console.warn('Date parsing error:', dateError);
-                }
-              }
-            }
-            
-            return serverOrder;
-          });
-          
-          // Filter out completed and paid orders from active orders
-          // ALSO filter out recently paid orders to prevent polling override
-          const activeServerOrders = mergedServerOrders.filter(order => {
-            // Standard filtering for completed/cancelled/paid orders
-            if (['completed', 'cancelled', 'paid'].includes(order.status)) {
-              return false;
-            }
-            
-            // CRITICAL: Filter out recently paid orders to prevent polling override
-            if (recentPaymentCompletions.has(order.id)) {
-              console.log('🚫 Filtering out recently paid order from server response:', order.id);
-              return false;
-            }
-            
-            return true;
-          });
-          
-          // Move completed orders to today's bills
-          const completedOrders = mergedServerOrders.filter(order => 
-            ['completed', 'paid'].includes(order.status)
-          );
-          
-          if (completedOrders.length > 0) {
-            setTodaysBills(prevBills => {
-              const existingIds = new Set(prevBills.map(bill => bill.id));
-              const newCompletedOrders = completedOrders.filter(order => !existingIds.has(order.id));
-              return [...newCompletedOrders, ...prevBills];
-            });
+        // Filter out completed and paid orders from active orders
+        const activeServerOrders = sortedOrders.filter(order => {
+          // Standard filtering for completed/cancelled/paid orders
+          if (['completed', 'cancelled', 'paid'].includes(order.status)) {
+            return false;
           }
           
-          const mergedOrders = [...finalOptimisticOrders, ...activeServerOrders];
+          // CRITICAL: Filter out recently paid orders to prevent polling override
+          if (recentPaymentCompletions.has(order.id)) {
+            console.log('🚫 Filtering out recently paid order from server response:', order.id);
+            return false;
+          }
           
-          return mergedOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        } catch (mergeError) {
-          console.error('Error merging orders:', mergeError);
-          // Fallback to just server orders if merging fails
-          return sortedOrders.filter(order => !['completed', 'cancelled', 'paid'].includes(order.status));
+          return true;
+        });
+        
+        // Move completed orders to today's bills
+        const completedOrders = sortedOrders.filter(order => 
+          ['completed', 'paid'].includes(order.status)
+        );
+        
+        if (completedOrders.length > 0) {
+          setTodaysBills(prevBills => {
+            const existingIds = new Set(prevBills.map(bill => bill.id));
+            const newCompletedOrders = completedOrders.filter(order => !existingIds.has(order.id));
+            return [...newCompletedOrders, ...prevBills];
+          });
         }
+        
+        console.log('📋 Setting orders directly from server:', activeServerOrders.length);
+        return activeServerOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       });
       
     } catch (error) {
@@ -871,33 +818,19 @@ const OrdersPage = ({ user }) => {
       const selectedTable = formData.table_id ? tables.find(t => t.id === formData.table_id) : null;
       const customerName = formData.customer_name?.trim() || (businessSettings?.kot_mode_enabled === false ? 'Cash Sale' : '');
       
-      // Create optimistic order for instant display
-      const optimisticOrder = {
-        id: `temp_${Date.now()}`,
-        table_id: formData.table_id || null,
-        table_number: selectedTable?.table_number || 0,
-        items: selectedItems,
-        customer_name: customerName,
-        customer_phone: formData.customer_phone || '',
-        status: 'pending',
-        total: selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-        created_at: new Date().toISOString(),
-        is_optimistic: true // Flag to identify optimistic orders
-      };
-
-      // Instant UI update - show order immediately
-      setOrders(prevOrders => [optimisticOrder, ...prevOrders]);
+      // SIMPLIFIED: Direct server creation without optimistic updates
+      console.log('🚀 Creating order directly on server...');
       
       // Instant feedback
       playSound('success');
-      toast.success('🎉 Order created successfully!');
+      toast.success('🎉 Creating order...');
       
-      // Close menu and reset form
+      // Close menu and reset form immediately
       setShowMenuPage(false);
       setCartExpanded(false);
       resetForm();
 
-      // Create actual order on server
+      // Create order on server
       const response = await apiWithRetry({
         method: 'post',
         url: `${API}/orders`,
@@ -912,14 +845,18 @@ const OrdersPage = ({ user }) => {
         timeout: 12000 // Longer timeout for order creation
       });
 
-      // Replace optimistic order with real order
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === optimisticOrder.id 
-            ? { ...response.data, created_at: response.data.created_at || new Date().toISOString() }
-            : order
-        )
-      );
+      // SIMPLIFIED: Just add the server order directly to the list
+      setOrders(prevOrders => {
+        const newOrder = { 
+          ...response.data, 
+          created_at: response.data.created_at || new Date().toISOString() 
+        };
+        console.log('✅ Order created successfully, adding to list:', newOrder.id);
+        return [newOrder, ...prevOrders];
+      });
+      
+      // Success feedback
+      toast.success('✅ Order created successfully!');
 
       // Update last order created to prevent duplicates
       setLastOrderCreated({
@@ -938,14 +875,10 @@ const OrdersPage = ({ user }) => {
         );
       }
 
-      // Background refresh for consistency (but don't override optimistic updates)
+      // Simple background refresh for tables only
       setTimeout(() => {
         fetchTables(true);
-        // Delay the first order refresh to let optimistic update be visible
-        setTimeout(() => {
-          fetchOrders(true);
-        }, 1000);
-      }, 3000); // Increased delay to let optimistic update be visible
+      }, 3000);
       
       // Offer WhatsApp notification
       if (response.data?.whatsapp_link && formData.customer_phone) {
