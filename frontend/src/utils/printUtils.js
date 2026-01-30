@@ -277,21 +277,20 @@ const generatePaymentUrl = (order, businessSettings) => {
   return paymentUrl;
 };
 
-// Generate QR code data URL using multiple methods with thermal printer optimization
+// Generate QR code data URL using multiple reliable methods
 const generateQRCodeDataUrl = (text, size = 100) => {
   try {
-    // For thermal printers, optimize size based on paper width
-    const optimizedSize = size <= 80 ? 80 : size <= 120 ? 100 : 120;
+    // Optimize size for better scanning (minimum 80px for mobile cameras)
+    const optimizedSize = Math.max(80, Math.min(200, size));
     
-    // Method 1: Try Google Charts API (most reliable)
-    // Use higher error correction (H = ~30%) for better scanning on thermal printers
-    const googleQR = `https://chart.googleapis.com/chart?chs=${optimizedSize}x${optimizedSize}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8&chld=H|2`;
+    console.log('🔗 Generating QR code for UPI payment');
+    console.log('🔗 QR code size:', optimizedSize);
     
-    // Method 2: Try QR Server API as backup
-    const qrServerAPI = `https://api.qrserver.com/v1/create-qr-code/?size=${optimizedSize}x${optimizedSize}&data=${encodeURIComponent(text)}&ecc=H&margin=1`;
+    // Method 1: QR Server API (most reliable and fast)
+    const qrServerAPI = `https://api.qrserver.com/v1/create-qr-code/?size=${optimizedSize}x${optimizedSize}&data=${encodeURIComponent(text)}&ecc=M&margin=2&format=png`;
     
-    // Return primary method (Google Charts is most reliable)
-    return googleQR;
+    // Return primary method (QR Server is most reliable for UPI)
+    return qrServerAPI;
   } catch (error) {
     console.error('QR code generation failed:', error);
     // Enhanced fallback with better UPI pattern
@@ -1198,7 +1197,7 @@ const generateProfessionalReceiptHTML = (order, businessOverride = null) => {
     html += '<div class="center bold small mb-1">SCAN TO PAY BALANCE</div>';
     
     const paymentUrl = generatePaymentUrl(order, b);
-    const qrSize = settings.paper_width === '58mm' ? 60 : 80;
+    const qrSize = settings.paper_width === '58mm' ? 80 : 100;
     const qrCodeDataUrl = generateQRCodeDataUrl(paymentUrl, qrSize);
     
     html += `<div class="center mb-1">

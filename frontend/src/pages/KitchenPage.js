@@ -47,7 +47,22 @@ const KitchenPage = ({ user }) => {
     fetchBusinessSettings();
     initializeAudioElements();
     
-    const interval = autoRefresh ? setInterval(fetchOrders, 5000) : null;
+    const interval = autoRefresh ? setInterval(() => {
+      // COMPLETELY BLOCK polling if there are status changes in progress
+      if (processingOrders.size > 0) {
+        console.log('⏸️ Kitchen: BLOCKING polling - status changes in progress:', Array.from(processingOrders));
+        return;
+      }
+      
+      // Extended interaction blocking for kitchen page
+      const lastInteraction = localStorage.getItem('lastUserInteraction');
+      if (lastInteraction && (Date.now() - parseInt(lastInteraction)) < 3000) {
+        console.log('⏸️ Kitchen: BLOCKING polling - recent user interaction');
+        return;
+      }
+      
+      fetchOrders();
+    }, 4000) : null; // Increased to 4 seconds for kitchen stability
     const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
     
     return () => {
@@ -166,45 +181,63 @@ const KitchenPage = ({ user }) => {
       
       const sorted = activeOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       
-      // Check for new orders and trigger notifications
-      if (orders.length > 0) {
-        const newOrders = sorted.filter(o => o.status === 'pending' && !orders.find(old => old.id === o.id));
-        if (newOrders.length > 0) {
-          // Play new order sound
-          playNewOrderSound();
-          
-          // Trigger vibration pattern (3 short bursts)
-          triggerVibration([200, 100, 200, 100, 200]);
-          
-          // Play phone ring for urgent orders
-          playPhoneRingSound();
-          
-          // Show browser notification
-          showNotification(
-            `🍽️ ${newOrders.length} New Order${newOrders.length > 1 ? 's' : ''}!`,
-            newOrders.map(o => `Table ${o.table_number || 'Counter'}: ${o.items.length} items`).join('\n'),
-            '🔔'
+      // 🚀 ULTRA-STRICT MERGE: Preserve optimistic updates and UI locks for kitchen
+      setOrders(prevOrders => {
+        // Get orders with optimistic updates or UI locks (status changes in progress)
+        const lockedOrders = prevOrders.filter(order => order.optimistic_update || order.ui_locked);
+        const lockedOrderIds = new Set(lockedOrders.map(order => order.id));
+        
+        // Get server orders that don't have optimistic updates or UI locks
+        const nonLockedServerOrders = sorted.filter(order => !lockedOrderIds.has(order.id));
+        
+        // Merge: locked orders take absolute precedence over server data
+        const mergedOrders = [...lockedOrders, ...nonLockedServerOrders];
+        
+        // Check for new orders and trigger notifications (only for non-locked orders)
+        if (prevOrders.length > 0) {
+          const newOrders = nonLockedServerOrders.filter(o => 
+            o.status === 'pending' && !prevOrders.find(old => old.id === o.id)
           );
-          
-          // Show toast notification
-          toast.success(`🔔 ${newOrders.length} new order${newOrders.length > 1 ? 's' : ''} received!`, {
-            duration: 5000,
-            action: {
-              label: 'View',
-              onClick: () => setFilter('pending')
-            }
-          });
+          if (newOrders.length > 0) {
+            // Play new order sound
+            playNewOrderSound();
+            
+            // Trigger vibration pattern (3 short bursts)
+            triggerVibration([200, 100, 200, 100, 200]);
+            
+            // Play phone ring for urgent orders
+            playPhoneRingSound();
+            
+            // Show browser notification
+            showNotification(
+              `🍽️ ${newOrders.length} New Order${newOrders.length > 1 ? 's' : ''}!`,
+              newOrders.map(o => `Table ${o.table_number || 'Counter'}: ${o.items.length} items`).join('\n'),
+              '🔔'
+            );
+            
+            // Show toast notification
+            toast.success(`🔔 ${newOrders.length} new order${newOrders.length > 1 ? 's' : ''} received!`, {
+              duration: 5000,
+              action: {
+                label: 'View',
+                onClick: () => setFilter('pending')
+              }
+            });
+          }
         }
-      }
+        
+        return mergedOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      });
       
-      setOrders(sorted);
       setStats({
         pending: sorted.filter(o => o.status === 'pending').length,
         preparing: sorted.filter(o => o.status === 'preparing').length,
         ready: sorted.filter(o => o.status === 'ready').length
       });
+      
     } catch (error) {
-      console.error('Failed to fetch orders', error);
+      console.error('Failed to fetch orders:', error);
+      // Don't clear orders on error to prevent flickering
     }
   };
 
@@ -289,8 +322,16 @@ const KitchenPage = ({ user }) => {
   }, []);
 
   const handleStatusChange = async (orderId, status) => {
+    // Prevent double-clicks
+    if (processingOrders.has(orderId)) {
+      return;
+    }
+    
     // Instant feedback - add to processing set
     setProcessingOrders(prev => new Set([...prev, orderId]));
+    
+    // EXTENDED INTERACTION BLOCKING for kitchen
+    localStorage.setItem('lastUserInteraction', Date.now().toString());
     
     // Play button click sound immediately
     playButtonClickSound();
@@ -298,11 +339,18 @@ const KitchenPage = ({ user }) => {
     // Trigger haptic feedback
     triggerVibration([100]);
     
-    // Optimistic UI update with error handling
+    // Optimistic UI update with ultra-stable state
     setOrders(prevOrders => 
       prevOrders.map(order => 
         order.id === orderId 
-          ? { ...order, status, processing: true, updated_at: new Date().toISOString() }
+          ? { 
+              ...order, 
+              status, 
+              processing: true, 
+              updated_at: new Date().toISOString(),
+              optimistic_update: true, // Mark as optimistic to prevent polling conflicts
+              ui_locked: true // Additional lock for kitchen display
+            }
           : order
       )
     );
@@ -329,18 +377,30 @@ const KitchenPage = ({ user }) => {
         className: 'font-bold'
       });
       
+      // Update with server confirmation while maintaining visual stability
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { 
+                ...order, 
+                status, 
+                processing: false, 
+                optimistic_update: false, // Clear optimistic flag
+                ui_locked: false // Clear UI lock
+              }
+            : order
+        )
+      );
+      
       // For completed orders, show a brief success animation before removing
       if (status === 'completed') {
-        // Keep the order visible for 2 seconds with completed status
+        // Keep the order visible for 3 seconds with completed status
         setTimeout(() => {
           setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
-        }, 2000);
+        }, 3000);
       }
       
-      // Refresh orders to get server state (but don't override completed order immediately)
-      if (status !== 'completed') {
-        fetchOrders();
-      }
+      // NO immediate fetchOrders() call to prevent flickering
       
     } catch (error) {
       // Error feedback
@@ -357,17 +417,27 @@ const KitchenPage = ({ user }) => {
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
-            ? { ...order, processing: false }
+            ? { 
+                ...order, 
+                processing: false,
+                optimistic_update: false,
+                ui_locked: false
+              }
             : order
         )
       );
     } finally {
-      // Remove from processing set
-      setProcessingOrders(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(orderId);
-        return newSet;
-      });
+      // Remove from processing set after extended delay to prevent polling conflicts
+      setTimeout(() => {
+        setProcessingOrders(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(orderId);
+          return newSet;
+        });
+        
+        // Extended interaction blocking
+        localStorage.setItem('lastUserInteraction', Date.now().toString());
+      }, 2000); // Extended to 2 seconds for kitchen stability
     }
   };
 

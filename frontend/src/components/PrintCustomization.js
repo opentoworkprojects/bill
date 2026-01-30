@@ -111,6 +111,10 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
   useEffect(() => {
     try {
       setCustomization(initializeCustomization());
+      // Force regenerate preview with new settings
+      setTimeout(() => {
+        generatePreview();
+      }, 100);
     } catch (error) {
       console.error('Error updating customization from business settings:', error);
       toast.error('Error loading print settings. Using defaults.');
@@ -1081,16 +1085,43 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       });
       
       console.log('🔧 Save response:', response.data);
-      toast.success('Print settings saved successfully!');
       
-      // Safely update parent component
+      // CRITICAL: Invalidate print settings cache to ensure KOT themes are applied immediately
       try {
-        if (onUpdate && typeof onUpdate === 'function') {
-          onUpdate(updatedSettings);
+        // Import and call cache invalidation function
+        const { invalidateSettingsCache } = await import('../utils/printUtils');
+        invalidateSettingsCache();
+        console.log('🔧 Print settings cache invalidated - KOT themes will now apply');
+        
+        // Show specific success message for KOT theme changes
+        if (activeTab === 'kot') {
+          toast.success('KOT theme settings saved! Print a test KOT to see the new design.');
+        } else {
+          toast.success('Print settings saved successfully!');
         }
-      } catch (updateError) {
-        console.warn('Error updating parent component:', updateError);
-        // Don't fail the save operation if parent update fails
+      } catch (cacheError) {
+        console.warn('Error invalidating cache:', cacheError);
+        // Force reload of settings by clearing localStorage cache keys
+        try {
+          const cacheKeys = Object.keys(localStorage).filter(key => 
+            key.includes('print') || key.includes('settings') || key.includes('cache')
+          );
+          cacheKeys.forEach(key => {
+            if (key !== 'user' && key !== 'token') {
+              localStorage.removeItem(key);
+            }
+          });
+          console.log('🔧 Fallback cache clearing completed');
+          
+          if (activeTab === 'kot') {
+            toast.success('KOT theme settings saved! Print a test KOT to see the new design.');
+          } else {
+            toast.success('Print settings saved successfully!');
+          }
+        } catch (fallbackError) {
+          console.warn('Fallback cache clearing failed:', fallbackError);
+          toast.success('Print settings saved successfully!');
+        }
       }
       
       // Safely update local storage
@@ -1927,8 +1958,8 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
                   </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <p className="text-xs text-blue-800">
-                      <strong>Tip:</strong> Different themes work better for different kitchen setups. 
-                      Compact themes save paper, while detailed themes provide more information for complex orders.
+                      <strong>Tip:</strong> After changing KOT themes, save settings and print a test KOT to see the new design. 
+                      Different themes work better for different kitchen setups - compact themes save paper, while detailed themes provide more information for complex orders.
                     </p>
                   </div>
                 </CardContent>
