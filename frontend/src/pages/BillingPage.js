@@ -805,6 +805,7 @@ const BillingPage = ({ user }) => {
       setPaymentCompleted(true);
       
       // 🚀 IMMEDIATE EVENT DISPATCH: Notify OrdersPage about payment completion
+      // IMPORTANT: Remove from active orders regardless of payment status (full or partial)
       const paymentCompletionEvent = new CustomEvent('paymentCompleted', {
         detail: {
           orderId: orderId,
@@ -816,10 +817,15 @@ const BillingPage = ({ user }) => {
             balance_amount: balance,
             is_credit: isCredit,
             total: total
-          }
+          },
+          // Flag to indicate this order should be removed from active orders
+          removeFromActiveOrders: true
         }
       });
+      
+      console.log('🚀 Dispatching payment completion event:', paymentCompletionEvent.detail);
       window.dispatchEvent(paymentCompletionEvent);
+      console.log('✅ Payment completion event dispatched successfully');
       
       // Also store in localStorage for cross-tab communication
       localStorage.setItem('paymentCompleted', JSON.stringify({
@@ -833,6 +839,7 @@ const BillingPage = ({ user }) => {
           is_credit: isCredit,
           total: total
         },
+        removeFromActiveOrders: true,
         timestamp: Date.now()
       }));
       

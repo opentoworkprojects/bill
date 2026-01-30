@@ -124,6 +124,10 @@ const OrdersPage = ({ user }) => {
   const [processingStatusChanges, setProcessingStatusChanges] = useState(new Set());
   // Add state for forcing immediate refresh after status changes
   const [needsImmediateRefresh, setNeedsImmediateRefresh] = useState(false);
+  // Add state to track recent payment completions to prevent polling override
+  const [recentPaymentCompletions, setRecentPaymentCompletions] = useState(new Set());
+  // Add state for global polling disable during order creation
+  const [globalPollingDisabled, setGlobalPollingDisabled] = useState(false);
   const dataLoadedRef = useRef(false);
 
   // Get unique categories from menu items
@@ -135,6 +139,129 @@ const OrdersPage = ({ user }) => {
       loadInitialData();
     }
   }, []);
+
+  // Listen for payment completion events from BillingPage
+  useEffect(() => {
+    const handlePaymentCompleted = (event) => {
+      console.log('🎯 Payment completion event received!', event.detail);
+      
+      // Don't handle payment events during order creation
+      if (globalPollingDisabled || isCreatingOrder) {
+        console.log('⏸️ Skipping payment completion handling - order creation in progress', {
+          globalPollingDisabled,
+          isCreatingOrder
+        });
+        return;
+      }
+      
+      const { orderId: paidOrderId, orderData } = event.detail;
+      
+      console.log('💰 Processing payment completion for order:', paidOrderId, orderData);
+      
+      // IMMEDIATE ORDER REMOVAL: Remove paid order from active orders instantly
+      setOrders(prevOrders => {
+        console.log('📋 Current orders before removal:', prevOrders.map(o => ({ id: o.id, status: o.status })));
+        
+        const paidOrder = prevOrders.find(order => order.id === paidOrderId);
+        if (paidOrder) {
+          console.log('🚀 INSTANTLY removing paid order from active orders:', paidOrderId);
+          console.log('💰 Payment details:', { 
+            isCredit: orderData.is_credit, 
+            balance: orderData.balance_amount,
+            received: orderData.payment_received,
+            total: orderData.total
+          });
+          
+          // Add to today's bills immediately - ALWAYS add to bills after payment
+          setTodaysBills(prevBills => {
+            const exists = prevBills.some(bill => bill.id === paidOrderId);
+            if (!exists) {
+              const completedOrder = { 
+                ...paidOrder, 
+                ...orderData, 
+                // Keep the server status but ensure it's in bills
+                status: orderData.status || 'completed',
+                payment_received: orderData.payment_received || paidOrder.total,
+                balance_amount: orderData.balance_amount || 0,
+                is_credit: orderData.is_credit || false
+              };
+              console.log('📝 Adding paid order to today\'s bills:', completedOrder);
+              return [completedOrder, ...prevBills];
+            }
+            return prevBills;
+          });
+          
+          // ALWAYS remove from active orders after ANY payment - NO EXCEPTIONS
+          const filteredOrders = prevOrders.filter(order => order.id !== paidOrderId);
+          console.log('✅ Orders after removal:', filteredOrders.map(o => ({ id: o.id, status: o.status })));
+          
+          // Track this payment completion to prevent polling override
+          setRecentPaymentCompletions(prev => {
+            const newSet = new Set(prev);
+            newSet.add(paidOrderId);
+            return newSet;
+          });
+          
+          // Remove from tracking after 10 seconds (longer than polling interval)
+          setTimeout(() => {
+            setRecentPaymentCompletions(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(paidOrderId);
+              return newSet;
+            });
+          }, 10000);
+          
+          // Show confirmation toast
+          if (orderData.is_credit) {
+            toast.success(`💰 Partial payment received! Order moved to bills (Balance: ₹${orderData.balance_amount})`);
+          } else {
+            toast.success('✅ Payment completed! Order moved to bills');
+          }
+          
+          return filteredOrders;
+        } else {
+          console.log('⚠️ Paid order not found in active orders:', paidOrderId);
+        }
+        return prevOrders;
+      });
+      
+      // Optional: Force server refresh after a longer delay for sync (but order already removed from UI)
+      setTimeout(() => {
+        console.log('🔄 Background server refresh after payment completion');
+        fetchTodaysBills();
+      }, 2000);
+    };
+
+    // Listen for custom payment completion events
+    window.addEventListener('paymentCompleted', handlePaymentCompleted);
+    
+    // Also listen for storage events (cross-tab communication)
+    const handleStorageChange = (event) => {
+      // Don't handle storage events during order creation
+      if (globalPollingDisabled || isCreatingOrder) {
+        console.log('⏸️ Skipping storage event handling - order creation in progress');
+        return;
+      }
+      
+      if (event.key === 'paymentCompleted') {
+        try {
+          const paymentData = JSON.parse(event.newValue);
+          if (paymentData && paymentData.orderId) {
+            handlePaymentCompleted({ detail: paymentData });
+          }
+        } catch (e) {
+          console.warn('Failed to parse payment completion data:', e);
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('paymentCompleted', handlePaymentCompleted);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [globalPollingDisabled, isCreatingOrder, recentPaymentCompletions]);
 
   // Real-time polling for active orders and today's bills (every 2 seconds to avoid overriding optimistic updates)
   useEffect(() => {
@@ -157,6 +284,12 @@ const OrdersPage = ({ user }) => {
         return;
       }
       
+      // Skip polling if there are recent payment completions to prevent override
+      if (recentPaymentCompletions.size > 0) {
+        console.log('⏸️ Skipping polling - recent payment completions:', Array.from(recentPaymentCompletions));
+        return;
+      }
+      
       // Skip polling if user recently interacted (within 2 seconds for faster response)
       const lastInteraction = localStorage.getItem('lastUserInteraction');
       if (lastInteraction && (Date.now() - parseInt(lastInteraction)) < 2000) {
@@ -173,7 +306,7 @@ const OrdersPage = ({ user }) => {
     }, 2000); // Reduced to 2 seconds for faster updates
 
     return () => clearInterval(interval);
-  }, [activeTab, processingStatusChanges, needsImmediateRefresh]); // Added needsImmediateRefresh dependency
+  }, [activeTab, processingStatusChanges, needsImmediateRefresh, recentPaymentCompletions]); // Added recentPaymentCompletions dependency
 
   // Track user interactions to pause polling
   useEffect(() => {
@@ -543,9 +676,21 @@ const OrdersPage = ({ user }) => {
           });
           
           // Filter out completed and paid orders from active orders
-          const activeServerOrders = mergedServerOrders.filter(order => 
-            !['completed', 'cancelled', 'paid'].includes(order.status)
-          );
+          // ALSO filter out recently paid orders to prevent polling override
+          const activeServerOrders = mergedServerOrders.filter(order => {
+            // Standard filtering for completed/cancelled/paid orders
+            if (['completed', 'cancelled', 'paid'].includes(order.status)) {
+              return false;
+            }
+            
+            // CRITICAL: Filter out recently paid orders to prevent polling override
+            if (recentPaymentCompletions.has(order.id)) {
+              console.log('🚫 Filtering out recently paid order from server response:', order.id);
+              return false;
+            }
+            
+            return true;
+          });
           
           // Move completed orders to today's bills
           const completedOrders = mergedServerOrders.filter(order => 
