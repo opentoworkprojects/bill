@@ -5061,24 +5061,24 @@ async def get_orders(
         print(f"🆘 All strategies failed, returning empty list")
         return []
             
-            # Basic datetime conversion
-            for order in orders:
-                try:
-                    if isinstance(order.get("created_at"), str):
-                        order["created_at"] = datetime.fromisoformat(order["created_at"])
-                    if isinstance(order.get("updated_at"), str):
-                        order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-                except:
-                    # If datetime conversion fails, leave as string
-                    pass
+        # Basic datetime conversion
+        for order in orders:
+            try:
+                if isinstance(order.get("created_at"), str):
+                    order["created_at"] = datetime.fromisoformat(order["created_at"])
+                if isinstance(order.get("updated_at"), str):
+                    order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+            except:
+                # If datetime conversion fails, leave as string
+                pass
+        
+        print(f"🆘 Fallback returned {len(orders)} orders")
+        return orders
             
-            print(f"🆘 Fallback returned {len(orders)} orders")
-            return orders
-            
-        except Exception as final_error:
-            print(f"❌ Final fallback failed: {final_error}")
-            # Return empty list rather than crash
-            return []
+    except Exception as final_error:
+        print(f"❌ Final fallback failed: {final_error}")
+        # Return empty list rather than crash
+        return []
         
     except Exception as e:
         print(f"❌ Critical error in get_orders: {e}")
