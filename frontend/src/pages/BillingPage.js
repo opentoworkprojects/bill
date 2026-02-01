@@ -129,7 +129,7 @@ const BillingPage = ({ user }) => {
     };
   }, [orderId]);
 
-  // 🚀 OPTIMIZED DATA LOADING - Force fresh data for updated orders
+  // 🚀 OPTIMIZED DATA LOADING - Use preloaded cache for instant billing
   const loadBillingDataOptimized = async () => {
     if (!orderId) return;
 
@@ -138,9 +138,9 @@ const BillingPage = ({ user }) => {
 
     try {
       
-      // FORCE FRESH DATA: Always fetch latest order data to ensure updates are reflected
-      console.log('🔄 Loading fresh billing data for order:', orderId);
-      const billingData = await billingCache.getBillingData(orderId, true); // Force fresh
+      // 🚀 CACHE-FIRST APPROACH: Use preloaded data for instant billing experience
+      console.log('⚡ Loading billing data for order:', orderId);
+      const billingData = await billingCache.getBillingData(orderId, false); // Use cache first
       
       setOrder(billingData.order);
       setOrderItems(billingData.order.items || []);
@@ -169,8 +169,8 @@ const BillingPage = ({ user }) => {
         setDiscountValue(billingData.order.discount_value || billingData.order.discount || '');
       }
       
-      // End timing with cache miss metadata
-      endBillingTimer(orderId, { cacheHit: false, dataSource: 'api' });
+      // End timing with cache hit/miss metadata
+      endBillingTimer(orderId, { cacheHit: true, dataSource: 'cache' });
       
       // Pre-load payment data for faster processing
       preloadPaymentData(orderId).catch(error => {
@@ -372,8 +372,7 @@ const BillingPage = ({ user }) => {
             setMenuItems(items);
             setMenuLoading(false);
             
-            // Refresh in background after showing cached data
-            setTimeout(() => fetchMenuItems(true), 500);
+            // Menu items are already fresh from billingCache - no need to refresh
             return;
           }
         } catch (e) {

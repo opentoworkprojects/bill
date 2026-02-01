@@ -23,6 +23,7 @@ class PerformanceMonitor {
       payment_validation: 300, // Payment validation within 300ms
       payment_confirmation: 500, // Payment confirmation within 500ms
       payment_error: 200,     // Error display within 200ms
+      billing_load: 1000,     // Billing page load within 1s (with preloaded data)
       
       // API Performance Thresholds (Requirements 5.1, 5.2)
       api_response: 500,      // 95% of API requests within 500ms
