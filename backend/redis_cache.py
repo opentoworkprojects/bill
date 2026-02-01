@@ -441,6 +441,38 @@ class RedisCache:
             print(f"❌ Redis delete error: {e}")
             return False
     
+    async def invalidate_date_aware_caches(self, org_id: str, date_key: str = None):
+        """Invalidate date-aware caches for orders and bills"""
+        if not self.is_connected():
+            return False
+            
+        try:
+            # Use current date if not provided
+            if not date_key:
+                date_key = datetime.now().strftime("%Y-%m-%d")
+            
+            # Invalidate date-aware cache keys
+            cache_keys = [
+                f"active_orders:{org_id}:{date_key}",
+                f"todays_bills:{org_id}:{date_key}",
+                f"active_orders:{org_id}",  # Legacy key for backward compatibility
+            ]
+            
+            success_count = 0
+            for key in cache_keys:
+                try:
+                    if await self.delete(key):
+                        success_count += 1
+                        print(f"🗑️ Invalidated date-aware cache: {key}")
+                except Exception as key_error:
+                    print(f"⚠️ Failed to invalidate cache key {key}: {key_error}")
+            
+            return success_count > 0
+            
+        except Exception as e:
+            print(f"❌ Redis date-aware invalidation error: {e}")
+            return False
+    
     # ============ ORDER DETAILS CACHE ============
     
     async def get_order(self, order_id: str, org_id: str) -> Optional[Dict]:

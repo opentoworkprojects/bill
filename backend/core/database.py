@@ -1,4 +1,5 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+import os
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from motor.core import AgnosticDatabase
 from typing import Optional
 from .config import settings
@@ -8,6 +9,12 @@ class Database:
     db: AgnosticDatabase = None
 
 db = Database()
+
+async def get_database() -> AsyncIOMotorDatabase:
+    """Get database connection"""
+    if db.client is None:
+        await connect_to_mongo()
+    return db.db
 
 async def connect_to_mongo():
     """Initialize MongoDB connection"""
