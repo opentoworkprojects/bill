@@ -588,10 +588,10 @@ const OrdersPage = ({ user }) => {
     }
     
     try {
-      // DISABLE CACHING COMPLETELY - Always fetch fresh data from server/database
-      console.log('🚀 Fetching fresh orders directly from database (no cache)');
+      // ALWAYS FETCH FRESH DATA FROM DATABASE - No caching for order status accuracy
+      console.log('🚀 Always fetching fresh orders from database (no cache)');
       
-      const params = `?_t=${Date.now()}&fresh=true`; // Always force fresh data
+      const params = `?fresh=true&_t=${Date.now()}`; // Always force fresh data from DB
       const response = await apiWithRetry({
         method: 'get',
         url: `${API}/orders${params}`,
@@ -600,15 +600,21 @@ const OrdersPage = ({ user }) => {
       
       const ordersData = Array.isArray(response.data) ? response.data : [];
       
-      // Validate and clean order data
+      // Get today's start time for logging purposes (but don't filter active orders by date)
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      // Validate and clean order data (NO date filtering for active orders)
       const validOrders = ordersData.filter(order => {
         // Ensure order has required fields
-        return order && 
-               order.id && 
-               order.created_at && 
-               order.status && 
-               typeof order.total === 'number' &&
-               Array.isArray(order.items);
+        if (!order || !order.id || !order.created_at || !order.status || 
+            typeof order.total !== 'number' || !Array.isArray(order.items)) {
+          return false;
+        }
+        
+        // NO DATE FILTERING for active orders - yesterday's uncompleted orders should show
+        // Business Logic: If an order is not completed, it should appear regardless of date
+        return true;
       }).map(order => ({
         ...order,
         // Ensure all required fields have default values
@@ -624,8 +630,38 @@ const OrdersPage = ({ user }) => {
       
       const sortedOrders = validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
-      // NO CACHING - Always use fresh server data
-      console.log('📋 Using fresh server data, no caching');
+      // Log orders by date for visibility
+      const todayOrders = sortedOrders.filter(order => {
+        try {
+          const orderDate = new Date(order.created_at);
+          return orderDate >= todayStart;
+        } catch {
+          return true;
+        }
+      });
+      
+      const yesterdayOrders = sortedOrders.filter(order => {
+        try {
+          const orderDate = new Date(order.created_at);
+          const yesterdayStart = new Date(todayStart);
+          yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+          return orderDate >= yesterdayStart && orderDate < todayStart;
+        } catch {
+          return false;
+        }
+      });
+      
+      console.log(`🚀 Active orders breakdown:`);
+      console.log(`   📅 Today: ${todayOrders.length} active orders`);
+      console.log(`   📅 Yesterday (uncompleted): ${yesterdayOrders.length} active orders`);
+      console.log(`   📊 Total: ${validOrders.length} active orders (including uncompleted from previous days)`);
+      
+      if (yesterdayOrders.length > 0) {
+        console.log(`   ⚠️ Yesterday's uncompleted orders (still showing - correct behavior):`);
+        yesterdayOrders.slice(0, 3).forEach(order => {
+          console.log(`      - Order ${order.id}: ${order.status} from ${order.created_at}`);
+        });
+      }
       
       // SIMPLIFIED: Just use server data directly, no complex merging
       setOrders(prevOrders => {
@@ -658,7 +694,7 @@ const OrdersPage = ({ user }) => {
           });
         }
         
-        console.log('📋 Setting orders directly from server:', activeServerOrders.length);
+        console.log('📋 Setting TODAY\'s active orders from database:', activeServerOrders.length);
         return activeServerOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       });
       

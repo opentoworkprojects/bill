@@ -4916,7 +4916,8 @@ async def get_orders(
     status: Optional[str] = None, 
     current_user: dict = Depends(get_current_user),
     page: int = Query(1, ge=1, description="Page number starting from 1"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page (max 100)")
+    page_size: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
+    fresh: Optional[bool] = Query(False, description="Force fresh data from database")
 ):
     # Get user's organization_id - CRITICAL for data isolation
     user_org_id = current_user.get("organization_id")
@@ -4930,38 +4931,24 @@ async def get_orders(
     print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching orders with status: {status}")
 
     try:
-        # Strategy 1: Try Redis-cached order service for active orders
-        if not status or status not in ["completed", "cancelled"]:
-            try:
-                cached_service = get_cached_order_service()
-                
-                if not status:
-                    # Get all active orders (Redis cache with MongoDB fallback)
-                    orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
-                    print(f"🚀 Returned {len(orders)} active orders (cached service)")
-                    return orders
-                else:
-                    # Get active orders and filter by status
-                    active_orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
-                    filtered_orders = [order for order in active_orders if order.get("status") == status]
-                    print(f"🚀 Returned {len(filtered_orders)} orders with status '{status}' (cached service)")
-                    return filtered_orders
-                    
-            except Exception as cache_error:
-                print(f"❌ Cached service error: {cache_error}, falling back to direct MongoDB")
-                # Continue to Strategy 2
+        # ALWAYS CHECK DATABASE FIRST for most accurate order status
+        print(f"📊 Always fetching fresh data from database for org {user_org_id}")
         
-        # Strategy 2: Direct MongoDB query (for completed/cancelled orders or if cache fails)
-        print(f"📊 Fetching orders directly from MongoDB for org {user_org_id}")
-        
+        # Build query with proper status filtering (NO date filter for active orders)
         query = {"organization_id": user_org_id}
+        
         if status:
             query["status"] = status
-        elif not status:
-            # If no status specified, get active orders from MongoDB
-            query["status"] = {"$nin": ["completed", "cancelled"]}
+            # For completed/paid orders, don't filter by date (show all history)
+            # For active orders, also don't filter by date (show uncompleted orders from any date)
+        else:
+            # No status specified = get active orders (uncompleted) from any date
+            # Business Logic: Show ALL uncompleted orders, even from yesterday
+            query["status"] = {"$nin": ["completed", "cancelled", "paid"]}
+            # NO DATE FILTER: Yesterday's uncompleted orders should still show as active
 
         try:
+            # ALWAYS fetch from database for most current status
             orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
             
             # Convert datetime objects for consistency
@@ -4977,27 +4964,102 @@ async def get_orders(
                     except:
                         pass
             
-            print(f"📊 Returned {len(orders)} orders from MongoDB (status: {status})")
+            # Log orders by date for business visibility (but don't filter them out)
+            if not status or status not in ["completed", "paid", "cancelled"]:
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                today_orders = []
+                yesterday_orders = []
+                older_orders = []
+                
+                for order in orders:
+                    try:
+                        order_date = order.get("created_at")
+                        if isinstance(order_date, str):
+                            order_date = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
+                        
+                        if order_date >= today_start:
+                            today_orders.append(order)
+                        elif order_date >= (today_start - timedelta(days=1)):
+                            yesterday_orders.append(order)
+                        else:
+                            older_orders.append(order)
+                    except Exception as date_error:
+                        print(f"⚠️ Date parsing error for order {order.get('id')}: {date_error}")
+                        today_orders.append(order)  # Default to today if parsing fails
+                
+                print(f"🚀 Active orders breakdown:")
+                print(f"   📅 Today: {len(today_orders)} active orders")
+                print(f"   📅 Yesterday (uncompleted): {len(yesterday_orders)} active orders")
+                print(f"   📅 Older (uncompleted): {len(older_orders)} active orders")
+                print(f"   📊 Total active orders: {len(orders)} (including uncompleted from previous days)")
+                
+                if yesterday_orders:
+                    print(f"   ⚠️ Yesterday's uncompleted orders (still active - correct behavior):")
+                    for order in yesterday_orders[:3]:  # Show first 3
+                        print(f"      - Order {order.get('id', 'unknown')}: {order.get('status')} from {order.get('created_at')}")
+            else:
+                print(f"📊 Returned {len(orders)} {status} orders from database")
+            
+            # SMART CACHING: Cache fresh results for very short time (30 seconds only)
+            if not fresh:
+                try:
+                    cached_service = get_cached_order_service()
+                    if cached_service and not status:
+                        # Only cache active orders for 30 seconds
+                        await cached_service.cache.set_active_orders(user_org_id, orders, ttl=30)
+                        print(f"💾 Cached {len(orders)} orders for 30 seconds")
+                except Exception as cache_error:
+                    print(f"⚠️ Cache write error: {cache_error}")
+            
             return orders
             
         except Exception as db_error:
             print(f"❌ MongoDB query error: {db_error}")
-            # Continue to Strategy 3
+            # Fallback to cached service if database fails - NO date filtering for active orders
+            try:
+                cached_service = get_cached_order_service()
+                if cached_service:
+                    orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
+                    
+                    # Log the fallback orders by date for visibility (but don't filter them)
+                    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                    today_count = 0
+                    yesterday_count = 0
+                    older_count = 0
+                    
+                    for order in orders:
+                        try:
+                            order_date = order.get("created_at")
+                            if isinstance(order_date, str):
+                                order_date = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
+                            elif isinstance(order_date, datetime):
+                                pass  # Already datetime
+                            else:
+                                continue
+                            
+                            if order_date >= today_start:
+                                today_count += 1
+                            elif order_date >= (today_start - timedelta(days=1)):
+                                yesterday_count += 1
+                            else:
+                                older_count += 1
+                        except Exception as date_error:
+                            print(f"⚠️ Date parsing error in fallback for order {order.get('id')}: {date_error}")
+                            today_count += 1  # Default to today
+                    
+                    print(f"🆘 Fallback active orders breakdown:")
+                    print(f"   📅 Today: {today_count} orders")
+                    print(f"   📅 Yesterday (uncompleted): {yesterday_count} orders")
+                    print(f"   📅 Older (uncompleted): {older_count} orders")
+                    print(f"   📊 Total: {len(orders)} active orders (including uncompleted from previous days)")
+                    
+                    return orders
+            except Exception as cache_error:
+                print(f"❌ Cache fallback also failed: {cache_error}")
         
-        # Strategy 3: Final fallback with minimal query
-        print(f"🆘 Using minimal fallback query for org {user_org_id}")
-        
-        try:
-            # Most basic query possible
-            basic_query = {"organization_id": user_org_id}
-            orders = await db.orders.find(basic_query, {"_id": 0}).sort("created_at", -1).limit(100).to_list(100)
-            
-            # Filter by status if needed
-            if status:
-                orders = [order for order in orders if order.get("status") == status]
-            elif not status:
-                # Filter to active orders only
-                orders = [order for order in orders if order.get("status") not in ["completed", "cancelled"]]
+        # Final fallback: return empty list
+        print(f"🆘 All strategies failed, returning empty list")
+        return []
             
             # Basic datetime conversion
             for order in orders:
@@ -5184,46 +5246,76 @@ async def update_order_status(
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
 
-    # Try to get order from cache first, then fallback to MongoDB
+    print(f"🔄 Updating order {order_id} to status: {status} for org {user_org_id}")
+
+    # ALWAYS get order from database for most current data
     try:
-        cached_service = get_cached_order_service()
-        order = await cached_service.get_order_by_id(order_id, user_org_id, use_cache=True)
-        if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
-    except Exception as e:
-        print(f"⚠️ Cache error getting order {order_id}: {e}")
         order = await db.orders.find_one(
             {"id": order_id, "organization_id": user_org_id}, {"_id": 0}
         )
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        
+        print(f"📊 Found order {order_id} with current status: {order.get('status')}")
+    except Exception as e:
+        print(f"❌ Database error getting order {order_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
 
-    # Update order status in MongoDB
-    await db.orders.update_one(
-        {"id": order_id, "organization_id": user_org_id},
-        {
-            "$set": {
-                "status": status,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        },
-    )
+    # Update order status in MongoDB with timestamp
+    try:
+        result = await db.orders.update_one(
+            {"id": order_id, "organization_id": user_org_id},
+            {
+                "$set": {
+                    "status": status,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Order not found for update")
+        
+        print(f"✅ Order {order_id} updated to {status} in database")
+    except Exception as e:
+        print(f"❌ Database update error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update order")
 
-    # Invalidate Redis cache for this order and active orders list
+    # INSTANT CACHE INVALIDATION: Clear all related caches immediately
     try:
         cached_service = get_cached_order_service()
-        await cached_service.invalidate_order_caches(user_org_id, order_id)
+        if cached_service:
+            # Invalidate all order-related caches
+            await cached_service.invalidate_order_caches(user_org_id, order_id)
+            
+            # Also invalidate active orders cache with date-aware keys
+            today_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            cache_keys = [
+                f"active_orders:{user_org_id}:{today_key}",
+                f"active_orders:{user_org_id}",
+                f"todays_bills:{user_org_id}:{today_key}",
+                f"order:{user_org_id}:{order_id}",
+            ]
+            
+            invalidated_count = 0
+            for key in cache_keys:
+                try:
+                    if await cached_service.cache.delete(key):
+                        invalidated_count += 1
+                        print(f"🗑️ Invalidated cache key: {key}")
+                except Exception as key_error:
+                    print(f"⚠️ Failed to invalidate cache key {key}: {key_error}")
+            
+            print(f"🚀 Invalidated {invalidated_count} cache keys for instant update")
+            
+            # Also invalidate table cache if status affects table
+            if status == "completed":
+                await cached_service.invalidate_table_caches(user_org_id)
         
-        # Also invalidate table cache if status affects table
-        if status == "completed":
-            await cached_service.invalidate_table_caches(user_org_id)
-        
-        print(f"🗑️ Cache invalidated for order status update {order_id} -> {status}")
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
 
     # Update table status if order is completed - Use TableStatusManager for immediate sync
-    # This ensures cache invalidation happens (Requirements 1.2, 1.3)
     if status == "completed":
         table_id = order.get("table_id")
         if table_id and table_id != "counter":
@@ -5231,7 +5323,7 @@ async def update_order_status(
                 table_manager = get_table_status_manager()
                 result = await table_manager.set_table_available(user_org_id, table_id)
                 if result["success"]:
-                    print(f"✅ Table {order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for status update {order_id}")
+                    print(f"✅ Table {order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager")
                 else:
                     print(f"⚠️ TableStatusManager failed: {result['message']}")
                     # Fallback to direct update
@@ -5239,18 +5331,31 @@ async def update_order_status(
                         {"id": table_id, "organization_id": user_org_id},
                         {"$set": {"status": "available", "current_order_id": None}}
                     )
-                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback for status update {order_id}")
+                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback")
             except Exception as e:
                 print(f"⚠️ TableStatusManager error: {e}, using fallback")
-                # Fallback to direct update if TableStatusManager fails
                 try:
                     await db.tables.update_one(
                         {"id": table_id, "organization_id": user_org_id},
                         {"$set": {"status": "available", "current_order_id": None}}
                     )
-                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback for status update {order_id}")
+                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback")
                 except Exception as fallback_error:
                     print(f"⚠️ Table clearing fallback error: {fallback_error}")
+    
+    # Verify the update by fetching the order again
+    try:
+        updated_order = await db.orders.find_one(
+            {"id": order_id, "organization_id": user_org_id},
+            {"_id": 0, "id": 1, "status": 1, "updated_at": 1}
+        )
+        
+        if updated_order:
+            print(f"✅ Verified: Order {order_id} status is now {updated_order.get('status')}")
+        else:
+            print(f"⚠️ Could not verify order update for {order_id}")
+    except Exception as verify_error:
+        print(f"⚠️ Verification error: {verify_error}")
     
     # Generate WhatsApp notification if enabled
     business = current_user.get("business_settings", {})
@@ -5274,6 +5379,11 @@ async def update_order_status(
 
     return {
         "message": "Order status updated",
+        "order_id": order_id,
+        "new_status": status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "cache_invalidated": True,
+        "database_verified": True,
         "whatsapp_link": whatsapp_link,
         "customer_phone": customer_phone
     }

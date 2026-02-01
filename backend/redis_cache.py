@@ -700,10 +700,12 @@ class CachedOrderService:
         print(f"📊 Fetching active orders from MongoDB for org {org_id}")
         
         try:
-            # Query only active orders (not completed/cancelled)
+            # Query active orders (not completed/cancelled/paid) regardless of date
+            # Business Logic: Show ALL uncompleted orders, even from yesterday
             query = {
                 "organization_id": org_id,
-                "status": {"$nin": ["completed", "cancelled"]}
+                "status": {"$nin": ["completed", "cancelled", "paid"]}
+                # NO DATE FILTER: Yesterday's uncompleted orders should still show as active
             }
             
             orders = await self.db.orders.find(
@@ -723,14 +725,46 @@ class CachedOrderService:
                     print(f"⚠️ Datetime conversion error for order {order.get('id', 'unknown')}: {dt_error}")
                     pass
             
+            # Log orders by date for visibility
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            today_orders = []
+            yesterday_orders = []
+            older_orders = []
+            
+            for order in orders:
+                try:
+                    order_date = order.get("created_at")
+                    if isinstance(order_date, str):
+                        order_date = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
+                    
+                    if order_date >= today_start:
+                        today_orders.append(order)
+                    elif order_date >= (today_start - timedelta(days=1)):
+                        yesterday_orders.append(order)
+                    else:
+                        older_orders.append(order)
+                except Exception as date_error:
+                    print(f"⚠️ Date parsing error for order {order.get('id')}: {date_error}")
+                    today_orders.append(order)  # Default to today if parsing fails
+            
+            print(f"📊 Active orders breakdown:")
+            print(f"   📅 Today: {len(today_orders)} orders")
+            print(f"   📅 Yesterday (still active): {len(yesterday_orders)} orders")
+            print(f"   📅 Older (still active): {len(older_orders)} orders")
+            
+            if yesterday_orders:
+                print(f"   ⚠️ Yesterday's uncompleted orders still showing (correct behavior):")
+                for order in yesterday_orders[:3]:  # Show first 3
+                    print(f"      - Order {order.get('id', 'unknown')}: {order.get('status')} from {order.get('created_at')}")
+            
             # Try to cache the results if Redis is available
             if use_cache and self.cache.is_connected():
                 try:
-                    await self.cache.set_active_orders(org_id, orders, ttl=300)  # 5 min cache
+                    await self.cache.set_active_orders(org_id, orders, ttl=60)  # 1 min cache
                 except Exception as cache_set_error:
                     print(f"⚠️ Failed to cache orders: {cache_set_error}")
             
-            print(f"📊 Found {len(orders)} active orders for org {org_id}")
+            print(f"📊 Found {len(orders)} total active orders for org {org_id} (including uncompleted from previous days)")
             return orders
             
         except Exception as db_error:
