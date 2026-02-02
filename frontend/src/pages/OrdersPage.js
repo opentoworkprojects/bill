@@ -665,16 +665,30 @@ const OrdersPage = ({ user }) => {
       
       // SIMPLIFIED: Just use server data directly, no complex merging
       setOrders(prevOrders => {
-        // Filter out completed and paid orders from active orders
+        // Filter out completed and paid orders from active orders - BULLETPROOF FILTERING
         const activeServerOrders = sortedOrders.filter(order => {
-          // Standard filtering for completed/cancelled/paid orders
-          if (['completed', 'cancelled', 'paid'].includes(order.status)) {
+          // CRITICAL: Ensure order has valid status
+          if (!order.status) {
+            console.warn('⚠️ Order without status found:', order.id);
+            return false; // Exclude orders without status
+          }
+          
+          // BULLETPROOF: Filter out ALL completed/cancelled/paid orders
+          const completedStatuses = ['completed', 'cancelled', 'paid', 'billed', 'settled'];
+          if (completedStatuses.includes(order.status.toLowerCase())) {
+            console.log('🚫 Filtering out completed order from active list:', order.id, order.status);
             return false;
           }
           
           // CRITICAL: Filter out recently paid orders to prevent polling override
           if (recentPaymentCompletions.has(order.id)) {
             console.log('🚫 Filtering out recently paid order from server response:', order.id);
+            return false;
+          }
+          
+          // ADDITIONAL: Filter out orders with payment_received >= total (fully paid)
+          if (order.payment_received && order.total && order.payment_received >= order.total) {
+            console.log('🚫 Filtering out fully paid order from active list:', order.id, `(₹${order.payment_received}/₹${order.total})`);
             return false;
           }
           

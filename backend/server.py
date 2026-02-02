@@ -4911,6 +4911,63 @@ async def create_order(
     }
 
 
+@api_router.get("/orders/debug-active", response_model=dict)
+async def debug_active_orders(current_user: dict = Depends(get_current_user)):
+    """Debug endpoint to analyze active orders filtering"""
+    user_org_id = current_user.get("organization_id")
+    
+    if not user_org_id:
+        raise HTTPException(status_code=403, detail="Organization not configured")
+    
+    try:
+        # Get ALL orders for this organization
+        all_orders = await db.orders.find(
+            {"organization_id": user_org_id}, 
+            {"_id": 0}
+        ).sort("created_at", -1).limit(100).to_list(100)
+        
+        # Analyze orders by status
+        status_analysis = {}
+        payment_analysis = []
+        
+        for order in all_orders:
+            status = order.get("status", "unknown")
+            payment_received = order.get("payment_received", 0) or 0
+            total = order.get("total", 0) or 0
+            
+            # Count by status
+            if status not in status_analysis:
+                status_analysis[status] = {"count": 0, "orders": []}
+            status_analysis[status]["count"] += 1
+            status_analysis[status]["orders"].append({
+                "id": order.get("id"),
+                "created_at": order.get("created_at"),
+                "payment_received": payment_received,
+                "total": total,
+                "is_fully_paid": payment_received >= total and total > 0
+            })
+            
+            # Check payment status
+            if payment_received >= total and total > 0:
+                payment_analysis.append({
+                    "id": order.get("id"),
+                    "status": status,
+                    "payment_received": payment_received,
+                    "total": total,
+                    "should_be_filtered": True
+                })
+        
+        return {
+            "total_orders": len(all_orders),
+            "status_breakdown": status_analysis,
+            "fully_paid_orders": payment_analysis,
+            "organization_id": user_org_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
+
+
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(
     status: Optional[str] = None, 
@@ -4944,12 +5001,39 @@ async def get_orders(
         else:
             # No status specified = get active orders (uncompleted) from any date
             # Business Logic: Show ALL uncompleted orders, even from yesterday
-            query["status"] = {"$nin": ["completed", "cancelled", "paid"]}
+            # BULLETPROOF: Exclude ALL possible completed statuses
+            completed_statuses = ["completed", "cancelled", "paid", "billed", "settled"]
+            query["status"] = {"$nin": completed_statuses}
             # NO DATE FILTER: Yesterday's uncompleted orders should still show as active
 
         try:
             # ALWAYS fetch from database for most current status
             orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
+            
+            # BULLETPROOF FILTERING: Additional check for fully paid orders
+            if not status or status not in ["completed", "paid", "cancelled", "billed", "settled"]:
+                # Filter out orders that are fully paid (payment_received >= total)
+                filtered_orders = []
+                for order in orders:
+                    # Check if order is fully paid
+                    payment_received = order.get("payment_received", 0) or 0
+                    total = order.get("total", 0) or 0
+                    
+                    if payment_received >= total and total > 0:
+                        print(f"🚫 Filtering out fully paid order from active list: {order.get('id')} (₹{payment_received}/₹{total})")
+                        continue
+                    
+                    # Check status again (double-check)
+                    order_status = order.get("status", "").lower()
+                    completed_statuses = ["completed", "cancelled", "paid", "billed", "settled"]
+                    if order_status in completed_statuses:
+                        print(f"🚫 Filtering out completed order from active list: {order.get('id')} ({order_status})")
+                        continue
+                    
+                    filtered_orders.append(order)
+                
+                orders = filtered_orders
+                print(f"🔍 After bulletproof filtering: {len(orders)} truly active orders")
             
             # Convert datetime objects for consistency
             for order in orders:
