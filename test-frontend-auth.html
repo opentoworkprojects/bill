@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Management Auth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Staff Management Authentication Test</h1>
+    <p>This page tests the staff management functionality directly</p>
+
+    <div class="test-section info">
+        <h3>📋 Test Instructions</h3>
+        <ol>
+            <li>Open browser console (F12) to see detailed logs</li>
+            <li>Enter your admin credentials below</li>
+            <li>Click "Test Login" to authenticate</li>
+            <li>Click "Test Staff Creation" to test the staff endpoint</li>
+            <li>Check console for any errors</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>🔐 Authentication</h3>
+        <input type="text" id="username" placeholder="Username" value="admin">
+        <input type="password" id="password" placeholder="Password" value="">
+        <button onclick="testLogin()">Test Login</button>
+        <div id="loginResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>👤 Staff Management Test</h3>
+        <input type="text" id="staffUsername" placeholder="Staff Username" value="teststaff123">
+        <input type="email" id="staffEmail" placeholder="Staff Email" value="teststaff@example.com">
+        <input type="password" id="staffPassword" placeholder="Staff Password" value="testpass123">
+        <button onclick="testStaffCreation()">Test Staff Creation</button>
+        <button onclick="testStaffList()">Test Staff List</button>
+        <div id="staffResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 Test Results</h3>
+        <div id="testResults"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://restro-ai.onrender.com/api';
+        let authToken = null;
+
+        function log(message, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            const resultsDiv = document.getElementById('testResults');
+            const timestamp = new Date().toLocaleTimeString();
+            resultsDiv.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+        }
+
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('loginResult');
+
+            if (!username || !password) {
+                resultDiv.innerHTML = '<div class="error">Please enter username and password</div>';
+                return;
+            }
+
+            try {
+                log('🔐 Attempting login...', 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    const user = data.user;
+                    resultDiv.innerHTML = `<div class="success">✅ Login successful!<br>User: ${user.username}<br>Role: ${user.role}</div>`;
+                    log(`✅ Login successful: ${user.username} (${user.role})`, 'success');
+                    
+                    if (user.role !== 'admin') {
+                        log('⚠️ Warning: User is not admin. Staff management requires admin role.', 'error');
+                    }
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Login failed: ${data.detail || 'Unknown error'}</div>`;
+                    log(`❌ Login failed: ${response.status} - ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Login error: ${error.message}</div>`;
+                log(`❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testStaffList() {
+            const resultDiv = document.getElementById('staffResult');
+            
+            if (!authToken) {
+                resultDiv.innerHTML = '<div class="error">Please login first</div>';
+                return;
+            }
+
+            try {
+                log('📋 Testing staff list...', 'info');
+                
+                const response = await fetch(`${API_BASE}/staff`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Staff list retrieved: ${data.length} staff members</div>`;
+                    log(`✅ Staff list: ${data.length} members`, 'success');
+                    console.log('Staff data:', data);
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Staff list failed: ${data.detail || 'Unknown error'}</div>`;
+                    log(`❌ Staff list failed: ${response.status} - ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Staff list error: ${error.message}</div>`;
+                log(`❌ Staff list error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testStaffCreation() {
+            const resultDiv = document.getElementById('staffResult');
+            
+            if (!authToken) {
+                resultDiv.innerHTML = '<div class="error">Please login first</div>';
+                return;
+            }
+
+            const staffData = {
+                username: document.getElementById('staffUsername').value,
+                email: document.getElementById('staffEmail').value,
+                password: document.getElementById('staffPassword').value,
+                role: 'waiter'
+            };
+
+            if (!staffData.username || !staffData.email || !staffData.password) {
+                resultDiv.innerHTML = '<div class="error">Please fill all staff fields</div>';
+                return;
+            }
+
+            try {
+                log('👤 Testing staff creation...', 'info');
+                
+                const response = await fetch(`${API_BASE}/staff/create-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(staffData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Staff creation request successful!<br>OTP sent to: ${data.email}</div>`;
+                    log(`✅ Staff creation request successful: ${data.message}`, 'success');
+                    log('📧 Check backend logs for OTP code', 'info');
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Staff creation failed: ${data.detail || 'Unknown error'}</div>`;
+                    log(`❌ Staff creation failed: ${response.status} - ${data.detail}`, 'error');
+                    
+                    if (response.status === 500) {
+                        log('🔍 500 error indicates backend issue - check server logs', 'error');
+                    }
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Staff creation error: ${error.message}</div>`;
+                log(`❌ Staff creation error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test CORS and basic connectivity on page load
+        window.onload = async function() {
+            log('🌐 Testing backend connectivity...', 'info');
+            
+            try {
+                const response = await fetch('https://restro-ai.onrender.com/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Backend healthy: ${data.message}`, 'success');
+                } else {
+                    log(`❌ Backend health check failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Backend connectivity error: ${error.message}`, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

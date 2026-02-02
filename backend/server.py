@@ -2746,52 +2746,67 @@ async def verify_staff_creation(
     current_user: dict = Depends(get_current_user)
 ):
     """Step 2: Verify OTP and create staff"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can create staff")
-    
-    email_lower = email.lower().strip()
-    
-    # Get OTP data
-    otp_data = staff_otp_storage.get(email_lower)
-    if not otp_data:
-        raise HTTPException(status_code=400, detail="No verification request found. Please request OTP again.")
-    
-    # Check if OTP expired
-    if datetime.now(timezone.utc) > otp_data["expires"]:
+    try:
+        if current_user["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only admin can create staff")
+        
+        email_lower = email.lower().strip()
+        
+        # Get OTP data
+        otp_data = staff_otp_storage.get(email_lower)
+        if not otp_data:
+            raise HTTPException(status_code=400, detail="No verification request found. Please request OTP again.")
+        
+        # Check if OTP expired
+        if datetime.now(timezone.utc) > otp_data["expires"]:
+            del staff_otp_storage[email_lower]
+            raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+        
+        # Verify OTP
+        if otp_data["otp"] != otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP. Please check and try again.")
+        
+        # Get staff data
+        staff_data = otp_data["staff_data"]
+        admin_org_id = otp_data["organization_id"]
+        
+        # Generate unique referral code for staff
+        staff_referral_code = await generate_unique_referral_code()
+        
+        # Create user object
+        user_obj = User(
+            username=staff_data["username"],
+            email=staff_data["email"],
+            role=staff_data["role"],
+            organization_id=admin_org_id,
+            setup_completed=True,  # Staff don't need to complete setup
+            referral_code=staff_referral_code  # Always set referral code
+        )
+
+        doc = user_obj.model_dump()
+        doc["password"] = hash_password(staff_data["password"])
+        
+        # Handle optional fields safely
+        doc["phone"] = staff_data.get("phone") if staff_data.get("phone") else None
+        doc["salary"] = staff_data.get("salary") if staff_data.get("salary") else None
+        
+        doc["created_at"] = doc["created_at"].isoformat()
+        doc["email_verified"] = True
+        doc["email_verified_at"] = datetime.now(timezone.utc).isoformat()
+
+        await db.users.insert_one(doc)
+        
+        # Remove used OTP
         del staff_otp_storage[email_lower]
-        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
-    
-    # Verify OTP
-    if otp_data["otp"] != otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP. Please check and try again.")
-    
-    # Get staff data
-    staff_data = otp_data["staff_data"]
-    admin_org_id = otp_data["organization_id"]
-    
-    # Create user object
-    user_obj = User(
-        username=staff_data["username"],
-        email=staff_data["email"],
-        role=staff_data["role"],
-        organization_id=admin_org_id,
-        setup_completed=True,  # Staff don't need to complete setup
-    )
-
-    doc = user_obj.model_dump()
-    doc["password"] = hash_password(staff_data["password"])
-    doc["phone"] = staff_data["phone"]
-    doc["salary"] = staff_data["salary"]
-    doc["created_at"] = doc["created_at"].isoformat()
-    doc["email_verified"] = True
-    doc["email_verified_at"] = datetime.now(timezone.utc).isoformat()
-
-    await db.users.insert_one(doc)
-    
-    # Remove used OTP
-    del staff_otp_storage[email_lower]
-    
-    return {"message": "Staff member created successfully", "id": user_obj.id}
+        
+        return {"message": "Staff member created successfully", "id": user_obj.id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Staff verification error: {str(e)}")
+        print(f"❌ Staff data: {staff_data if 'staff_data' in locals() else 'Not available'}")
+        raise HTTPException(status_code=500, detail=f"Failed to create staff member: {str(e)}")
 
 
 @api_router.post("/staff/create")
@@ -2799,33 +2814,48 @@ async def create_staff(
     staff_data: StaffCreate, current_user: dict = Depends(get_current_user)
 ):
     """Direct staff creation without OTP (for skip verification)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can create staff")
+    try:
+        if current_user["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only admin can create staff")
 
-    existing = await db.users.find_one({"username": staff_data.username}, {"_id": 0})
-    if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        existing = await db.users.find_one({"username": staff_data.username}, {"_id": 0})
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
 
-    # Get admin's organization_id
-    admin_org_id = current_user.get("organization_id") or current_user["id"]
+        # Get admin's organization_id
+        admin_org_id = current_user.get("organization_id") or current_user["id"]
 
-    user_obj = User(
-        username=staff_data.username,
-        email=staff_data.email,
-        role=staff_data.role,
-        organization_id=admin_org_id,  # Link staff to this organization
-        setup_completed=True,  # Staff don't need to complete setup
-    )
+        # Generate unique referral code for staff
+        staff_referral_code = await generate_unique_referral_code()
 
-    doc = user_obj.model_dump()
-    doc["password"] = hash_password(staff_data.password)
-    doc["phone"] = staff_data.phone
-    doc["salary"] = staff_data.salary
-    doc["created_at"] = doc["created_at"].isoformat()
-    doc["email_verified"] = False
+        user_obj = User(
+            username=staff_data.username,
+            email=staff_data.email,
+            role=staff_data.role,
+            organization_id=admin_org_id,  # Link staff to this organization
+            setup_completed=True,  # Staff don't need to complete setup
+            referral_code=staff_referral_code  # Always set referral code
+        )
 
-    await db.users.insert_one(doc)
-    return {"message": "Staff member created", "id": user_obj.id}
+        doc = user_obj.model_dump()
+        doc["password"] = hash_password(staff_data.password)
+        
+        # Handle optional fields safely
+        doc["phone"] = staff_data.phone if staff_data.phone else None
+        doc["salary"] = staff_data.salary if staff_data.salary else None
+        
+        doc["created_at"] = doc["created_at"].isoformat()
+        doc["email_verified"] = False
+
+        await db.users.insert_one(doc)
+        return {"message": "Staff member created", "id": user_obj.id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Staff creation error: {str(e)}")
+        print(f"❌ Staff data: {staff_data}")
+        raise HTTPException(status_code=500, detail=f"Failed to create staff member: {str(e)}")
 
 
 @api_router.get("/staff")

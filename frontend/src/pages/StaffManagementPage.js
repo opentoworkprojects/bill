@@ -72,13 +72,7 @@ const StaffManagementPage = ({ user }) => {
         fetchStaff();
         resetForm();
       } else {
-        // Step 1: Request OTP for new staff
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Authentication required. Please login again.');
-          return;
-        }
-
+        // Step 1: Request OTP for new staff - use global axios instance
         const createData = {
           username: formData.username,
           email: formData.email,
@@ -89,12 +83,7 @@ const StaffManagementPage = ({ user }) => {
         if (formData.phone) createData.phone = formData.phone;
         if (formData.salary) createData.salary = parseFloat(formData.salary);
         
-        await axios.post(`${API}/staff/create-request`, createData, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        await axios.post(`${API}/staff/create-request`, createData);
         toast.success('📧 OTP sent to staff email for verification!');
         setPendingStaffEmail(formData.email);
         setShowOTPVerification(true);
@@ -103,6 +92,13 @@ const StaffManagementPage = ({ user }) => {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to save staff';
       toast.error(errorMsg);
       console.error('Staff save error:', error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+      }
     }
   };
 
@@ -114,21 +110,10 @@ const StaffManagementPage = ({ user }) => {
     
     setOtpLoading(true);
     try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-
+      // Use the global axios instance which already has auth interceptors
       const response = await axios.post(`${API}/staff/verify-create`, {
         email: pendingStaffEmail,
         otp: otp
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
       });
       
       toast.success('✅ Staff member verified and added successfully!');
@@ -164,13 +149,6 @@ const StaffManagementPage = ({ user }) => {
     
     setOtpLoading(true);
     try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-
       // Create staff directly without verification
       const createData = {
         username: formData.username,
@@ -182,12 +160,7 @@ const StaffManagementPage = ({ user }) => {
       if (formData.phone) createData.phone = formData.phone;
       if (formData.salary) createData.salary = parseFloat(formData.salary);
       
-      await axios.post(`${API}/staff/create`, createData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await axios.post(`${API}/staff/create`, createData);
       toast.success('✅ Staff member added (email not verified)');
       setShowOTPVerification(false);
       setDialogOpen(false);
@@ -211,13 +184,6 @@ const StaffManagementPage = ({ user }) => {
   const handleResendOTP = async () => {
     setOtpLoading(true);
     try {
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Authentication required. Please login again.');
-        return;
-      }
-
       const createData = {
         username: formData.username,
         email: formData.email,
@@ -228,12 +194,7 @@ const StaffManagementPage = ({ user }) => {
       if (formData.phone) createData.phone = formData.phone;
       if (formData.salary) createData.salary = parseFloat(formData.salary);
       
-      await axios.post(`${API}/staff/create-request`, createData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await axios.post(`${API}/staff/create-request`, createData);
       toast.success('📧 New OTP sent to staff email!');
     } catch (error) {
       console.error('Resend OTP error:', error);
