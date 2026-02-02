@@ -2775,6 +2775,7 @@ async def verify_staff_creation(
         email=staff_data["email"],
         role=staff_data["role"],
         organization_id=admin_org_id,
+        setup_completed=True,  # Staff don't need to complete setup
     )
 
     doc = user_obj.model_dump()
@@ -2813,6 +2814,7 @@ async def create_staff(
         email=staff_data.email,
         role=staff_data.role,
         organization_id=admin_org_id,  # Link staff to this organization
+        setup_completed=True,  # Staff don't need to complete setup
     )
 
     doc = user_obj.model_dump()

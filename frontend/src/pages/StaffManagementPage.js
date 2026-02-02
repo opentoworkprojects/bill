@@ -116,13 +116,23 @@ const StaffManagementPage = ({ user }) => {
       fetchStaff();
       resetForm();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid OTP');
+      const errorMsg = error.response?.data?.detail || 'Invalid OTP or verification failed';
+      toast.error(errorMsg);
+      
+      // If OTP expired, show option to resend
+      if (errorMsg.includes('expired')) {
+        toast.info('OTP expired. Click "Resend OTP" to get a new one.');
+      }
     } finally {
       setOtpLoading(false);
     }
   };
 
   const handleSkipVerification = async () => {
+    if (!window.confirm('Skip email verification? The staff member will be added without email verification.')) {
+      return;
+    }
+    
     setOtpLoading(true);
     try {
       // Create staff directly without verification
@@ -137,7 +147,7 @@ const StaffManagementPage = ({ user }) => {
       if (formData.salary) createData.salary = parseFloat(formData.salary);
       
       await axios.post(`${API}/staff/create`, createData);
-      toast.success('Staff member added (email not verified)');
+      toast.success('✅ Staff member added (email not verified)');
       setShowOTPVerification(false);
       setDialogOpen(false);
       setOtp('');
@@ -145,7 +155,8 @@ const StaffManagementPage = ({ user }) => {
       fetchStaff();
       resetForm();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create staff');
+      const errorMsg = error.response?.data?.detail || 'Failed to create staff';
+      toast.error(errorMsg);
     } finally {
       setOtpLoading(false);
     }
@@ -299,6 +310,15 @@ const StaffManagementPage = ({ user }) => {
                     className="w-full"
                   >
                     Resend OTP
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={handleSkipVerification}
+                    disabled={otpLoading}
+                    className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
+                  >
+                    Skip Verification & Add Staff
                   </Button>
                   
                   <button
