@@ -1285,75 +1285,228 @@ async def send_staff_verification_email(email: str, otp: str, staff_name: str, a
     """Send OTP email for staff email verification"""
     from email_service import send_otp_email
     
-    subject = "Verify Your Email - BillByteKOT Staff Account"
+    # Improved subject line to avoid spam filters
+    subject = f"Staff Invitation: Join {admin_name}'s Restaurant Team - Verification Required"
     
+    # Improved HTML with better spam score
     html_body = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Staff Invitation - BillByteKOT</title>
         <style>
-            body {{ font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }}
-            .container {{ max-width: 500px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-            .header {{ text-align: center; color: #7c3aed; }}
-            .otp-box {{ background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-            .info {{ background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }}
-            .footer {{ text-align: center; color: #666; font-size: 12px; margin-top: 20px; }}
+            body {{ 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; 
+                background-color: #f8fafc; 
+                margin: 0; 
+                padding: 20px; 
+                line-height: 1.6;
+            }}
+            .container {{ 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: #ffffff; 
+                border-radius: 12px; 
+                padding: 40px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                border: 1px solid #e2e8f0;
+            }}
+            .header {{ 
+                text-align: center; 
+                margin-bottom: 30px;
+                border-bottom: 2px solid #f1f5f9;
+                padding-bottom: 20px;
+            }}
+            .logo {{ 
+                color: #7c3aed; 
+                font-size: 28px; 
+                font-weight: bold; 
+                margin-bottom: 8px;
+            }}
+            .subtitle {{ 
+                color: #64748b; 
+                font-size: 16px; 
+                margin: 0;
+            }}
+            .content {{ 
+                color: #334155; 
+                font-size: 16px; 
+                margin-bottom: 30px;
+            }}
+            .otp-section {{ 
+                background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); 
+                color: white; 
+                text-align: center; 
+                padding: 30px; 
+                border-radius: 12px; 
+                margin: 30px 0;
+                box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+            }}
+            .otp-label {{ 
+                font-size: 14px; 
+                opacity: 0.9; 
+                margin-bottom: 10px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+            .otp-code {{ 
+                font-size: 36px; 
+                font-weight: bold; 
+                letter-spacing: 6px; 
+                font-family: 'Courier New', monospace;
+                margin: 10px 0;
+            }}
+            .info-box {{ 
+                background-color: #f0f9ff; 
+                border: 1px solid #bae6fd; 
+                border-left: 4px solid #0ea5e9; 
+                padding: 20px; 
+                margin: 25px 0; 
+                border-radius: 8px;
+            }}
+            .info-box p {{ 
+                margin: 0; 
+                color: #0c4a6e;
+                font-size: 14px;
+            }}
+            .steps {{ 
+                background-color: #fefce8; 
+                border: 1px solid #fde047; 
+                border-left: 4px solid #eab308; 
+                padding: 20px; 
+                margin: 25px 0; 
+                border-radius: 8px;
+            }}
+            .steps h3 {{ 
+                margin: 0 0 15px 0; 
+                color: #92400e;
+                font-size: 16px;
+            }}
+            .steps ol {{ 
+                margin: 0; 
+                padding-left: 20px;
+                color: #92400e;
+            }}
+            .steps li {{ 
+                margin-bottom: 8px;
+                font-size: 14px;
+            }}
+            .footer {{ 
+                text-align: center; 
+                color: #64748b; 
+                font-size: 13px; 
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e2e8f0;
+            }}
+            .company-info {{ 
+                margin-bottom: 10px;
+                font-weight: 600;
+            }}
+            .contact-info {{ 
+                margin-bottom: 15px;
+            }}
+            .disclaimer {{ 
+                font-size: 12px; 
+                color: #94a3b8;
+                font-style: italic;
+            }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🍽️ BillByteKOT</h1>
-                <p>Staff Account Verification</p>
+                <div class="logo">🍽️ BillByteKOT</div>
+                <p class="subtitle">Restaurant Management System</p>
             </div>
             
-            <h2>Hello {staff_name}! 👋</h2>
-            <p><strong>{admin_name}</strong> has invited you to join their restaurant team on BillByteKOT.</p>
-            <p>Please share this OTP with your admin to verify your email and complete your account setup:</p>
-            
-            <div class="otp-box">{otp}</div>
-            
-            <div class="info">
-                <p style="margin: 0;"><strong>⏰ Valid for 10 minutes</strong><br>
-                This OTP will expire in 10 minutes for security reasons.</p>
+            <div class="content">
+                <h2 style="color: #1e293b; margin-bottom: 20px;">Hello {staff_name}! 👋</h2>
+                <p><strong>{admin_name}</strong> has invited you to join their restaurant team on BillByteKOT, a professional restaurant management platform.</p>
+                <p>To complete your account setup, please share the verification code below with your admin:</p>
             </div>
             
-            <p style="color: #666; font-size: 14px;">If you didn't expect this invitation, please ignore this email.</p>
+            <div class="otp-section">
+                <div class="otp-label">Verification Code</div>
+                <div class="otp-code">{otp}</div>
+                <div style="font-size: 14px; opacity: 0.9; margin-top: 10px;">
+                    Share this code with {admin_name}
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>⏰ Important:</strong> This verification code expires in 10 minutes for security reasons.</p>
+            </div>
+            
+            <div class="steps">
+                <h3>Next Steps:</h3>
+                <ol>
+                    <li>Share the verification code <strong>{otp}</strong> with {admin_name}</li>
+                    <li>Your admin will enter this code to complete your account setup</li>
+                    <li>You'll receive login credentials once your account is created</li>
+                    <li>Start managing orders, inventory, and more!</li>
+                </ol>
+            </div>
             
             <div class="footer">
-                <p><strong>BillByteKOT</strong> - Smart Restaurant Management<br>
-                © 2025 BillByte Innovations. All rights reserved.</p>
+                <div class="company-info">BillByteKOT - Smart Restaurant Management</div>
+                <div class="contact-info">
+                    📧 support@billbytekot.in | 📞 +91-8310832669<br>
+                    🌐 www.billbytekot.in
+                </div>
+                <div class="disclaimer">
+                    If you didn't expect this invitation, please ignore this email.<br>
+                    This is an automated message from BillByteKOT's secure system.
+                </div>
             </div>
         </div>
     </body>
     </html>
     """
     
+    # Improved plain text version
     text_body = f"""
-    Hello {staff_name}!
-    
-    {admin_name} has invited you to join their restaurant team on BillByteKOT.
-    
-    Your verification OTP is: {otp}
-    
-    Please share this OTP with your admin to complete your account setup.
-    This OTP is valid for 10 minutes.
-    
-    If you didn't expect this invitation, please ignore this email.
-    
-    ---
-    BillByteKOT - Smart Restaurant Management
-    © 2025 BillByte Innovations
+BillByteKOT - Staff Invitation
+
+Hello {staff_name}!
+
+{admin_name} has invited you to join their restaurant team on BillByteKOT.
+
+VERIFICATION CODE: {otp}
+
+Please share this verification code with {admin_name} to complete your account setup.
+
+Next Steps:
+1. Share the code {otp} with {admin_name}
+2. Your admin will enter this code to create your account
+3. You'll receive login credentials once setup is complete
+4. Start using BillByteKOT to manage your restaurant!
+
+Important: This code expires in 10 minutes for security.
+
+If you didn't expect this invitation, please ignore this email.
+
+---
+BillByteKOT - Smart Restaurant Management
+support@billbytekot.in | +91-8310832669
+www.billbytekot.in
+
+This is an automated message from BillByteKOT's secure system.
     """
     
-    # Log OTP for debugging
+    # Enhanced logging for debugging
     print(f"🔐 STAFF VERIFICATION OTP for {email}: {otp}")
+    print(f"📧 Sending staff invitation email to {email} from admin {admin_name}")
     
     try:
+        # Use improved sender name to avoid spam
         result = await send_otp_email(email, subject, html_body, text_body)
+        print(f"✅ Staff verification email sent successfully to {email}")
         return result
     except Exception as e:
-        print(f"Email service error: {e}")
+        print(f"❌ Email service error: {e}")
         return {"success": False, "message": str(e)}
 
 
@@ -2751,27 +2904,47 @@ async def verify_staff_creation(
             raise HTTPException(status_code=403, detail="Only admin can create staff")
         
         email_lower = email.lower().strip()
+        otp_clean = otp.strip()  # Clean OTP input
+        
+        print(f"🔍 OTP Verification Debug:")
+        print(f"   Email: {email_lower}")
+        print(f"   OTP received: '{otp_clean}'")
+        print(f"   Available OTP storage keys: {list(staff_otp_storage.keys())}")
         
         # Get OTP data
         otp_data = staff_otp_storage.get(email_lower)
         if not otp_data:
+            print(f"❌ No OTP data found for {email_lower}")
             raise HTTPException(status_code=400, detail="No verification request found. Please request OTP again.")
+        
+        print(f"   Stored OTP: '{otp_data['otp']}'")
+        print(f"   Expires at: {otp_data['expires']}")
+        print(f"   Current time: {datetime.now(timezone.utc)}")
         
         # Check if OTP expired
         if datetime.now(timezone.utc) > otp_data["expires"]:
+            print(f"❌ OTP expired for {email_lower}")
             del staff_otp_storage[email_lower]
             raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
         
-        # Verify OTP
-        if otp_data["otp"] != otp:
-            raise HTTPException(status_code=400, detail="Invalid OTP. Please check and try again.")
+        # Verify OTP (case-insensitive and strip whitespace)
+        stored_otp = str(otp_data["otp"]).strip()
+        if stored_otp != otp_clean:
+            print(f"❌ OTP mismatch for {email_lower}: expected '{stored_otp}', got '{otp_clean}'")
+            raise HTTPException(status_code=400, detail=f"Invalid OTP. Please check and try again. Expected: {stored_otp}, Got: {otp_clean}")
+        
+        print(f"✅ OTP verified successfully for {email_lower}")
         
         # Get staff data
         staff_data = otp_data["staff_data"]
         admin_org_id = otp_data["organization_id"]
         
+        print(f"📝 Creating staff with data: {staff_data}")
+        print(f"🏢 Organization ID: {admin_org_id}")
+        
         # Generate unique referral code for staff
         staff_referral_code = await generate_unique_referral_code()
+        print(f"🎫 Generated referral code: {staff_referral_code}")
         
         # Create user object
         user_obj = User(
@@ -2794,10 +2967,13 @@ async def verify_staff_creation(
         doc["email_verified"] = True
         doc["email_verified_at"] = datetime.now(timezone.utc).isoformat()
 
+        print(f"💾 Inserting staff document into database...")
         await db.users.insert_one(doc)
+        print(f"✅ Staff member created successfully with ID: {user_obj.id}")
         
         # Remove used OTP
         del staff_otp_storage[email_lower]
+        print(f"🗑️ Removed used OTP for {email_lower}")
         
         return {"message": "Staff member created successfully", "id": user_obj.id}
         
@@ -2806,6 +2982,8 @@ async def verify_staff_creation(
     except Exception as e:
         print(f"❌ Staff verification error: {str(e)}")
         print(f"❌ Staff data: {staff_data if 'staff_data' in locals() else 'Not available'}")
+        import traceback
+        print(f"❌ Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to create staff member: {str(e)}")
 
 

@@ -184,13 +184,13 @@ async def send_support_email(email: str, subject: str, html_body: str, text_body
 
 
 async def send_otp_email(email: str, subject: str, html_body: str, text_body: str) -> dict:
-    """Send OTP email from support@billbytekot.in"""
+    """Send OTP email from support@billbytekot.in with improved deliverability"""
     return await send_email(
         email, 
         subject, 
         html_body, 
         text_body, 
-        from_email="BillByteKOT <support@billbytekot.in>",
+        from_email="BillByteKOT Team <support@billbytekot.in>",
         reply_to="support@billbytekot.in"
     )
 
