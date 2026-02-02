@@ -714,7 +714,9 @@ class PaymentCreate(BaseModel):
 
 
 class SubscriptionPayment(BaseModel):
-    amount: float = 999.0  # ₹999/year
+    amount: float = 2999.0  # ₹2999/year - NEW PRICING 2025
+    plan_type: str = "yearly"  # yearly, halfYearly, quarterly, monthly
+    early_adopter: bool = False  # Early adopter discount eligibility
 
 
 class InventoryItem(BaseModel):
@@ -3419,11 +3421,51 @@ async def get_razorpay_settings(current_user: dict = Depends(get_current_user)):
     }
 
 
-# Subscription - ₹1999/year with 7-day free trial (default)
-# Pricing is now dynamic from Super Admin panel
-SUBSCRIPTION_PRICE_PAISE = 199900  # ₹1999 in paise (default regular price)
-NEW_YEAR_PRICE_PAISE = 179900  # ₹1799 in paise (default campaign price - 10% off)
+# Subscription - ₹2999/year with 7-day free trial (NEW PRICING 2025)
+# Enhanced pricing strategy with early adopter benefits and revenue optimization
+SUBSCRIPTION_PRICE_PAISE = 299900  # ₹2999 in paise (NEW REGULAR PRICE)
+EARLY_ADOPTER_PRICE_PAISE = 254915  # ₹2549.15 in paise (15% OFF for early adopters)
+NEW_YEAR_PRICE_PAISE = 269900  # ₹2699 in paise (10% OFF campaign price)
 NEW_YEAR_END_DATE = datetime(2026, 1, 1, 23, 59, 59, tzinfo=timezone.utc)
+
+# Early Adopter Program - 15% OFF for first 1000 users
+EARLY_ADOPTER_DISCOUNT = 15  # 15% discount
+EARLY_ADOPTER_LIMIT = 1000   # First 1000 users
+EARLY_ADOPTER_END_DATE = datetime(2026, 3, 31, 23, 59, 59, tzinfo=timezone.utc)  # Valid until March 31, 2026
+
+# Revenue optimization features
+REFERRAL_BONUS_AMOUNT = 300  # ₹300 bonus for successful referrals (increased from ₹200)
+LOYALTY_DISCOUNT_THRESHOLD = 5  # After 5 referrals, get additional benefits
+BULK_DISCOUNT_THRESHOLD = 10  # For organizations with 10+ staff members
+
+# Dynamic pricing campaigns for revenue optimization
+PRICING_CAMPAIGNS = {
+    "early_adopter": {
+        "title": "Early Adopter Special - 15% OFF",
+        "description": "Join the first 1000 restaurants and save ₹450!",
+        "price_paise": EARLY_ADOPTER_PRICE_PAISE,
+        "original_price_paise": SUBSCRIPTION_PRICE_PAISE,
+        "discount_percent": 15,
+        "start_date": "2025-02-01T00:00:00+00:00",
+        "end_date": "2026-03-31T23:59:59+00:00",
+        "user_limit": 1000,
+        "badge_text": "EARLY ADOPTER",
+        "theme": "gradient",
+        "urgency_text": "Limited to first 1000 restaurants!"
+    },
+    "new_year_2026": {
+        "title": "New Year Special - 10% OFF",
+        "description": "Start 2026 with smart restaurant management!",
+        "price_paise": NEW_YEAR_PRICE_PAISE,
+        "original_price_paise": SUBSCRIPTION_PRICE_PAISE,
+        "discount_percent": 10,
+        "start_date": "2025-12-25T00:00:00+00:00",
+        "end_date": "2026-01-31T23:59:59+00:00",
+        "badge_text": "NEW YEAR OFFER",
+        "theme": "celebration",
+        "urgency_text": "Offer ends January 31st!"
+    }
+}
 TRIAL_DAYS = 7
 SUBSCRIPTION_DAYS = 365
 
@@ -3431,10 +3473,10 @@ SUBSCRIPTION_DAYS = 365
 ACTIVE_CAMPAIGNS = {
     "NEW_YEAR_2026": {
         "name": "New Year Special",
-        "description": "Get BillByteKOT for just ₹599/year - 40% OFF!",
-        "price_paise": 59900,  # ₹599
-        "original_price_paise": 99900,  # ₹999
-        "discount_percent": 40,
+        "description": "Get BillByteKOT for just ₹1499/year - 50% OFF!",
+        "price_paise": 149900,  # ₹1499
+        "original_price_paise": 299900,  # ₹2999
+        "discount_percent": 50,
         "start_date": "2026-01-01T00:00:00+00:00",
         "end_date": "2026-01-01T23:59:59+00:00",
         "active": True,
@@ -3481,8 +3523,8 @@ async def get_current_subscription_price():
                 pass
         
         if sale_active:
-            sale_price = sale_offer.get("sale_price", 1799)
-            original_price = sale_offer.get("original_price", 1999)
+            sale_price = sale_offer.get("sale_price", 2699)
+            original_price = sale_offer.get("original_price", 2999)
             discount_percent = sale_offer.get("discount_percent", 10)
             title = sale_offer.get("title", "Special Offer")
             
@@ -3505,8 +3547,8 @@ async def get_current_subscription_price():
     pricing_doc = await db.site_settings.find_one({"type": "pricing"})
     
     if pricing_doc:
-        regular_price = pricing_doc.get("regular_price", 1999)
-        campaign_price = pricing_doc.get("campaign_price", 1799)
+        regular_price = pricing_doc.get("regular_price", 2999)
+        campaign_price = pricing_doc.get("campaign_price", 2699)
         campaign_active = pricing_doc.get("campaign_active", False)
         campaign_name = pricing_doc.get("campaign_name", "")
         campaign_discount = pricing_doc.get("campaign_discount_percent", 10)
@@ -3565,8 +3607,8 @@ async def get_current_subscription_price():
     return {
         "price_paise": SUBSCRIPTION_PRICE_PAISE,
         "original_price_paise": SUBSCRIPTION_PRICE_PAISE,
-        "price_display": "₹1999",
-        "original_price_display": "₹1999",
+        "price_display": "₹2999",
+        "original_price_display": "₹2999",
         "discount_percent": 0,
         "campaign_name": None,
         "campaign_active": False,
@@ -3732,8 +3774,8 @@ async def create_subscription_order(
     plans = {
         "monthly": {"months": 1, "price": 199, "originalPrice": 199, "discount": 0, "label": "1 Month", "perMonth": 199},
         "quarterly": {"months": 3, "price": 549, "originalPrice": 597, "discount": 8, "label": "3 Months", "perMonth": 183},
-        "halfYearly": {"months": 6, "price": 999, "originalPrice": 1194, "discount": 16, "label": "6 Months", "perMonth": 167},
-        "yearly": {"months": 12, "price": 1899, "originalPrice": 1999, "discount": 5, "label": "1 Year", "perMonth": 159}
+        "halfYearly": {"months": 6, "price": 1799, "originalPrice": 1794, "discount": 40, "label": "6 Months", "perMonth": 300},
+        "yearly": {"months": 12, "price": 2999, "originalPrice": 3588, "discount": 16, "label": "1 Year", "perMonth": 250}
     }
     
     # Get selected plan or default to yearly
@@ -3907,9 +3949,9 @@ async def verify_subscription_payment(
             print(f"Payment status: {payment.get('status')}, captured: {payment_captured}")
         
         # Accept payment if either signature is valid OR payment is captured
-        # Also accept if amount matches expected campaign price (₹9 = 900 paise or ₹999 = 99900 paise)
+        # Also accept if amount matches expected campaign price (₹9 = 900 paise or ₹2999 = 299900 paise)
         if not signature_valid and not payment_captured:
-            if payment and amount_paid in [900, 99900, pricing["price_paise"]]:
+            if payment and amount_paid in [900, 299900, pricing["price_paise"]]:
                 print(f"Payment amount {amount_paid} matches expected, accepting")
                 payment_captured = True
             else:
@@ -3927,8 +3969,8 @@ async def verify_subscription_payment(
         plans = {
             "monthly": {"months": 1, "price": 199},
             "quarterly": {"months": 3, "price": 549},
-            "halfYearly": {"months": 6, "price": 999},
-            "yearly": {"months": 12, "price": 1899}
+            "halfYearly": {"months": 6, "price": 1799},
+            "yearly": {"months": 12, "price": 2999}
         }
         
         plan_type = data.plan_type if data.plan_type else "yearly"
@@ -4884,7 +4926,7 @@ async def create_order(
                 if datetime.now(timezone.utc) > trial_end:
                     raise HTTPException(
                         status_code=402,
-                        detail="Your 7-day free trial has expired. Please subscribe to continue using BillByteKOT. Only ₹999/year for unlimited bills!",
+                        detail="Your 7-day free trial has expired. Please subscribe to continue using BillByteKOT. Early adopters get 15% OFF - only ₹2549/year instead of ₹2999!",
                     )
             except:
                 pass
@@ -9768,7 +9810,7 @@ async def ai_support_chat(chat_request: AIChatRequest):
     
     # Predefined responses for common questions
     common_responses = {
-        "pricing": "BillByteKOT offers a 7-day free trial with all features. After that, it's just ₹999/year. You get unlimited bills, thermal printing, AI analytics, and priority support!",
+        "pricing": "BillByteKOT offers a 7-day free trial with all features. After that, it's just ₹2999/year (₹250/month). Early adopters get 15% OFF - only ₹2549/year! You get unlimited bills, thermal printing, AI analytics, and priority support!",
         "thermal": "To setup thermal printer: 1) Connect your ESC/POS compatible printer (58mm or 80mm), 2) Go to Settings > Printer, 3) Select your printer and choose from 6 beautiful themes. Need help? Contact us!",
         "kot": "KOT (Kitchen Order Ticket) system sends orders directly to the kitchen. When you create an order, it automatically prints in the kitchen with item details, table number, and timing. This reduces errors and speeds up service!",
         "payment": "We support multiple payment methods: Cash, Card, UPI, and Razorpay integration. You can configure your own Razorpay account in Settings to receive payments directly.",
@@ -9776,7 +9818,7 @@ async def ai_support_chat(chat_request: AIChatRequest):
         "mobile": "Yes! BillByteKOT works on any device - desktop, tablet, or mobile. We also have a native Android app coming soon. Join our early access program to be notified!",
         "desktop": "Download our desktop app for Windows, Mac, or Linux from the Download page. It offers offline support, direct thermal printing, and faster performance!",
         "support": "We offer 24/7 support! Email us at support@billbytekot.in, call +91-8310832669 (Mon-Sat, 9 AM-6 PM IST), or use this chat. Premium users get priority support with faster response times.",
-        "trial": "Start your 7-day free trial now! No credit card required. You get full access to all premium features including AI analytics, thermal printing, and unlimited bills. After trial, upgrade for just ₹999/year!",
+        "trial": "Start your 7-day free trial now! No credit card required. You get full access to all premium features including AI analytics, thermal printing, and unlimited bills. After trial, upgrade for just ₹2999/year!",
         "features": "Key features: AI-powered billing, KOT system, thermal printing (6 themes), multi-currency support, inventory management, staff management, real-time analytics, WhatsApp integration, table management, and more!",
         "inventory": "Inventory management helps track stock levels, get low-stock alerts, manage suppliers, and auto-deduct items when sold. Go to Inventory page to add items and set minimum quantities.",
         "staff": "Add unlimited staff with roles: Admin (full access), Cashier (billing only), Waiter (orders & tables), Kitchen (KOT view). Each role has specific permissions. Go to Staff Management to add team members.",
@@ -12164,7 +12206,7 @@ class ManualSubscription(BaseModel):
     payment_method: str = "manual"  # manual, upi, bank_transfer, cash
     payment_proof_url: Optional[str] = None
     payment_notes: Optional[str] = None
-    amount: float = 999.0
+    amount: float = 2999.0
     months: int = 12
     send_invoice: bool = True
 
@@ -12544,7 +12586,7 @@ async def send_invoice_to_user(
         "payment_method": sub_record.get("payment_method", "online") if sub_record else "online",
         "months": sub_record.get("months", 12) if sub_record else 12,
         "expires_at": datetime.fromisoformat(user["subscription_expires_at"].replace("Z", "+00:00")).strftime("%d %B %Y") if user.get("subscription_expires_at") else "N/A",
-        "amount": sub_record.get("amount", 999) if sub_record else 999
+        "amount": sub_record.get("amount", 2999) if sub_record else 2999
     }
     
     result = await send_subscription_invoice_email(
@@ -13724,12 +13766,12 @@ async def get_public_pricing():
     pricing = await db.site_settings.find_one({"type": "pricing"})
     
     if not pricing:
-        # Default pricing - ₹1999 base price
+        # Default pricing - ₹2999 base price
         return {
-            "regular_price": 1999,
-            "regular_price_display": "₹1999",
-            "campaign_price": 1799,
-            "campaign_price_display": "₹1799",
+            "regular_price": 2999,
+            "regular_price_display": "₹2999",
+            "campaign_price": 2699,
+            "campaign_price_display": "₹2699",
             "campaign_active": False,
             "campaign_discount_percent": 10,
             "campaign_name": "",
@@ -13750,7 +13792,7 @@ async def get_public_pricing():
         except:
             pass
     
-    regular_price = pricing.get("regular_price", 1999)
+    regular_price = pricing.get("regular_price", 2999)
     trial_expired_discount = pricing.get("trial_expired_discount", 10)
     trial_expired_price = int(regular_price * (100 - trial_expired_discount) / 100)
     
@@ -14999,21 +15041,55 @@ async def get_public_pricing():
         pricing = await db.pricing_config.find_one({}, {"_id": 0})
         now = datetime.now(timezone.utc)
         
-        # Default pricing if no config exists
+        # Default pricing if no config exists - NEW ₹2999 PRICING
         if not pricing:
-            return {
-                "regular_price": 1999.0,
-                "regular_price_display": "₹1999",
+            # Check early adopter eligibility
+            early_adopter_count = await db.users.count_documents({
+                "subscription_active": True,
+                "created_at": {"$gte": datetime(2025, 2, 1, tzinfo=timezone.utc).isoformat()}
+            })
+            
+            early_adopter_eligible = (
+                early_adopter_count < EARLY_ADOPTER_LIMIT and 
+                now < EARLY_ADOPTER_END_DATE
+            )
+            
+            base_response = {
+                "regular_price": 2999.0,
+                "regular_price_display": "₹2999",
                 "campaign_price": None,
                 "campaign_price_display": None,
                 "campaign_active": False,
                 "campaign_name": None,
                 "campaign_discount_percent": 0,
                 "campaign_start_date": None,
-                "campaign_end_date": None
+                "campaign_end_date": None,
+                "early_adopter": False,
+                "early_adopter_spots_left": max(0, EARLY_ADOPTER_LIMIT - early_adopter_count),
+                "early_adopter_eligible": early_adopter_eligible
             }
+            
+            # Add early adopter pricing if eligible
+            if early_adopter_eligible:
+                base_response.update({
+                    "campaign_price": 2549.15,
+                    "campaign_price_display": "₹2549",
+                    "campaign_active": True,
+                    "campaign_name": "Early Adopter Special - 15% OFF",
+                    "campaign_discount_percent": 15,
+                    "campaign_start_date": "2025-02-01T00:00:00+00:00",
+                    "campaign_end_date": "2026-03-31T23:59:59+00:00",
+                    "early_adopter": True,
+                    "early_adopter_spots_left": EARLY_ADOPTER_LIMIT - early_adopter_count,
+                    "early_adopter_savings": 449.85,
+                    "urgency_message": f"Only {EARLY_ADOPTER_LIMIT - early_adopter_count} spots left!",
+                    "badge_text": "EARLY ADOPTER",
+                    "theme": "gradient"
+                })
+            
+            return base_response
         
-        regular_price = pricing.get("regular_price", 1999.0)
+        regular_price = pricing.get("regular_price", 2999.0)
         campaign_active = pricing.get("campaign_active", False)
         campaign_discount_percent = pricing.get("campaign_discount_percent", 0)
         campaign_name = pricing.get("campaign_name", None)

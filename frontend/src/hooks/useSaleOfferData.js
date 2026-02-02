@@ -55,12 +55,12 @@ const useSaleOfferData = () => {
       } else {
         // Use default pricing if API fails
         setPricing({
-          regular_price: 1999,
-          regular_price_display: '₹1999',
-          campaign_price: 1799,
-          campaign_price_display: '₹1799',
+          regular_price: 2999,
+          regular_price_display: '₹2999',
+          campaign_price: 2549,
+          campaign_price_display: '₹2549',
           campaign_active: false,
-          campaign_discount_percent: 10,
+          campaign_discount_percent: 15,
           trial_days: 7
         });
       }
@@ -78,12 +78,12 @@ const useSaleOfferData = () => {
       // Set defaults on error
       setSaleOffer(null);
       setPricing({
-        regular_price: 1999,
-        regular_price_display: '₹1999',
-        campaign_price: 1799,
-        campaign_price_display: '₹1799',
+        regular_price: 2999,
+        regular_price_display: '₹2999',
+        campaign_price: 2549,
+        campaign_price_display: '₹2549',
         campaign_active: false,
-        campaign_discount_percent: 10,
+        campaign_discount_percent: 15,
         trial_days: 7
       });
       setCampaign(null);

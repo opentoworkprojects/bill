@@ -54,6 +54,7 @@ import CityLandingPage from './pages/CityLandingPage';
 import ComparisonPage from './pages/ComparisonPage';
 import DesktopInfo from './components/DesktopInfo';
 import UpdateBanner from './components/UpdateBanner';
+import EarlyAdopterBanner from './components/EarlyAdopterBanner';
 import { Toaster } from './components/ui/sonner';
 import { setupAutoSync } from './utils/offlineSync';
 import { startNotificationPolling, requestNotificationPermission } from './utils/pushNotifications';
@@ -539,6 +540,7 @@ function App() {
     return storedUser;
   });
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [pricing, setPricing] = useState(null);
 
   // Set up the global logout callback
   useEffect(() => {
@@ -575,6 +577,17 @@ function App() {
     };
     
     initAuth();
+    
+    // Fetch pricing data for banners
+    const fetchPricingData = async () => {
+      try {
+        const response = await axios.get(`${API}/public/pricing`);
+        setPricing(response.data);
+      } catch (error) {
+        console.log('Failed to fetch pricing data:', error);
+      }
+    };
+    fetchPricingData();
     
     // ✅ PERFORMANCE: Initialize optimization modules
     console.log('⚡ Initializing performance optimizations...');
@@ -936,6 +949,7 @@ function App() {
         </Routes>
         <DesktopInfo />
         <UpdateBanner />
+        <EarlyAdopterBanner pricing={pricing} />
       </BrowserRouter>
       <Toaster position="top-center" richColors />
       <Analytics />

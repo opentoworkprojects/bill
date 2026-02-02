@@ -2,16 +2,16 @@ const comparisonData = {
   'billbytekot-vs-petpooja': {
     title: 'BillByteKOT vs Petpooja - Complete Comparison 2025',
     metaTitle: 'BillByteKOT vs Petpooja Comparison 2025 | Which is Better?',
-    metaDescription: 'Compare BillByteKOT vs Petpooja KOT-first restaurant automation platforms. Features, pricing, pros & cons. BillByteKOT offers better value at ₹1999 vs Petpooja ₹12000+',
+    metaDescription: 'Compare BillByteKOT vs Petpooja KOT-first restaurant automation platforms. Features, pricing, pros & cons. BillByteKOT offers better value at ₹2999 vs Petpooja ₹12000+',
     slug: 'billbytekot-vs-petpooja',
     competitor: 'Petpooja',
     ourProduct: 'BillByteKOT',
-    summary: 'BillByteKOT offers superior value with advanced features at ₹1999/year compared to Petpooja\'s ₹12,000+ pricing',
+    summary: 'BillByteKOT offers superior value with advanced features at ₹2999/year compared to Petpooja\'s ₹12,000+ pricing',
     winner: 'BillByteKOT',
     features: [
       {
         feature: 'Pricing',
-        billbytekot: '₹1999/year',
+        billbytekot: '₹2999/year',
         competitor: '₹12,000+/year',
         winner: 'billbytekot'
       },
@@ -60,7 +60,7 @@ const comparisonData = {
     ],
     pros: {
       billbytekot: [
-        'Extremely affordable at ₹1999/year',
+        'Extremely affordable at ₹2999/year',
         'Advanced AI-powered features',
         '6 professional thermal receipt themes',
         'WhatsApp Cloud API integration',
@@ -90,7 +90,7 @@ const comparisonData = {
         'Poor customer support'
       ]
     },
-    verdict: 'BillByteKOT is the clear winner for small to medium restaurants looking for advanced features at affordable pricing. While Petpooja has brand recognition, BillByteKOT offers superior value with modern features like AI recommendations, advanced KOT system, and WhatsApp integration at just ₹1999/year compared to Petpooja\'s ₹12,000+ pricing.'
+    verdict: 'BillByteKOT is the clear winner for small to medium restaurants looking for advanced features at affordable pricing. While Petpooja has brand recognition, BillByteKOT offers superior value with modern features like AI recommendations, advanced KOT system, and WhatsApp integration at just ₹2999/year compared to Petpooja\'s ₹12,000+ pricing.'
   },
   'billbytekot-vs-posist': {
     title: 'BillByteKOT vs POSist - Which is Better for Your Restaurant?',
@@ -104,7 +104,7 @@ const comparisonData = {
     features: [
       {
         feature: 'Pricing',
-        billbytekot: '₹1999/year',
+        billbytekot: '₹2999/year',
         competitor: '₹15,000+/year',
         winner: 'billbytekot'
       },
@@ -181,7 +181,7 @@ const comparisonData = {
     features: [
       {
         feature: 'Pricing Model',
-        billbytekot: 'Fixed ₹1999/year',
+        billbytekot: 'Fixed ₹2999/year',
         competitor: 'Per-terminal pricing',
         winner: 'billbytekot'
       },

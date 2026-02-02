@@ -12,7 +12,7 @@ const BrandPage = () => {
 
   const brandHighlights = [
     { icon: Award, title: "500+ Restaurants Trust Us", desc: "Leading restaurant software in India" },
-    { icon: TrendingUp, title: "85% Cost Savings", desc: "₹1999/year vs competitors' ₹12,000+" },
+    { icon: TrendingUp, title: "85% Cost Savings", desc: "₹2999/year vs competitors' ₹12,000+" },
     { icon: Clock, title: "7-Day Free Trial", desc: "Test all features before purchase" },
     { icon: Heart, title: "24/7 Support", desc: "Dedicated customer success team" },
   ];
@@ -29,19 +29,19 @@ const BrandPage = () => {
   const brandFAQs = [
     {
       question: "What is BillByteKOT and what makes it special?",
-      answer: "BillByteKOT is India's most affordable and feature-rich KOT-first restaurant automation platform. What makes it special is the combination of comprehensive features (KOT system, thermal printing, GST billing, inventory management, WhatsApp integration) at just ₹1999/year - 85% cheaper than competitors like Petpooja while offering superior functionality."
+      answer: "BillByteKOT is India's most affordable and feature-rich KOT-first restaurant automation platform. What makes it special is the combination of comprehensive features (KOT system, thermal printing, GST billing, inventory management, WhatsApp integration) at just ₹2999/year - 75% cheaper than competitors like Petpooja while offering superior functionality."
     },
     {
       question: "How is BillByteKOT different from Petpooja and other restaurant software?",
-      answer: "BillByteKOT offers significant advantages: 1) Much lower cost (₹1999 vs ₹12,000+), 2) FREE advanced KOT system (others charge extra), 3) 6 professional thermal receipt themes, 4) Modern WhatsApp Cloud API integration, 5) AI-powered recommendations, 6) Offline mode support, 7) Better user interface and customer support."
+      answer: "BillByteKOT offers significant advantages: 1) Much lower cost (₹2999 vs ₹12,000+), 2) FREE advanced KOT system (others charge extra), 3) 6 professional thermal receipt themes, 4) Modern WhatsApp Cloud API integration, 5) AI-powered recommendations, 6) Offline mode support, 7) Better user interface and customer support."
     },
     {
       question: "Is BillByteKOT suitable for my restaurant type?",
       answer: "Yes! BillByteKOT works for all types of food businesses: restaurants, cafes, dhabas, sweet shops, bakeries, cloud kitchens, food trucks, bars, canteens, and food courts. It's designed to scale from small single-location businesses to multi-location restaurant chains."
     },
     {
-      question: "What does BillByteKOT include in the ₹1999/year package?",
-      answer: "Everything! The ₹1999/year package includes: Complete restaurant billing system, FREE KOT (Kitchen Order Ticket) system, thermal printing with 6 themes, GST compliant invoicing, inventory management, staff management, WhatsApp integration, real-time reports, table management, multi-location support, mobile app access, and 24/7 customer support."
+      question: "What does BillByteKOT include in the ₹2999/year package?",
+      answer: "Everything! The ₹2999/year package includes: Complete restaurant billing system, FREE KOT (Kitchen Order Ticket) system, thermal printing with 6 themes, GST compliant invoicing, inventory management, staff management, WhatsApp integration, real-time reports, table management, multi-location support, mobile app access, and 24/7 customer support."
     },
     {
       question: "Can I try BillByteKOT before purchasing?",
@@ -57,8 +57,8 @@ const BrandPage = () => {
     <>
       {/* Enhanced SEO for Brand Page */}
       <EnhancedSEOHead
-        title="BillByteKOT - India's #1 KOT-First Restaurant Automation Platform | Better than Petpooja at ₹1999/year"
-        description="BillByteKOT is India's leading KOT-first restaurant automation platform trusted by 500+ restaurants. Complete solution with FREE KOT system, thermal printing, GST billing & WhatsApp integration at just ₹1999/year - 85% cheaper than Petpooja!"
+        title="BillByteKOT - India's #1 KOT-First Restaurant Automation Platform | Better than Petpooja at ₹2999/year"
+        description="BillByteKOT is India's leading KOT-first restaurant automation platform trusted by 500+ restaurants. Complete solution with FREE KOT system, thermal printing, GST billing & WhatsApp integration at just ₹2999/year - 75% cheaper than Petpooja!"
         keywords={[
           'BillByteKOT',
           'BillByte KOT',
@@ -158,7 +158,7 @@ const BrandPage = () => {
             <p className="text-xl text-gray-600 mb-8 max-w-4xl mx-auto">
               India's most trusted restaurant billing software with <strong>FREE KOT system</strong>, 
               thermal printing, GST billing & WhatsApp integration. Trusted by <strong>500+ restaurants</strong> 
-              at just <strong>₹1999/year</strong> - 85% cheaper than competitors!
+              at just <strong>₹2999/year</strong> - 75% cheaper than competitors!
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">

@@ -179,13 +179,18 @@ const PromotionalBanner = ({ position = 'top', showOnPages = ['all'] }) => {
           <div className="flex items-center space-x-3">
             {getIcon('pricing')}
             <div>
-              <span className="font-bold text-lg">{data.campaign_name || 'Special Pricing'}</span>
+              <span className="font-bold text-lg">
+                {data.early_adopter ? 'Early Adopter Special' : data.campaign_name || 'Special Pricing'}
+              </span>
               <span className="ml-2 text-sm opacity-90">
-                Save {data.campaign_discount_percent}% on your subscription
+                {data.early_adopter 
+                  ? `Save ₹450! Only ${data.early_adopter_spots_left || 850} spots left`
+                  : `Save ${data.campaign_discount_percent || 15}% on your subscription`
+                }
               </span>
               <span className="ml-3 bg-white text-emerald-600 px-2 py-1 rounded-full text-xs font-bold">
-                {data.campaign_price_display} 
-                <span className="line-through ml-1 opacity-70">{data.regular_price_display}</span>
+                ₹{data.campaign_price || 2549}
+                <span className="line-through ml-1 opacity-70">₹{data.regular_price || 2999}</span>
               </span>
             </div>
           </div>
@@ -196,6 +201,12 @@ const PromotionalBanner = ({ position = 'top', showOnPages = ['all'] }) => {
                 <span>Ends: {new Date(data.campaign_end_date).toLocaleDateString()}</span>
               </div>
             )}
+            <button
+              onClick={() => window.location.href = '/subscription'}
+              className="bg-white text-emerald-600 px-4 py-2 rounded-full font-semibold hover:bg-gray-100 transition-colors"
+            >
+              {data.early_adopter ? 'Join Early Adopters' : 'Subscribe Now'}
+            </button>
             <button
               onClick={handleClose}
               className="text-white hover:text-gray-200 transition-colors"

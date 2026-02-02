@@ -37,13 +37,18 @@ const TrialBanner = ({ user }) => {
       cache.timestamp = Date.now();
       setPricing(response.data);
     } catch (error) {
-      // Fallback pricing
+      // Fallback pricing - NEW ₹2999 PRICING
       setPricing({
-        regular_price: 1999,
-        regular_price_display: '₹1999',
-        trial_expired_discount: 10,
-        trial_expired_price: 1799,
-        trial_expired_price_display: '₹1799'
+        regular_price: 2999,
+        regular_price_display: '₹2999',
+        campaign_price: 2549,
+        campaign_price_display: '₹2549',
+        campaign_active: true,
+        campaign_discount_percent: 15,
+        trial_expired_discount: 15,
+        trial_expired_price: 2549,
+        trial_expired_price_display: '₹2549',
+        early_adopter: true
       });
     } finally {
       setLoading(false);
@@ -58,10 +63,11 @@ const TrialBanner = ({ user }) => {
   // Don't show if user has active subscription (not in trial)
   if (!is_trial && !trial_expired) return null;
 
-  // Get dynamic pricing from Super Admin
-  const regularPrice = pricing?.regular_price_display || '₹1999';
-  const discountPercent = pricing?.trial_expired_discount || 10;
-  const discountedPrice = pricing?.trial_expired_price_display || '₹1799';
+  // Get dynamic pricing from Super Admin - NEW ₹2999 PRICING
+  const regularPrice = pricing?.regular_price_display || '₹2999';
+  const discountPercent = pricing?.campaign_discount_percent || pricing?.trial_expired_discount || 15;
+  const discountedPrice = pricing?.campaign_price_display || pricing?.trial_expired_price_display || '₹2549';
+  const isEarlyAdopter = pricing?.early_adopter || pricing?.campaign_active;
 
   // Determine banner color based on trial days
   const getBannerStyle = () => {

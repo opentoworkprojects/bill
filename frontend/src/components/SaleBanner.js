@@ -262,10 +262,10 @@ const SaleBanner = ({ position = 'top', saleData: propSaleData = null }) => {
             {saleData.subtitle || 'On Annual Subscription'}
           </p>
 
-          {/* Price Display */}
+          {/* Price Display - Updated for ₹2999 pricing */}
           <div className="flex items-center justify-center gap-3 mb-6">
-            <span className="text-2xl line-through opacity-50">₹{saleData.original_price || 1999}</span>
-            <span className="text-4xl font-black">₹{saleData.sale_price || 1599}</span>
+            <span className="text-2xl line-through opacity-50">₹{saleData.original_price || 2999}</span>
+            <span className="text-4xl font-black">₹{saleData.sale_price || 2549}</span>
             <span className="text-sm opacity-70">/year</span>
           </div>
 

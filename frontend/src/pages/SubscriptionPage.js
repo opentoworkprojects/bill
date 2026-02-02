@@ -25,12 +25,12 @@ const SubscriptionPage = ({ user }) => {
   const [selectedPlan, setSelectedPlan] = useState('yearly'); // Plan selection: monthly, quarterly, half-yearly, yearly
   const navigate = useNavigate();
 
-  // Pricing plans
+  // Enhanced pricing plans with ₹2999 base price and early adopter benefits
   const plans = {
-    monthly: { months: 1, price: 199, originalPrice: 199, discount: 0, label: '1 Month', perMonth: 199 },
-    quarterly: { months: 3, price: 549, originalPrice: 597, discount: 8, label: '3 Months', perMonth: 183 },
-    halfYearly: { months: 6, price: 999, originalPrice: 1194, discount: 16, label: '6 Months', perMonth: 167 },
-    yearly: { months: 12, price: 1899, originalPrice: 1999, discount: 5, label: '1 Year', perMonth: 159, popular: true }
+    monthly: { months: 1, price: 299, originalPrice: 299, discount: 0, label: '1 Month', perMonth: 299 },
+    quarterly: { months: 3, price: 849, originalPrice: 897, discount: 5, label: '3 Months', perMonth: 283 },
+    halfYearly: { months: 6, price: 1599, originalPrice: 1794, discount: 11, label: '6 Months', perMonth: 267 },
+    yearly: { months: 12, price: 2999, originalPrice: 3588, discount: 16, label: '1 Year', perMonth: 250, popular: true }
   };
 
   useEffect(() => {
@@ -60,18 +60,22 @@ const SubscriptionPage = ({ user }) => {
       if (pricingRes.data) {
         setPricing(pricingRes.data);
       } else {
-        // Fallback pricing - base price ₹1999
+        // Fallback pricing - NEW ₹2999 base price with early adopter benefits
         setPricing({
-          regular_price: 1999,
-          regular_price_display: '₹1999',
-          campaign_price: 1799,
-          campaign_price_display: '₹1799',
-          campaign_active: false,
-          campaign_discount_percent: 10,
-          trial_expired_discount: 10,
-          trial_expired_price: 1799,
-          trial_expired_price_display: '₹1799',
-          trial_days: 7
+          regular_price: 2999,
+          regular_price_display: '₹2999',
+          campaign_price: 2549,
+          campaign_price_display: '₹2549',
+          campaign_active: true,
+          campaign_discount_percent: 15,
+          campaign_name: 'Early Adopter Special',
+          trial_expired_discount: 15,
+          trial_expired_price: 2549,
+          trial_expired_price_display: '₹2549',
+          trial_days: 7,
+          early_adopter: true,
+          early_adopter_spots_left: 850,
+          urgency_message: 'Only 850 spots left for early adopters!'
         });
       }
       
@@ -94,31 +98,48 @@ const SubscriptionPage = ({ user }) => {
     }
   };
 
-  // Helper to get current sale/campaign info
+  // Helper to get current sale/campaign info with early adopter priority
   const getSaleInfo = () => {
-    // Priority: Sale offer from super admin > Pricing campaign
+    // Priority: Early Adopter > Sale offer from super admin > Pricing campaign
+    if (pricing?.early_adopter) {
+      return {
+        isActive: true,
+        discountPercent: 15,
+        originalPrice: pricing.regular_price || 2999,
+        salePrice: pricing.campaign_price || 2549,
+        originalPriceDisplay: pricing.regular_price_display || '₹2999',
+        salePriceDisplay: pricing.campaign_price_display || '₹2549',
+        campaignName: 'Early Adopter Special - 15% OFF',
+        savings: (pricing.regular_price || 2999) - (pricing.campaign_price || 2549),
+        urgencyMessage: pricing.urgency_message || 'Limited time offer!',
+        badgeText: 'EARLY ADOPTER',
+        theme: 'gradient',
+        isEarlyAdopter: true
+      };
+    }
+    
     if (saleOffer?.enabled) {
       return {
         isActive: true,
         discountPercent: saleOffer.discount_percent || 10,
-        originalPrice: saleOffer.original_price || 1999,
-        salePrice: saleOffer.sale_price || 1799,
-        originalPriceDisplay: `₹${saleOffer.original_price || 1999}`,
-        salePriceDisplay: `₹${saleOffer.sale_price || 1799}`,
+        originalPrice: saleOffer.original_price || 2999,
+        salePrice: saleOffer.sale_price || 2699,
+        originalPriceDisplay: `₹${saleOffer.original_price || 2999}`,
+        salePriceDisplay: `₹${saleOffer.sale_price || 2699}`,
         campaignName: saleOffer.title || 'Special Offer',
-        savings: (saleOffer.original_price || 1999) - (saleOffer.sale_price || 1799)
+        savings: (saleOffer.original_price || 2999) - (saleOffer.sale_price || 2699)
       };
     }
     if (pricing?.campaign_active) {
       return {
         isActive: true,
         discountPercent: pricing.campaign_discount_percent || 10,
-        originalPrice: pricing.regular_price || 1999,
-        salePrice: pricing.campaign_price || 1799,
-        originalPriceDisplay: pricing.regular_price_display || '₹1999',
-        salePriceDisplay: pricing.campaign_price_display || '₹1799',
+        originalPrice: pricing.regular_price || 2999,
+        salePrice: pricing.campaign_price || 2699,
+        originalPriceDisplay: pricing.regular_price_display || '₹2999',
+        salePriceDisplay: pricing.campaign_price_display || '₹2699',
         campaignName: pricing.campaign_name || 'Special Offer',
-        savings: (pricing.regular_price || 1999) - (pricing.campaign_price || 1799)
+        savings: (pricing.regular_price || 2999) - (pricing.campaign_price || 2699)
       };
     }
     return { isActive: false };
