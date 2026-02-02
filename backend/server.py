@@ -4968,6 +4968,101 @@ async def debug_active_orders(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
 
 
+@api_router.post("/tables/sync-repair")
+async def repair_table_order_sync(current_user: dict = Depends(get_current_user)):
+    """
+    Repair table-order synchronization issues
+    This endpoint will fix mismatches between active orders and occupied tables
+    """
+    user_org_id = get_secure_org_id(current_user)
+    
+    print(f"🔧 Starting table-order synchronization repair for org {user_org_id}")
+    
+    try:
+        # Get all active orders
+        active_orders = await db.orders.find(
+            {
+                "organization_id": user_org_id,
+                "status": {"$nin": ["completed", "cancelled", "paid"]}
+            },
+            {"_id": 0}
+        ).to_list(1000)
+        
+        # Get all tables
+        tables = await db.tables.find(
+            {"organization_id": user_org_id},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        print(f"📊 Found {len(active_orders)} active orders and {len(tables)} tables")
+        
+        # Create maps for analysis
+        orders_with_tables = {order["id"]: order for order in active_orders if order.get("table_id")}
+        occupied_tables = {table["id"]: table for table in tables if table.get("status") == "occupied"}
+        
+        repairs_made = 0
+        
+        # Fix 1: Clear orphaned tables (occupied but no matching active order)
+        for table_id, table in occupied_tables.items():
+            current_order_id = table.get("current_order_id")
+            if current_order_id and current_order_id not in [order["id"] for order in active_orders]:
+                # This table is occupied but the order is not active - clear it
+                await db.tables.update_one(
+                    {"id": table_id, "organization_id": user_org_id},
+                    {"$set": {"status": "available", "current_order_id": None}}
+                )
+                print(f"🔧 Cleared orphaned table {table.get('table_number')} (was occupied by non-active order {current_order_id})")
+                repairs_made += 1
+        
+        # Fix 2: Occupy tables for active orders that should have occupied tables
+        for order_id, order in orders_with_tables.items():
+            table_id = order.get("table_id")
+            if table_id and table_id != "counter":
+                table = next((t for t in tables if t.get("id") == table_id), None)
+                if table:
+                    if table.get("status") != "occupied" or table.get("current_order_id") != order_id:
+                        # This order has a table but the table is not properly occupied
+                        await db.tables.update_one(
+                            {"id": table_id, "organization_id": user_org_id},
+                            {"$set": {"status": "occupied", "current_order_id": order_id}}
+                        )
+                        print(f"🔧 Set table {table.get('table_number')} to occupied for active order {order_id}")
+                        repairs_made += 1
+        
+        # Invalidate table cache after repairs
+        try:
+            cached_service = get_cached_order_service()
+            if cached_service:
+                await cached_service.invalidate_table_caches(user_org_id)
+                print(f"🗑️ Table cache invalidated after repairs")
+        except Exception as cache_error:
+            print(f"⚠️ Cache invalidation error: {cache_error}")
+        
+        # Get updated counts for verification
+        updated_tables = await db.tables.find(
+            {"organization_id": user_org_id},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        updated_occupied_count = len([t for t in updated_tables if t.get("status") == "occupied"])
+        orders_with_tables_count = len(orders_with_tables)
+        
+        return {
+            "message": "Table-order synchronization repair completed",
+            "repairs_made": repairs_made,
+            "active_orders": len(active_orders),
+            "orders_with_tables": orders_with_tables_count,
+            "occupied_tables_before": len(occupied_tables),
+            "occupied_tables_after": updated_occupied_count,
+            "synchronized": orders_with_tables_count == updated_occupied_count,
+            "organization_id": user_org_id
+        }
+        
+    except Exception as e:
+        print(f"❌ Table sync repair failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync repair failed: {str(e)}")
+
+
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(
     status: Optional[str] = None, 
@@ -5399,15 +5494,21 @@ async def update_order_status(
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
 
-    # Update table status if order is completed - Use TableStatusManager for immediate sync
-    if status == "completed":
-        table_id = order.get("table_id")
-        if table_id and table_id != "counter":
-            try:
-                table_manager = get_table_status_manager()
+    # Update table status based on order status - Use TableStatusManager for immediate sync
+    table_id = order.get("table_id")
+    if table_id and table_id != "counter":
+        try:
+            table_manager = get_table_status_manager()
+            
+            # Determine if table should be available or occupied based on status
+            table_clearing_statuses = ["completed", "cancelled", "paid"]
+            table_occupying_statuses = ["pending", "preparing", "ready", "served"]
+            
+            if status in table_clearing_statuses:
+                # Clear the table
                 result = await table_manager.set_table_available(user_org_id, table_id)
                 if result["success"]:
-                    print(f"✅ Table {order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager")
+                    print(f"✅ Table {order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager (status: {status})")
                 else:
                     print(f"⚠️ TableStatusManager failed: {result['message']}")
                     # Fallback to direct update
@@ -5415,17 +5516,41 @@ async def update_order_status(
                         {"id": table_id, "organization_id": user_org_id},
                         {"$set": {"status": "available", "current_order_id": None}}
                     )
-                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback")
-            except Exception as e:
-                print(f"⚠️ TableStatusManager error: {e}, using fallback")
-                try:
+                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback (status: {status})")
+            
+            elif status in table_occupying_statuses:
+                # Ensure table is occupied
+                result = await table_manager.set_table_occupied(user_org_id, table_id, order_id)
+                if result["success"]:
+                    print(f"✅ Table {order.get('table_number', 'unknown')} set to OCCUPIED via TableStatusManager (status: {status})")
+                else:
+                    print(f"⚠️ TableStatusManager failed: {result['message']}")
+                    # Fallback to direct update
+                    await db.tables.update_one(
+                        {"id": table_id, "organization_id": user_org_id},
+                        {"$set": {"status": "occupied", "current_order_id": order_id}}
+                    )
+                    print(f"🍽️ Table {order.get('table_number', 'unknown')} occupied via fallback (status: {status})")
+            
+        except Exception as e:
+            print(f"⚠️ TableStatusManager error: {e}, using fallback")
+            try:
+                # Fallback table status update
+                table_clearing_statuses = ["completed", "cancelled", "paid"]
+                if status in table_clearing_statuses:
                     await db.tables.update_one(
                         {"id": table_id, "organization_id": user_org_id},
                         {"$set": {"status": "available", "current_order_id": None}}
                     )
-                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback")
-                except Exception as fallback_error:
-                    print(f"⚠️ Table clearing fallback error: {fallback_error}")
+                    print(f"🍽️ Table {order.get('table_number', 'unknown')} cleared via fallback (status: {status})")
+                else:
+                    await db.tables.update_one(
+                        {"id": table_id, "organization_id": user_org_id},
+                        {"$set": {"status": "occupied", "current_order_id": order_id}}
+                    )
+                    print(f"🍽️ Table {order.get('table_number', 'unknown')} occupied via fallback (status: {status})")
+            except Exception as fallback_error:
+                print(f"⚠️ Table status fallback error: {fallback_error}")
     
     # Verify the update by fetching the order again
     try:
