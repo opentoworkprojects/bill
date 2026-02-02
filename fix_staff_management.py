@@ -11,7 +11,7 @@ import json
 import time
 
 # Production API configuration
-API_BASE = "https://billbytekot-backend.onrender.com"
+API_BASE = "https://restro-ai.onrender.com"
 
 def test_staff_management_fix():
     """Test staff management functionality"""

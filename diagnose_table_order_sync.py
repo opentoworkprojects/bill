@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 # Production API configuration
-API_BASE = "https://billbytekot-backend.onrender.com"
+API_BASE = "https://restro-ai.onrender.com"
 
 def diagnose_table_order_sync():
     """Diagnose table-order synchronization issues"""

@@ -7,7 +7,7 @@ import requests
 import json
 
 # Production API configuration
-API_BASE = "https://billbytekot-backend.onrender.com"
+API_BASE = "https://restro-ai.onrender.com"
 
 def diagnose_staff_organization_issue():
     """Diagnose staff organization assignment issues"""

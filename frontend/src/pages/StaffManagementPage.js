@@ -73,6 +73,12 @@ const StaffManagementPage = ({ user }) => {
         resetForm();
       } else {
         // Step 1: Request OTP for new staff
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Authentication required. Please login again.');
+          return;
+        }
+
         const createData = {
           username: formData.username,
           email: formData.email,
@@ -83,7 +89,12 @@ const StaffManagementPage = ({ user }) => {
         if (formData.phone) createData.phone = formData.phone;
         if (formData.salary) createData.salary = parseFloat(formData.salary);
         
-        await axios.post(`${API}/staff/create-request`, createData);
+        await axios.post(`${API}/staff/create-request`, createData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
         toast.success('📧 OTP sent to staff email for verification!');
         setPendingStaffEmail(formData.email);
         setShowOTPVerification(true);
@@ -103,9 +114,21 @@ const StaffManagementPage = ({ user }) => {
     
     setOtpLoading(true);
     try {
-      await axios.post(`${API}/staff/verify-create`, {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required. Please login again.');
+        return;
+      }
+
+      const response = await axios.post(`${API}/staff/verify-create`, {
         email: pendingStaffEmail,
         otp: otp
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       toast.success('✅ Staff member verified and added successfully!');
@@ -116,8 +139,14 @@ const StaffManagementPage = ({ user }) => {
       fetchStaff();
       resetForm();
     } catch (error) {
+      console.error('OTP verification error:', error);
       const errorMsg = error.response?.data?.detail || 'Invalid OTP or verification failed';
       toast.error(errorMsg);
+      
+      // If authentication error, suggest re-login
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Authentication failed. Please refresh the page and login again.');
+      }
       
       // If OTP expired, show option to resend
       if (errorMsg.includes('expired')) {
@@ -135,6 +164,13 @@ const StaffManagementPage = ({ user }) => {
     
     setOtpLoading(true);
     try {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required. Please login again.');
+        return;
+      }
+
       // Create staff directly without verification
       const createData = {
         username: formData.username,
@@ -146,7 +182,12 @@ const StaffManagementPage = ({ user }) => {
       if (formData.phone) createData.phone = formData.phone;
       if (formData.salary) createData.salary = parseFloat(formData.salary);
       
-      await axios.post(`${API}/staff/create`, createData);
+      await axios.post(`${API}/staff/create`, createData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       toast.success('✅ Staff member added (email not verified)');
       setShowOTPVerification(false);
       setDialogOpen(false);
@@ -155,8 +196,13 @@ const StaffManagementPage = ({ user }) => {
       fetchStaff();
       resetForm();
     } catch (error) {
+      console.error('Skip verification error:', error);
       const errorMsg = error.response?.data?.detail || 'Failed to create staff';
       toast.error(errorMsg);
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Authentication failed. Please refresh the page and login again.');
+      }
     } finally {
       setOtpLoading(false);
     }
@@ -165,6 +211,13 @@ const StaffManagementPage = ({ user }) => {
   const handleResendOTP = async () => {
     setOtpLoading(true);
     try {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required. Please login again.');
+        return;
+      }
+
       const createData = {
         username: formData.username,
         email: formData.email,
@@ -175,10 +228,21 @@ const StaffManagementPage = ({ user }) => {
       if (formData.phone) createData.phone = formData.phone;
       if (formData.salary) createData.salary = parseFloat(formData.salary);
       
-      await axios.post(`${API}/staff/create-request`, createData);
+      await axios.post(`${API}/staff/create-request`, createData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       toast.success('📧 New OTP sent to staff email!');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to resend OTP');
+      console.error('Resend OTP error:', error);
+      const errorMsg = error.response?.data?.detail || 'Failed to resend OTP';
+      toast.error(errorMsg);
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Authentication failed. Please refresh the page and login again.');
+      }
     } finally {
       setOtpLoading(false);
     }

@@ -21,8 +21,8 @@ useEffect(() => {
   ServiceWorkerManager.register();
   
   // Prefetch critical resources
-  ResourcePrefetcher.prefetchDNS('billbytekot-backend.onrender.com');
-  ResourcePrefetcher.preconnect('billbytekot-backend.onrender.com');
+  ResourcePrefetcher.prefetchDNS('restro-ai.onrender.com');
+  ResourcePrefetcher.preconnect('restro-ai.onrender.com');
   
   return () => {
     // Cleanup on unmount
@@ -165,7 +165,7 @@ class OptimizedAPIClient {
 }
 
 export const apiClient = new OptimizedAPIClient(
-  process.env.REACT_APP_API_URL || 'https://billbytekot-backend.onrender.com/api'
+  process.env.REACT_APP_API_URL || 'https://restro-ai.onrender.com/api'
 );
 */
 
@@ -372,7 +372,7 @@ import { ResourcePrefetcher } from '../utils/frontendPerformanceOptimization';
 export function App() {
   useEffect(() => {
     // Prefetch DNS for API server
-    ResourcePrefetcher.prefetchDNS('billbytekot-backend.onrender.com');
+    ResourcePrefetcher.prefetchDNS('restro-ai.onrender.com');
     
     // Preconnect to CDN if used
     ResourcePrefetcher.preconnect('cdn.example.com');

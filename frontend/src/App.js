@@ -584,8 +584,8 @@ function App() {
     console.log('📸 Lazy image loader initialized')
     
     // Prefetch critical resources
-    ResourcePrefetcher.prefetchDNS('billbytekot-backend.onrender.com')
-    ResourcePrefetcher.preconnect('billbytekot-backend.onrender.com')
+    ResourcePrefetcher.prefetchDNS('restro-ai.onrender.com')
+    ResourcePrefetcher.preconnect('restro-ai.onrender.com')
     console.log('🔗 Resource prefetching enabled')
     
     // Initialize Service Worker Manager
