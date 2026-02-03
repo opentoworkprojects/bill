@@ -272,10 +272,15 @@ ALLOWED_ORIGINS = [
 ]
 
 # CRITICAL: Add CORS middleware BEFORE any routes
+# Use wildcard origins without credentials to ensure Access-Control-Allow-Origin is always present.
+allow_all_origins = os.getenv("CORS_ALLOW_ALL", "true").lower() in ("1", "true", "yes")
+cors_origins = ["*"] if allow_all_origins else ALLOWED_ORIGINS
+cors_allow_credentials = False if "*" in cors_origins else True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins temporarily to fix CORS
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

@@ -448,11 +448,24 @@ const BillingPage = ({ user }) => {
     return symbols[businessSettings?.currency || 'INR'] || '₹';
   };
 
-  const calculateReceivedAmount = () => {
+  const priorPaid = useMemo(() => {
+    const value = parseFloat(order?.payment_received);
+    return Number.isFinite(value) ? value : 0;
+  }, [order?.payment_received]);
+
+  const calculateCurrentReceivedAmount = () => {
     if (splitPayment) {
       return (parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0) + (parseFloat(upiAmount) || 0);
     }
     return parseFloat(receivedAmount) || 0;
+  };
+
+  const calculateReceivedAmount = () => {
+    if (!splitPayment && !showReceivedAmount) {
+      return calculateTotal();
+    }
+    const current = calculateCurrentReceivedAmount();
+    return Math.max(0, priorPaid) + current;
   };
 
   const calculateBalanceAmount = () => {
@@ -482,6 +495,7 @@ const BillingPage = ({ user }) => {
   const getTotalSplitAmount = () => {
     return (parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0) + (parseFloat(upiAmount) || 0);
   };
+
 
   // Memoized calculations to prevent unnecessary recalculations
   const subtotal = useMemo(() => orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [orderItems]);
@@ -1237,6 +1251,12 @@ const BillingPage = ({ user }) => {
 
   const currency = getCurrencySymbol();
   const discountAmt = calculateDiscountAmount();
+  const hasPriorPayment = priorPaid > 0;
+  const remainingDue = Math.max(0, calculateTotal() - priorPaid);
+  const basePaymentAmount = hasPriorPayment ? remainingDue : calculateTotal();
+  const currentReceived = calculateCurrentReceivedAmount();
+  const totalReceived = calculateReceivedAmount();
+  const thisPaymentAmount = splitPayment ? getTotalSplitAmount() : showReceivedAmount ? currentReceived : basePaymentAmount;
   const orderData = { ...order, items: orderItems, subtotal: calculateSubtotal(), tax: calculateTax(), total: calculateTotal(), discount: discountAmt, discount_amount: discountAmt, tax_rate: getEffectiveTaxRate() };
 
   return (
@@ -1798,8 +1818,8 @@ const BillingPage = ({ user }) => {
               </div>
             </div>
             {/* Payment Method Selection */}
-            <div className="bg-gray-50 p-3 rounded-lg mt-3">
-              <h4 className="font-semibold text-sm mb-2">Payment Method</h4>
+            <div className="bg-gray-50 p-2 sm:p-3 rounded-lg mt-2 sm:mt-3">
+              <h4 className="font-semibold text-xs sm:text-sm mb-2">Payment Method</h4>
               <div className="grid grid-cols-3 gap-2">
                 {[{ id: 'cash', icon: Wallet, label: 'Cash', color: '#22c55e' }, { id: 'card', icon: CreditCard, label: 'Card', color: '#3b82f6' }, { id: 'upi', icon: Smartphone, label: 'UPI', color: '#8b5cf6' }].map(m => (
                   <button 
@@ -1808,11 +1828,11 @@ const BillingPage = ({ user }) => {
                       setPaymentMethod(m.id);
                       setSplitPayment(false);
                     }} 
-                    className={`py-2 rounded-lg flex flex-col items-center gap-1 border-2 transition-all ${paymentMethod === m.id && !splitPayment ? 'text-white border-transparent' : 'bg-white border-gray-200'}`} 
+                    className={`py-1.5 sm:py-2 rounded-lg flex flex-col items-center gap-1 border-2 transition-all ${paymentMethod === m.id && !splitPayment ? 'text-white border-transparent' : 'bg-white border-gray-200'}`} 
                     style={paymentMethod === m.id && !splitPayment ? { backgroundColor: m.color } : {}}
                   >
-                    <m.icon className="w-5 h-5" />
-                    <span className="text-xs font-medium">{m.label}</span>
+                    <m.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="text-[11px] sm:text-xs font-medium">{m.label}</span>
                   </button>
                 ))}
               </div>
@@ -1837,220 +1857,183 @@ const BillingPage = ({ user }) => {
               </div>
             </div>
             
-            {/* Enhanced Payment Amount Options */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl mt-3 border border-blue-200">
-              <h4 className="font-semibold text-base mb-3 text-gray-800 flex items-center gap-2">
-                💳 Payment Amount
-                <span className="text-2xl font-bold text-violet-600 ml-auto">{currency}{calculateTotal().toFixed(2)}</span>
-              </h4>
-              
-              {!splitPayment && (
-                <div className="space-y-3">
-                  {/* Enhanced Full Payment Checkbox */}
-                  <div className="bg-white border-2 border-green-200 rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <input 
-                        type="checkbox" 
-                        id="fullPaymentCheck" 
-                        checked={!showReceivedAmount} 
-                        onChange={(e) => {
-                          setShowReceivedAmount(!e.target.checked);
-                          if (e.target.checked) {
-                            setReceivedAmount('');
-                          }
-                        }}
-                        className="w-6 h-6 text-green-600 rounded-lg focus:ring-green-500 focus:ring-2"
-                      />
-                      <label htmlFor="fullPaymentCheck" className="flex-1 font-semibold text-green-800 text-base cursor-pointer">
-                        ✅ Mark as Fully Paid ({currency}{calculateTotal().toFixed(2)})
-                      </label>
-                    </div>
-                    <p className="text-sm text-green-600 mt-2 ml-9">
-                      Customer pays the exact bill amount
-                    </p>
+            {/* Payment Amount Options */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-3 sm:p-4 rounded-xl mt-2 sm:mt-3 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm sm:text-base text-gray-800 flex items-center gap-2">
+                  💳 Payment Amount
+                </h4>
+                <span className="text-xl sm:text-2xl font-bold text-violet-600">{currency}{calculateTotal().toFixed(2)}</span>
+              </div>
+
+              <div className={`grid ${hasPriorPayment ? 'grid-cols-3' : 'grid-cols-2'} gap-2 mt-2`}>
+                <div className="bg-white/80 border border-blue-100 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-500">Total</p>
+                  <p className="text-sm font-semibold">{currency}{calculateTotal().toFixed(2)}</p>
+                </div>
+                {hasPriorPayment && (
+                  <div className="bg-white/80 border border-blue-100 rounded-lg p-2">
+                    <p className="text-[10px] text-gray-500">Paid</p>
+                    <p className="text-sm font-semibold">{currency}{priorPaid.toFixed(2)}</p>
                   </div>
-                  
-                  {/* Enhanced Custom Amount Input - Only show when full payment is unchecked */}
-                  {showReceivedAmount && (
-                    <div className="bg-white border-2 border-orange-200 rounded-xl p-4 shadow-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-orange-600 text-lg">⚙️</span>
-                        <h5 className="font-semibold text-orange-800">Custom Payment Amount</h5>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <label className="text-sm font-semibold text-gray-700 min-w-[120px]">
-                            Amount Received:
-                          </label>
-                          <div className="flex-1 relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">
-                              {currency}
-                            </span>
-                            <input 
-                              type="number" 
-                              value={receivedAmount} 
-                              onChange={(e) => setReceivedAmount(e.target.value)} 
-                              placeholder="0.00"
-                              className="w-full h-14 pl-10 pr-4 text-xl font-bold border-2 border-gray-300 rounded-xl text-center focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all duration-200" 
-                              min="0"
-                              step="0.01"
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Enhanced Smart Payment Status Indicator */}
-                        {receivedAmount && (
-                          <div className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                            parseFloat(receivedAmount) === 0 ? 'bg-red-50 border-red-200' :
-                            parseFloat(receivedAmount) < calculateTotal() ? 'bg-orange-50 border-orange-200' :
-                            parseFloat(receivedAmount) > calculateTotal() ? 'bg-blue-50 border-blue-200' :
-                            'bg-green-50 border-green-200'
-                          }`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded-full ${
-                                parseFloat(receivedAmount) === 0 ? 'bg-red-500' :
-                                parseFloat(receivedAmount) < calculateTotal() ? 'bg-orange-500' :
-                                parseFloat(receivedAmount) > calculateTotal() ? 'bg-blue-500' :
-                                'bg-green-500'
-                              } animate-pulse`}></div>
-                              <div className="flex-1">
-                                {parseFloat(receivedAmount) === 0 ? (
-                                  <div className="text-red-700">
-                                    <span className="font-bold">❌ Unpaid Order</span>
-                                    <p className="text-sm text-red-600 mt-1">No payment received yet</p>
-                                  </div>
-                                ) : parseFloat(receivedAmount) < calculateTotal() ? (
-                                  <div className="text-orange-700">
-                                    <span className="font-bold">⚠️ Partial Payment</span>
-                                    <p className="text-sm text-orange-600 mt-1">
-                                      Balance Due: <span className="font-bold">{currency}{(calculateTotal() - parseFloat(receivedAmount)).toFixed(2)}</span>
-                                    </p>
-                                  </div>
-                                ) : parseFloat(receivedAmount) > calculateTotal() ? (
-                                  <div className="text-blue-700">
-                                    <span className="font-bold">💰 Overpayment</span>
-                                    <p className="text-sm text-blue-600 mt-1">
-                                      Change to Return: <span className="font-bold">{currency}{(parseFloat(receivedAmount) - calculateTotal()).toFixed(2)}</span>
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <div className="text-green-700">
-                                    <span className="font-bold">✅ Exact Payment</span>
-                                    <p className="text-sm text-green-600 mt-1">Perfect! No change needed</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Enhanced Quick Amount Buttons */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <button 
-                            onClick={() => setReceivedAmount((calculateTotal() * 0.5).toFixed(2))}
-                            className="py-3 text-sm bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border-2 border-yellow-300 rounded-xl hover:from-yellow-200 hover:to-yellow-300 font-bold transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            50% Payment
-                          </button>
-                          <button 
-                            onClick={() => setReceivedAmount(calculateTotal().toFixed(2))}
-                            className="py-3 text-sm bg-gradient-to-r from-green-100 to-green-200 text-green-800 border-2 border-green-300 rounded-xl hover:from-green-200 hover:to-green-300 font-bold transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            Full Amount
-                          </button>
-                          <button 
-                            onClick={() => setReceivedAmount(Math.ceil(calculateTotal()).toString())}
-                            className="py-3 text-sm bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border-2 border-blue-300 rounded-xl hover:from-blue-200 hover:to-blue-300 font-bold transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            Round Up
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )} 
+                )}
+                <div className="bg-white/80 border border-blue-100 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-500">Due</p>
+                  <p className="text-sm font-semibold text-red-600">{currency}{remainingDue.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitPayment(false);
+                    setShowReceivedAmount(false);
+                    setReceivedAmount('');
+                  }}
+                  className={`py-1.5 text-[11px] font-semibold rounded-lg border ${
+                    !splitPayment && !showReceivedAmount ? 'bg-violet-600 text-white border-violet-600' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  Settle Due
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitPayment(false);
+                    setShowReceivedAmount(true);
+                  }}
+                  className={`py-1.5 text-[11px] font-semibold rounded-lg border ${
+                    !splitPayment && showReceivedAmount ? 'bg-violet-600 text-white border-violet-600' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  Add/Custom
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitPayment(true);
+                    setShowReceivedAmount(false);
+                    setReceivedAmount('');
+                  }}
+                  className={`py-1.5 text-[11px] font-semibold rounded-lg border ${
+                    splitPayment ? 'bg-violet-600 text-white border-violet-600' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  Split
+                </button>
+              </div>
+
+              {!splitPayment && !showReceivedAmount && (
+                <div className="mt-2 bg-white/80 border border-blue-100 rounded-lg p-2 text-[11px] text-gray-600 flex justify-between">
+                  <span>Collect now</span>
+                  <span className="font-semibold">{currency}{basePaymentAmount.toFixed(2)}</span>
                 </div>
               )}
-              
-              {/* Split Payment Inputs */}
+
+              {!splitPayment && showReceivedAmount && (
+                <div className="mt-2 bg-white border border-blue-100 rounded-lg p-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-gray-600 min-w-[90px]">This payment</label>
+                    <div className="flex-1 relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">
+                        {currency}
+                      </span>
+                      <input
+                        type="number"
+                        value={receivedAmount}
+                        onChange={(e) => setReceivedAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-9 pl-6 pr-2 text-sm font-semibold border border-gray-300 rounded-lg text-right focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setReceivedAmount((basePaymentAmount * 0.5).toFixed(2))}
+                      className="py-1.5 text-[11px] rounded-lg border border-yellow-200 bg-yellow-50 text-yellow-800 font-semibold"
+                    >
+                      50%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceivedAmount(basePaymentAmount.toFixed(2))}
+                      className="py-1.5 text-[11px] rounded-lg border border-green-200 bg-green-50 text-green-800 font-semibold"
+                    >
+                      Due
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceivedAmount(Math.ceil(basePaymentAmount).toString())}
+                      className="py-1.5 text-[11px] rounded-lg border border-blue-200 bg-blue-50 text-blue-800 font-semibold"
+                    >
+                      Round
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {splitPayment && (
-                <div className="space-y-2">
+                <div className="mt-2 bg-white border border-blue-100 rounded-lg p-2 space-y-2">
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-xs text-gray-600">Cash</label>
-                      <input 
-                        type="number" 
-                        value={cashAmount} 
-                        onChange={(e) => setCashAmount(e.target.value)} 
+                      <label className="text-[11px] text-gray-600">Cash</label>
+                      <input
+                        type="number"
+                        value={cashAmount}
+                        onChange={(e) => setCashAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full h-8 px-2 text-sm border rounded-lg text-center" 
+                        className="w-full h-8 px-2 text-xs border rounded-lg text-center"
                         min="0"
                         step="0.01"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-600">Card</label>
-                      <input 
-                        type="number" 
-                        value={cardAmount} 
-                        onChange={(e) => setCardAmount(e.target.value)} 
+                      <label className="text-[11px] text-gray-600">Card</label>
+                      <input
+                        type="number"
+                        value={cardAmount}
+                        onChange={(e) => setCardAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full h-8 px-2 text-sm border rounded-lg text-center" 
+                        className="w-full h-8 px-2 text-xs border rounded-lg text-center"
                         min="0"
                         step="0.01"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-600">UPI</label>
-                      <input 
-                        type="number" 
-                        value={upiAmount} 
-                        onChange={(e) => setUpiAmount(e.target.value)} 
+                      <label className="text-[11px] text-gray-600">UPI</label>
+                      <input
+                        type="number"
+                        value={upiAmount}
+                        onChange={(e) => setUpiAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full h-8 px-2 text-sm border rounded-lg text-center" 
+                        className="w-full h-8 px-2 text-xs border rounded-lg text-center"
                         min="0"
                         step="0.01"
                       />
                     </div>
                   </div>
-                  
-                  <div className="text-xs text-gray-600 text-center">
-                    Total Split: {currency}{getTotalSplitAmount().toFixed(2)} / {currency}{calculateTotal().toFixed(2)}
+                  <div className="text-[11px] text-gray-600 flex justify-between">
+                    <span>This split: {currency}{getTotalSplitAmount().toFixed(2)}</span>
+                    <span>Due: {currency}{calculateBalanceAmount().toFixed(2)}</span>
                   </div>
                 </div>
               )}
-              
-              {/* Payment Summary */}
-              {((showReceivedAmount && receivedAmount) || splitPayment) && (
-                <div className="bg-white p-2 rounded border mt-2 text-xs space-y-1">
-                  <div className="flex justify-between font-medium">
-                    <span>Bill Total:</span>
-                    <span>{currency}{calculateTotal().toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Amount Received:</span>
-                    <span>{currency}{calculateReceivedAmount().toFixed(2)}</span>
-                  </div>
-                  {isPartialPayment() && (
-                    <div className="flex justify-between text-red-600 font-medium">
-                      <span>Balance Due:</span>
-                      <span>{currency}{calculateBalanceAmount().toFixed(2)}</span>
-                    </div>
-                  )}
-                  {isOverPayment() && (
-                    <div className="flex justify-between text-green-600 font-medium">
-                      <span>Change to Return:</span>
-                      <span>{currency}{calculateChangeAmount().toFixed(2)}</span>
-                    </div>
-                  )}
-                  {calculateReceivedAmount() === calculateTotal() && (
-                    <div className="flex justify-between text-green-600 font-medium">
-                      <span>Status:</span>
-                      <span>EXACT PAYMENT</span>
-                    </div>
-                  )}
-                </div>
-              )}
+
+              <div className="mt-2 bg-white/80 border border-blue-100 rounded-lg p-2 text-[11px] text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                <span>This payment: {currency}{thisPaymentAmount.toFixed(2)}</span>
+                <span>After payment: {currency}{totalReceived.toFixed(2)}</span>
+                {totalReceived < calculateTotal() ? (
+                  <span className="text-red-600 font-semibold">Due {currency}{calculateBalanceAmount().toFixed(2)}</span>
+                ) : totalReceived > calculateTotal() ? (
+                  <span className="text-green-600 font-semibold">Change {currency}{calculateChangeAmount().toFixed(2)}</span>
+                ) : (
+                  <span className="text-green-600 font-semibold">Exact payment</span>
+                )}
+              </div>
             </div>
             {!paymentCompleted ? (
               <Button 
@@ -2113,14 +2096,14 @@ const BillingPage = ({ user }) => {
                     <span className="font-bold">
                       {splitPayment ? (
                         getTotalSplitAmount() === 0 ? 'Enter Split Payment Amounts' :
-                        getTotalSplitAmount() < calculateTotal() ? `💰 Record Split Payment ${currency}${getTotalSplitAmount().toFixed(0)} (Due: ${currency}${(calculateTotal() - getTotalSplitAmount()).toFixed(0)})` :
-                        getTotalSplitAmount() > calculateTotal() ? `💸 Pay Split ${currency}${getTotalSplitAmount().toFixed(0)} (Change: ${currency}${(getTotalSplitAmount() - calculateTotal()).toFixed(0)})` :
+                        totalReceived < calculateTotal() ? `💰 Record Split Payment ${currency}${getTotalSplitAmount().toFixed(0)} (Due: ${currency}${calculateBalanceAmount().toFixed(0)})` :
+                        totalReceived > calculateTotal() ? `💸 Pay Split ${currency}${getTotalSplitAmount().toFixed(0)} (Change: ${currency}${calculateChangeAmount().toFixed(0)})` :
                         `✅ Pay Split ${currency}${getTotalSplitAmount().toFixed(0)}`
                       ) : showReceivedAmount && receivedAmount ? (
-                        isPartialPayment() ? `💰 Record Partial Payment ${currency}${calculateReceivedAmount().toFixed(0)}` :
-                        isOverPayment() ? `💸 Pay ${currency}${calculateReceivedAmount().toFixed(0)} (Change: ${currency}${calculateChangeAmount().toFixed(0)})` :
-                        `✅ Pay ${currency}${calculateReceivedAmount().toFixed(0)}`
-                      ) : `🚀 Pay ${currency}${calculateTotal().toFixed(0)}`}
+                        isPartialPayment() ? `💰 Record Partial Payment ${currency}${currentReceived.toFixed(0)}` :
+                        isOverPayment() ? `💸 Pay ${currency}${currentReceived.toFixed(0)} (Change: ${currency}${calculateChangeAmount().toFixed(0)})` :
+                        `✅ Pay ${currency}${currentReceived.toFixed(0)}`
+                      ) : `🚀 Pay ${currency}${(hasPriorPayment ? remainingDue : calculateTotal()).toFixed(0)}`}
                     </span>
                   </div>
                 )}
@@ -2433,7 +2416,7 @@ const BillingPage = ({ user }) => {
             <p className="text-sm text-gray-500 mb-4 font-semibold uppercase tracking-wide">Payment Method</p>
             <div className="grid grid-cols-3 gap-4">
               {[{ id: 'cash', icon: Wallet, label: 'Cash', color: '#22c55e' }, { id: 'card', icon: CreditCard, label: 'Card', color: '#3b82f6' }, { id: 'upi', icon: Smartphone, label: 'UPI', color: '#8b5cf6' }].map(m => (
-                <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`py-5 rounded-xl flex flex-col items-center gap-2 border-2 transition-all ${paymentMethod === m.id ? 'text-white border-transparent shadow-lg scale-105' : 'bg-white border-gray-200 hover:border-gray-300'}`} style={paymentMethod === m.id ? { backgroundColor: m.color } : {}}>
+                <button key={m.id} onClick={() => { setPaymentMethod(m.id); setSplitPayment(false); }} className={`py-5 rounded-xl flex flex-col items-center gap-2 border-2 transition-all ${paymentMethod === m.id && !splitPayment ? 'text-white border-transparent shadow-lg scale-105' : 'bg-white border-gray-200 hover:border-gray-300'}`} style={paymentMethod === m.id && !splitPayment ? { backgroundColor: m.color } : {}}>
                   <m.icon className="w-8 h-8" /><span className="font-semibold text-lg">{m.label}</span>
                 </button>
               ))}
@@ -2441,101 +2424,179 @@ const BillingPage = ({ user }) => {
             
             {/* Payment Amount Options - Desktop */}
             <div className="mt-6 bg-blue-50 p-4 rounded-xl">
-              <h4 className="font-semibold text-base mb-3">Payment Amount</h4>
-              
-              {!splitPayment && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="radio" 
-                      id="fullPaymentDesktop" 
-                      name="paymentTypeDesktop" 
-                      checked={!showReceivedAmount} 
-                      onChange={() => {
-                        setShowReceivedAmount(false);
-                        setReceivedAmount('');
-                      }}
-                      className="rounded"
-                    />
-                    <label htmlFor="fullPaymentDesktop" className="text-base font-medium">
-                      Full Payment: {currency}{calculateTotal().toFixed(2)}
-                    </label>
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-base">Payment Amount</h4>
+                <span className="text-2xl font-bold text-violet-600">{currency}{calculateTotal().toFixed(2)}</span>
+              </div>
+
+              <div className={`grid ${hasPriorPayment ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mt-3`}>
+                <div className="bg-white/80 border border-blue-100 rounded-lg p-3">
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="text-lg font-semibold">{currency}{calculateTotal().toFixed(2)}</p>
+                </div>
+                {hasPriorPayment && (
+                  <div className="bg-white/80 border border-blue-100 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Paid</p>
+                    <p className="text-lg font-semibold">{currency}{priorPaid.toFixed(2)}</p>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="radio" 
-                      id="customPaymentDesktop" 
-                      name="paymentTypeDesktop" 
-                      checked={showReceivedAmount} 
-                      onChange={() => setShowReceivedAmount(true)}
-                      className="rounded"
-                    />
-                    <label htmlFor="customPaymentDesktop" className="text-base font-medium">
-                      Custom Amount (Partial/Overpayment)
-                    </label>
-                  </div>
-                  
-                  {showReceivedAmount && (
-                    <div className="ml-6 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-base text-gray-600 min-w-[120px]">Amount Received:</span>
-                        <input 
-                          type="number" 
-                          value={receivedAmount} 
-                          onChange={(e) => setReceivedAmount(e.target.value)} 
-                          placeholder={calculateTotal().toFixed(0)}
-                          className="flex-1 h-10 px-3 text-base border rounded-lg text-center" 
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      
-                      {/* Quick Amount Buttons */}
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setReceivedAmount((calculateTotal() * 0.5).toFixed(2))}
-                          className="px-3 py-2 text-sm bg-yellow-100 border border-yellow-300 rounded-lg hover:bg-yellow-200 font-medium"
-                        >
-                          50%
-                        </button>
-                        <button 
-                          onClick={() => setReceivedAmount(calculateTotal().toFixed(2))}
-                          className="px-3 py-2 text-sm bg-green-100 border border-green-300 rounded-lg hover:bg-green-200 font-medium"
-                        >
-                          Full
-                        </button>
-                        <button 
-                          onClick={() => setReceivedAmount(Math.ceil(calculateTotal()).toString())}
-                          className="px-3 py-2 text-sm bg-blue-100 border border-blue-300 rounded-lg hover:bg-blue-200 font-medium"
-                        >
-                          Round Up
-                        </button>
-                      </div>
-                      
-                      {/* Payment Summary */}
-                      <div className="bg-white p-3 rounded-lg border">
-                        <div className="flex justify-between text-sm">
-                          <span>Bill Total:</span>
-                          <span className="font-semibold">{currency}{calculateTotal().toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Amount Received:</span>
-                          <span className="font-semibold">{currency}{calculateReceivedAmount().toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-bold border-t pt-1 mt-1">
-                          <span className={calculateReceivedAmount() < calculateTotal() ? 'text-red-600' : 'text-green-600'}>
-                            {calculateReceivedAmount() < calculateTotal() ? 'Balance Due:' : 'Change:'}
-                          </span>
-                          <span className={calculateReceivedAmount() < calculateTotal() ? 'text-red-600' : 'text-green-600'}>
-                            {currency}{Math.abs(calculateTotal() - calculateReceivedAmount()).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                )}
+                <div className="bg-white/80 border border-blue-100 rounded-lg p-3">
+                  <p className="text-xs text-gray-500">Due</p>
+                  <p className="text-lg font-semibold text-red-600">{currency}{remainingDue.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitPayment(false);
+                    setShowReceivedAmount(false);
+                    setReceivedAmount('');
+                  }}
+                  className={`py-2 text-sm font-semibold rounded-lg border ${
+                    !splitPayment && !showReceivedAmount ? 'bg-violet-600 text-white border-violet-600' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  Settle Due
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitPayment(false);
+                    setShowReceivedAmount(true);
+                  }}
+                  className={`py-2 text-sm font-semibold rounded-lg border ${
+                    !splitPayment && showReceivedAmount ? 'bg-violet-600 text-white border-violet-600' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  Add/Custom
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSplitPayment(true);
+                    setShowReceivedAmount(false);
+                    setReceivedAmount('');
+                  }}
+                  className={`py-2 text-sm font-semibold rounded-lg border ${
+                    splitPayment ? 'bg-violet-600 text-white border-violet-600' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  Split
+                </button>
+              </div>
+
+              {!splitPayment && !showReceivedAmount && (
+                <div className="mt-3 bg-white/80 border border-blue-100 rounded-lg p-3 text-sm flex justify-between">
+                  <span>Collect now</span>
+                  <span className="font-semibold">{currency}{basePaymentAmount.toFixed(2)}</span>
                 </div>
               )}
+
+              {!splitPayment && showReceivedAmount && (
+                <div className="mt-3 bg-white border border-blue-100 rounded-lg p-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-600 min-w-[120px]">This payment</label>
+                    <div className="flex-1 relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
+                        {currency}
+                      </span>
+                      <input
+                        type="number"
+                        value={receivedAmount}
+                        onChange={(e) => setReceivedAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-11 pl-8 pr-3 text-base font-semibold border border-gray-300 rounded-lg text-right focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReceivedAmount((basePaymentAmount * 0.5).toFixed(2))}
+                      className="px-3 py-2 text-sm bg-yellow-100 border border-yellow-300 rounded-lg font-medium"
+                    >
+                      50%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceivedAmount(basePaymentAmount.toFixed(2))}
+                      className="px-3 py-2 text-sm bg-green-100 border border-green-300 rounded-lg font-medium"
+                    >
+                      Due
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceivedAmount(Math.ceil(basePaymentAmount).toString())}
+                      className="px-3 py-2 text-sm bg-blue-100 border border-blue-300 rounded-lg font-medium"
+                    >
+                      Round Up
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {splitPayment && (
+                <div className="mt-3 bg-white border border-blue-100 rounded-lg p-3 space-y-2">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-600">Cash</label>
+                      <input
+                        type="number"
+                        value={cashAmount}
+                        onChange={(e) => setCashAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-9 px-2 text-sm border rounded-lg text-center"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Card</label>
+                      <input
+                        type="number"
+                        value={cardAmount}
+                        onChange={(e) => setCardAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-9 px-2 text-sm border rounded-lg text-center"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">UPI</label>
+                      <input
+                        type="number"
+                        value={upiAmount}
+                        onChange={(e) => setUpiAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-9 px-2 text-sm border rounded-lg text-center"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 flex justify-between">
+                    <span>This split: {currency}{getTotalSplitAmount().toFixed(2)}</span>
+                    <span>Due: {currency}{calculateBalanceAmount().toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 bg-white/80 border border-blue-100 rounded-lg p-3 text-sm flex flex-wrap gap-x-4 gap-y-1">
+                <span>This payment: {currency}{thisPaymentAmount.toFixed(2)}</span>
+                <span>After payment: {currency}{totalReceived.toFixed(2)}</span>
+                {totalReceived < calculateTotal() ? (
+                  <span className="text-red-600 font-semibold">Due {currency}{calculateBalanceAmount().toFixed(2)}</span>
+                ) : totalReceived > calculateTotal() ? (
+                  <span className="text-green-600 font-semibold">Change {currency}{calculateChangeAmount().toFixed(2)}</span>
+                ) : (
+                  <span className="text-green-600 font-semibold">Exact payment</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="p-4 flex-1 flex flex-col">
@@ -2602,8 +2663,8 @@ const BillingPage = ({ user }) => {
                     <span className="text-3xl animate-bounce">💳</span>
                     <span className="font-bold text-xl">
                       {showReceivedAmount ? 
-                        `🚀 Pay ${currency}${calculateReceivedAmount().toFixed(0)}` : 
-                        `🚀 Pay ${currency}${calculateTotal().toFixed(0)}`
+                        `🚀 Pay ${currency}${currentReceived.toFixed(0)}` : 
+                        `🚀 Pay ${currency}${(hasPriorPayment ? remainingDue : calculateTotal()).toFixed(0)}`
                       }
                     </span>
                   </div>
