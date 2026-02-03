@@ -1,6 +1,10 @@
 // craco.config.js
 const path = require("path");
-require("dotenv").config();
+const dotenv = require("dotenv");
+
+// Load env early for CRACO config (prefer .env.local over .env)
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: path.resolve(__dirname, ".env.local"), override: true });
 
 // Environment variable overrides
 const config = {
