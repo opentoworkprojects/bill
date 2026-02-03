@@ -13,16 +13,6 @@ export const useElectron = () => {
   
   // Navigation is handled by ElectronNavigator component in App.js
   
-  // Handle update check from Electron menu
-  useEffect(() => {
-    if (isElectron && window.electronAPI?.onCheckUpdates) {
-      window.electronAPI.onCheckUpdates(() => {
-        // Show update notification or modal
-        alert('You are running the latest version of BillByteKOT!');
-      });
-    }
-  }, [isElectron]);
-  
   // Show native notification
   const showNotification = useCallback((title, body) => {
     if (isElectron && window.electronAPI?.showNotification) {

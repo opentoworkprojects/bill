@@ -278,12 +278,23 @@ allow_all_origins = os.getenv("CORS_ALLOW_ALL", "true").lower() in ("1", "true",
 cors_origins = ["*"] if allow_all_origins else ALLOWED_ORIGINS
 cors_allow_credentials = False if "*" in cors_origins else True
 
+# Enhanced CORS configuration with better error handling
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=cors_allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language", 
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
     expose_headers=["*"],
 )
 
@@ -5825,325 +5836,433 @@ async def update_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Update an existing order"""
-    user_org_id = get_secure_org_id(current_user)
-    
-    # Verify order belongs to user's organization
-    existing_order = await db.orders.find_one(
-        {"id": order_id, "organization_id": user_org_id}
-    )
-    
-    if not existing_order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    # Handle status update separately (e.g., marking as completed from billing page)
-    if "status" in order_data and order_data.get("status") == "completed":
-        update_data = {
-            "status": "completed",
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        # Also update payment fields if provided
-        payment_fields = ["payment_method", "is_credit", "payment_received", "balance_amount"]
-        for field in payment_fields:
-            if field in order_data:
-                update_data[field] = order_data[field]
+    try:
+        # Log incoming request for debugging
+        print(f"🔄 PUT /orders/{order_id} - Request data: {json.dumps(order_data, default=str)[:500]}...")
+        print(f"👤 User: {current_user.get('username', 'unknown')} (org: {current_user.get('organization_id', 'none')})")
         
-        await db.orders.update_one(
-            {"id": order_id, "organization_id": user_org_id},
-            {"$set": update_data}
-        )
+        user_org_id = get_secure_org_id(current_user)
         
-        # Clear table when order is completed - Use TableStatusManager for immediate, direct DB update
-        if existing_order.get("table_id") and existing_order.get("table_id") != "counter":
+        # Validate order_id format
+        if not order_id or not isinstance(order_id, str):
+            print(f"❌ Invalid order_id format: {order_id}")
+            raise HTTPException(status_code=400, detail="Invalid order ID format")
+        
+        # Validate order_data is a dictionary
+        if not isinstance(order_data, dict):
+            print(f"❌ Invalid order_data format: {type(order_data)}")
+            raise HTTPException(status_code=400, detail="Invalid request data format")
+        
+        # Verify order belongs to user's organization
+        try:
+            existing_order = await db.orders.find_one(
+                {"id": order_id, "organization_id": user_org_id}
+            )
+        except Exception as db_error:
+            print(f"❌ Database error finding order {order_id}: {str(db_error)}")
+            raise HTTPException(status_code=500, detail="Database error while finding order")
+        
+        if not existing_order:
+            print(f"❌ Order not found: {order_id} for org: {user_org_id}")
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Handle status update separately (e.g., marking as completed from billing page)
+        if "status" in order_data and order_data.get("status") == "completed":
             try:
-                table_manager = get_table_status_manager()
-                result = await table_manager.set_table_available(user_org_id, existing_order["table_id"])
-                if result["success"]:
-                    print(f"✅ Table {existing_order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for completed order {order_id}")
-                else:
-                    print(f"⚠️ TableStatusManager failed: {result['message']}")
-                    # Fallback to direct update
-                    await db.tables.update_one(
-                        {"id": existing_order["table_id"], "organization_id": user_org_id},
-                        {"$set": {"status": "available", "current_order_id": None}}
-                    )
-                    print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for completed order {order_id}")
-            except Exception as e:
-                print(f"⚠️ TableStatusManager error: {e}, using fallback")
-                # Fallback to direct update if TableStatusManager fails
+                print(f"💳 Processing order completion for {order_id}")
+                
+                update_data = {
+                    "status": "completed",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+                
+                # Validate and add payment fields if provided
+                payment_fields = ["payment_method", "is_credit", "payment_received", "balance_amount"]
+                for field in payment_fields:
+                    if field in order_data:
+                        value = order_data[field]
+                        # Validate numeric fields
+                        if field in ["payment_received", "balance_amount"]:
+                            try:
+                                value = float(value) if value is not None else 0.0
+                                if not math.isfinite(value) or value < 0:
+                                    print(f"⚠️ Invalid {field} value: {value}, using 0")
+                                    value = 0.0
+                            except (TypeError, ValueError) as e:
+                                print(f"⚠️ Error converting {field} to float: {e}, using 0")
+                                value = 0.0
+                        # Validate boolean fields
+                        elif field == "is_credit":
+                            value = bool(value) if value is not None else False
+                        # Validate string fields
+                        elif field == "payment_method":
+                            if not isinstance(value, str) or not value.strip():
+                                value = "cash"
+                        
+                        update_data[field] = value
+                
+                # Update order in database
                 try:
-                    await db.tables.update_one(
-                        {"id": existing_order["table_id"], "organization_id": user_org_id},
-                        {"$set": {"status": "available", "current_order_id": None}}
+                    result = await db.orders.update_one(
+                        {"id": order_id, "organization_id": user_org_id},
+                        {"$set": update_data}
                     )
-                    print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for completed order {order_id}")
-                except Exception as fallback_error:
-                    print(f"⚠️ Table clearing fallback error: {fallback_error}")
-        
-        # Invalidate cache for completed order update
-        try:
-            cached_service = get_cached_order_service()
-            await cached_service.invalidate_order_caches(user_org_id, order_id)
-            print(f"🗑️ Cache invalidated for completed order update {order_id}")
-        except Exception as e:
-            print(f"⚠️ Cache invalidation error: {e}")
-        
-        return {"message": "Order completed and table cleared successfully"}
-    
-    # For completed orders, only allow updating payment-related fields
-    if existing_order.get("status") == "completed":
-        # Allow updating: is_credit, payment_method, payment_received, balance_amount, customer_name, customer_phone
-        # Also allow discount and tax updates
-        allowed_fields = [
-            "is_credit", "payment_method", "payment_received", "balance_amount", 
-            "customer_name", "customer_phone",
-            "cash_amount", "card_amount", "upi_amount", "credit_amount",
-            "discount", "discount_type", "discount_value", "discount_amount",
-            "tax", "tax_rate", "subtotal", "total", "items"
-        ]
-        update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
-        
-        for field in allowed_fields:
-            if field in order_data:
-                update_data[field] = order_data[field]
-        
-        # Calculate balance if payment_received is provided
-        # Fix: Use the new total from order_data if provided, otherwise use existing
-        if "payment_received" in order_data:
-            total = order_data.get("total", existing_order.get("total", 0))
-            payment_received = order_data.get("payment_received", 0) or 0
-            calculated_balance = max(0, total - payment_received)  # Ensure non-negative
-            update_data["balance_amount"] = calculated_balance
-            # Auto-mark as credit if there's a balance
-            if calculated_balance > 0:
-                update_data["is_credit"] = True
-            else:
-                update_data["is_credit"] = False
-                update_data["balance_amount"] = 0
-            print(f"💰 Payment update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={update_data['is_credit']}")
-        
-        await db.orders.update_one(
-            {"id": order_id, "organization_id": user_org_id},
-            {"$set": update_data}
-        )
-        
-        # Invalidate cache for payment update
-        try:
-            cached_service = get_cached_order_service()
-            await cached_service.invalidate_order_caches(user_org_id, order_id)
-            print(f"🗑️ Cache invalidated for payment update {order_id}")
-        except Exception as e:
-            print(f"⚠️ Cache invalidation error: {e}")
-        
-        # Clear table if payment is fully completed (no balance remaining) - Use TableStatusManager
-        if update_data.get("balance_amount", 0) <= 0 and not update_data.get("is_credit", False):
-            table_id = existing_order.get("table_id")
-            if table_id and table_id != "counter":
-                try:
-                    table_manager = get_table_status_manager()
-                    result = await table_manager.set_table_available(user_org_id, table_id)
-                    if result["success"]:
-                        print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed payment")
-                    else:
-                        print(f"⚠️ TableStatusManager failed: {result['message']}")
-                        # Fallback to direct update
-                        await db.tables.update_one(
-                            {"id": table_id, "organization_id": user_org_id},
-                            {"$set": {"status": "available", "current_order_id": None}}
-                        )
-                        print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
-                except Exception as e:
-                    print(f"⚠️ TableStatusManager error: {e}, using fallback")
-                    # Fallback to direct update if TableStatusManager fails
+                    
+                    if result.matched_count == 0:
+                        print(f"❌ No order matched for update: {order_id}")
+                        raise HTTPException(status_code=404, detail="Order not found for update")
+                    
+                    print(f"✅ Order {order_id} marked as completed")
+                    
+                except Exception as update_error:
+                    print(f"❌ Database error updating order {order_id}: {str(update_error)}")
+                    raise HTTPException(status_code=500, detail="Failed to update order status")
+                
+                # Clear table when order is completed - Use TableStatusManager for immediate, direct DB update
+                if existing_order.get("table_id") and existing_order.get("table_id") != "counter":
                     try:
-                        await db.tables.update_one(
-                            {"id": table_id, "organization_id": user_org_id},
-                            {"$set": {"status": "available", "current_order_id": None}}
-                        )
-                        print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
-                    except Exception as fallback_error:
-                        print(f"⚠️ Table clearing fallback error: {fallback_error}")
-        
-        return {"message": "Order payment details updated successfully"}
-    
-    # For non-completed orders, allow full editing
-    def _safe_float(value, fallback=0.0):
-        try:
-            if value is None:
-                return fallback
-            number = float(value)
-            if not math.isfinite(number):
-                return fallback
-            return number
-        except (TypeError, ValueError):
-            return fallback
-
-    def _normalize_items(raw_items, fallback_items):
-        if not isinstance(raw_items, list):
-            return fallback_items
-        normalized = []
-        for item in raw_items:
-            if not isinstance(item, dict):
-                return fallback_items
-            normalized_item = dict(item)
-            quantity = int(item.get("quantity") or 0)
-            if quantity <= 0:
-                return fallback_items
-            normalized_item["quantity"] = quantity
-            normalized_item["price"] = _safe_float(item.get("price"), 0.0)
-            if "menu_item_id" in normalized_item and normalized_item["menu_item_id"] is not None:
-                normalized_item["menu_item_id"] = str(normalized_item["menu_item_id"])
-            if "name" in normalized_item and normalized_item["name"] is not None:
-                normalized_item["name"] = str(normalized_item["name"])
-            normalized.append(normalized_item)
-        return normalized
-
-    existing_items = existing_order.get("items", [])
-    items = _normalize_items(order_data.get("items", existing_items), existing_items)
-    subtotal = _safe_float(order_data.get("subtotal", existing_order.get("subtotal", 0)), existing_order.get("subtotal", 0))
-    tax = _safe_float(order_data.get("tax", existing_order.get("tax", 0)), existing_order.get("tax", 0))
-    tax_rate = _safe_float(order_data.get("tax_rate", existing_order.get("tax_rate", 5.0)), existing_order.get("tax_rate", 5.0))
-    total = _safe_float(order_data.get("total", existing_order.get("total", 0)), existing_order.get("total", 0))
-    discount = _safe_float(order_data.get("discount", existing_order.get("discount", 0)), existing_order.get("discount", 0))
-    discount_value = _safe_float(order_data.get("discount_value", existing_order.get("discount_value", 0)), existing_order.get("discount_value", 0))
-    discount_amount = _safe_float(order_data.get("discount_amount", existing_order.get("discount_amount", 0)), existing_order.get("discount_amount", 0))
-    discount_type = order_data.get("discount_type", existing_order.get("discount_type", "amount"))
-    if discount_type not in ("amount", "percent"):
-        discount_type = existing_order.get("discount_type", "amount")
-
-    update_data = {
-        "items": items,
-        "subtotal": subtotal,
-        "tax": tax,
-        "tax_rate": tax_rate,
-        "total": total,
-        "customer_name": order_data.get("customer_name", existing_order.get("customer_name", "")),
-        "customer_phone": order_data.get("customer_phone", existing_order.get("customer_phone", "")),
-        "payment_method": order_data.get("payment_method", existing_order.get("payment_method", "cash")),
-        # Split payment fields
-        "cash_amount": _safe_float(order_data.get("cash_amount", existing_order.get("cash_amount", 0)), existing_order.get("cash_amount", 0)),
-        "card_amount": _safe_float(order_data.get("card_amount", existing_order.get("card_amount", 0)), existing_order.get("card_amount", 0)),
-        "upi_amount": _safe_float(order_data.get("upi_amount", existing_order.get("upi_amount", 0)), existing_order.get("upi_amount", 0)),
-        "credit_amount": _safe_float(order_data.get("credit_amount", existing_order.get("credit_amount", 0)), existing_order.get("credit_amount", 0)),
-        # Discount fields
-        "discount": discount,
-        "discount_type": discount_type,
-        "discount_value": discount_value,
-        "discount_amount": discount_amount,
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    # Initialize payment snapshot for logging and safe defaults
-    payment_received = _safe_float(existing_order.get("payment_received", 0), 0) or 0
-    calculated_balance = _safe_float(existing_order.get("balance_amount", max(0, total - payment_received)), max(0, total - payment_received))
-    is_credit = existing_order.get("is_credit", calculated_balance > 0)
-
-    # FIXED: Only update payment fields if explicitly provided in the request
-    # Don't automatically calculate payment_received when just editing order items
-    if "payment_received" in order_data:
-        # Only update payment fields if payment_received is explicitly provided
-        payment_received = _safe_float(order_data.get("payment_received", 0), 0) or 0
-        
-        # Calculate balance correctly - ensure it's never negative
-        calculated_balance = max(0, total - payment_received)
-        
-        # Determine is_credit based on balance
-        is_credit = calculated_balance > 0
-        
-        # If full payment (balance <= 0), ensure is_credit is false and balance is 0
-        if calculated_balance <= 0:
-            is_credit = False
-            calculated_balance = 0
-        
-        update_data["payment_received"] = payment_received
-        update_data["balance_amount"] = calculated_balance
-        update_data["is_credit"] = is_credit
-        
-        print(f"📝 Payment update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
-    else:
-        # If payment_received not provided, preserve existing payment status
-        # Only recalculate balance if total changed
-        existing_payment = existing_order.get("payment_received", 0) or 0
-        new_total = total
-        existing_total = _safe_float(existing_order.get("total", total), total)
-        
-        if new_total != existing_total and existing_payment > 0:
-            # Recalculate balance with new total but keep existing payment
-            calculated_balance = max(0, new_total - existing_payment)
-            is_credit = calculated_balance > 0
-            
-            if calculated_balance <= 0:
-                is_credit = False
-                calculated_balance = 0
-            
-            update_data["balance_amount"] = calculated_balance
-            update_data["is_credit"] = is_credit
-            print(f"📝 Total changed: new_total={new_total}, existing_payment={existing_payment}, new_balance={calculated_balance}")
-        else:
-            print(f"📝 Order edit: preserving existing payment status (payment_received={existing_payment})")
-    
-    # Handle explicit payment method changes
-    if "payment_method" in order_data:
-        update_data["payment_method"] = order_data["payment_method"]
-    
-    # Handle explicit credit status changes
-    if "is_credit" in order_data:
-        update_data["is_credit"] = order_data["is_credit"]
-    
-    # Also update status if provided
-    if "status" in order_data:
-        update_data["status"] = order_data["status"]
-    
-    print(f"📝 Order update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
-    
-    try:
-        await db.orders.update_one(
-            {"id": order_id, "organization_id": user_org_id},
-            {"$set": update_data}
-        )
-    except Exception as update_error:
-        print(f"Order update failed for {order_id}: {update_error}")
-        raise HTTPException(status_code=500, detail="Failed to update order")
-    
-    # Invalidate cache for order update
-    try:
-        cached_service = get_cached_order_service()
-        await cached_service.invalidate_order_caches(user_org_id, order_id)
-        print(f"🗑️ Cache invalidated for order update {order_id}")
-    except Exception as e:
-        print(f"⚠️ Cache invalidation error: {e}")
-    
-    # FIXED: Only release table if order status is explicitly set to completed
-    # Don't release table just because payment_received >= total during editing
-    if (order_data.get("status") in ["completed", "paid", "settled"] or
-        (update_data.get("status") in ["completed", "paid", "settled"])):
-        table_id = existing_order.get("table_id")
-        if table_id and table_id != "counter":
-            try:
-                table_manager = get_table_status_manager()
-                result = await table_manager.set_table_available(user_org_id, table_id)
-                if result["success"]:
-                    print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed order")
-                else:
-                    print(f"⚠️ TableStatusManager failed: {result['message']}")
-                    # Fallback to direct update
-                    await db.tables.update_one(
-                        {"id": table_id, "organization_id": user_org_id},
-                        {"$set": {"status": "available", "current_order_id": None}}
-                    )
-                    print(f"🍽️ Table freed via fallback for completed order: {table_id}")
-            except Exception as e:
-                print(f"⚠️ TableStatusManager error: {e}, using fallback")
-                # Fallback to direct update if TableStatusManager fails
+                        table_manager = get_table_status_manager()
+                        result = await table_manager.set_table_available(user_org_id, existing_order["table_id"])
+                        if result["success"]:
+                            print(f"✅ Table {existing_order.get('table_number', 'unknown')} set to AVAILABLE via TableStatusManager for completed order {order_id}")
+                        else:
+                            print(f"⚠️ TableStatusManager failed: {result['message']}")
+                            # Fallback to direct update
+                            try:
+                                await db.tables.update_one(
+                                    {"id": existing_order["table_id"], "organization_id": user_org_id},
+                                    {"$set": {"status": "available", "current_order_id": None}}
+                                )
+                                print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for completed order {order_id}")
+                            except Exception as table_error:
+                                print(f"❌ Table clearing fallback error: {table_error}")
+                    except Exception as e:
+                        print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                        # Fallback to direct update if TableStatusManager fails
+                        try:
+                            await db.tables.update_one(
+                                {"id": existing_order["table_id"], "organization_id": user_org_id},
+                                {"$set": {"status": "available", "current_order_id": None}}
+                            )
+                            print(f"🍽️ Table {existing_order.get('table_number', 'unknown')} cleared via fallback for completed order {order_id}")
+                        except Exception as fallback_error:
+                            print(f"❌ Table clearing fallback error: {fallback_error}")
+                
+                # Invalidate cache for completed order update
                 try:
-                    await db.tables.update_one(
-                        {"id": table_id, "organization_id": user_org_id},
-                        {"$set": {"status": "available", "current_order_id": None}}
-                    )
-                    print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
-                except Exception as fallback_error:
-                    print(f"⚠️ Table clearing fallback error: {fallback_error}")
-    
-    return {"message": "Order updated successfully"}
+                    cached_service = get_cached_order_service()
+                    await cached_service.invalidate_order_caches(user_org_id, order_id)
+                    print(f"🗑️ Cache invalidated for completed order update {order_id}")
+                except Exception as e:
+                    print(f"⚠️ Cache invalidation error: {e}")
+                
+                return {"message": "Order completed and table cleared successfully"}
+                
+            except HTTPException:
+                # Re-raise HTTP exceptions
+                raise
+            except Exception as completion_error:
+                print(f"❌ Unexpected error completing order {order_id}: {str(completion_error)}")
+                import traceback
+                print(f"❌ Stack trace: {traceback.format_exc()}")
+                raise HTTPException(status_code=500, detail="Failed to complete order")
+        
+        # For completed orders, only allow updating payment-related fields
+        if existing_order.get("status") == "completed":
+            # Allow updating: is_credit, payment_method, payment_received, balance_amount, customer_name, customer_phone
+            # Also allow discount and tax updates
+            allowed_fields = [
+                "is_credit", "payment_method", "payment_received", "balance_amount", 
+                "customer_name", "customer_phone",
+                "cash_amount", "card_amount", "upi_amount", "credit_amount",
+                "discount", "discount_type", "discount_value", "discount_amount",
+                "tax", "tax_rate", "subtotal", "total", "items"
+            ]
+            update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+            
+            for field in allowed_fields:
+                if field in order_data:
+                    update_data[field] = order_data[field]
+            
+            # Calculate balance if payment_received is provided
+            # Fix: Use the new total from order_data if provided, otherwise use existing
+            if "payment_received" in order_data:
+                total = order_data.get("total", existing_order.get("total", 0))
+                payment_received = order_data.get("payment_received", 0) or 0
+                calculated_balance = max(0, total - payment_received)  # Ensure non-negative
+                update_data["balance_amount"] = calculated_balance
+                # Auto-mark as credit if there's a balance
+                if calculated_balance > 0:
+                    update_data["is_credit"] = True
+                else:
+                    update_data["is_credit"] = False
+                    update_data["balance_amount"] = 0
+                print(f"💰 Payment update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={update_data['is_credit']}")
+            
+            await db.orders.update_one(
+                {"id": order_id, "organization_id": user_org_id},
+                {"$set": update_data}
+            )
+            
+            # Invalidate cache for payment update
+            try:
+                cached_service = get_cached_order_service()
+                await cached_service.invalidate_order_caches(user_org_id, order_id)
+                print(f"🗑️ Cache invalidated for payment update {order_id}")
+            except Exception as e:
+                print(f"⚠️ Cache invalidation error: {e}")
+            
+            # Clear table if payment is fully completed (no balance remaining) - Use TableStatusManager
+            if update_data.get("balance_amount", 0) <= 0 and not update_data.get("is_credit", False):
+                table_id = existing_order.get("table_id")
+                if table_id and table_id != "counter":
+                    try:
+                        table_manager = get_table_status_manager()
+                        result = await table_manager.set_table_available(user_org_id, table_id)
+                        if result["success"]:
+                            print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed payment")
+                        else:
+                            print(f"⚠️ TableStatusManager failed: {result['message']}")
+                            # Fallback to direct update
+                            await db.tables.update_one(
+                                {"id": table_id, "organization_id": user_org_id},
+                                {"$set": {"status": "available", "current_order_id": None}}
+                            )
+                            print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                    except Exception as e:
+                        print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                        # Fallback to direct update if TableStatusManager fails
+                        try:
+                            await db.tables.update_one(
+                                {"id": table_id, "organization_id": user_org_id},
+                                {"$set": {"status": "available", "current_order_id": None}}
+                            )
+                            print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                        except Exception as fallback_error:
+                            print(f"⚠️ Table clearing fallback error: {fallback_error}")
+            
+            return {"message": "Order payment details updated successfully"}
+        
+        # Handle non-completed orders - allow full editing
+        else:
+            existing_items = existing_order.get("items", [])
+            items = order_data.get("items", existing_items)
+            
+            # Validate items structure
+            if not isinstance(items, list):
+                items = existing_items
+            else:
+                # Normalize items to ensure proper structure
+                normalized_items = []
+                for item in items:
+                    if not isinstance(item, dict):
+                        items = existing_items
+                        break
+                    normalized_item = dict(item)
+                    # Ensure quantity is valid
+                    try:
+                        quantity = int(item.get("quantity") or 0)
+                        if quantity <= 0:
+                            items = existing_items
+                            break
+                        normalized_item["quantity"] = quantity
+                    except (TypeError, ValueError):
+                        items = existing_items
+                        break
+                    
+                    # Ensure price is valid
+                    try:
+                        price = float(item.get("price") or 0)
+                        if not math.isfinite(price):
+                            price = 0.0
+                        normalized_item["price"] = price
+                    except (TypeError, ValueError):
+                        normalized_item["price"] = 0.0
+                    
+                    # Ensure string fields are strings
+                    if "menu_item_id" in normalized_item and normalized_item["menu_item_id"] is not None:
+                        normalized_item["menu_item_id"] = str(normalized_item["menu_item_id"])
+                    if "name" in normalized_item and normalized_item["name"] is not None:
+                        normalized_item["name"] = str(normalized_item["name"])
+                    
+                    normalized_items.append(normalized_item)
+                else:
+                    items = normalized_items
+            
+            # Safe float conversion helper
+            def safe_float(value, fallback=0.0):
+                try:
+                    if value is None:
+                        return fallback
+                    number = float(value)
+                    if not math.isfinite(number):
+                        return fallback
+                    return number
+                except (TypeError, ValueError):
+                    return fallback
+            
+            subtotal = safe_float(order_data.get("subtotal", existing_order.get("subtotal", 0)), existing_order.get("subtotal", 0))
+            tax = safe_float(order_data.get("tax", existing_order.get("tax", 0)), existing_order.get("tax", 0))
+            tax_rate = safe_float(order_data.get("tax_rate", existing_order.get("tax_rate", 5.0)), existing_order.get("tax_rate", 5.0))
+            total = safe_float(order_data.get("total", existing_order.get("total", 0)), existing_order.get("total", 0))
+            discount = safe_float(order_data.get("discount", existing_order.get("discount", 0)), existing_order.get("discount", 0))
+            discount_value = safe_float(order_data.get("discount_value", existing_order.get("discount_value", 0)), existing_order.get("discount_value", 0))
+            discount_amount = safe_float(order_data.get("discount_amount", existing_order.get("discount_amount", 0)), existing_order.get("discount_amount", 0))
+            discount_type = order_data.get("discount_type", existing_order.get("discount_type", "amount"))
+            if discount_type not in ("amount", "percent"):
+                discount_type = existing_order.get("discount_type", "amount")
+
+            update_data = {
+                "items": items,
+                "subtotal": subtotal,
+                "tax": tax,
+                "tax_rate": tax_rate,
+                "total": total,
+                "customer_name": order_data.get("customer_name", existing_order.get("customer_name", "")),
+                "customer_phone": order_data.get("customer_phone", existing_order.get("customer_phone", "")),
+                "payment_method": order_data.get("payment_method", existing_order.get("payment_method", "cash")),
+                # Split payment fields
+                "cash_amount": safe_float(order_data.get("cash_amount", existing_order.get("cash_amount", 0)), existing_order.get("cash_amount", 0)),
+                "card_amount": safe_float(order_data.get("card_amount", existing_order.get("card_amount", 0)), existing_order.get("card_amount", 0)),
+                "upi_amount": safe_float(order_data.get("upi_amount", existing_order.get("upi_amount", 0)), existing_order.get("upi_amount", 0)),
+                "credit_amount": safe_float(order_data.get("credit_amount", existing_order.get("credit_amount", 0)), existing_order.get("credit_amount", 0)),
+                # Discount fields
+                "discount": discount,
+                "discount_type": discount_type,
+                "discount_value": discount_value,
+                "discount_amount": discount_amount,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Initialize payment snapshot for logging and safe defaults
+            payment_received = safe_float(existing_order.get("payment_received", 0), 0) or 0
+            calculated_balance = safe_float(existing_order.get("balance_amount", max(0, total - payment_received)), max(0, total - payment_received))
+            is_credit = existing_order.get("is_credit", calculated_balance > 0)
+
+            # FIXED: Only update payment fields if explicitly provided in the request
+            # Don't automatically calculate payment_received when just editing order items
+            if "payment_received" in order_data:
+                # Only update payment fields if payment_received is explicitly provided
+                payment_received = safe_float(order_data.get("payment_received", 0), 0) or 0
+                
+                # Calculate balance correctly - ensure it's never negative
+                calculated_balance = max(0, total - payment_received)
+                
+                # Determine is_credit based on balance
+                is_credit = calculated_balance > 0
+                
+                # If full payment (balance <= 0), ensure is_credit is false and balance is 0
+                if calculated_balance <= 0:
+                    is_credit = False
+                    calculated_balance = 0
+                
+                update_data["payment_received"] = payment_received
+                update_data["balance_amount"] = calculated_balance
+                update_data["is_credit"] = is_credit
+                
+                print(f"📝 Payment update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
+            else:
+                # If payment_received not provided, preserve existing payment status
+                # Only recalculate balance if total changed
+                existing_payment = existing_order.get("payment_received", 0) or 0
+                new_total = total
+                existing_total = safe_float(existing_order.get("total", total), total)
+                
+                if new_total != existing_total and existing_payment > 0:
+                    # Recalculate balance with new total but keep existing payment
+                    calculated_balance = max(0, new_total - existing_payment)
+                    is_credit = calculated_balance > 0
+                    
+                    if calculated_balance <= 0:
+                        is_credit = False
+                        calculated_balance = 0
+                    
+                    update_data["balance_amount"] = calculated_balance
+                    update_data["is_credit"] = is_credit
+                    print(f"📝 Total changed: new_total={new_total}, existing_payment={existing_payment}, new_balance={calculated_balance}")
+                else:
+                    print(f"📝 Order edit: preserving existing payment status (payment_received={existing_payment})")
+            
+            # Handle explicit payment method changes
+            if "payment_method" in order_data:
+                update_data["payment_method"] = order_data["payment_method"]
+            
+            # Handle explicit credit status changes
+            if "is_credit" in order_data:
+                update_data["is_credit"] = order_data["is_credit"]
+            
+            # Also update status if provided
+            if "status" in order_data:
+                update_data["status"] = order_data["status"]
+            
+            print(f"📝 Order update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
+            
+            try:
+                await db.orders.update_one(
+                    {"id": order_id, "organization_id": user_org_id},
+                    {"$set": update_data}
+                )
+            except Exception as update_error:
+                print(f"Order update failed for {order_id}: {update_error}")
+                raise HTTPException(status_code=500, detail="Failed to update order")
+            
+            # Invalidate cache for order update
+            try:
+                cached_service = get_cached_order_service()
+                await cached_service.invalidate_order_caches(user_org_id, order_id)
+                print(f"🗑️ Cache invalidated for order update {order_id}")
+            except Exception as e:
+                print(f"⚠️ Cache invalidation error: {e}")
+            
+            # FIXED: Only release table if order status is explicitly set to completed
+            # Don't release table just because payment_received >= total during editing
+            if (order_data.get("status") in ["completed", "paid", "settled"] or
+                (update_data.get("status") in ["completed", "paid", "settled"])):
+                table_id = existing_order.get("table_id")
+                if table_id and table_id != "counter":
+                    try:
+                        table_manager = get_table_status_manager()
+                        result = await table_manager.set_table_available(user_org_id, table_id)
+                        if result["success"]:
+                            print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed order")
+                        else:
+                            print(f"⚠️ TableStatusManager failed: {result['message']}")
+                            # Fallback to direct update
+                            await db.tables.update_one(
+                                {"id": table_id, "organization_id": user_org_id},
+                                {"$set": {"status": "available", "current_order_id": None}}
+                            )
+                            print(f"🍽️ Table freed via fallback for completed order: {table_id}")
+                    except Exception as e:
+                        print(f"⚠️ TableStatusManager error: {e}, using fallback")
+                        # Fallback to direct update if TableStatusManager fails
+                        try:
+                            await db.tables.update_one(
+                                {"id": table_id, "organization_id": user_org_id},
+                                {"$set": {"status": "available", "current_order_id": None}}
+                            )
+                            print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                        except Exception as fallback_error:
+                            print(f"⚠️ Table clearing fallback error: {fallback_error}")
+            
+            return {"message": "Order updated successfully"}
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (400, 404, etc.)
+        raise
+    except Exception as e:
+        # Log unexpected errors with full context
+        print(f"❌ Unexpected error in update_order for {order_id}: {str(e)}")
+        import traceback
+        print(f"❌ Full stack trace: {traceback.format_exc()}")
+        print(f"❌ Request data: {json.dumps(order_data, default=str)}")
+        print(f"❌ User context: {current_user.get('username', 'unknown')} (org: {current_user.get('organization_id', 'none')})")
+        
+        # Return a generic 500 error to avoid exposing internal details
+        raise HTTPException(
+            status_code=500, 
+            detail="Internal server error while updating order. Please try again or contact support."
+        )
 
 
 @api_router.put("/orders/{order_id}/cancel")

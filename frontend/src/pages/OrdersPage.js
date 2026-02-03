@@ -19,6 +19,9 @@ import {
   filterServerActiveOrders,
   normalizeStatus
 } from '../utils/orderWorkflowRules';
+// 🔧 DUPLICATE FIX: Import new polling manager and atomic fetcher
+import orderPollingManager from '../utils/orderPollingManager';
+import { fetchOrdersAtomic, fetchTodaysBillsAtomic } from '../utils/orderFetcher';
 
 // Enhanced sound effects for better UX
 const playSound = (type) => {
@@ -136,10 +139,81 @@ const OrdersPage = ({ user }) => {
   console.log('🔧 PaymentProtectionActive state initialized:', paymentProtectionActive);
   // Add state for global polling disable during order creation
   const [globalPollingDisabled, setGlobalPollingDisabled] = useState(false);
+  // Add state for preventing duplicate order updates
+  const [lastOrdersUpdate, setLastOrdersUpdate] = useState(0);
+  const [isUpdatingOrders, setIsUpdatingOrders] = useState(false);
   const dataLoadedRef = useRef(false);
 
   // Get unique categories from menu items
   const categories = ['all', ...new Set(menuItems.map(item => item.category).filter(Boolean))];
+
+  // 🔧 DUPLICATE FIX: Order deduplication function
+  const updateOrdersWithDeduplication = (newOrders, source = 'unknown') => {
+    const now = Date.now();
+    
+    // Prevent rapid successive updates (debounce)
+    if (now - lastOrdersUpdate < 500) {
+      console.log(`⏸️ Skipping order update from ${source} - too soon after last update (${now - lastOrdersUpdate}ms)`);
+      return;
+    }
+    
+    // Prevent concurrent updates
+    if (isUpdatingOrders) {
+      console.log(`⏸️ Skipping order update from ${source} - update already in progress`);
+      return;
+    }
+    
+    setIsUpdatingOrders(true);
+    setLastOrdersUpdate(now);
+    
+    setOrders(prevOrders => {
+      // Create a map of existing orders for fast lookup
+      const existingOrdersMap = new Map();
+      prevOrders.forEach(order => {
+        if (order && order.id) {
+          existingOrdersMap.set(order.id, order);
+        }
+      });
+      
+      // Create a map of new orders
+      const newOrdersMap = new Map();
+      newOrders.forEach(order => {
+        if (order && order.id) {
+          newOrdersMap.set(order.id, order);
+        }
+      });
+      
+      // If the orders are identical, don't update
+      if (existingOrdersMap.size === newOrdersMap.size && existingOrdersMap.size > 0) {
+        let identical = true;
+        for (const [id, existingOrder] of existingOrdersMap) {
+          const newOrder = newOrdersMap.get(id);
+          if (!newOrder || 
+              existingOrder.status !== newOrder.status ||
+              existingOrder.updated_at !== newOrder.updated_at ||
+              existingOrder.payment_received !== newOrder.payment_received) {
+            identical = false;
+            break;
+          }
+        }
+        
+        if (identical) {
+          console.log(`📋 Orders unchanged from ${source} - skipping update`);
+          setIsUpdatingOrders(false);
+          return prevOrders;
+        }
+      }
+      
+      console.log(`📋 Updating orders from ${source}:`, {
+        previous: prevOrders.length,
+        new: newOrders.length,
+        source
+      });
+      
+      setIsUpdatingOrders(false);
+      return newOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    });
+  };
 
   useEffect(() => {
     if (!dataLoadedRef.current) {
@@ -277,63 +351,95 @@ const OrdersPage = ({ user }) => {
     };
   }, [globalPollingDisabled, isCreatingOrder, recentPaymentCompletions]);
 
-  // Real-time polling for active orders and today's bills (every 2 seconds to avoid overriding optimistic updates)
+  // 🔧 DUPLICATE FIX: Coordinated polling to prevent duplicate orders
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Force immediate refresh if needed
-      if (needsImmediateRefresh) {
-        // NUCLEAR PROTECTION: Skip if payment protection is active
-        if (paymentProtectionActive) {
-          console.log('🛡️ Skipping immediate refresh - payment protection active');
-          setNeedsImmediateRefresh(false);
-          return;
+    console.log('🔄 Setting up coordinated polling system');
+    
+    // Create coordinated refresh function
+    const coordinatedRefresh = async (options = {}) => {
+      const { source = 'polling' } = options;
+      
+      try {
+        if (activeTab === 'active') {
+          // Fetch active orders atomically
+          const result = await fetchOrdersAtomic(API, options, recentPaymentCompletions);
+          
+          // Update state atomically to prevent duplicates
+          setOrders(result.activeOrders);
+          
+          // Move completed orders to today's bills
+          if (result.completedOrders.length > 0) {
+            setTodaysBills(prevBills => {
+              const existingIds = new Set(prevBills.map(bill => bill.id));
+              const newCompletedOrders = result.completedOrders.filter(order => !existingIds.has(order.id));
+              return [...newCompletedOrders, ...prevBills];
+            });
+          }
+          
+          console.log(`✅ Active orders updated: ${result.activeOrders.length} orders`);
+          
+        } else if (activeTab === 'history') {
+          // Fetch today's bills atomically
+          const bills = await fetchTodaysBillsAtomic(API, options);
+          setTodaysBills(bills);
+          console.log(`✅ Today's bills updated: ${bills.length} bills`);
         }
         
-        console.log('🚀 Immediate refresh triggered');
-        setNeedsImmediateRefresh(false);
-        if (activeTab === 'active') {
-          fetchOrders(true); // Force refresh
-        } else if (activeTab === 'history') {
-          fetchTodaysBills();
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Coordinated refresh failed:', error);
         }
-        return;
       }
-      
-      // Skip polling if there are active status changes to avoid conflicts
+    };
+    
+    // Set up coordinated polling interval
+    const interval = setInterval(() => {
+      // Skip polling if there are active status changes
       if (processingStatusChanges.size > 0) {
-        console.log('⏸️ Skipping polling - status changes in progress:', Array.from(processingStatusChanges));
+        console.log('⏸️ Skipping coordinated polling - status changes in progress');
         return;
       }
       
-      // Skip polling if payment protection is active (NUCLEAR PROTECTION)
+      // Skip polling if payment protection is active
       if (paymentProtectionActive) {
-        console.log('🛡️ Skipping polling - payment protection active');
+        console.log('🛡️ Skipping coordinated polling - payment protection active');
         return;
       }
       
-      // Skip polling if there are recent payment completions to prevent override
+      // Skip polling if there are recent payment completions
       if (recentPaymentCompletions.size > 0) {
-        console.log('⏸️ Skipping polling - recent payment completions:', Array.from(recentPaymentCompletions));
+        console.log('⏸️ Skipping coordinated polling - recent payment completions');
         return;
       }
       
-      // Skip polling if user recently interacted (within 2 seconds for faster response)
+      // Skip polling if user recently interacted
       const lastInteraction = localStorage.getItem('lastUserInteraction');
       if (lastInteraction && (Date.now() - parseInt(lastInteraction)) < 2000) {
-        console.log('⏸️ Skipping polling - recent user interaction');
+        console.log('⏸️ Skipping coordinated polling - recent user interaction');
         return;
       }
       
-      console.log('🔄 Background polling - fetching orders');
-      if (activeTab === 'active') {
-        fetchOrders(); // Refresh orders when viewing active tab
-      } else if (activeTab === 'history') {
-        fetchTodaysBills(); // Refresh today's bills when viewing history tab
+      // Use polling manager to coordinate refresh
+      orderPollingManager.coordinateRefresh(coordinatedRefresh, {
+        source: 'background-polling'
+      });
+      
+    }, 3000); // Increased to 3 seconds to reduce server load
+    
+    // Handle immediate refresh requests
+    if (needsImmediateRefresh) {
+      console.log('🚀 Immediate refresh requested');
+      setNeedsImmediateRefresh(false);
+      
+      if (!paymentProtectionActive) {
+        orderPollingManager.forceRefresh(coordinatedRefresh, 'immediate-refresh');
       }
-    }, 2000); // Reduced to 2 seconds for faster updates
-
-    return () => clearInterval(interval);
-  }, [activeTab, processingStatusChanges, needsImmediateRefresh, recentPaymentCompletions, paymentProtectionActive]); // Removed recentOrderCreation dependency
+    }
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [activeTab, processingStatusChanges, needsImmediateRefresh, recentPaymentCompletions, paymentProtectionActive]);
 
   // Track user interactions to pause polling
   useEffect(() => {
@@ -395,31 +501,8 @@ const OrdersPage = ({ user }) => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [activeTab, paymentProtectionActive]);
 
-  // Real-time refresh on mouse movement (user is active)
-  useEffect(() => {
-    let lastRefresh = Date.now();
-    const handleMouseMove = () => {
-      // NUCLEAR PROTECTION: Skip if payment protection is active
-      if (paymentProtectionActive) {
-        console.log('🛡️ Skipping mouse movement refresh - payment protection active');
-        return;
-      }
-      
-      const now = Date.now();
-      // Only refresh if it's been more than 2 seconds since last refresh
-      if (now - lastRefresh > 2000) {
-        lastRefresh = now;
-        if (activeTab === 'active') {
-          fetchOrders();
-        } else if (activeTab === 'history') {
-          fetchTodaysBills();
-        }
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, [activeTab, paymentProtectionActive]);
+  // REMOVED: Aggressive mouse movement refresh that was causing flickering
+  // The coordinated polling system handles regular updates without user interaction triggers
 
   // Manual refresh function for real-time updates
   const handleManualRefresh = async () => {
@@ -669,26 +752,23 @@ const OrdersPage = ({ user }) => {
       }
       
       // SIMPLIFIED: Just use server data directly, no complex merging
-      setOrders(prevOrders => {
-        // Filter out completed and paid orders from active orders - BULLETPROOF FILTERING
-        const activeServerOrders = filterServerActiveOrders(sortedOrders, recentPaymentCompletions);
-        
-        // Move completed orders to today's bills
-        const completedOrders = sortedOrders.filter(order =>
-          ['completed', 'paid'].includes(normalizeStatus(order.status))
-        );
-        
-        if (completedOrders.length > 0) {
-          setTodaysBills(prevBills => {
-            const existingIds = new Set(prevBills.map(bill => bill.id));
-            const newCompletedOrders = completedOrders.filter(order => !existingIds.has(order.id));
-            return [...newCompletedOrders, ...prevBills];
-          });
-        }
-        
-        console.log('📋 Setting TODAY\'s active orders from database:', activeServerOrders.length);
-        return activeServerOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      });
+      const activeServerOrders = filterServerActiveOrders(sortedOrders, recentPaymentCompletions);
+      
+      // Move completed orders to today's bills
+      const completedOrders = sortedOrders.filter(order =>
+        ['completed', 'paid'].includes(normalizeStatus(order.status))
+      );
+      
+      if (completedOrders.length > 0) {
+        setTodaysBills(prevBills => {
+          const existingIds = new Set(prevBills.map(bill => bill.id));
+          const newCompletedOrders = completedOrders.filter(order => !existingIds.has(order.id));
+          return [...newCompletedOrders, ...prevBills];
+        });
+      }
+      
+      console.log('📋 Setting TODAY\'s active orders from database:', activeServerOrders.length);
+      updateOrdersWithDeduplication(activeServerOrders, 'fetchOrders');
       
     } catch (error) {
       console.error('Failed to fetch orders', error);

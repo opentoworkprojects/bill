@@ -14,6 +14,9 @@ import { billingCache } from '../utils/billingCache';
 import { startBillingTimer, endBillingTimer } from '../utils/performanceMonitor';
 import apiClient, { apiWithRetry, apiSilent } from '../utils/apiClient';
 import { computePaymentState, determineBillingCompletionStatus } from '../utils/orderWorkflowRules';
+import { paymentValidator, validatePayment } from '../utils/paymentValidator';
+import { billingErrorLogger, logPaymentError, logValidationError, logNetworkError, logPerformanceIssue } from '../utils/billingErrorLogger';
+import { paymentPerformanceMonitor, startPaymentMonitoring } from '../utils/paymentPerformanceMonitor';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
@@ -688,6 +691,8 @@ const BillingPage = ({ user }) => {
     setLoading(true);
     
     try {
+      console.log('💳 Processing payment:', { orderId, total, received, balance, isCredit });
+      
       // Prepare payment data - ensure all fields are explicitly set
       // CRITICAL FIX: QR orders (Self-Order) should stay 'pending' until kitchen marks as completed
       const paymentData = {
@@ -726,11 +731,14 @@ const BillingPage = ({ user }) => {
         paymentData.credit_amount = balance;
       }
       
+      console.log('📤 Sending payment data:', JSON.stringify(paymentData, null, 2));
+      
       // Use optimized payment processor with callbacks for immediate UI feedback
       let result;
       try {
         result = await processPaymentFast(paymentData, {
           onStart: (data) => {
+            console.log('🚀 Optimized payment processing started');
             // Optimistic UI update - show success immediately
             setCompletedPaymentData({
               received: received,
@@ -741,31 +749,87 @@ const BillingPage = ({ user }) => {
             });
           },
           onError: (error) => {
+            console.error('❌ Optimized payment processing failed:', error);
+            logPaymentError(error, {
+              orderId,
+              amount: total,
+              paymentMethod: splitPayment ? 'split' : paymentMethod,
+              isCredit,
+              tableNumber: order?.table_number
+            });
             // Revert optimistic update on error
             setCompletedPaymentData(null);
           }
         });
+        
+        console.log('✅ Optimized payment processing completed:', result);
+        
       } catch (optimizedError) {
-        // Fallback to standard payment processing
+        console.warn('⚠️ Optimized payment failed, falling back to standard processing:', optimizedError);
+        
+        // Log the optimized payment failure
+        logPaymentError(optimizedError, {
+          orderId,
+          amount: total,
+          paymentMethod: splitPayment ? 'split' : paymentMethod,
+          isCredit,
+          tableNumber: order?.table_number,
+          fallback: true
+        });
+        
+        // Fallback to standard payment processing with enhanced error handling
         const token = localStorage.getItem('token');
-        result = await apiWithRetry({
-          method: 'put',
-          url: `${API}/orders/${orderId}`,
-          data: paymentData,
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 15000 // Longer timeout for payment processing
-        });
         
-        // Set completed payment data for fallback
-        setCompletedPaymentData({
-          received: received,
-          balance: balance,
-          total: total,
-          isCredit: isCredit,
-          paymentMethod: splitPayment ? 'split' : paymentMethod
-        });
-        
-        result = { success: true, processingTime: 0 };
+        try {
+          result = await apiWithRetry({
+            method: 'put',
+            url: `${API}/orders/${orderId}`,
+            data: paymentData,
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 15000 // Longer timeout for payment processing
+          });
+          
+          console.log('✅ Fallback payment processing completed:', result);
+          
+          // Set completed payment data for fallback
+          setCompletedPaymentData({
+            received: received,
+            balance: balance,
+            total: total,
+            isCredit: isCredit,
+            paymentMethod: splitPayment ? 'split' : paymentMethod
+          });
+          
+          result = { success: true, processingTime: 0 };
+          
+        } catch (fallbackError) {
+          console.error('❌ Fallback payment processing also failed:', fallbackError);
+          
+          // Enhanced error logging for fallback failure
+          logPaymentError(fallbackError, {
+            orderId,
+            amount: total,
+            paymentMethod: splitPayment ? 'split' : paymentMethod,
+            isCredit,
+            tableNumber: order?.table_number,
+            fallback: true,
+            originalError: optimizedError.message
+          });
+          
+          // Check if it's a network error
+          if (fallbackError.code === 'ERR_NETWORK' || !fallbackError.response) {
+            logNetworkError(fallbackError, {
+              url: `${API}/orders/${orderId}`,
+              method: 'PUT',
+              timeout: 15000
+            });
+          }
+          
+          throw fallbackError; // Re-throw to be handled by outer catch
+        }
       }
       
       // 🗑️ CACHE INVALIDATION: Clear cached billing data after successful payment
@@ -863,12 +927,30 @@ const BillingPage = ({ user }) => {
       
       // Release table asynchronously (don't block UI)
       releaseTable().catch(error => {
+        console.warn('Table release failed but payment succeeded:', error);
         // Table release failed but payment succeeded - continue
       });
       
     } catch (error) {
+      console.error('❌ Payment processing error:', error);
+      
+      // Enhanced error logging
+      logPaymentError(error, {
+        orderId,
+        amount: total,
+        paymentMethod: splitPayment ? 'split' : paymentMethod,
+        isCredit,
+        tableNumber: order?.table_number,
+        errorDetails: {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        }
+      });
+      
       // Check if payment actually succeeded despite the error
       try {
+        console.log('🔍 Verifying payment status after error...');
         const token = localStorage.getItem('token');
         const verifyResponse = await apiSilent({
           method: 'get',
@@ -879,6 +961,7 @@ const BillingPage = ({ user }) => {
         
         const updatedOrder = verifyResponse?.data;
         if (updatedOrder && (updatedOrder.status === 'completed' || updatedOrder.payment_received > 0)) {
+          console.log('✅ Payment verification successful - payment was processed despite error');
           
           // 🗑️ CACHE INVALIDATION: Clear cached billing data after successful payment
           billingCache.invalidateOrder(orderId);
@@ -895,15 +978,24 @@ const BillingPage = ({ user }) => {
           
           // Release table if needed
           releaseTable().catch(err => {
+            console.warn('Table release failed but payment succeeded:', err);
             // Table release failed but payment succeeded
           });
           
           return; // Exit early - payment was successful
+        } else {
+          console.log('❌ Payment verification failed - payment was not processed');
         }
       } catch (verifyError) {
-        // Could not verify payment status
+        console.error('❌ Could not verify payment status:', verifyError);
+        logNetworkError(verifyError, {
+          url: `${API}/orders/${orderId}`,
+          method: 'GET',
+          timeout: 8000
+        });
       }
       
+      // Payment failed - provide user-friendly error message
       let errorMessage = 'Payment failed. Please try again.';
       
       if (error.response?.status === 401) {
@@ -912,6 +1004,10 @@ const BillingPage = ({ user }) => {
         errorMessage = 'Not authorized to process payment.';
       } else if (error.response?.status === 404) {
         errorMessage = 'Order not found. Please refresh and try again.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again or contact support if the issue persists.';
+      } else if (error.code === 'ERR_NETWORK' || !error.response) {
+        errorMessage = 'Network error. Please check your connection and try again.';
       } else if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
       } else if (error.message) {
@@ -919,43 +1015,90 @@ const BillingPage = ({ user }) => {
       }
       
       toast.error(errorMessage);
+      throw error; // Re-throw for handlePayment to catch
+      
     } finally {
       setLoading(false);
     }
   };
 
   const handlePayment = async () => {
+    const startTime = performance.now();
+    const paymentMonitor = startPaymentMonitoring(`payment-${orderId}-${Date.now()}`);
+    
     // 🚀 ENHANCED INSTANT FEEDBACK: Multiple feedback mechanisms
     setLoading(true);
     
-    // 🔊 ENHANCED SOUND EFFECTS: Multiple sound types for better feedback
     try {
-      // Payment processing sound (cash register)
-      const paymentSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-      paymentSound.volume = 0.4;
-      paymentSound.play().catch(() => {});
+      // ✅ PAYMENT VALIDATION: Validate payment data before processing
+      const total = calculateTotal();
+      const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
+      const balance = Math.max(0, total - received);
+      const isCredit = balance > 0;
       
-      // Success chime (delayed)
-      setTimeout(() => {
-        try {
-          const successSound = new Audio('data:audio/wav;base64,UklGRvIBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-          successSound.volume = 0.5;
-          successSound.play().catch(() => {});
-        } catch (e) {}
-      }, 300);
+      // Prepare validation data
+      const validationData = {
+        orderData: {
+          id: orderId,
+          total: total,
+          items: orderItems
+        },
+        paymentMethod: splitPayment ? 'split' : paymentMethod,
+        paymentAmount: received,
+        customerInfo: {
+          name: customerName,
+          phone: customerPhone
+        },
+        splitAmounts: splitPayment ? {
+          cash_amount: parseFloat(cashAmount) || 0,
+          card_amount: parseFloat(cardAmount) || 0,
+          upi_amount: parseFloat(upiAmount) || 0,
+          credit_amount: balance
+        } : null
+      };
       
-    } catch (e) {}
-    
-    // 📳 VIBRATION FEEDBACK: Enhanced haptic feedback
-    try {
-      if (navigator.vibrate) {
-        // Payment processing vibration pattern
-        navigator.vibrate([100, 50, 100, 50, 200]);
+      // Validate payment data
+      const validation = validatePayment(validationData);
+      if (!validation.isValid) {
+        logValidationError(validation, validationData);
+        paymentMonitor.markFailure(new Error(`Validation failed: ${validation.error}`));
+        toast.error(`Validation Error: ${validation.error}`);
+        setLoading(false);
+        return;
       }
-    } catch (e) {}
-    
-    try {
+      
+      console.log('✅ Payment validation passed');
+      
+      // 🔊 ENHANCED SOUND EFFECTS: Multiple sound types for better feedback
+      try {
+        // Payment processing sound (cash register)
+        const paymentSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+        paymentSound.volume = 0.4;
+        paymentSound.play().catch(() => {});
+        
+        // Success chime (delayed)
+        setTimeout(() => {
+          try {
+            const successSound = new Audio('data:audio/wav;base64,UklGRvIBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+            successSound.volume = 0.5;
+            successSound.play().catch(() => {});
+          } catch (e) {}
+        }, 300);
+        
+      } catch (e) {}
+      
+      // 📳 VIBRATION FEEDBACK: Enhanced haptic feedback
+      try {
+        if (navigator.vibrate) {
+          // Payment processing vibration pattern
+          navigator.vibrate([100, 50, 100, 50, 200]);
+        }
+      } catch (e) {}
+      
       if (!order) {
+        const error = new Error('Order not found');
+        logPaymentError(error, { orderId, amount: total, paymentMethod });
+        paymentMonitor.markFailure(error);
         toast.error('Order not found');
         setLoading(false);
         return;
@@ -963,16 +1106,16 @@ const BillingPage = ({ user }) => {
       
       const updated = await updateOrderItems();
       if (!updated) {
+        const error = new Error('Failed to update order items');
+        paymentMonitor.markFailure(error);
         setLoading(false);
         return;
       }
       
-      const total = calculateTotal();
-      const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
-      const balance = Math.max(0, total - received);
-      const isCredit = balance > 0;
-      
       if ((showReceivedAmount || splitPayment) && received <= 0) {
+        const error = new Error('Invalid received amount');
+        logValidationError({ isValid: false, error: 'Invalid received amount' }, { received, total });
+        paymentMonitor.markFailure(error);
         toast.error('Please enter a valid received amount');
         setLoading(false);
         return;
@@ -1013,13 +1156,43 @@ const BillingPage = ({ user }) => {
         }
       } catch (e) {}
       
-      // Process payment in background
-      processPayment().catch(error => {
+      // Process payment in background with enhanced error handling
+      processPayment().then(() => {
+        // Payment succeeded
+        const result = paymentMonitor.markSuccess();
+        console.log('✅ Payment monitoring completed:', result);
+      }).catch(error => {
+        // Log payment error with context
+        logPaymentError(error, {
+          orderId,
+          amount: total,
+          paymentMethod: splitPayment ? 'split' : paymentMethod,
+          isCredit,
+          tableNumber: order?.table_number
+        });
+        
+        // Mark payment as failed in monitor
+        paymentMonitor.markFailure(error);
+        
         // Background payment processing failed
         // Revert optimistic update on error
         setPaymentCompleted(false);
         setCompletedPaymentData(null);
-        toast.error('❌ Payment processing failed. Please try again.');
+        
+        // Enhanced error message based on error type
+        let errorMessage = '❌ Payment processing failed. Please try again.';
+        
+        if (error.code === 'ERR_NETWORK' || !error.response) {
+          errorMessage = '🌐 Network error. Please check your connection and try again.';
+        } else if (error.response?.status === 500) {
+          errorMessage = '⚠️ Server error. Payment may have been processed. Please verify before retrying.';
+        } else if (error.response?.status === 400) {
+          errorMessage = '❌ Invalid payment data. Please check your entries and try again.';
+        } else if (error.response?.data?.detail) {
+          errorMessage = `❌ ${error.response.data.detail}`;
+        }
+        
+        toast.error(errorMessage);
         
         // Error vibration
         try {
@@ -1029,9 +1202,25 @@ const BillingPage = ({ user }) => {
         } catch (e) {}
       }).finally(() => {
         setLoading(false);
+        
+        // Log performance metrics
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        logPerformanceIssue('payment_processing', duration, 3000);
       });
       
     } catch (error) {
+      // Log unexpected errors
+      logPaymentError(error, {
+        orderId,
+        amount: calculateTotal(),
+        paymentMethod: splitPayment ? 'split' : paymentMethod,
+        tableNumber: order?.table_number
+      });
+      
+      // Mark payment as failed in monitor
+      paymentMonitor.markFailure(error);
+      
       toast.error('❌ Payment processing failed. Please try again.');
       setLoading(false);
       // Revert optimistic update

@@ -53,7 +53,7 @@ import PWAHomePage from './pages/PWAHomePage';
 import CityLandingPage from './pages/CityLandingPage';
 import ComparisonPage from './pages/ComparisonPage';
 import DesktopInfo from './components/DesktopInfo';
-import UpdateBanner from './components/UpdateBanner';
+
 import { Toaster } from './components/ui/sonner';
 import { setupAutoSync } from './utils/offlineSync';
 import { startNotificationPolling, requestNotificationPermission } from './utils/pushNotifications';
@@ -961,7 +961,6 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         <DesktopInfo />
-        <UpdateBanner />
       </BrowserRouter>
       <Toaster position="top-center" richColors />
       <Analytics />
