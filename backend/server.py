@@ -12,6 +12,7 @@ import tempfile
 import io
 import time
 import random
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -5965,34 +5966,82 @@ async def update_order(
         return {"message": "Order payment details updated successfully"}
     
     # For non-completed orders, allow full editing
+    def _safe_float(value, fallback=0.0):
+        try:
+            if value is None:
+                return fallback
+            number = float(value)
+            if not math.isfinite(number):
+                return fallback
+            return number
+        except (TypeError, ValueError):
+            return fallback
+
+    def _normalize_items(raw_items, fallback_items):
+        if not isinstance(raw_items, list):
+            return fallback_items
+        normalized = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                return fallback_items
+            normalized_item = dict(item)
+            quantity = int(item.get("quantity") or 0)
+            if quantity <= 0:
+                return fallback_items
+            normalized_item["quantity"] = quantity
+            normalized_item["price"] = _safe_float(item.get("price"), 0.0)
+            if "menu_item_id" in normalized_item and normalized_item["menu_item_id"] is not None:
+                normalized_item["menu_item_id"] = str(normalized_item["menu_item_id"])
+            if "name" in normalized_item and normalized_item["name"] is not None:
+                normalized_item["name"] = str(normalized_item["name"])
+            normalized.append(normalized_item)
+        return normalized
+
+    existing_items = existing_order.get("items", [])
+    items = _normalize_items(order_data.get("items", existing_items), existing_items)
+    subtotal = _safe_float(order_data.get("subtotal", existing_order.get("subtotal", 0)), existing_order.get("subtotal", 0))
+    tax = _safe_float(order_data.get("tax", existing_order.get("tax", 0)), existing_order.get("tax", 0))
+    tax_rate = _safe_float(order_data.get("tax_rate", existing_order.get("tax_rate", 5.0)), existing_order.get("tax_rate", 5.0))
+    total = _safe_float(order_data.get("total", existing_order.get("total", 0)), existing_order.get("total", 0))
+    discount = _safe_float(order_data.get("discount", existing_order.get("discount", 0)), existing_order.get("discount", 0))
+    discount_value = _safe_float(order_data.get("discount_value", existing_order.get("discount_value", 0)), existing_order.get("discount_value", 0))
+    discount_amount = _safe_float(order_data.get("discount_amount", existing_order.get("discount_amount", 0)), existing_order.get("discount_amount", 0))
+    discount_type = order_data.get("discount_type", existing_order.get("discount_type", "amount"))
+    if discount_type not in ("amount", "percent"):
+        discount_type = existing_order.get("discount_type", "amount")
+
     update_data = {
-        "items": order_data.get("items", existing_order["items"]),
-        "subtotal": order_data.get("subtotal", existing_order["subtotal"]),
-        "tax": order_data.get("tax", existing_order["tax"]),
-        "tax_rate": order_data.get("tax_rate", existing_order.get("tax_rate")),
-        "total": order_data.get("total", existing_order["total"]),
+        "items": items,
+        "subtotal": subtotal,
+        "tax": tax,
+        "tax_rate": tax_rate,
+        "total": total,
         "customer_name": order_data.get("customer_name", existing_order.get("customer_name", "")),
         "customer_phone": order_data.get("customer_phone", existing_order.get("customer_phone", "")),
         "payment_method": order_data.get("payment_method", existing_order.get("payment_method", "cash")),
         # Split payment fields
-        "cash_amount": order_data.get("cash_amount", existing_order.get("cash_amount", 0)),
-        "card_amount": order_data.get("card_amount", existing_order.get("card_amount", 0)),
-        "upi_amount": order_data.get("upi_amount", existing_order.get("upi_amount", 0)),
-        "credit_amount": order_data.get("credit_amount", existing_order.get("credit_amount", 0)),
+        "cash_amount": _safe_float(order_data.get("cash_amount", existing_order.get("cash_amount", 0)), existing_order.get("cash_amount", 0)),
+        "card_amount": _safe_float(order_data.get("card_amount", existing_order.get("card_amount", 0)), existing_order.get("card_amount", 0)),
+        "upi_amount": _safe_float(order_data.get("upi_amount", existing_order.get("upi_amount", 0)), existing_order.get("upi_amount", 0)),
+        "credit_amount": _safe_float(order_data.get("credit_amount", existing_order.get("credit_amount", 0)), existing_order.get("credit_amount", 0)),
         # Discount fields
-        "discount": order_data.get("discount", existing_order.get("discount", 0)),
-        "discount_type": order_data.get("discount_type", existing_order.get("discount_type", "amount")),
-        "discount_value": order_data.get("discount_value", existing_order.get("discount_value", 0)),
-        "discount_amount": order_data.get("discount_amount", existing_order.get("discount_amount", 0)),
+        "discount": discount,
+        "discount_type": discount_type,
+        "discount_value": discount_value,
+        "discount_amount": discount_amount,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
+    # Initialize payment snapshot for logging and safe defaults
+    payment_received = _safe_float(existing_order.get("payment_received", 0), 0) or 0
+    calculated_balance = _safe_float(existing_order.get("balance_amount", max(0, total - payment_received)), max(0, total - payment_received))
+    is_credit = existing_order.get("is_credit", calculated_balance > 0)
+
     # FIXED: Only update payment fields if explicitly provided in the request
     # Don't automatically calculate payment_received when just editing order items
     if "payment_received" in order_data:
         # Only update payment fields if payment_received is explicitly provided
-        total = order_data.get("total", existing_order["total"])
-        payment_received = order_data.get("payment_received", 0) or 0
+        payment_received = _safe_float(order_data.get("payment_received", 0), 0) or 0
         
         # Calculate balance correctly - ensure it's never negative
         calculated_balance = max(0, total - payment_received)
@@ -6014,8 +6063,8 @@ async def update_order(
         # If payment_received not provided, preserve existing payment status
         # Only recalculate balance if total changed
         existing_payment = existing_order.get("payment_received", 0) or 0
-        new_total = order_data.get("total", existing_order["total"])
-        existing_total = existing_order["total"]
+        new_total = total
+        existing_total = _safe_float(existing_order.get("total", total), total)
         
         if new_total != existing_total and existing_payment > 0:
             # Recalculate balance with new total but keep existing payment
@@ -6046,10 +6095,14 @@ async def update_order(
     
     print(f"📝 Order update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
     
-    await db.orders.update_one(
-        {"id": order_id, "organization_id": user_org_id},
-        {"$set": update_data}
-    )
+    try:
+        await db.orders.update_one(
+            {"id": order_id, "organization_id": user_org_id},
+            {"$set": update_data}
+        )
+    except Exception as update_error:
+        print(f"Order update failed for {order_id}: {update_error}")
+        raise HTTPException(status_code=500, detail="Failed to update order")
     
     # Invalidate cache for order update
     try:

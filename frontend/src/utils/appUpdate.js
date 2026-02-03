@@ -11,7 +11,8 @@ export const CURRENT_VERSION = '1.4.0';
 // Check for updates from backend
 export const checkForUpdates = async (apiBaseUrl) => {
   try {
-    const response = await fetch(`${apiBaseUrl}/api/app-version`);
+    const baseUrl = apiBaseUrl?.endsWith('/api') ? apiBaseUrl.slice(0, -4) : apiBaseUrl;
+    const response = await fetch(`${baseUrl}/api/app-version`);
     if (!response.ok) return null;
     
     const data = await response.json();
