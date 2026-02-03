@@ -481,7 +481,7 @@ const SetupRoute = ({ children, isAuthChecking }) => {
 };
 
 // Route for home page - redirects to dashboard if logged in
-const HomeRoute = ({ isAuthChecking }) => {
+const HomeRoute = ({ isAuthChecking, pricing }) => {
   // Wait for auth check to complete (includes IndexedDB)
   if (isAuthChecking) {
     console.log('HomeRoute: Still checking auth...');
@@ -498,7 +498,7 @@ const HomeRoute = ({ isAuthChecking }) => {
   }
   
   console.log('HomeRoute: No token, showing landing page');
-  return <LandingPage />;
+  return <LandingPage pricing={pricing} />;
 };
 
 // Route for login page - redirects to dashboard if already logged in
@@ -539,6 +539,7 @@ function App() {
     return storedUser;
   });
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [pricing, setPricing] = useState(null);
 
   // Set up the global logout callback
   useEffect(() => {
@@ -576,8 +577,6 @@ function App() {
     
     initAuth();
     
-<<<<<<< Updated upstream
-=======
     // Fetch pricing data for banners
     const fetchPricingData = async () => {
       try {
@@ -603,7 +602,6 @@ function App() {
     };
     fetchPricingData();
     
->>>>>>> Stashed changes
     // ✅ PERFORMANCE: Initialize optimization modules
     console.log('⚡ Initializing performance optimizations...');
     
@@ -808,7 +806,7 @@ function App() {
       <BrowserRouter>
         <ElectronNavigator />
         <Routes>
-          <Route path="/" element={<HomeRoute isAuthChecking={isAuthChecking} />} />
+          <Route path="/" element={<HomeRoute isAuthChecking={isAuthChecking} pricing={pricing} />} />
           <Route path="/login" element={<LoginRoute setUser={setUser} isAuthChecking={isAuthChecking} />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />

@@ -673,8 +673,8 @@ const OrdersPage = ({ user }) => {
             return false; // Exclude orders without status
           }
           
-          // BULLETPROOF: Filter out ALL completed/cancelled/paid orders
-          const completedStatuses = ['completed', 'cancelled', 'paid', 'billed', 'settled'];
+          // BULLETPROOF: Filter out ALL completed/cancelled orders (keep paid orders visible)
+          const completedStatuses = ['completed', 'cancelled', 'billed', 'settled'];
           if (completedStatuses.includes(order.status.toLowerCase())) {
             console.log('🚫 Filtering out completed order from active list:', order.id, order.status);
             return false;
@@ -2105,7 +2105,7 @@ const OrdersPage = ({ user }) => {
             <Clock className="w-4 h-4" />
             Active Orders
             <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'active' ? 'bg-violet-100 text-violet-700' : 'bg-gray-200'}`}>
-              {loading ? '...' : orders.filter(o => !['completed', 'cancelled', 'paid'].includes(o.status)).length}
+              {loading ? '...' : orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length}
             </span>
           </button>
           <button
@@ -2159,7 +2159,7 @@ const OrdersPage = ({ user }) => {
         {/* Active Orders Tab */}
         {!loading && activeTab === 'active' && (
           <div className="space-y-3">
-            {orders.filter(order => !['completed', 'cancelled'].includes(order.status) && order.status !== 'paid').length === 0 && (
+            {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
                 <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl">🍽️</span>
@@ -2168,7 +2168,7 @@ const OrdersPage = ({ user }) => {
                 <p className="text-gray-500 text-sm">All clear! Tap "New Order" to get started</p>
               </div>
             )}
-            {orders.filter(order => !['completed', 'cancelled', 'paid'].includes(order.status)).map((order) => {
+            {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).map((order) => {
               const statusConfig = {
                 pending: { color: 'amber', icon: '⏳', label: 'Pending', bg: 'bg-amber-500' },
                 preparing: { color: 'blue', icon: '👨‍🍳', label: 'Cooking', bg: 'bg-blue-500' },

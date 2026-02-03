@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        code { background-color: #f8f9fa; padding: 2px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Pricing Runtime Error Fix</h1>
+    
+    <div class="test-case error">
+        <h3>❌ Previous Error</h3>
+        <p><strong>Error:</strong> <code>setPricing is not defined</code></p>
+        <p><strong>Cause:</strong> Missing useState declaration for pricing state in App.js</p>
+        <p><strong>Location:</strong> fetchPricingData function was calling setPricing without state being declared</p>
+    </div>
+    
+    <div class="test-case success">
+        <h3>✅ Fix Applied</h3>
+        <p><strong>Added:</strong> <code>const [pricing, setPricing] = useState(null);</code> in App.js</p>
+        <p><strong>Updated:</strong> HomeRoute to accept and pass pricing prop to LandingPage</p>
+        <p><strong>Updated:</strong> Route definition to pass pricing state to HomeRoute</p>
+    </div>
+    
+    <div class="test-case info">
+        <h3>🔧 Changes Made</h3>
+        <ol>
+            <li><strong>App.js Line ~543:</strong> Added pricing state declaration</li>
+            <li><strong>App.js HomeRoute:</strong> Updated to accept pricing prop</li>
+            <li><strong>App.js HomeRoute:</strong> Pass pricing to LandingPage component</li>
+            <li><strong>App.js Route:</strong> Pass pricing state to HomeRoute</li>
+        </ol>
+    </div>
+    
+    <div class="test-case success">
+        <h3>✅ Expected Behavior</h3>
+        <ul>
+            <li>App loads without runtime errors</li>
+            <li>LandingPage receives pricing data</li>
+            <li>Pricing banners and campaigns display correctly</li>
+            <li>No "setPricing is not defined" error</li>
+        </ul>
+    </div>
+    
+    <div class="test-case info">
+        <h3>🧪 Testing Instructions</h3>
+        <ol>
+            <li>Start the frontend server: <code>cd frontend && npm start</code></li>
+            <li>Open browser to <code>http://localhost:3000</code></li>
+            <li>Check browser console for errors</li>
+            <li>Verify landing page loads correctly</li>
+            <li>Check that pricing banners display</li>
+        </ol>
+    </div>
+    
+    <script>
+        console.log('Pricing Fix Test Page Loaded');
+        console.log('Key changes:');
+        console.log('1. Added pricing state: const [pricing, setPricing] = useState(null);');
+        console.log('2. Updated HomeRoute to pass pricing prop');
+        console.log('3. Updated Route to pass pricing state');
+        console.log('4. LandingPage now receives pricing data correctly');
+    </script>
+</body>
+</html>

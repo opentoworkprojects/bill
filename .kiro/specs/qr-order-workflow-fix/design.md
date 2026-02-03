@@ -2,225 +2,215 @@
 
 ## Overview
 
-This design addresses the critical workflow issue where QR code orders bypass the Active Orders system and go directly to Today's Bills. The solution involves modifying the order routing logic, implementing proper status management, and ensuring real-time synchronization across all restaurant systems.
+This design addresses a critical workflow issue where orders are incorrectly removed from the active tab when marked as "paid" through the edit modal, even when actual completion has not been processed through the proper billing workflow. The fix implements a distinction between "paid" status and "completed" status, ensuring orders remain visible in the active tab until properly completed through the billing page.
 
-The core problem is in the order creation flow where QR orders are being marked as completed immediately upon placement, rather than following the standard order lifecycle. This design establishes a unified order processing pipeline that treats QR orders identically to staff-entered orders.
+The solution applies to all order types (QR orders, manual orders, etc.) and maintains consistency across the entire order management system.
 
 ## Architecture
 
-The solution involves three main architectural changes:
+The fix involves three main components:
 
-1. **Order Routing Layer**: Centralized order processing that routes all orders through the same pipeline
-2. **Status Management Service**: Unified order status tracking across all order sources
-3. **Real-time Synchronization**: Event-driven updates to keep all systems in sync
+1. **Active Tab Filtering Logic** - Change from filtering by "paid" status to filtering by "completed" status
+2. **Edit Modal Payment Handling** - Prevent automatic order removal when payment status is changed
+3. **Billing Page Completion Logic** - Ensure only the "Bill Pay" action marks orders as "completed"
 
-```mermaid
-graph TD
-    A[Customer QR Order] --> B[Order Validation Service]
-    B --> C[Order Routing Layer]
-    C --> D[Active Orders System]
-    D --> E[Kitchen Display]
-    D --> F[Staff Interface]
-    
-    G[Staff Order Entry] --> B
-    
-    H[Status Management Service] --> D
-    H --> I[Today's Bills]
-    
-    J[Real-time Sync Service] --> E
-    J --> F
-    J --> K[Mobile Staff App]
+### Current vs. Proposed Flow
+
+**Current (Problematic) Flow:**
+```
+Order Created → Edit Modal (Mark as "Paid") → Order Removed from Active Tab → Lost from View
+```
+
+**Proposed (Fixed) Flow:**
+```
+Order Created → Edit Modal (Mark as "Paid") → Order Remains in Active Tab → Billing Page ("Bill Pay") → Order Marked as "Completed" → Order Removed from Active Tab
 ```
 
 ## Components and Interfaces
 
-### Order Processing Pipeline
+### 1. OrdersPage.js - Active Tab Filtering
 
-**OrderProcessor Interface**:
-```typescript
-interface OrderProcessor {
-  processOrder(order: Order, source: OrderSource): Promise<ProcessedOrder>
-  validateOrder(order: Order): ValidationResult
-  routeOrder(order: ProcessedOrder): Promise<void>
-}
+**Current Implementation:**
+```javascript
+// Lines 2171, 2108, 678-682
+orders.filter(order => !['completed', 'cancelled', 'paid'].includes(order.status))
 ```
 
-**Order Model**:
-```typescript
-interface Order {
-  id: string
-  tableNumber: string
-  items: OrderItem[]
-  source: OrderSource // 'QR' | 'STAFF' | 'PHONE'
-  status: OrderStatus
-  timestamps: OrderTimestamps
-  metadata: OrderMetadata
-}
-
-interface OrderStatus {
-  current: 'pending' | 'active' | 'preparing' | 'ready' | 'completed'
-  history: StatusChange[]
-}
+**Proposed Change:**
+```javascript
+// Remove 'paid' from the filter - only filter by 'completed'
+orders.filter(order => !['completed', 'cancelled'].includes(order.status))
 ```
 
-### Status Management Service
+**Key Changes:**
+- Remove `'paid'` from the `completedStatuses` array in line 677
+- Update active tab count calculation (line 2108)
+- Update order display filtering (line 2171)
+- Update empty state check (line 2162)
 
-**StatusManager Interface**:
-```typescript
-interface StatusManager {
-  updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<void>
-  getOrderStatus(orderId: string): Promise<OrderStatus>
-  subscribeToStatusChanges(callback: StatusChangeCallback): void
-}
+### 2. EditOrderModal.jsx - Payment Status Handling
+
+**Current Implementation:**
+```javascript
+// Lines 257-260 - Already partially fixed
+payment_received: useSplitPayment ? paidAmount : (order?.payment_received || 0),
 ```
 
-The StatusManager ensures that all status changes follow business rules and trigger appropriate notifications to connected systems.
+**Analysis:**
+The edit modal is already correctly implemented to not automatically set `payment_received = total`. The issue is in the filtering logic, not the edit modal itself.
 
-### Real-time Synchronization
+**Required Verification:**
+- Ensure edit modal never sets `status: 'completed'`
+- Ensure edit modal preserves existing `payment_received` values
+- Ensure edit modal allows payment method changes without triggering completion
 
-**SyncService Interface**:
-```typescript
-interface SyncService {
-  broadcastOrderUpdate(order: Order): Promise<void>
-  subscribeToUpdates(systemId: string, callback: UpdateCallback): void
-  handleConnectionLoss(): void
-  resyncOnReconnect(): Promise<void>
-}
+### 3. BillingPage.js - Completion Logic
+
+**Current Implementation:**
+```javascript
+// Lines 683, 772, 820 - Correct completion logic
+status: shouldStayPending ? 'pending' : 'completed',
 ```
+
+**Analysis:**
+The billing page correctly sets `status: 'completed'` only when the "Bill Pay" action is executed. This logic is already correct and should remain unchanged.
+
+**Key Verification Points:**
+- Only `processPayment()` function should set `status: 'completed'`
+- QR orders should stay 'pending' until kitchen marks as completed
+- Credit orders should stay 'pending' until fully paid
 
 ## Data Models
 
-### Core Order Structure
+### Order Status States
 
-```typescript
-interface ProcessedOrder extends Order {
-  validationStatus: 'valid' | 'invalid' | 'warning'
-  routingDestination: 'active_orders' | 'hold' | 'reject'
-  processingTimestamp: Date
-}
-
-interface OrderTimestamps {
-  placed: Date
-  received: Date
-  started?: Date
-  ready?: Date
-  completed?: Date
-}
-
-interface OrderMetadata {
-  customerInfo?: CustomerInfo
-  specialInstructions?: string
-  estimatedPrepTime?: number
-  priority: 'normal' | 'high' | 'rush'
-}
+```javascript
+// Current order statuses
+const ORDER_STATUSES = {
+  PENDING: 'pending',      // Order created, not yet processed
+  PREPARING: 'preparing',  // Kitchen is preparing the order
+  READY: 'ready',         // Order is ready for pickup/delivery
+  COMPLETED: 'completed', // Order fully completed and paid
+  CANCELLED: 'cancelled', // Order was cancelled
+  PAID: 'paid'           // Order payment received but not completed
+};
 ```
 
-### Status Change Tracking
+### Payment vs Completion States
 
-```typescript
-interface StatusChange {
-  from: OrderStatus['current']
-  to: OrderStatus['current']
-  timestamp: Date
-  triggeredBy: 'system' | 'staff' | 'customer'
-  staffId?: string
-}
+```javascript
+// Payment status (can be partial)
+const PAYMENT_STATES = {
+  UNPAID: { payment_received: 0, balance_amount: total },
+  PARTIAL: { payment_received: partial, balance_amount: remaining },
+  PAID: { payment_received: total, balance_amount: 0 }
+};
+
+// Completion status (binary)
+const COMPLETION_STATES = {
+  ACTIVE: 'pending|preparing|ready|paid', // Shows in active tab
+  COMPLETED: 'completed|cancelled'        // Removed from active tab
+};
 ```
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+*A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-Before defining the correctness properties, let me analyze the acceptance criteria to determine which are testable as properties.
-
-### Property 1: QR Order Routing Consistency
-*For any* QR order placed by a customer, the order should be routed to Active_Orders with an initial status of "pending" and should never be automatically marked as "completed" upon placement.
+### Property 1: Active Tab Filtering Based on Completion Status
+*For any* order of any type (QR, manual, etc.), the active tab should display the order if and only if its status is not "completed" or "cancelled", regardless of payment status
 **Validates: Requirements 1.1, 1.2, 1.3**
 
-### Property 2: Order Source Equality
-*For any* order processing operation (status updates, modifications, display), QR orders and staff-entered orders should be processed identically with the same priority and capabilities.
-**Validates: Requirements 1.4, 3.2**
+### Property 2: Bill Pay Action as Sole Completion Mechanism  
+*For any* order of any type, the order should only be marked as "completed" and removed from the active tab when the Bill Pay action is successfully executed on the billing page
+**Validates: Requirements 2.4, 4.1, 4.2**
 
-### Property 3: Real-time Display Updates
-*For any* QR order entering Active_Orders or changing status, the Kitchen_Display should show the complete order information within 5 seconds and reflect all subsequent status changes in real-time.
-**Validates: Requirements 2.1, 2.2, 2.4**
+### Property 3: Payment Status Independence from Completion
+*For any* order of any type, marking the order as "paid" through any interface should not automatically mark it as "completed" or remove it from the active tab
+**Validates: Requirements 4.3, 1.4**
 
-### Property 4: Order Status Lifecycle
-*For any* order (QR or staff-entered), status transitions should follow the sequence: pending → preparing → ready → completed, with each transition properly recorded and triggering appropriate system updates.
-**Validates: Requirements 4.1, 4.2, 4.3, 4.4**
+### Property 4: Data Consistency Across Interfaces
+*For any* order modifications made through the edit modal, the billing page should display consistent and current data without conflicts
+**Validates: Requirements 3.1, 3.2, 3.4**
 
-### Property 5: Completion Workflow
-*For any* order marked as "completed", the system should automatically move it from Active_Orders to Today_Bills while preserving all order data and history.
-**Validates: Requirements 3.4, 4.5**
+### Property 5: Payment Amount Accuracy and Persistence
+*For any* payment amount updates, the system should accurately store, validate, and display the current payment amounts across all interfaces
+**Validates: Requirements 5.1, 5.2, 5.4**
 
-### Property 6: Staff Interface Integration
-*For any* QR order, the Staff_Interface should display it alongside regular orders, allow all modification operations (add items, change quantities, add notes), and clearly indicate the order source.
-**Validates: Requirements 3.1, 3.3, 3.5**
+### Property 6: Billing Workflow Processing Consistency
+*For any* order type, the billing page should process payment workflows consistently and update all related displays immediately upon completion
+**Validates: Requirements 2.1, 2.2, 2.3, 4.4**
 
-### Property 7: System Synchronization
-*For any* QR order data change, all connected systems (Kitchen_Display, Staff_Interface, Mobile_App) should receive synchronized updates and maintain consistent information across concurrent access.
-**Validates: Requirements 5.2, 5.4**
+### Property 7: Edit Modal Workflow Isolation
+*For any* changes made in the edit modal, the billing workflow functionality should remain unaffected and continue to work correctly
+**Validates: Requirements 3.3, 5.3**
 
-### Property 8: Network Resilience
-*For any* network interruption during QR order processing, the system should handle the interruption gracefully and synchronize all pending changes when connection is restored.
-**Validates: Requirements 5.3**
-
-### Property 9: Order Validation
-*For any* QR order submission, the system should validate all order data before routing to Active_Orders, and if validation fails, should log errors and notify staff without corrupting the order flow.
-**Validates: Requirements 6.1, 6.3**
-
-### Property 10: Duplicate Prevention
-*For any* table attempting to place multiple orders, the system should prevent duplicate orders from the same table within a 5-minute window while allowing legitimate subsequent orders.
-**Validates: Requirements 6.4**
-
-### Property 11: Data Integrity Preservation
-*For any* order movement between systems or status changes, all order metadata, timestamps, and referential integrity should be preserved without data loss or corruption.
-**Validates: Requirements 4.6, 6.2, 6.5**
-
-### Property 12: Response Time Compliance
-*For any* QR order submission, the system should notify Active_Orders within 3 seconds to ensure timely kitchen workflow integration.
-**Validates: Requirements 5.1**
+### Property 8: End-to-End Workflow Integrity
+*For any* order type, the complete workflow from creation through edit modal modifications to billing completion should maintain proper state transitions and consistent behavior
+**Validates: Requirements 6.1, 6.2, 6.3, 6.4**
 
 ## Error Handling
 
-The system must handle several error scenarios gracefully:
+### Edit Modal Error Scenarios
+1. **Invalid Payment Status Changes** - Prevent setting invalid payment combinations
+2. **Data Validation Failures** - Handle cases where order updates fail validation
+3. **Network Failures** - Graceful handling of update failures with rollback
 
-### Order Processing Errors
-- **Invalid Order Data**: Validate all incoming QR orders and reject malformed requests with clear error messages
-- **System Unavailability**: Queue orders locally when Active_Orders system is temporarily unavailable
-- **Duplicate Detection**: Prevent duplicate orders while allowing legitimate reorders after the time window
+### Billing Page Error Scenarios  
+1. **Payment Processing Failures** - Ensure failed payments don't mark orders as completed
+2. **Concurrent Modification Conflicts** - Handle cases where order is modified during billing
+3. **Incomplete Payment Data** - Validate payment amounts before processing completion
 
-### Network and Connectivity Issues
-- **Connection Loss**: Maintain local order state and sync when connectivity is restored
-- **Partial Sync Failures**: Retry failed synchronization attempts with exponential backoff
-- **System Overload**: Implement rate limiting and graceful degradation during peak periods
-
-### Data Consistency Errors
-- **Status Conflicts**: Resolve conflicting status updates using timestamp-based conflict resolution
-- **Missing References**: Handle cases where orders reference non-existent tables or menu items
-- **Corrupted Data**: Detect and recover from data corruption using checksums and validation
+### Active Tab Display Errors
+1. **Status Synchronization Issues** - Handle cases where order status is inconsistent
+2. **Cache Invalidation Failures** - Ensure fresh data is displayed after status changes
+3. **Filter Logic Errors** - Prevent orders from being incorrectly hidden or shown
 
 ## Testing Strategy
 
-The testing approach combines unit tests for specific scenarios with property-based tests for comprehensive coverage of the order workflow fix.
+### Dual Testing Approach
+This fix requires both unit testing and property-based testing to ensure comprehensive coverage:
 
-### Unit Testing Focus
-- **Integration Points**: Test connections between QR system, Active_Orders, and Kitchen_Display
-- **Error Scenarios**: Validate error handling for network failures, invalid data, and system overload
-- **Edge Cases**: Test boundary conditions like exactly 5-minute duplicate windows and 3-second timing requirements
-- **Status Transitions**: Verify each specific status change scenario with concrete examples
+**Unit Tests** focus on:
+- Specific examples of the problematic workflow
+- Edge cases like concurrent modifications
+- Error conditions and failure scenarios
+- Integration points between edit modal and billing page
+
+**Property Tests** focus on:
+- Universal properties that hold for all order types
+- Comprehensive input coverage through randomization
+- State transition correctness across different workflows
+- Data consistency validation across interfaces
 
 ### Property-Based Testing Configuration
-- **Framework**: Use fast-check (JavaScript/TypeScript) or Hypothesis (Python) for property testing
-- **Test Iterations**: Minimum 100 iterations per property test to ensure comprehensive input coverage
-- **Order Generation**: Generate random orders with varying complexity, table numbers, and timing
-- **System State**: Test properties across different system states (busy periods, network issues, etc.)
+- **Testing Library**: Use Jest with fast-check for JavaScript property-based testing
+- **Test Iterations**: Minimum 100 iterations per property test
+- **Test Tagging**: Each property test must reference its design document property
+- **Tag Format**: `// Feature: qr-order-workflow-fix, Property {number}: {property_text}`
 
-### Property Test Implementation
-Each correctness property will be implemented as a property-based test with the following configuration:
-- **Minimum 100 iterations** per test to handle randomization effectively
-- **Tagged with feature reference**: `Feature: qr-order-workflow-fix, Property N: [property description]`
-- **Comprehensive input generation**: Random orders, timing variations, and system states
-- **Assertion verification**: Each property maps directly to measurable system behavior
+### Key Test Scenarios
 
-The dual testing approach ensures both specific workflow scenarios work correctly (unit tests) and the general order processing behavior is robust across all possible inputs (property tests).
+**Unit Test Examples:**
+1. Mark QR order as "paid" in edit modal → Verify order remains in active tab
+2. Complete payment via billing page → Verify order is marked "completed" and removed
+3. Partial payment scenario → Verify order stays active until full completion
+4. Concurrent edit modal and billing page modifications → Verify data consistency
+
+**Property Test Examples:**
+1. Generate random orders with various statuses → Verify active tab filtering is correct
+2. Generate random payment amounts → Verify billing page displays accurate amounts
+3. Generate random order modifications → Verify edit modal doesn't break billing workflow
+4. Generate random completion scenarios → Verify only Bill Pay marks orders as completed
+
+### Integration Testing
+- Test complete workflow from order creation to completion
+- Verify cross-component communication works correctly
+- Test real-time updates and cache invalidation
+- Validate user interface consistency across all screens
+
+### Performance Testing
+- Ensure filtering changes don't impact page load times
+- Verify real-time updates don't cause UI lag
+- Test with large numbers of orders to ensure scalability
+- Monitor memory usage during status transitions
