@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { Plus, Trash2, X, ChevronDown, Search } from 'lucide-react';
+import { buildEditPaymentFields } from '../utils/orderWorkflowRules';
 
 /**
  * EditOrderModal Component - Compact, Responsive UI/UX
@@ -240,6 +241,18 @@ const EditOrderModal = ({
       return;
     }
 
+    const paymentFields = buildEditPaymentFields({
+      orderPaymentReceived: order?.payment_received || 0,
+      paymentMethod,
+      useSplitPayment,
+      paidAmount,
+      creditAmount,
+      cashAmount,
+      cardAmount,
+      upiAmount,
+      total
+    });
+
     const payload = {
       items: editItems,
       subtotal: subtotalAfterDiscount,
@@ -252,16 +265,7 @@ const EditOrderModal = ({
       discount_type: discountType,
       discount_value: discountValue,
       discount_amount: discountAmount,
-      payment_method: useSplitPayment ? 'split' : paymentMethod,
-      is_credit: useSplitPayment ? creditAmount > 0 : (paymentMethod === 'credit'),
-      // FIXED: Don't automatically set payment_received = total when editing
-      // Only update payment if explicitly using split payment or credit
-      payment_received: useSplitPayment ? paidAmount : (order?.payment_received || 0),
-      balance_amount: useSplitPayment ? creditAmount : (paymentMethod === 'credit' ? total : Math.max(0, total - (order?.payment_received || 0))),
-      cash_amount: useSplitPayment ? cashAmount : (paymentMethod === 'cash' ? total : 0),
-      card_amount: useSplitPayment ? cardAmount : (paymentMethod === 'card' ? total : 0),
-      upi_amount: useSplitPayment ? upiAmount : (paymentMethod === 'upi' ? total : 0),
-      credit_amount: useSplitPayment ? creditAmount : (paymentMethod === 'credit' ? total : 0)
+      ...paymentFields
     };
 
     await onUpdate(payload);

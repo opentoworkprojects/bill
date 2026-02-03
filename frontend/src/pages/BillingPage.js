@@ -13,6 +13,7 @@ import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPaymen
 import { billingCache } from '../utils/billingCache';
 import { startBillingTimer, endBillingTimer } from '../utils/performanceMonitor';
 import apiClient, { apiWithRetry, apiSilent } from '../utils/apiClient';
+import { computePaymentState, determineBillingCompletionStatus } from '../utils/orderWorkflowRules';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
@@ -666,21 +667,18 @@ const BillingPage = ({ user }) => {
   const processPayment = async () => {
     const total = calculateTotal();
     // Fix: Always calculate received amount correctly - default to full payment
-    const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
-    const balance = Math.max(0, total - received);
-    const isCredit = balance > 0;
+    const rawReceived = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
+    const { payment_received: received, balance_amount: balance, is_credit: isCredit } = computePaymentState(total, rawReceived);
+    const completionStatus = determineBillingCompletionStatus({ waiterName: order?.waiter_name, isCredit });
     
     setLoading(true);
     
     try {
       // Prepare payment data - ensure all fields are explicitly set
       // CRITICAL FIX: QR orders (Self-Order) should stay 'pending' until kitchen marks as completed
-      const isQROrder = order?.waiter_name === 'Self-Order';
-      const shouldStayPending = isQROrder || isCredit;
-      
       const paymentData = {
         order_id: orderId,
-        status: shouldStayPending ? 'pending' : 'completed',
+        status: completionStatus,
         payment_method: splitPayment ? 'split' : paymentMethod,
         payment_received: received,  // Always set explicitly
         balance_amount: balance,     // Always set explicitly (0 for full payment)
@@ -769,7 +767,7 @@ const BillingPage = ({ user }) => {
           orderId: orderId,
           orderData: {
             ...order,
-            status: shouldStayPending ? 'pending' : 'completed',
+            status: completionStatus,
             payment_method: splitPayment ? 'split' : paymentMethod,
             payment_received: received,
             balance_amount: balance,
@@ -790,7 +788,7 @@ const BillingPage = ({ user }) => {
         orderId: orderId,
         orderData: {
           ...order,
-          status: shouldStayPending ? 'pending' : 'completed',
+          status: completionStatus,
           payment_method: splitPayment ? 'split' : paymentMethod,
           payment_received: received,
           balance_amount: balance,
@@ -817,7 +815,7 @@ const BillingPage = ({ user }) => {
         discount: discountAmt, 
         discount_amount: discountAmt, 
         tax_rate: getEffectiveTaxRate(),
-        status: shouldStayPending ? 'pending' : 'completed',
+        status: completionStatus,
         payment_method: splitPayment ? 'split' : paymentMethod,
         payment_received: received,
         balance_amount: balance,

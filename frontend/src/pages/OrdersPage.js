@@ -14,6 +14,11 @@ import OptimizedBillingButton from '../components/OptimizedBillingButton';
 import { billingCache } from '../utils/billingCache';
 import EditOrderModal from '../components/EditOrderModal';
 import { apiWithRetry, apiSilent } from '../utils/apiClient';
+import {
+  filterActiveOrders,
+  filterServerActiveOrders,
+  normalizeStatus
+} from '../utils/orderWorkflowRules';
 
 // Enhanced sound effects for better UX
 const playSound = (type) => {
@@ -666,38 +671,11 @@ const OrdersPage = ({ user }) => {
       // SIMPLIFIED: Just use server data directly, no complex merging
       setOrders(prevOrders => {
         // Filter out completed and paid orders from active orders - BULLETPROOF FILTERING
-        const activeServerOrders = sortedOrders.filter(order => {
-          // CRITICAL: Ensure order has valid status
-          if (!order.status) {
-            console.warn('⚠️ Order without status found:', order.id);
-            return false; // Exclude orders without status
-          }
-          
-          // BULLETPROOF: Filter out ALL completed/cancelled orders (keep paid orders visible)
-          const completedStatuses = ['completed', 'cancelled', 'billed', 'settled'];
-          if (completedStatuses.includes(order.status.toLowerCase())) {
-            console.log('🚫 Filtering out completed order from active list:', order.id, order.status);
-            return false;
-          }
-          
-          // CRITICAL: Filter out recently paid orders to prevent polling override
-          if (recentPaymentCompletions.has(order.id)) {
-            console.log('🚫 Filtering out recently paid order from server response:', order.id);
-            return false;
-          }
-          
-          // ADDITIONAL: Filter out orders with payment_received >= total (fully paid)
-          if (order.payment_received && order.total && order.payment_received >= order.total) {
-            console.log('🚫 Filtering out fully paid order from active list:', order.id, `(₹${order.payment_received}/₹${order.total})`);
-            return false;
-          }
-          
-          return true;
-        });
+        const activeServerOrders = filterServerActiveOrders(sortedOrders, recentPaymentCompletions);
         
         // Move completed orders to today's bills
-        const completedOrders = sortedOrders.filter(order => 
-          ['completed', 'paid'].includes(order.status)
+        const completedOrders = sortedOrders.filter(order =>
+          ['completed', 'paid'].includes(normalizeStatus(order.status))
         );
         
         if (completedOrders.length > 0) {
@@ -2105,7 +2083,7 @@ const OrdersPage = ({ user }) => {
             <Clock className="w-4 h-4" />
             Active Orders
             <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'active' ? 'bg-violet-100 text-violet-700' : 'bg-gray-200'}`}>
-              {loading ? '...' : orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length}
+              {loading ? '...' : filterActiveOrders(orders).length}
             </span>
           </button>
           <button
@@ -2159,7 +2137,7 @@ const OrdersPage = ({ user }) => {
         {/* Active Orders Tab */}
         {!loading && activeTab === 'active' && (
           <div className="space-y-3">
-            {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).length === 0 && (
+            {filterActiveOrders(orders).length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
                 <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl">🍽️</span>
@@ -2168,7 +2146,7 @@ const OrdersPage = ({ user }) => {
                 <p className="text-gray-500 text-sm">All clear! Tap "New Order" to get started</p>
               </div>
             )}
-            {orders.filter(order => !['completed', 'cancelled'].includes(order.status)).map((order) => {
+            {filterActiveOrders(orders).map((order) => {
               const statusConfig = {
                 pending: { color: 'amber', icon: '⏳', label: 'Pending', bg: 'bg-amber-500' },
                 preparing: { color: 'blue', icon: '👨‍🍳', label: 'Cooking', bg: 'bg-blue-500' },
