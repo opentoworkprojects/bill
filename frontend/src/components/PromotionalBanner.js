@@ -18,30 +18,54 @@ const PromotionalBanner = ({ position = 'top', showOnPages = ['all'] }) => {
   const fetchPromotionalData = async () => {
     try {
       setLoading(true);
+      console.log('PromotionalBanner - Fetching promotional data...');
       
-      // Fetch active campaigns
-      const campaignsRes = await axios.get(`${API}/public/active-campaigns`);
-      setCampaigns(campaignsRes.data.campaigns || []);
-      
-      // Fetch sale offer
-      const saleOfferRes = await axios.get(`${API}/public/sale-offer`);
-      setSaleOffer(saleOfferRes.data.enabled ? saleOfferRes.data : null);
-      
-      // Fetch pricing
+      // Fetch pricing first as it's most reliable
       const pricingRes = await axios.get(`${API}/public/pricing`);
+      console.log('PromotionalBanner - Pricing data:', pricingRes.data);
       setPricing(pricingRes.data);
       
-      // Determine which banner to show (priority: sale offer > campaigns > pricing)
-      if (saleOfferRes.data.enabled) {
-        setCurrentBanner({ type: 'sale', data: saleOfferRes.data });
-      } else if (campaignsRes.data.campaigns && campaignsRes.data.campaigns.length > 0) {
-        setCurrentBanner({ type: 'campaign', data: campaignsRes.data.campaigns[0] });
-      } else if (pricingRes.data.campaign_active) {
+      // Always show pricing banner if we have campaign data
+      if (pricingRes.data && (pricingRes.data.campaign_active || pricingRes.data.early_adopter)) {
+        console.log('PromotionalBanner - Setting pricing banner');
         setCurrentBanner({ type: 'pricing', data: pricingRes.data });
+        setIsVisible(true);
+      } else {
+        console.log('PromotionalBanner - No active campaigns found');
+        // Still try to fetch other data
+        try {
+          const campaignsRes = await axios.get(`${API}/public/active-campaigns`);
+          setCampaigns(campaignsRes.data.campaigns || []);
+          
+          const saleOfferRes = await axios.get(`${API}/public/sale-offer`);
+          setSaleOffer(saleOfferRes.data.enabled ? saleOfferRes.data : null);
+          
+          if (saleOfferRes.data.enabled) {
+            setCurrentBanner({ type: 'sale', data: saleOfferRes.data });
+          } else if (campaignsRes.data.campaigns && campaignsRes.data.campaigns.length > 0) {
+            setCurrentBanner({ type: 'campaign', data: campaignsRes.data.campaigns[0] });
+          }
+        } catch (err) {
+          console.log('PromotionalBanner - Failed to fetch additional data:', err);
+        }
       }
       
     } catch (error) {
-      console.error('Failed to fetch promotional data:', error);
+      console.error('PromotionalBanner - Failed to fetch promotional data:', error);
+      // Set fallback banner to ensure something shows
+      setCurrentBanner({ 
+        type: 'pricing', 
+        data: {
+          regular_price: 2999,
+          campaign_price: 2549,
+          campaign_active: true,
+          campaign_name: 'Early Adopter Special',
+          campaign_discount_percent: 15,
+          early_adopter: true,
+          early_adopter_spots_left: 850
+        }
+      });
+      setIsVisible(true);
     } finally {
       setLoading(false);
     }

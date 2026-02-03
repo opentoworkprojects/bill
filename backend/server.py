@@ -5315,30 +5315,33 @@ async def get_orders(
             # ALWAYS fetch from database for most current status
             orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
             
-            # BULLETPROOF FILTERING: Additional check for fully paid orders
+            # IMPROVED BUSINESS LOGIC: Filter based on status, not payment amount
             if not status or status not in ["completed", "paid", "cancelled", "billed", "settled"]:
-                # Filter out orders that are fully paid (payment_received >= total)
+                # Filter out orders based on STATUS only, not payment amount
+                # This ensures orders stay active until explicitly completed through billing
                 filtered_orders = []
                 for order in orders:
-                    # Check if order is fully paid
-                    payment_received = order.get("payment_received", 0) or 0
-                    total = order.get("total", 0) or 0
-                    
-                    if payment_received >= total and total > 0:
-                        print(f"🚫 Filtering out fully paid order from active list: {order.get('id')} (₹{payment_received}/₹{total})")
-                        continue
-                    
-                    # Check status again (double-check)
+                    # Check status (primary filter)
                     order_status = order.get("status", "").lower()
                     completed_statuses = ["completed", "cancelled", "paid", "billed", "settled"]
+                    
                     if order_status in completed_statuses:
                         print(f"🚫 Filtering out completed order from active list: {order.get('id')} ({order_status})")
                         continue
                     
+                    # RESTAURANT BUSINESS LOGIC: Keep orders active even if payment_received >= total
+                    # Orders should only be removed when explicitly marked as completed through billing
+                    payment_received = order.get("payment_received", 0) or 0
+                    total = order.get("total", 0) or 0
+                    
+                    # Log payment status but don't filter based on it
+                    if payment_received >= total and total > 0:
+                        print(f"💰 Order has full payment but staying active: {order.get('id')} (₹{payment_received}/₹{total}) - status: {order_status}")
+                    
                     filtered_orders.append(order)
                 
                 orders = filtered_orders
-                print(f"🔍 After bulletproof filtering: {len(orders)} truly active orders")
+                print(f"🔍 After status-based filtering: {len(orders)} truly active orders")
             
             # Convert datetime objects for consistency
             for order in orders:
@@ -5979,24 +5982,58 @@ async def update_order(
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    # Fix: Properly calculate payment fields when payment_received is provided
-    total = order_data.get("total", existing_order["total"])
-    payment_received = order_data.get("payment_received", existing_order.get("payment_received", 0)) or 0
+    # FIXED: Only update payment fields if explicitly provided in the request
+    # Don't automatically calculate payment_received when just editing order items
+    if "payment_received" in order_data:
+        # Only update payment fields if payment_received is explicitly provided
+        total = order_data.get("total", existing_order["total"])
+        payment_received = order_data.get("payment_received", 0) or 0
+        
+        # Calculate balance correctly - ensure it's never negative
+        calculated_balance = max(0, total - payment_received)
+        
+        # Determine is_credit based on balance
+        is_credit = calculated_balance > 0
+        
+        # If full payment (balance <= 0), ensure is_credit is false and balance is 0
+        if calculated_balance <= 0:
+            is_credit = False
+            calculated_balance = 0
+        
+        update_data["payment_received"] = payment_received
+        update_data["balance_amount"] = calculated_balance
+        update_data["is_credit"] = is_credit
+        
+        print(f"📝 Payment update: total={total}, received={payment_received}, balance={calculated_balance}, is_credit={is_credit}")
+    else:
+        # If payment_received not provided, preserve existing payment status
+        # Only recalculate balance if total changed
+        existing_payment = existing_order.get("payment_received", 0) or 0
+        new_total = order_data.get("total", existing_order["total"])
+        existing_total = existing_order["total"]
+        
+        if new_total != existing_total and existing_payment > 0:
+            # Recalculate balance with new total but keep existing payment
+            calculated_balance = max(0, new_total - existing_payment)
+            is_credit = calculated_balance > 0
+            
+            if calculated_balance <= 0:
+                is_credit = False
+                calculated_balance = 0
+            
+            update_data["balance_amount"] = calculated_balance
+            update_data["is_credit"] = is_credit
+            print(f"📝 Total changed: new_total={new_total}, existing_payment={existing_payment}, new_balance={calculated_balance}")
+        else:
+            print(f"📝 Order edit: preserving existing payment status (payment_received={existing_payment})")
     
-    # Calculate balance correctly - ensure it's never negative
-    calculated_balance = max(0, total - payment_received)
+    # Handle explicit payment method changes
+    if "payment_method" in order_data:
+        update_data["payment_method"] = order_data["payment_method"]
     
-    # Determine is_credit based on balance
-    is_credit = calculated_balance > 0
-    
-    # If full payment (balance <= 0), ensure is_credit is false and balance is 0
-    if calculated_balance <= 0:
-        is_credit = False
-        calculated_balance = 0
-    
-    update_data["payment_received"] = payment_received
-    update_data["balance_amount"] = calculated_balance
-    update_data["is_credit"] = is_credit
+    # Handle explicit credit status changes
+    if "is_credit" in order_data:
+        update_data["is_credit"] = order_data["is_credit"]
     
     # Also update status if provided
     if "status" in order_data:
@@ -6017,17 +6054,17 @@ async def update_order(
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
     
-    # Clear table if payment is fully completed (no balance remaining) - Use TableStatusManager
-    if (update_data.get("balance_amount", 0) <= 0 and 
-        not update_data.get("is_credit", False) and 
-        update_data.get("payment_received", 0) > 0):
+    # FIXED: Only release table if order status is explicitly set to completed
+    # Don't release table just because payment_received >= total during editing
+    if (order_data.get("status") in ["completed", "paid", "settled"] or
+        (update_data.get("status") in ["completed", "paid", "settled"])):
         table_id = existing_order.get("table_id")
         if table_id and table_id != "counter":
             try:
                 table_manager = get_table_status_manager()
                 result = await table_manager.set_table_available(user_org_id, table_id)
                 if result["success"]:
-                    print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed payment")
+                    print(f"✅ Table {table_id} set to AVAILABLE via TableStatusManager for completed order")
                 else:
                     print(f"⚠️ TableStatusManager failed: {result['message']}")
                     # Fallback to direct update
@@ -6035,7 +6072,7 @@ async def update_order(
                         {"id": table_id, "organization_id": user_org_id},
                         {"$set": {"status": "available", "current_order_id": None}}
                     )
-                    print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
+                    print(f"🍽️ Table freed via fallback for completed order: {table_id}")
             except Exception as e:
                 print(f"⚠️ TableStatusManager error: {e}, using fallback")
                 # Fallback to direct update if TableStatusManager fails

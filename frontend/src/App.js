@@ -576,6 +576,34 @@ function App() {
     
     initAuth();
     
+<<<<<<< Updated upstream
+=======
+    // Fetch pricing data for banners
+    const fetchPricingData = async () => {
+      try {
+        console.log('Fetching pricing data...');
+        const response = await axios.get(`${API}/public/pricing`);
+        console.log('Pricing data received:', response.data);
+        setPricing(response.data);
+      } catch (error) {
+        console.log('Failed to fetch pricing data:', error);
+        // Set fallback pricing to ensure banners can still show
+        setPricing({
+          regular_price: 2999,
+          regular_price_display: '₹2999',
+          campaign_price: 2549,
+          campaign_price_display: '₹2549',
+          campaign_active: true,
+          campaign_name: 'Early Adopter Special - 15% OFF',
+          early_adopter: true,
+          early_adopter_eligible: true,
+          early_adopter_spots_left: 850
+        });
+      }
+    };
+    fetchPricingData();
+    
+>>>>>>> Stashed changes
     // ✅ PERFORMANCE: Initialize optimization modules
     console.log('⚡ Initializing performance optimizations...');
     

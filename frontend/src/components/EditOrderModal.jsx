@@ -254,8 +254,10 @@ const EditOrderModal = ({
       discount_amount: discountAmount,
       payment_method: useSplitPayment ? 'split' : paymentMethod,
       is_credit: useSplitPayment ? creditAmount > 0 : (paymentMethod === 'credit'),
-      payment_received: useSplitPayment ? paidAmount : (paymentMethod === 'credit' ? 0 : total),
-      balance_amount: useSplitPayment ? creditAmount : Math.max(0, total - (paymentMethod === 'credit' ? 0 : total)),
+      // FIXED: Don't automatically set payment_received = total when editing
+      // Only update payment if explicitly using split payment or credit
+      payment_received: useSplitPayment ? paidAmount : (order?.payment_received || 0),
+      balance_amount: useSplitPayment ? creditAmount : (paymentMethod === 'credit' ? total : Math.max(0, total - (order?.payment_received || 0))),
       cash_amount: useSplitPayment ? cashAmount : (paymentMethod === 'cash' ? total : 0),
       card_amount: useSplitPayment ? cardAmount : (paymentMethod === 'card' ? total : 0),
       upi_amount: useSplitPayment ? upiAmount : (paymentMethod === 'upi' ? total : 0),
