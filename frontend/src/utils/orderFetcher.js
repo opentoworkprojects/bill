@@ -392,29 +392,20 @@ export async function fetchTodaysBillsAtomic(apiUrl, options = {}) {
   console.log(`📋 Fetching today's bills atomically from: ${source}`);
   
   try {
-    // Get today's date range
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
-    
-    const params = `?start_date=${todayStart.toISOString()}&end_date=${todayEnd.toISOString()}&status=completed&fresh=true&_t=${Date.now()}`;
+    // Use the dedicated today-bills endpoint with cache busting
     const response = await apiWithRetry({
       method: 'get',
-      url: `${apiUrl}/orders${params}`,
+      url: `${apiUrl}/orders/today-bills?fresh=true&_t=${Date.now()}`,
       timeout: 10000,
       signal
     });
     
     const billsData = Array.isArray(response.data) ? response.data : [];
     
-    // Filter and sort completed orders
+    // Backend already filters for today's completed/paid orders
+    // Just sort by created_at descending (newest first)
     const todaysBills = billsData
-      .filter(order => {
-        if (!order || !order.id) return false;
-        const status = normalizeStatus(order.status);
-        return ['completed', 'paid', 'billed', 'settled'].includes(status);
-      })
+      .filter(order => order && order.id) // Basic validation
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
     console.log(`📋 Found ${todaysBills.length} bills for today from: ${source}`);
