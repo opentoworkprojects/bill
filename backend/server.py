@@ -5540,28 +5540,35 @@ async def get_todays_bills(current_user: dict = Depends(get_current_user)):
         
         try:
             # Query for today's COMPLETED orders ONLY
+            # FIXED: Use datetime object for comparison, not ISO string
             query = {
                 "organization_id": user_org_id,
-                "created_at": {"$gte": today_utc.isoformat()},
+                "created_at": {"$gte": today_utc},  # Use datetime object, not isoformat()
                 "status": {"$in": ["completed", "paid"]}  # ONLY completed or paid orders
             }
             
             orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
             
-            # Convert datetime objects for consistency
+            # Convert datetime objects to ISO strings for JSON serialization
             for order in orders:
-                if isinstance(order.get("created_at"), str):
+                if isinstance(order.get("created_at"), datetime):
+                    order["created_at"] = order["created_at"].isoformat()
+                elif isinstance(order.get("created_at"), str):
+                    # Already a string, ensure it's valid
                     try:
-                        order["created_at"] = datetime.fromisoformat(order["created_at"])
+                        datetime.fromisoformat(order["created_at"])
                     except:
-                        pass
-                if isinstance(order.get("updated_at"), str):
+                        order["created_at"] = datetime.now(timezone.utc).isoformat()
+                        
+                if isinstance(order.get("updated_at"), datetime):
+                    order["updated_at"] = order["updated_at"].isoformat()
+                elif isinstance(order.get("updated_at"), str):
                     try:
-                        order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+                        datetime.fromisoformat(order["updated_at"])
                     except:
-                        pass
+                        order["updated_at"] = datetime.now(timezone.utc).isoformat()
             
-            print(f"📊 Found {len(orders)} today's bills for org {user_org_id}")
+            print(f"✅ Found {len(orders)} today's bills for org {user_org_id}")
             return orders
             
         except Exception as db_error:

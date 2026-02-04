@@ -22,6 +22,13 @@ import {
 // 🔧 DUPLICATE FIX: Import new polling manager and atomic fetcher
 import orderPollingManager from '../utils/orderPollingManager';
 import { fetchOrdersAtomic, fetchTodaysBillsAtomic } from '../utils/orderFetcher';
+// 🚀 INSTANT ACTIVE ORDERS: Import new sync and cache systems
+import activeOrdersSync from '../utils/activeOrdersSync';
+import activeOrdersCache from '../utils/activeOrdersCache';
+// 📊 PERFORMANCE MONITORING: Import performance monitoring systems
+import performanceMonitor from '../utils/performanceMonitor';
+import performanceAlertSystem from '../utils/performanceAlertSystem';
+// import PerformanceDashboard from '../components/PerformanceDashboard'; // DISABLED FOR PRODUCTION
 
 // Enhanced sound effects for better UX
 const playSound = (type) => {
@@ -143,6 +150,12 @@ const OrdersPage = ({ user }) => {
   const [lastOrdersUpdate, setLastOrdersUpdate] = useState(0);
   const [isUpdatingOrders, setIsUpdatingOrders] = useState(false);
   const dataLoadedRef = useRef(false);
+
+  // 📊 PERFORMANCE MONITORING: Performance dashboard state (hidden by default)
+  const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(() => {
+    // Only show if explicitly enabled in localStorage - NOT shown by default
+    return localStorage.getItem('showPerformanceDashboard') === 'true';
+  });
 
   // Get unique categories from menu items
   const categories = ['all', ...new Set(menuItems.map(item => item.category).filter(Boolean))];
@@ -500,6 +513,95 @@ const OrdersPage = ({ user }) => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [activeTab, paymentProtectionActive]);
+
+  // 🚀 INSTANT ACTIVE ORDERS: Event listeners for real-time updates
+  useEffect(() => {
+    console.log('🎧 Setting up active orders event listeners');
+    
+    // Listen for new active orders
+    const handleActiveOrderAdded = (event) => {
+      const { order, source } = event.detail;
+      console.log('🎯 Active order added event received:', order.id, 'from', source);
+      
+      // Order should already be in state from handleSubmitOrder, but ensure it's there
+      setOrders(prevOrders => {
+        const exists = prevOrders.some(o => o.id === order.id);
+        if (!exists) {
+          console.log('🚀 Adding missing order to active orders:', order.id);
+          return [order, ...prevOrders];
+        }
+        return prevOrders;
+      });
+    };
+    
+    // Listen for active orders updates
+    const handleActiveOrdersUpdated = (event) => {
+      const { orders, source } = event.detail;
+      console.log('🔄 Active orders updated event received:', orders.length, 'orders from', source);
+      
+      // Update orders if source is reliable
+      if (source === 'server-sync' || source === 'cache-sync') {
+        setOrders(orders);
+      }
+    };
+    
+    // Listen for refresh requests
+    const handleActiveOrdersRefreshRequested = (event) => {
+      const { reason } = event.detail;
+      console.log('🔄 Active orders refresh requested:', reason);
+      
+      // Trigger immediate refresh if not in payment protection mode
+      if (!paymentProtectionActive) {
+        fetchOrders(true);
+      }
+    };
+    
+    // Add event listeners
+    window.addEventListener('activeOrderAdded', handleActiveOrderAdded);
+    window.addEventListener('activeOrdersUpdated', handleActiveOrdersUpdated);
+    window.addEventListener('activeOrdersRefreshRequested', handleActiveOrdersRefreshRequested);
+    
+    // Subscribe to ActiveOrdersSync for direct updates
+    const unsubscribeSync = activeOrdersSync.addEventListener((event) => {
+      console.log('🔔 ActiveOrdersSync event:', event.type, event);
+      
+      if (event.type === 'new-order') {
+        // Ensure order is in active orders list
+        setOrders(prevOrders => {
+          const exists = prevOrders.some(o => o.id === event.order.id);
+          if (!exists) {
+            console.log('🚀 Adding order from sync event:', event.order.id);
+            return [event.order, ...prevOrders];
+          }
+          return prevOrders;
+        });
+      }
+    });
+    
+    // Subscribe to ActiveOrdersCache for cache updates
+    const unsubscribeCache = activeOrdersCache.subscribe((cachedOrders, eventType, data) => {
+      console.log('💾 ActiveOrdersCache event:', eventType, cachedOrders.length, 'orders');
+      
+      if (eventType === 'cache-synced' && cachedOrders.length > 0) {
+        // Update orders from cache if we have fresh data
+        setOrders(cachedOrders);
+      }
+    });
+    
+    console.log('✅ Active orders event listeners set up');
+    
+    // Cleanup function
+    return () => {
+      console.log('🧹 Cleaning up active orders event listeners');
+      
+      window.removeEventListener('activeOrderAdded', handleActiveOrderAdded);
+      window.removeEventListener('activeOrdersUpdated', handleActiveOrdersUpdated);
+      window.removeEventListener('activeOrdersRefreshRequested', handleActiveOrdersRefreshRequested);
+      
+      unsubscribeSync();
+      unsubscribeCache();
+    };
+  }, [paymentProtectionActive]);
 
   // REMOVED: Aggressive mouse movement refresh that was causing flickering
   // The coordinated polling system handles regular updates without user interaction triggers
@@ -920,6 +1022,13 @@ const OrdersPage = ({ user }) => {
       return;
     }
 
+    // 📊 PERFORMANCE MONITORING: Start timing order creation to display
+    const completeOrderDisplayTiming = performanceMonitor.startTiming('order-creation', {
+      itemCount: selectedItems.length,
+      tableId: formData.table_id,
+      hasCustomerInfo: !!(formData.customer_name || formData.customer_phone)
+    });
+
     setIsCreatingOrder(true);
 
     try {
@@ -953,15 +1062,40 @@ const OrdersPage = ({ user }) => {
         timeout: 12000 // Longer timeout for order creation
       });
 
-      // SIMPLIFIED: Just add the server order directly to the list
+      // INSTANT ACTIVE ORDERS: Add to active orders immediately
+      const newOrder = { 
+        ...response.data, 
+        created_at: response.data.created_at || new Date().toISOString() 
+      };
+      
+      console.log('✅ Order created successfully:', newOrder.id);
+      
+      // 1. Add to active orders state immediately
       setOrders(prevOrders => {
-        const newOrder = { 
-          ...response.data, 
-          created_at: response.data.created_at || new Date().toISOString() 
-        };
-        console.log('✅ Order created successfully, adding to list:', newOrder.id);
+        console.log('🚀 INSTANT: Adding new order to active orders list');
+        
+        // 📊 PERFORMANCE MONITORING: Complete timing when order appears in UI
+        const displayTime = completeOrderDisplayTiming({
+          orderId: newOrder.id,
+          fromCache: false,
+          serverResponseTime: Date.now() - now
+        });
+        
+        console.log(`📊 Order creation to display time: ${displayTime.toFixed(2)}ms`);
+        
         return [newOrder, ...prevOrders];
       });
+      
+      // 2. Notify ActiveOrdersSync for immediate propagation
+      activeOrdersSync.notifyNewOrder(newOrder);
+      
+      // 3. Add to ActiveOrdersCache for fast future access
+      activeOrdersCache.addActiveOrder(newOrder);
+      
+      // 4. Broadcast window event for cross-component communication
+      window.dispatchEvent(new CustomEvent('activeOrderAdded', {
+        detail: { order: newOrder, source: 'order-creation' }
+      }));
       
       // Success feedback
       toast.success('✅ Order created successfully!');
@@ -1006,6 +1140,12 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Order creation failed:', error);
       
+      // 📊 PERFORMANCE MONITORING: Record error
+      completeOrderDisplayTiming({
+        error: error.message,
+        errorType: 'order-creation-failed'
+      });
+      
       // Remove optimistic order on failure
       setOrders(prevOrders => prevOrders.filter(order => order.id !== `temp_${now}`));
       
@@ -1021,6 +1161,13 @@ const OrdersPage = ({ user }) => {
     setSelectedItems([]);
     setMenuSearch('');
     setActiveCategory('all');
+  };
+
+  // 📊 PERFORMANCE MONITORING: Toggle performance dashboard
+  const togglePerformanceDashboard = () => {
+    const newValue = !showPerformanceDashboard;
+    setShowPerformanceDashboard(newValue);
+    localStorage.setItem('showPerformanceDashboard', newValue.toString());
   };
 
   const handleStatusChangeWithTracking = (orderId, status) => {
@@ -2952,6 +3099,12 @@ const OrdersPage = ({ user }) => {
           </div>
         )}
       </div>
+      
+      {/* 📊 PERFORMANCE MONITORING: Performance Dashboard - DISABLED FOR PRODUCTION */}
+      {/* <PerformanceDashboard 
+        isVisible={showPerformanceDashboard}
+        onToggle={togglePerformanceDashboard}
+      /> */}
     </Layout>
   );
 };

@@ -1,325 +1,470 @@
 /**
  * Performance Dashboard Component
- * Real-time monitoring dashboard for fast order creation optimization
- * Requirements: 11.4 - Provide real-time dashboards showing system performance metrics
+ * 
+ * This component provides a real-time dashboard for monitoring active orders
+ * display performance, cache efficiency, and system health metrics.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { performanceMonitor } from '../utils/performanceMonitor';
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { 
+  Activity, 
+  Clock, 
+  Database, 
+  AlertTriangle, 
+  CheckCircle, 
+  TrendingUp, 
+  TrendingDown, 
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Settings,
+  Download
+} from 'lucide-react';
+import performanceMonitor from '../utils/performanceMonitor';
+import activeOrdersCache from '../utils/activeOrdersCache';
+import performanceAlertSystem from '../utils/performanceAlertSystem';
 
-const PerformanceDashboard = ({ isVisible = false, onClose }) => {
-  const [dashboardData, setDashboardData] = useState(null);
+const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
+  const [performanceStats, setPerformanceStats] = useState(null);
+  const [cacheStats, setCacheStats] = useState(null);
+  const [alertStats, setAlertStats] = useState(null);
+  const [recentAlerts, setRecentAlerts] = useState([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(5000); // 5 seconds
-  const [selectedTimeRange, setSelectedTimeRange] = useState('1h');
-  const [alertsEnabled, setAlertsEnabled] = useState(true);
+  const intervalRef = useRef(null);
 
-  // Refresh dashboard data
-  const refreshData = useCallback(() => {
-    const data = performanceMonitor.getDashboardData();
-    setDashboardData(data);
+  // Load initial data and set up auto-refresh
+  useEffect(() => {
+    loadPerformanceData();
+    
+    if (autoRefresh) {
+      intervalRef.current = setInterval(loadPerformanceData, refreshInterval);
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [autoRefresh, refreshInterval]);
+
+  // Listen for real-time alerts
+  useEffect(() => {
+    const handleAlert = (event) => {
+      const alert = event.detail;
+      setRecentAlerts(prev => [alert, ...prev.slice(0, 9)]); // Keep last 10 alerts
+      
+      // Refresh stats when new alert comes in
+      loadPerformanceData();
+    };
+
+    window.addEventListener('performanceAlertSystemAlert', handleAlert);
+    
+    return () => {
+      window.removeEventListener('performanceAlertSystemAlert', handleAlert);
+    };
   }, []);
 
-  // Set up auto-refresh
-  useEffect(() => {
-    if (!isVisible) return;
-
-    refreshData();
-    const interval = setInterval(refreshData, refreshInterval);
-    return () => clearInterval(interval);
-  }, [isVisible, refreshInterval, refreshData]);
-
-  // Set up alert monitoring
-  useEffect(() => {
-    if (!alertsEnabled) return;
-
-    const unsubscribe = performanceMonitor.onThresholdViolation((violation) => {
-      // Show browser notification for critical violations
-      if (violation.severity === 'critical' && 'Notification' in window) {
-        if (Notification.permission === 'granted') {
-          new Notification('Performance Alert', {
-            body: `Critical performance issue: ${violation.operationType} took ${violation.duration}ms (threshold: ${violation.threshold}ms)`,
-            icon: '/favicon.ico'
-          });
-        }
-      }
-    });
-
-    return unsubscribe;
-  }, [alertsEnabled]);
-
-  // Request notification permission
-  const requestNotificationPermission = async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      await Notification.requestPermission();
+  /**
+   * Load performance data from all monitoring systems
+   */
+  const loadPerformanceData = async () => {
+    try {
+      // Get performance stats
+      const perfStats = performanceMonitor.getStats();
+      const perfReport = performanceMonitor.generateReport();
+      
+      // Get cache stats
+      const cachePerf = activeOrdersCache.getPerformanceStats();
+      
+      // Get alert system status
+      const alertStatus = performanceAlertSystem.getStatus();
+      const alerts = performanceAlertSystem.getAlertHistory({ timeRange: 3600000 }); // Last hour
+      
+      setPerformanceStats({
+        ...perfStats,
+        report: perfReport,
+        trends: performanceMonitor.analyzeTrends()
+      });
+      
+      setCacheStats(cachePerf);
+      setAlertStats(alertStatus);
+      setRecentAlerts(alerts.slice(0, 10)); // Keep last 10 alerts
+      
+    } catch (error) {
+      console.error('Failed to load performance data:', error);
     }
   };
 
-  if (!isVisible || !dashboardData) {
-    return null;
+  /**
+   * Manual refresh
+   */
+  const handleManualRefresh = () => {
+    loadPerformanceData();
+  };
+
+  /**
+   * Toggle auto-refresh
+   */
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+  };
+
+  /**
+   * Export performance report
+   */
+  const exportReport = () => {
+    if (!performanceStats) return;
+    
+    const report = {
+      timestamp: new Date().toISOString(),
+      performance: performanceStats.report,
+      cache: cacheStats,
+      alerts: alertStats,
+      recentAlerts: recentAlerts
+    };
+    
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `performance-report-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Get performance status color
+   */
+  const getPerformanceStatus = () => {
+    if (!performanceStats) return { color: 'gray', text: 'Loading...' };
+    
+    const avgTime = performanceStats.averageDisplayTime;
+    
+    if (avgTime <= 100) {
+      return { color: 'green', text: 'Excellent' };
+    } else if (avgTime <= 150) {
+      return { color: 'yellow', text: 'Good' };
+    } else if (avgTime <= 500) {
+      return { color: 'orange', text: 'Warning' };
+    } else {
+      return { color: 'red', text: 'Critical' };
+    }
+  };
+
+  /**
+   * Get cache status color
+   */
+  const getCacheStatus = () => {
+    if (!cacheStats) return { color: 'gray', text: 'Loading...' };
+    
+    const hitRate = cacheStats.hitRate;
+    
+    if (hitRate >= 90) {
+      return { color: 'green', text: 'Excellent' };
+    } else if (hitRate >= 70) {
+      return { color: 'yellow', text: 'Good' };
+    } else if (hitRate >= 50) {
+      return { color: 'orange', text: 'Warning' };
+    } else {
+      return { color: 'red', text: 'Critical' };
+    }
+  };
+
+  /**
+   * Format time in milliseconds
+   */
+  const formatTime = (ms) => {
+    if (ms < 1) return `${(ms * 1000).toFixed(0)}μs`;
+    if (ms < 1000) return `${ms.toFixed(1)}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+  };
+
+  /**
+   * Format percentage
+   */
+  const formatPercentage = (value) => {
+    return `${value.toFixed(1)}%`;
+  };
+
+  /**
+   * Get alert severity badge
+   */
+  const getAlertBadge = (severity) => {
+    const variants = {
+      critical: 'destructive',
+      warning: 'secondary',
+      info: 'outline'
+    };
+    
+    return <Badge variant={variants[severity] || 'outline'}>{severity}</Badge>;
+  };
+
+  if (!isVisible) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          onClick={onToggle}
+          variant="outline"
+          size="sm"
+          className="bg-white shadow-lg"
+        >
+          <Activity className="h-4 w-4 mr-2" />
+          Performance
+        </Button>
+      </div>
+    );
   }
 
-  const { summary, operationStats, recentViolations, responseTimeHistory, webVitals } = dashboardData;
+  const perfStatus = getPerformanceStatus();
+  const cacheStatus = getCacheStatus();
 
   return (
-    <div className="performance-dashboard-overlay">
-      <div className="performance-dashboard">
-        <div className="dashboard-header">
-          <h2>🚀 Performance Dashboard</h2>
-          <div className="dashboard-controls">
-            <select 
-              value={refreshInterval} 
-              onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              className="refresh-select"
-            >
-              <option value={1000}>1s refresh</option>
-              <option value={5000}>5s refresh</option>
-              <option value={10000}>10s refresh</option>
-              <option value={30000}>30s refresh</option>
-            </select>
-            <button 
-              onClick={requestNotificationPermission}
-              className="notification-btn"
-              title="Enable notifications for critical alerts"
-            >
-              🔔
-            </button>
-            <button onClick={onClose} className="close-btn">✕</button>
-          </div>
-        </div>
-
-        <div className="dashboard-content">
-          {/* Summary Cards */}
-          <div className="summary-cards">
-            <div className="summary-card">
-              <div className="card-header">
-                <span className="card-title">System Health</span>
-                <span className={`health-score ${getHealthScoreClass(summary.overallHealthScore)}`}>
-                  {summary.overallHealthScore}%
-                </span>
-              </div>
-              <div className="card-content">
-                <div className="metric">
-                  <span>Operations (1h):</span>
-                  <span>{summary.totalOperations}</span>
-                </div>
-                <div className="metric">
-                  <span>Avg Response:</span>
-                  <span>{summary.averageResponseTime}ms</span>
-                </div>
-                <div className="metric">
-                  <span>Violations:</span>
-                  <span className={summary.thresholdViolations > 0 ? 'text-warning' : 'text-success'}>
-                    {summary.thresholdViolations}
-                  </span>
-                </div>
-              </div>
+    <div className="fixed bottom-4 right-4 z-50 max-w-md">
+      <Card className="bg-white shadow-xl border-2">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Activity className="h-4 w-4 mr-2" />
+              Performance Monitor
+            </CardTitle>
+            <div className="flex items-center space-x-1">
+              <Button
+                onClick={toggleAutoRefresh}
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+              >
+                {autoRefresh ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+              </Button>
+              <Button
+                onClick={handleManualRefresh}
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+              >
+                <RefreshCw className="h-3 w-3" />
+              </Button>
+              <Button
+                onClick={() => setIsExpanded(!isExpanded)}
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+              >
+                {isExpanded ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              </Button>
+              <Button
+                onClick={onToggle}
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+              >
+                ×
+              </Button>
             </div>
-
-            {/* Web Vitals Card */}
-            <div className="summary-card">
-              <div className="card-header">
-                <span className="card-title">Core Web Vitals</span>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="pt-0">
+          {/* Quick Status Overview */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="text-center">
+              <div className={`text-xs font-medium text-${perfStatus.color}-600`}>
+                Display Time
               </div>
-              <div className="card-content">
-                {webVitals.web_vital_lcp && (
-                  <div className="metric">
-                    <span>LCP:</span>
-                    <span className={webVitals.web_vital_lcp.current > 2500 ? 'text-warning' : 'text-success'}>
-                      {Math.round(webVitals.web_vital_lcp.current)}ms
-                    </span>
-                  </div>
-                )}
-                {webVitals.web_vital_fid && (
-                  <div className="metric">
-                    <span>FID:</span>
-                    <span className={webVitals.web_vital_fid.current > 100 ? 'text-warning' : 'text-success'}>
-                      {Math.round(webVitals.web_vital_fid.current)}ms
-                    </span>
-                  </div>
-                )}
-                {webVitals.web_vital_cls && (
-                  <div className="metric">
-                    <span>CLS:</span>
-                    <span className={webVitals.web_vital_cls.current > 100 ? 'text-warning' : 'text-success'}>
-                      {(webVitals.web_vital_cls.current / 1000).toFixed(3)}
-                    </span>
-                  </div>
-                )}
+              <div className="text-lg font-bold">
+                {performanceStats ? formatTime(performanceStats.averageDisplayTime) : '--'}
               </div>
+              <Badge variant={perfStatus.color === 'green' ? 'default' : 'secondary'} className="text-xs">
+                {perfStatus.text}
+              </Badge>
+            </div>
+            
+            <div className="text-center">
+              <div className={`text-xs font-medium text-${cacheStatus.color}-600`}>
+                Cache Hit Rate
+              </div>
+              <div className="text-lg font-bold">
+                {cacheStats ? formatPercentage(cacheStats.hitRate) : '--'}
+              </div>
+              <Badge variant={cacheStatus.color === 'green' ? 'default' : 'secondary'} className="text-xs">
+                {cacheStatus.text}
+              </Badge>
             </div>
           </div>
 
-          {/* Operation Statistics */}
-          <div className="operations-section">
-            <h3>Operation Performance</h3>
-            <div className="operations-grid">
-              {Object.entries(operationStats).map(([operation, stats]) => (
-                <div key={operation} className="operation-card">
-                  <div className="operation-header">
-                    <span className="operation-name">{formatOperationName(operation)}</span>
-                    <span className={`trend-indicator ${getTrendClass(stats.recentTrend)}`}>
-                      {getTrendIcon(stats.recentTrend)}
-                    </span>
-                  </div>
-                  <div className="operation-stats">
-                    <div className="stat">
-                      <span>Avg:</span>
-                      <span className={stats.averageDuration > stats.threshold ? 'text-warning' : 'text-success'}>
-                        {stats.averageDuration}ms
-                      </span>
-                    </div>
-                    <div className="stat">
-                      <span>P95:</span>
-                      <span>{Math.round(stats.p95Duration)}ms</span>
-                    </div>
-                    <div className="stat">
-                      <span>Success:</span>
-                      <span className={stats.successRate < 95 ? 'text-warning' : 'text-success'}>
-                        {stats.successRate}%
-                      </span>
-                    </div>
-                    <div className="stat">
-                      <span>Count:</span>
-                      <span>{stats.count}</span>
-                    </div>
-                  </div>
-                  <div className="threshold-bar">
-                    <div 
-                      className="threshold-fill"
-                      style={{ 
-                        width: `${Math.min((stats.averageDuration / stats.threshold) * 100, 100)}%`,
-                        backgroundColor: stats.averageDuration > stats.threshold ? '#ff6b6b' : '#51cf66'
-                      }}
-                    />
-                    <span className="threshold-label">{stats.threshold}ms threshold</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Violations */}
-          {recentViolations.length > 0 && (
-            <div className="violations-section">
-              <h3>Recent Performance Violations</h3>
-              <div className="violations-list">
-                {recentViolations.map((violation, index) => (
-                  <div key={index} className={`violation-item severity-${violation.severity}`}>
-                    <div className="violation-header">
-                      <span className="violation-operation">{formatOperationName(violation.operationType)}</span>
-                      <span className="violation-time">{formatTime(violation.violationTimestamp)}</span>
-                    </div>
-                    <div className="violation-details">
-                      <span>Duration: {violation.duration}ms (threshold: {violation.threshold}ms)</span>
-                      <span className={`severity-badge severity-${violation.severity}`}>
-                        {violation.severity.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+          {/* Alert Summary */}
+          {alertStats && (
+            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                <span className="text-xs font-medium">Alerts (1h)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                {alertStats.criticalAlerts > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {alertStats.criticalAlerts} Critical
+                  </Badge>
+                )}
+                <Badge variant="outline" className="text-xs">
+                  {alertStats.recentAlerts} Total
+                </Badge>
               </div>
             </div>
           )}
 
-          {/* Response Time Chart */}
-          <div className="chart-section">
-            <h3>Response Time History</h3>
-            <div className="chart-container">
-              <ResponseTimeChart data={responseTimeHistory} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Simple response time chart component
-const ResponseTimeChart = ({ data }) => {
-  if (!data || data.length === 0) {
-    return <div className="chart-placeholder">No data available</div>;
-  }
-
-  const maxDuration = Math.max(...data.map(d => d.duration));
-  const chartHeight = 200;
-
-  return (
-    <div className="response-time-chart">
-      <svg width="100%" height={chartHeight} className="chart-svg">
-        {data.map((point, index) => {
-          const x = (index / (data.length - 1)) * 100;
-          const y = chartHeight - (point.duration / maxDuration) * (chartHeight - 20);
-          const isViolation = point.duration > point.threshold;
-          
-          return (
-            <g key={index}>
-              <circle
-                cx={`${x}%`}
-                cy={y}
-                r="3"
-                fill={isViolation ? '#ff6b6b' : '#51cf66'}
-                className="chart-point"
-              />
-              {index > 0 && (
-                <line
-                  x1={`${((index - 1) / (data.length - 1)) * 100}%`}
-                  y1={chartHeight - (data[index - 1].duration / maxDuration) * (chartHeight - 20)}
-                  x2={`${x}%`}
-                  y2={y}
-                  stroke="#666"
-                  strokeWidth="1"
-                />
+          {/* Expanded Details */}
+          {isExpanded && (
+            <div className="space-y-3">
+              {/* Performance Details */}
+              {performanceStats && (
+                <div>
+                  <h4 className="text-xs font-semibold mb-2 flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Performance Details
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-600">Median:</span>
+                      <span className="ml-1 font-medium">{formatTime(performanceStats.medianDisplayTime)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">95th %:</span>
+                      <span className="ml-1 font-medium">{formatTime(performanceStats.percentile95)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Operations:</span>
+                      <span className="ml-1 font-medium">{performanceStats.totalOperations}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Errors:</span>
+                      <span className="ml-1 font-medium">{formatPercentage(performanceStats.errorRate)}</span>
+                    </div>
+                  </div>
+                </div>
               )}
-            </g>
-          );
-        })}
-      </svg>
-      <div className="chart-legend">
-        <span className="legend-item">
-          <span className="legend-dot success"></span>
-          Within Threshold
-        </span>
-        <span className="legend-item">
-          <span className="legend-dot warning"></span>
-          Threshold Violation
-        </span>
-      </div>
+
+              {/* Cache Details */}
+              {cacheStats && (
+                <div>
+                  <h4 className="text-xs font-semibold mb-2 flex items-center">
+                    <Database className="h-3 w-3 mr-1" />
+                    Cache Performance
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-600">Hits:</span>
+                      <span className="ml-1 font-medium">{cacheStats.operationCounts.hits}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Misses:</span>
+                      <span className="ml-1 font-medium">{cacheStats.operationCounts.misses}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Avg Hit:</span>
+                      <span className="ml-1 font-medium">{formatTime(cacheStats.averageTimes.hit)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Cache Size:</span>
+                      <span className="ml-1 font-medium">{cacheStats.cacheSize}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Performance Trends */}
+              {performanceStats?.trends && (
+                <div>
+                  <h4 className="text-xs font-semibold mb-2 flex items-center">
+                    {performanceStats.trends.trend === 'improving' ? (
+                      <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
+                    ) : performanceStats.trends.trend === 'degrading' ? (
+                      <TrendingDown className="h-3 w-3 mr-1 text-red-500" />
+                    ) : (
+                      <Activity className="h-3 w-3 mr-1 text-gray-500" />
+                    )}
+                    Trend Analysis
+                  </h4>
+                  <div className="text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <Badge 
+                        variant={
+                          performanceStats.trends.trend === 'improving' ? 'default' :
+                          performanceStats.trends.trend === 'degrading' ? 'destructive' : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {performanceStats.trends.trend}
+                      </Badge>
+                    </div>
+                    {performanceStats.trends.percentageChange && (
+                      <div className="flex justify-between mt-1">
+                        <span className="text-gray-600">Change:</span>
+                        <span className={`font-medium ${
+                          performanceStats.trends.percentageChange > 0 ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {performanceStats.trends.percentageChange > 0 ? '+' : ''}
+                          {performanceStats.trends.percentageChange.toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Alerts */}
+              {recentAlerts.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold mb-2 flex items-center">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Recent Alerts
+                  </h4>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {recentAlerts.slice(0, 5).map((alert) => (
+                      <div key={alert.id} className="flex items-center justify-between p-1 bg-gray-50 rounded text-xs">
+                        <div className="flex-1 truncate">
+                          <div className="font-medium truncate">{alert.type}</div>
+                          <div className="text-gray-600 truncate">{alert.message}</div>
+                        </div>
+                        <div className="ml-2">
+                          {getAlertBadge(alert.severity)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center space-x-1">
+                  <Button
+                    onClick={exportReport}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-6"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Export
+                  </Button>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {autoRefresh ? `Auto-refresh: ${refreshInterval / 1000}s` : 'Manual refresh'}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-};
-
-// Helper functions
-const getHealthScoreClass = (score) => {
-  if (score >= 95) return 'excellent';
-  if (score >= 85) return 'good';
-  if (score >= 70) return 'fair';
-  return 'poor';
-};
-
-const getTrendClass = (trend) => {
-  switch (trend) {
-    case 'improving': return 'trend-improving';
-    case 'degrading': return 'trend-degrading';
-    default: return 'trend-stable';
-  }
-};
-
-const getTrendIcon = (trend) => {
-  switch (trend) {
-    case 'improving': return '📈';
-    case 'degrading': return '📉';
-    default: return '➡️';
-  }
-};
-
-const formatOperationName = (operation) => {
-  return operation
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase());
-};
-
-const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleTimeString();
 };
 
 export default PerformanceDashboard;

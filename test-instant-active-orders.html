@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Instant Active Orders</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .metrics {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Instant Active Orders Test</h1>
+        <p>This page tests the instant active orders functionality without requiring the full React app.</p>
+        
+        <div class="test-section info">
+            <h3>📊 System Status</h3>
+            <div id="status">Initializing...</div>
+            <button onclick="checkStatus()">Check Status</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test Actions</h3>
+            <button onclick="testNewOrder()">Simulate New Order</button>
+            <button onclick="testOrderUpdate()">Simulate Order Update</button>
+            <button onclick="testCacheSync()">Test Cache Sync</button>
+            <button onclick="testEventSystem()">Test Event System</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📈 Performance Metrics</h3>
+            <div id="metrics" class="metrics">No metrics available</div>
+            <button onclick="updateMetrics()">Update Metrics</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📝 Event Log</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Mock the utilities for testing
+        class MockActiveOrdersSync {
+            constructor() {
+                this.listeners = new Set();
+                this.metrics = {
+                    notificationsCount: 0,
+                    averageProcessingTime: 0,
+                    lastNotificationTime: 0,
+                    errorCount: 0
+                };
+                this.log('MockActiveOrdersSync initialized');
+            }
+            
+            log(message, data = null) {
+                const timestamp = new Date().toISOString();
+                const logEntry = `[ActiveOrdersSync ${timestamp}] ${message}`;
+                console.log(logEntry, data || '');
+                addToLog(logEntry + (data ? ' ' + JSON.stringify(data) : ''));
+            }
+            
+            addEventListener(listener) {
+                this.listeners.add(listener);
+                this.log(`Event listener added. Total listeners: ${this.listeners.size}`);
+                return () => this.removeEventListener(listener);
+            }
+            
+            removeEventListener(listener) {
+                const removed = this.listeners.delete(listener);
+                if (removed) {
+                    this.log(`Event listener removed. Total listeners: ${this.listeners.size}`);
+                }
+                return removed;
+            }
+            
+            notifyNewOrder(order) {
+                const startTime = Date.now();
+                this.log(`Notifying new order: ${order.id}`, { 
+                    status: order.status, 
+                    total: order.total 
+                });
+                
+                const event = {
+                    type: 'new-order',
+                    order,
+                    timestamp: startTime,
+                    source: 'order-creation'
+                };
+                
+                // Notify listeners
+                this.listeners.forEach(listener => {
+                    try {
+                        listener(event);
+                    } catch (error) {
+                        this.log('Listener error', error);
+                    }
+                });
+                
+                this.metrics.notificationsCount++;
+                this.metrics.lastNotificationTime = startTime;
+                
+                // Broadcast window event
+                window.dispatchEvent(new CustomEvent('activeOrderAdded', {
+                    detail: { order, source: 'order-creation' }
+                }));
+            }
+            
+            getMetrics() {
+                return {
+                    ...this.metrics,
+                    listenersCount: this.listeners.size
+                };
+            }
+        }
+        
+        class MockActiveOrdersCache {
+            constructor() {
+                this.cache = new Map();
+                this.subscribers = new Set();
+                this.metrics = {
+                    hits: 0,
+                    misses: 0,
+                    adds: 0,
+                    removes: 0
+                };
+                this.log('MockActiveOrdersCache initialized');
+            }
+            
+            log(message, data = null) {
+                const timestamp = new Date().toISOString();
+                const logEntry = `[ActiveOrdersCache ${timestamp}] ${message}`;
+                console.log(logEntry, data || '');
+                addToLog(logEntry + (data ? ' ' + JSON.stringify(data) : ''));
+            }
+            
+            subscribe(callback) {
+                this.subscribers.add(callback);
+                this.log(`Subscriber added. Total: ${this.subscribers.size}`);
+                
+                // Immediately call with current data
+                try {
+                    callback(this.getActiveOrders(), 'initial');
+                } catch (error) {
+                    this.log('Error in initial subscriber callback', error);
+                }
+                
+                return () => this.unsubscribe(callback);
+            }
+            
+            unsubscribe(callback) {
+                const removed = this.subscribers.delete(callback);
+                if (removed) {
+                    this.log(`Subscriber removed. Total: ${this.subscribers.size}`);
+                }
+                return removed;
+            }
+            
+            addActiveOrder(order) {
+                if (!order || !order.id) return false;
+                
+                this.cache.set(order.id, {
+                    ...order,
+                    _cached_at: Date.now(),
+                    _cache_source: 'add-active-order'
+                });
+                
+                this.metrics.adds++;
+                this.log(`Order ${order.id} added to cache`, {
+                    cacheSize: this.cache.size
+                });
+                
+                this.notifySubscribers('order-added', order);
+                return true;
+            }
+            
+            getActiveOrders() {
+                const orders = Array.from(this.cache.values())
+                    .filter(order => ['pending', 'preparing', 'ready'].includes(order.status))
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                this.metrics.hits++;
+                return orders;
+            }
+            
+            notifySubscribers(eventType, data) {
+                this.subscribers.forEach(callback => {
+                    try {
+                        callback(this.getActiveOrders(), eventType, data);
+                    } catch (error) {
+                        this.log(`Subscriber callback error for ${eventType}`, error);
+                    }
+                });
+            }
+            
+            getStats() {
+                return {
+                    ...this.metrics,
+                    cacheSize: this.cache.size,
+                    subscribersCount: this.subscribers.size
+                };
+            }
+        }
+        
+        // Initialize mock systems
+        window.activeOrdersSync = new MockActiveOrdersSync();
+        window.activeOrdersCache = new MockActiveOrdersCache();
+        
+        // Logging function
+        function addToLog(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Test functions
+        window.checkStatus = function() {
+            const syncMetrics = activeOrdersSync.getMetrics();
+            const cacheStats = activeOrdersCache.getStats();
+            
+            const status = `
+                ActiveOrdersSync: ${syncMetrics.listenersCount} listeners, ${syncMetrics.notificationsCount} notifications
+                ActiveOrdersCache: ${cacheStats.cacheSize} cached orders, ${cacheStats.subscribersCount} subscribers
+                System Status: ✅ Ready
+            `;
+            
+            document.getElementById('status').innerHTML = status.replace(/\n/g, '<br>');
+            addToLog('Status check completed');
+        };
+        
+        window.testNewOrder = function() {
+            const orderId = 'test_' + Date.now();
+            const order = {
+                id: orderId,
+                status: 'pending',
+                total: 25.99,
+                customer_name: 'Test Customer',
+                items: [{ name: 'Test Item', quantity: 1, price: 25.99 }],
+                created_at: new Date().toISOString()
+            };
+            
+            addToLog(`🧪 Testing new order: ${orderId}`);
+            
+            // Measure performance
+            const startTime = Date.now();
+            
+            // Simulate order creation flow
+            activeOrdersCache.addActiveOrder(order);
+            activeOrdersSync.notifyNewOrder(order);
+            
+            const endTime = Date.now();
+            const processingTime = endTime - startTime;
+            
+            addToLog(`✅ New order test completed in ${processingTime}ms`);
+            
+            if (processingTime < 100) {
+                addToLog(`🎉 SUCCESS: Processing time (${processingTime}ms) is under 100ms target!`);
+            } else {
+                addToLog(`⚠️ WARNING: Processing time (${processingTime}ms) exceeds 100ms target`);
+            }
+        };
+        
+        window.testOrderUpdate = function() {
+            const orders = activeOrdersCache.getActiveOrders();
+            if (orders.length === 0) {
+                addToLog('❌ No orders to update. Create an order first.');
+                return;
+            }
+            
+            const order = orders[0];
+            const updatedOrder = {
+                ...order,
+                status: 'preparing',
+                updated_at: new Date().toISOString()
+            };
+            
+            addToLog(`🧪 Testing order update: ${order.id} -> preparing`);
+            
+            const startTime = Date.now();
+            activeOrdersCache.addActiveOrder(updatedOrder);
+            const endTime = Date.now();
+            
+            addToLog(`✅ Order update test completed in ${endTime - startTime}ms`);
+        };
+        
+        window.testCacheSync = function() {
+            const serverOrders = [
+                {
+                    id: 'server_' + Date.now(),
+                    status: 'ready',
+                    total: 15.50,
+                    customer_name: 'Server Customer',
+                    created_at: new Date().toISOString()
+                }
+            ];
+            
+            addToLog('🧪 Testing cache sync with server data');
+            
+            const startTime = Date.now();
+            // Simulate server sync (would be implemented in real cache)
+            serverOrders.forEach(order => activeOrdersCache.addActiveOrder(order));
+            const endTime = Date.now();
+            
+            addToLog(`✅ Cache sync test completed in ${endTime - startTime}ms`);
+        };
+        
+        window.testEventSystem = function() {
+            addToLog('🧪 Testing event system');
+            
+            let eventReceived = false;
+            
+            // Add event listener
+            const handleEvent = (event) => {
+                eventReceived = true;
+                addToLog(`📡 Event received: ${event.detail.order.id}`);
+            };
+            
+            window.addEventListener('activeOrderAdded', handleEvent);
+            
+            // Trigger event
+            const testOrder = {
+                id: 'event_test_' + Date.now(),
+                status: 'pending',
+                total: 10.00,
+                created_at: new Date().toISOString()
+            };
+            
+            activeOrdersSync.notifyNewOrder(testOrder);
+            
+            setTimeout(() => {
+                if (eventReceived) {
+                    addToLog('✅ Event system test PASSED');
+                } else {
+                    addToLog('❌ Event system test FAILED');
+                }
+                window.removeEventListener('activeOrderAdded', handleEvent);
+            }, 100);
+        };
+        
+        window.updateMetrics = function() {
+            const syncMetrics = activeOrdersSync.getMetrics();
+            const cacheStats = activeOrdersCache.getStats();
+            
+            const metricsHtml = `
+                <strong>ActiveOrdersSync Metrics:</strong><br>
+                - Notifications: ${syncMetrics.notificationsCount}<br>
+                - Listeners: ${syncMetrics.listenersCount}<br>
+                - Errors: ${syncMetrics.errorCount}<br>
+                - Last Notification: ${syncMetrics.lastNotificationTime ? new Date(syncMetrics.lastNotificationTime).toLocaleTimeString() : 'Never'}<br>
+                <br>
+                <strong>ActiveOrdersCache Stats:</strong><br>
+                - Cache Size: ${cacheStats.cacheSize}<br>
+                - Subscribers: ${cacheStats.subscribersCount}<br>
+                - Cache Hits: ${cacheStats.hits}<br>
+                - Cache Adds: ${cacheStats.adds}<br>
+            `;
+            
+            document.getElementById('metrics').innerHTML = metricsHtml;
+            addToLog('📊 Metrics updated');
+        };
+        
+        window.clearLogs = function() {
+            document.getElementById('log').innerHTML = '';
+        };
+        
+        // Initialize
+        addToLog('🚀 Instant Active Orders Test initialized');
+        checkStatus();
+        updateMetrics();
+        
+        // Set up automatic metrics updates
+        setInterval(updateMetrics, 5000);
+    </script>
+</body>
+</html>

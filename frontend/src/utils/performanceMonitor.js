@@ -1,680 +1,550 @@
 /**
- * Comprehensive Performance Monitor for Fast Order Creation Optimization
- * Tracks all performance metrics across UI, API, cache, and real-time operations
- * Requirements: 11.1, 11.2, 11.3, 11.4
+ * Performance Monitor for Active Orders Display
+ * 
+ * This utility tracks timing metrics for active orders display to ensure
+ * the < 100ms target is consistently met and provides alerts when
+ * performance degrades.
  */
+
+import performanceLogger from './performanceLogger';
 
 class PerformanceMonitor {
   constructor() {
-    this.metrics = new Map();
+    this.metrics = {
+      displayTimes: [],
+      cacheHits: 0,
+      cacheMisses: 0,
+      serverRequests: 0,
+      errors: 0,
+      totalOperations: 0
+    };
+    
     this.thresholds = {
-      // UI Response Time Thresholds (Requirements 1.1-1.4)
-      ui_click: 50,           // Visual feedback within 50ms
-      ui_typing: 100,         // Search/input response within 100ms
-      ui_navigation: 200,     // Menu category navigation within 200ms
-      ui_cart_update: 100,    // Cart updates within 100ms
-      
-      // Menu Performance Thresholds (Requirements 2.1-2.3)
-      menu_load: 500,         // Menu display within 500ms
-      menu_search: 200,       // Search results within 200ms
-      menu_item_details: 300, // Item details within 300ms
-      
-      // Payment Processing Thresholds (Requirements 4.1, 4.3, 4.4)
-      payment_validation: 300, // Payment validation within 300ms
-      payment_confirmation: 500, // Payment confirmation within 500ms
-      payment_error: 200,     // Error display within 200ms
-      billing_load: 1000,     // Billing page load within 1s (with preloaded data)
-      
-      // API Performance Thresholds (Requirements 5.1, 5.2)
-      api_response: 500,      // 95% of API requests within 500ms
-      database_query: 200,    // Database queries within 200ms
-      
-      // Cache Performance Thresholds (Requirements 6.1, 6.2)
-      cache_memory: 10,       // Memory cache within 10ms
-      cache_session: 50,      // Session data without DB queries
-      
-      // Real-time Update Thresholds (Requirements 7.1, 7.2, 10.1, 10.2)
-      realtime_kitchen: 2000, // Kitchen display updates within 2s
-      realtime_client: 3000,  // Client updates within 3s
-      
-      // Progressive Loading Thresholds (Requirements 9.1, 9.2)
-      app_load: 1000,         // Core interface within 1s
-      image_placeholder: 100, // Image placeholders within 100ms
+      displayTime: 100, // 100ms target
+      warningTime: 150, // Warning threshold
+      criticalTime: 500, // Critical threshold
+      maxMetricsHistory: 1000 // Keep last 1000 measurements
     };
     
-    this.enabled = process.env.NODE_ENV === 'development' || localStorage.getItem('enablePerformanceMonitoring') === 'true';
-    this.alertCallbacks = new Set();
-    this.dashboardData = {
-      responseTimeHistory: [],
-      thresholdViolations: [],
-      performanceMetrics: new Map()
+    this.alerts = {
+      enabled: true,
+      consecutiveSlowOperations: 0,
+      lastAlert: 0,
+      alertCooldown: 30000 // 30 seconds between alerts
     };
     
-    // Initialize Web Vitals monitoring
-    this.initializeWebVitals();
-  }
-
-  /**
-   * Initialize Web Vitals monitoring for Core Web Vitals tracking
-   */
-  initializeWebVitals() {
-    if (typeof window === 'undefined') return;
-
-    // Largest Contentful Paint (LCP) - should be < 2.5s
-    new PerformanceObserver((entryList) => {
-      const entries = entryList.getEntries();
-      const lastEntry = entries[entries.length - 1];
-      this.recordMetric('web_vital_lcp', lastEntry.startTime, {
-        threshold: 2500,
-        element: lastEntry.element?.tagName || 'unknown'
-      });
-    }).observe({ entryTypes: ['largest-contentful-paint'] });
-
-    // First Input Delay (FID) - should be < 100ms
-    new PerformanceObserver((entryList) => {
-      const entries = entryList.getEntries();
-      entries.forEach(entry => {
-        const fid = entry.processingStart - entry.startTime;
-        this.recordMetric('web_vital_fid', fid, {
-          threshold: 100,
-          eventType: entry.name
-        });
-      });
-    }).observe({ entryTypes: ['first-input'] });
-
-    // Cumulative Layout Shift (CLS) - should be < 0.1
-    let clsValue = 0;
-    new PerformanceObserver((entryList) => {
-      const entries = entryList.getEntries();
-      entries.forEach(entry => {
-        if (!entry.hadRecentInput) {
-          clsValue += entry.value;
-        }
-      });
-      this.recordMetric('web_vital_cls', clsValue * 1000, { // Convert to ms for consistency
-        threshold: 100, // 0.1 * 1000
-        cumulative: true
-      });
-    }).observe({ entryTypes: ['layout-shift'] });
-  }
-
-  /**
-   * Start timing an operation with enhanced metadata
-   */
-  startTiming(operationId, operationType, metadata = {}) {
-    if (!this.enabled) return;
+    this.debugMode = process.env.NODE_ENV === 'development';
     
-    const key = `${operationId}_${operationType}`;
-    this.metrics.set(key, {
-      startTime: performance.now(),
-      operationType,
-      operationId,
-      metadata,
-      timestamp: new Date().toISOString()
-    });
+    this.log('PerformanceMonitor initialized');
   }
-
+  
   /**
-   * End timing and record performance metrics with threshold checking
+   * Log debug messages in development mode
    */
-  endTiming(operationId, operationType, additionalMetadata = {}) {
-    if (!this.enabled) return;
-    
-    const key = `${operationId}_${operationType}`;
-    const metric = this.metrics.get(key);
-    
-    if (!metric) {
-      console.warn(`No timing started for ${key}`);
-      return null;
+  log(message, data = null) {
+    if (this.debugMode) {
+      const timestamp = new Date().toISOString();
+      console.log(`[PerformanceMonitor ${timestamp}] ${message}`, data || '');
     }
+  }
+  
+  /**
+   * Start timing an active orders display operation
+   * @param {string} operationType - Type of operation (order-creation, status-change, etc.)
+   * @param {Object} context - Additional context for the operation
+   * @returns {Function} - Function to call when operation completes
+   */
+  startTiming(operationType, context = {}) {
+    const startTime = performance.now();
+    const operationId = `${operationType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const duration = performance.now() - metric.startTime;
-    const threshold = this.thresholds[operationType] || 1000;
+    this.log(`⏱️ TIMING START: ${operationType}`, { operationId, context });
     
-    const result = {
+    // Log timing start
+    performanceLogger.debug('PERFORMANCE', `Timing started: ${operationType}`, {
       operationId,
       operationType,
-      duration: Math.round(duration * 100) / 100, // Round to 2 decimal places
-      threshold,
-      withinThreshold: duration <= threshold,
-      timestamp: metric.timestamp,
-      metadata: { ...metric.metadata, ...additionalMetadata }
-    };
-    
-    // Record the metric
-    this.recordMetric(operationType, duration, result);
-    
-    // Check for threshold violations and alert
-    if (!result.withinThreshold) {
-      this.handleThresholdViolation(result);
-    }
-    
-    // Log with appropriate emoji based on performance
-    const emoji = this.getPerformanceEmoji(duration, threshold);
-    console.log(`${emoji} ${operationType} (${operationId}): ${result.duration}ms (threshold: ${threshold}ms)`, result);
-    
-    // Clean up
-    this.metrics.delete(key);
-    
-    return result;
-  }
-
-  /**
-   * Record a performance metric for dashboard and analytics
-   */
-  recordMetric(operationType, duration, metadata = {}) {
-    const metric = {
-      operationType,
-      duration,
-      timestamp: new Date().toISOString(),
-      ...metadata
-    };
-    
-    // Store in dashboard data
-    if (!this.dashboardData.performanceMetrics.has(operationType)) {
-      this.dashboardData.performanceMetrics.set(operationType, []);
-    }
-    
-    const metrics = this.dashboardData.performanceMetrics.get(operationType);
-    metrics.push(metric);
-    
-    // Keep only last 100 metrics per operation type
-    if (metrics.length > 100) {
-      metrics.splice(0, metrics.length - 100);
-    }
-    
-    // Update response time history for dashboard
-    this.dashboardData.responseTimeHistory.push({
-      timestamp: metric.timestamp,
-      operationType,
-      duration,
-      threshold: metadata.threshold || this.thresholds[operationType] || 1000
+      context,
+      startTime
     });
     
-    // Keep only last 200 entries in history
-    if (this.dashboardData.responseTimeHistory.length > 200) {
-      this.dashboardData.responseTimeHistory.splice(0, this.dashboardData.responseTimeHistory.length - 200);
-    }
+    // Create performance mark
+    performanceLogger.mark(`${operationType}-start-${operationId}`);
     
-    // Store in localStorage for persistence
-    this.persistMetric(metric);
-  }
-
-  /**
-   * Handle threshold violations with alerting
-   */
-  handleThresholdViolation(result) {
-    const violation = {
-      ...result,
-      severity: this.calculateSeverity(result.duration, result.threshold),
-      violationTimestamp: new Date().toISOString()
-    };
-    
-    this.dashboardData.thresholdViolations.push(violation);
-    
-    // Keep only last 50 violations
-    if (this.dashboardData.thresholdViolations.length > 50) {
-      this.dashboardData.thresholdViolations.splice(0, this.dashboardData.thresholdViolations.length - 50);
-    }
-    
-    // Trigger alert callbacks
-    this.alertCallbacks.forEach(callback => {
-      try {
-        callback(violation);
-      } catch (error) {
-        console.error('Error in performance alert callback:', error);
-      }
-    });
-    
-    // Log severe violations
-    if (violation.severity === 'critical') {
-      console.error('🚨 CRITICAL Performance Violation:', violation);
-    } else if (violation.severity === 'high') {
-      console.warn('⚠️ HIGH Performance Violation:', violation);
-    }
-  }
-
-  /**
-   * Calculate severity of performance violation
-   */
-  calculateSeverity(duration, threshold) {
-    const ratio = duration / threshold;
-    if (ratio >= 3) return 'critical';
-    if (ratio >= 2) return 'high';
-    if (ratio >= 1.5) return 'medium';
-    return 'low';
-  }
-
-  /**
-   * Get appropriate emoji for performance level
-   */
-  getPerformanceEmoji(duration, threshold) {
-    const ratio = duration / threshold;
-    if (ratio <= 0.5) return '⚡'; // Excellent
-    if (ratio <= 0.8) return '🚀'; // Good
-    if (ratio <= 1.0) return '✅'; // Acceptable
-    if (ratio <= 1.5) return '⏱️'; // Slow
-    if (ratio <= 2.0) return '🐌'; // Very slow
-    return '🚨'; // Critical
-  }
-
-  /**
-   * Store metric for persistence and analysis
-   */
-  persistMetric(metric) {
-    try {
-      const stored = JSON.parse(localStorage.getItem('performanceMetrics') || '[]');
-      stored.push(metric);
+    // Return completion function
+    return (result = {}) => {
+      const endTime = performance.now();
+      const displayTime = endTime - startTime;
       
-      // Keep only last 500 metrics
-      if (stored.length > 500) {
-        stored.splice(0, stored.length - 500);
-      }
-      
-      localStorage.setItem('performanceMetrics', JSON.stringify(stored));
-    } catch (error) {
-      console.warn('Failed to persist performance metric:', error);
-    }
-  }
-
-  /**
-   * Register alert callback for threshold violations
-   */
-  onThresholdViolation(callback) {
-    this.alertCallbacks.add(callback);
-    return () => this.alertCallbacks.delete(callback);
-  }
-
-  /**
-   * Get comprehensive performance statistics and dashboard data
-   */
-  getDashboardData() {
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    
-    // Filter recent metrics
-    const recentMetrics = this.dashboardData.responseTimeHistory.filter(
-      metric => new Date(metric.timestamp) > oneHourAgo
-    );
-    
-    // Calculate statistics by operation type
-    const statsByOperation = {};
-    this.dashboardData.performanceMetrics.forEach((metrics, operationType) => {
-      const recentOperationMetrics = metrics.filter(
-        metric => new Date(metric.timestamp) > oneHourAgo
+      // Create performance measure
+      performanceLogger.measure(
+        `${operationType}-duration-${operationId}`,
+        `${operationType}-start-${operationId}`
       );
       
-      if (recentOperationMetrics.length > 0) {
-        const durations = recentOperationMetrics.map(m => m.duration);
-        const threshold = this.thresholds[operationType] || 1000;
-        const withinThreshold = durations.filter(d => d <= threshold).length;
-        
-        statsByOperation[operationType] = {
-          count: recentOperationMetrics.length,
-          averageDuration: Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length * 100) / 100,
-          minDuration: Math.min(...durations),
-          maxDuration: Math.max(...durations),
-          p95Duration: this.calculatePercentile(durations, 95),
-          threshold,
-          successRate: Math.round((withinThreshold / durations.length) * 100),
-          recentTrend: this.calculateTrend(recentOperationMetrics)
-        };
+      this.recordDisplayTime(displayTime, operationType, {
+        ...context,
+        ...result,
+        operationId
+      });
+      
+      return displayTime;
+    };
+  }
+  
+  /**
+   * Record display time measurement
+   * @param {number} displayTime - Time taken in milliseconds
+   * @param {string} operationType - Type of operation
+   * @param {Object} context - Operation context
+   */
+  recordDisplayTime(displayTime, operationType, context = {}) {
+    const measurement = {
+      displayTime,
+      operationType,
+      timestamp: Date.now(),
+      context,
+      performance: this.getPerformanceCategory(displayTime)
+    };
+    
+    // Add to metrics
+    this.metrics.displayTimes.push(measurement);
+    this.metrics.totalOperations++;
+    
+    // Maintain history size
+    if (this.metrics.displayTimes.length > this.thresholds.maxMetricsHistory) {
+      this.metrics.displayTimes.shift();
+    }
+    
+    this.log(`📊 TIMING RECORDED: ${operationType} in ${displayTime.toFixed(2)}ms`, {
+      performance: measurement.performance,
+      context
+    });
+    
+    // Log to performance logger
+    performanceLogger.logTiming(operationType, displayTime, {
+      performance: measurement.performance,
+      context,
+      threshold: this.thresholds.displayTime.target
+    });
+    
+    // Check for performance issues
+    this.checkPerformanceThresholds(measurement);
+    
+    // Update cache metrics if available
+    if (context.fromCache !== undefined) {
+      if (context.fromCache) {
+        this.metrics.cacheHits++;
+      } else {
+        this.metrics.cacheMisses++;
+        this.metrics.serverRequests++;
+      }
+    }
+    
+    // Track errors
+    if (context.error) {
+      this.metrics.errors++;
+      performanceLogger.error('PERFORMANCE', `Operation failed: ${operationType}`, {
+        error: context.error,
+        displayTime,
+        context
+      });
+    }
+  }
+  
+  /**
+   * Get performance category for display time
+   * @param {number} displayTime - Time in milliseconds
+   * @returns {string} - Performance category
+   */
+  getPerformanceCategory(displayTime) {
+    if (displayTime <= this.thresholds.displayTime) {
+      return 'excellent';
+    } else if (displayTime <= this.thresholds.warningTime) {
+      return 'good';
+    } else if (displayTime <= this.thresholds.criticalTime) {
+      return 'warning';
+    } else {
+      return 'critical';
+    }
+  }
+  
+  /**
+   * Check performance thresholds and trigger alerts
+   * @param {Object} measurement - Performance measurement
+   */
+  checkPerformanceThresholds(measurement) {
+    const { displayTime, operationType } = measurement;
+    
+    if (displayTime > this.thresholds.displayTime) {
+      this.alerts.consecutiveSlowOperations++;
+      
+      this.log(`⚠️ SLOW OPERATION: ${operationType} took ${displayTime.toFixed(2)}ms (target: ${this.thresholds.displayTime}ms)`);
+      
+      // Trigger alert for critical performance
+      if (displayTime > this.thresholds.criticalTime) {
+        this.triggerPerformanceAlert('critical', measurement);
+      } else if (displayTime > this.thresholds.warningTime) {
+        this.triggerPerformanceAlert('warning', measurement);
+      }
+      
+      // Alert for consecutive slow operations
+      if (this.alerts.consecutiveSlowOperations >= 3) {
+        this.triggerPerformanceAlert('consecutive-slow', {
+          count: this.alerts.consecutiveSlowOperations,
+          lastOperation: measurement
+        });
+      }
+    } else {
+      // Reset consecutive slow operations counter
+      this.alerts.consecutiveSlowOperations = 0;
+    }
+  }
+  
+  /**
+   * Trigger performance alert
+   * @param {string} alertType - Type of alert
+   * @param {Object} data - Alert data
+   */
+  triggerPerformanceAlert(alertType, data) {
+    if (!this.alerts.enabled) return;
+    
+    const now = Date.now();
+    
+    // Check cooldown
+    if (now - this.alerts.lastAlert < this.alerts.alertCooldown) {
+      return;
+    }
+    
+    this.alerts.lastAlert = now;
+    
+    const alertMessage = this.getAlertMessage(alertType, data);
+    
+    this.log(`🚨 PERFORMANCE ALERT: ${alertType}`, data);
+    
+    // Dispatch custom event for UI components to handle
+    const alertEvent = new CustomEvent('performanceAlert', {
+      detail: {
+        type: alertType,
+        message: alertMessage,
+        data,
+        timestamp: now
       }
     });
+    
+    window.dispatchEvent(alertEvent);
+    
+    // Console warning for development
+    if (this.debugMode) {
+      console.warn(`🚨 Performance Alert: ${alertMessage}`, data);
+    }
+  }
+  
+  /**
+   * Get alert message for alert type
+   * @param {string} alertType - Type of alert
+   * @param {Object} data - Alert data
+   * @returns {string} - Alert message
+   */
+  getAlertMessage(alertType, data) {
+    switch (alertType) {
+      case 'critical':
+        return `Critical performance: ${data.operationType} took ${data.displayTime.toFixed(0)}ms (target: ${this.thresholds.displayTime}ms)`;
+      
+      case 'warning':
+        return `Slow performance: ${data.operationType} took ${data.displayTime.toFixed(0)}ms (target: ${this.thresholds.displayTime}ms)`;
+      
+      case 'consecutive-slow':
+        return `${data.count} consecutive slow operations detected. Last: ${data.lastOperation.operationType}`;
+      
+      case 'cache-miss-rate':
+        return `High cache miss rate: ${data.missRate.toFixed(1)}% (threshold: ${data.threshold}%)`;
+      
+      case 'error-rate':
+        return `High error rate: ${data.errorRate.toFixed(1)}% (threshold: ${data.threshold}%)`;
+      
+      default:
+        return `Performance issue detected: ${alertType}`;
+    }
+  }
+  
+  /**
+   * Get current performance statistics
+   * @returns {Object} - Performance statistics
+   */
+  getStats() {
+    const recentMeasurements = this.getRecentMeasurements(60000); // Last minute
+    const allMeasurements = this.metrics.displayTimes;
+    
+    if (allMeasurements.length === 0) {
+      return {
+        totalOperations: 0,
+        averageDisplayTime: 0,
+        medianDisplayTime: 0,
+        percentile95: 0,
+        percentile99: 0,
+        cacheHitRate: 0,
+        errorRate: 0,
+        performanceDistribution: {},
+        recentPerformance: {}
+      };
+    }
+    
+    const displayTimes = allMeasurements.map(m => m.displayTime);
+    const recentDisplayTimes = recentMeasurements.map(m => m.displayTime);
+    
+    return {
+      totalOperations: this.metrics.totalOperations,
+      averageDisplayTime: this.calculateAverage(displayTimes),
+      medianDisplayTime: this.calculateMedian(displayTimes),
+      percentile95: this.calculatePercentile(displayTimes, 95),
+      percentile99: this.calculatePercentile(displayTimes, 99),
+      cacheHitRate: this.calculateCacheHitRate(),
+      errorRate: this.calculateErrorRate(),
+      performanceDistribution: this.getPerformanceDistribution(allMeasurements),
+      recentPerformance: {
+        count: recentMeasurements.length,
+        averageDisplayTime: this.calculateAverage(recentDisplayTimes),
+        medianDisplayTime: this.calculateMedian(recentDisplayTimes)
+      },
+      thresholds: { ...this.thresholds },
+      alerts: {
+        consecutiveSlowOperations: this.alerts.consecutiveSlowOperations,
+        lastAlert: this.alerts.lastAlert
+      }
+    };
+  }
+  
+  /**
+   * Get recent measurements within time window
+   * @param {number} timeWindow - Time window in milliseconds
+   * @returns {Array} - Recent measurements
+   */
+  getRecentMeasurements(timeWindow) {
+    const cutoff = Date.now() - timeWindow;
+    return this.metrics.displayTimes.filter(m => m.timestamp >= cutoff);
+  }
+  
+  /**
+   * Calculate average of array
+   * @param {Array} values - Array of numbers
+   * @returns {number} - Average value
+   */
+  calculateAverage(values) {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+  
+  /**
+   * Calculate median of array
+   * @param {Array} values - Array of numbers
+   * @returns {number} - Median value
+   */
+  calculateMedian(values) {
+    if (values.length === 0) return 0;
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  }
+  
+  /**
+   * Calculate percentile of array
+   * @param {Array} values - Array of numbers
+   * @param {number} percentile - Percentile to calculate (0-100)
+   * @returns {number} - Percentile value
+   */
+  calculatePercentile(values, percentile) {
+    if (values.length === 0) return 0;
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+    
+    return sorted[Math.max(0, index)];
+  }
+  
+  /**
+   * Calculate cache hit rate
+   * @returns {number} - Cache hit rate as percentage
+   */
+  calculateCacheHitRate() {
+    const totalCacheOperations = this.metrics.cacheHits + this.metrics.cacheMisses;
+    
+    if (totalCacheOperations === 0) return 0;
+    
+    return (this.metrics.cacheHits / totalCacheOperations) * 100;
+  }
+  
+  /**
+   * Calculate error rate
+   * @returns {number} - Error rate as percentage
+   */
+  calculateErrorRate() {
+    if (this.metrics.totalOperations === 0) return 0;
+    
+    return (this.metrics.errors / this.metrics.totalOperations) * 100;
+  }
+  
+  /**
+   * Get performance distribution
+   * @param {Array} measurements - Array of measurements
+   * @returns {Object} - Performance distribution
+   */
+  getPerformanceDistribution(measurements) {
+    const distribution = {
+      excellent: 0,
+      good: 0,
+      warning: 0,
+      critical: 0
+    };
+    
+    measurements.forEach(measurement => {
+      distribution[measurement.performance]++;
+    });
+    
+    return distribution;
+  }
+  
+  /**
+   * Check for performance degradation trends
+   * @returns {Object} - Trend analysis
+   */
+  analyzeTrends() {
+    const recentMeasurements = this.getRecentMeasurements(300000); // Last 5 minutes
+    const olderMeasurements = this.metrics.displayTimes
+      .filter(m => m.timestamp < Date.now() - 300000)
+      .slice(-100); // Last 100 older measurements
+    
+    if (recentMeasurements.length < 10 || olderMeasurements.length < 10) {
+      return { trend: 'insufficient-data' };
+    }
+    
+    const recentAverage = this.calculateAverage(recentMeasurements.map(m => m.displayTime));
+    const olderAverage = this.calculateAverage(olderMeasurements.map(m => m.displayTime));
+    
+    const percentageChange = ((recentAverage - olderAverage) / olderAverage) * 100;
+    
+    let trend = 'stable';
+    if (percentageChange > 20) {
+      trend = 'degrading';
+    } else if (percentageChange < -20) {
+      trend = 'improving';
+    }
+    
+    return {
+      trend,
+      recentAverage,
+      olderAverage,
+      percentageChange,
+      recentCount: recentMeasurements.length,
+      olderCount: olderMeasurements.length
+    };
+  }
+  
+  /**
+   * Generate performance report
+   * @returns {Object} - Comprehensive performance report
+   */
+  generateReport() {
+    const stats = this.getStats();
+    const trends = this.analyzeTrends();
     
     return {
       summary: {
-        totalOperations: recentMetrics.length,
-        averageResponseTime: recentMetrics.length > 0 
-          ? Math.round(recentMetrics.reduce((sum, m) => sum + m.duration, 0) / recentMetrics.length * 100) / 100
-          : 0,
-        thresholdViolations: this.dashboardData.thresholdViolations.filter(
-          v => new Date(v.violationTimestamp) > oneHourAgo
-        ).length,
-        overallHealthScore: this.calculateHealthScore(statsByOperation)
+        totalOperations: stats.totalOperations,
+        averageDisplayTime: Math.round(stats.averageDisplayTime * 100) / 100,
+        targetMet: stats.averageDisplayTime <= this.thresholds.displayTime,
+        cacheHitRate: Math.round(stats.cacheHitRate * 100) / 100,
+        errorRate: Math.round(stats.errorRate * 100) / 100
       },
-      operationStats: statsByOperation,
-      recentViolations: this.dashboardData.thresholdViolations.slice(-10),
-      responseTimeHistory: recentMetrics,
-      webVitals: this.getWebVitalsStats()
-    };
-  }
-
-  /**
-   * Calculate percentile for performance analysis
-   */
-  calculatePercentile(values, percentile) {
-    const sorted = [...values].sort((a, b) => a - b);
-    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-    return sorted[index] || 0;
-  }
-
-  /**
-   * Calculate trend for recent metrics
-   */
-  calculateTrend(metrics) {
-    if (metrics.length < 2) return 'stable';
-    
-    const recent = metrics.slice(-10);
-    const older = metrics.slice(-20, -10);
-    
-    if (older.length === 0) return 'stable';
-    
-    const recentAvg = recent.reduce((sum, m) => sum + m.duration, 0) / recent.length;
-    const olderAvg = older.reduce((sum, m) => sum + m.duration, 0) / older.length;
-    
-    const change = ((recentAvg - olderAvg) / olderAvg) * 100;
-    
-    if (change > 10) return 'degrading';
-    if (change < -10) return 'improving';
-    return 'stable';
-  }
-
-  /**
-   * Calculate overall system health score
-   */
-  calculateHealthScore(statsByOperation) {
-    const operations = Object.values(statsByOperation);
-    if (operations.length === 0) return 100;
-    
-    const totalSuccessRate = operations.reduce((sum, op) => sum + op.successRate, 0);
-    return Math.round(totalSuccessRate / operations.length);
-  }
-
-  /**
-   * Get Web Vitals statistics
-   */
-  getWebVitalsStats() {
-    const webVitalMetrics = ['web_vital_lcp', 'web_vital_fid', 'web_vital_cls'];
-    const stats = {};
-    
-    webVitalMetrics.forEach(vital => {
-      const metrics = this.dashboardData.performanceMetrics.get(vital) || [];
-      if (metrics.length > 0) {
-        const recent = metrics.slice(-10);
-        const values = recent.map(m => m.duration);
-        stats[vital] = {
-          current: values[values.length - 1] || 0,
-          average: values.reduce((sum, v) => sum + v, 0) / values.length,
-          trend: this.calculateTrend(recent)
-        };
-      }
-    });
-    
-    return stats;
-  }
-
-  /**
-   * Legacy method for backward compatibility - get performance statistics
-   */
-  getStats() {
-    try {
-      const metrics = JSON.parse(localStorage.getItem('performanceMetrics') || '[]');
-      
-      if (metrics.length === 0) {
-        return { message: 'No performance data available' };
-      }
-      
-      // Group by operation type
-      const byOperation = {};
-      metrics.forEach(metric => {
-        if (!byOperation[metric.operationType]) {
-          byOperation[metric.operationType] = [];
-        }
-        byOperation[metric.operationType].push(metric);
-      });
-      
-      const summary = {};
-      Object.entries(byOperation).forEach(([operation, operationMetrics]) => {
-        const durations = operationMetrics.map(m => m.duration);
-        const threshold = this.thresholds[operation] || 1000;
-        const withinThreshold = durations.filter(d => d <= threshold).length;
-        
-        summary[operation] = {
-          count: operationMetrics.length,
-          averageDuration: `${Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)}ms`,
-          successRate: `${Math.round((withinThreshold / durations.length) * 100)}%`,
-          threshold: `${threshold}ms`
-        };
-      });
-      
-      return {
-        totalMetrics: metrics.length,
-        operationSummary: summary,
-        recentMetrics: metrics.slice(-10)
-      };
-    } catch (error) {
-      console.error('Failed to get performance stats:', error);
-      return { error: 'Failed to get stats' };
-    }
-  }
-
-  /**
-   * Clear all stored metrics
-   */
-  clearStats() {
-    localStorage.removeItem('performanceMetrics');
-    localStorage.removeItem('billingPerformanceMetrics'); // Legacy cleanup
-    this.dashboardData.responseTimeHistory = [];
-    this.dashboardData.thresholdViolations = [];
-    this.dashboardData.performanceMetrics.clear();
-    console.log('🗑️ Performance metrics cleared');
-  }
-
-  /**
-   * Enable/disable performance monitoring
-   */
-  setEnabled(enabled) {
-    this.enabled = enabled;
-    localStorage.setItem('enablePerformanceMonitoring', enabled.toString());
-    console.log(`📊 Performance monitoring ${enabled ? 'enabled' : 'disabled'}`);
-  }
-
-  /**
-   * Track UI interaction performance (Requirements 1.1-1.4)
-   */
-  trackUIInteraction(interactionType, elementId, callback) {
-    return async (...args) => {
-      const operationId = `${elementId}_${Date.now()}`;
-      this.startTiming(operationId, `ui_${interactionType}`, { elementId });
-      
-      try {
-        const result = await callback(...args);
-        this.endTiming(operationId, `ui_${interactionType}`, { success: true });
-        return result;
-      } catch (error) {
-        this.endTiming(operationId, `ui_${interactionType}`, { success: false, error: error.message });
-        throw error;
-      }
-    };
-  }
-
-  /**
-   * Track API call performance (Requirements 5.1, 5.2)
-   */
-  trackAPICall(endpoint, method = 'GET') {
-    const operationId = `${method}_${endpoint}_${Date.now()}`;
-    this.startTiming(operationId, 'api_response', { endpoint, method });
-    
-    return {
-      end: (success = true, metadata = {}) => {
-        this.endTiming(operationId, 'api_response', { success, endpoint, method, ...metadata });
-      }
-    };
-  }
-
-  /**
-   * Track cache performance (Requirements 6.1, 6.2)
-   */
-  trackCacheOperation(cacheType, operation, key) {
-    const operationId = `${cacheType}_${operation}_${key}_${Date.now()}`;
-    const operationType = `cache_${cacheType}`;
-    
-    this.startTiming(operationId, operationType, { cacheType, operation, key });
-    
-    return {
-      hit: (metadata = {}) => {
-        this.endTiming(operationId, operationType, { hit: true, operation, ...metadata });
+      performance: {
+        median: Math.round(stats.medianDisplayTime * 100) / 100,
+        percentile95: Math.round(stats.percentile95 * 100) / 100,
+        percentile99: Math.round(stats.percentile99 * 100) / 100,
+        distribution: stats.performanceDistribution
       },
-      miss: (metadata = {}) => {
-        this.endTiming(operationId, operationType, { hit: false, operation, ...metadata });
-      }
+      trends,
+      recent: stats.recentPerformance,
+      alerts: {
+        consecutiveSlowOperations: stats.alerts.consecutiveSlowOperations,
+        lastAlert: stats.alerts.lastAlert,
+        alertsEnabled: this.alerts.enabled
+      },
+      thresholds: stats.thresholds,
+      timestamp: Date.now()
     };
   }
-
-  /**
-   * Track real-time update performance (Requirements 7.1, 7.2, 10.1, 10.2)
-   */
-  trackRealTimeUpdate(updateType, targetId) {
-    const operationId = `${updateType}_${targetId}_${Date.now()}`;
-    const operationType = updateType.includes('kitchen') ? 'realtime_kitchen' : 'realtime_client';
-    
-    this.startTiming(operationId, operationType, { updateType, targetId });
-    
-    return {
-      complete: (metadata = {}) => {
-        this.endTiming(operationId, operationType, { updateType, targetId, ...metadata });
-      }
-    };
-  }
-
-  /**
-   * Track menu loading performance (Requirements 2.1-2.3)
-   */
-  trackMenuOperation(operationType, itemId = null) {
-    const operationId = `menu_${operationType}_${itemId || 'all'}_${Date.now()}`;
-    const perfOperationType = `menu_${operationType}`;
-    
-    this.startTiming(operationId, perfOperationType, { itemId });
-    
-    return {
-      complete: (metadata = {}) => {
-        this.endTiming(operationId, perfOperationType, { itemId, ...metadata });
-      }
-    };
-  }
-
-  /**
-   * Track payment processing performance (Requirements 4.1, 4.3, 4.4)
-   */
-  trackPaymentOperation(operationType, paymentId) {
-    const operationId = `payment_${operationType}_${paymentId}_${Date.now()}`;
-    const perfOperationType = `payment_${operationType}`;
-    
-    this.startTiming(operationId, perfOperationType, { paymentId });
-    
-    return {
-      complete: (success = true, metadata = {}) => {
-        this.endTiming(operationId, perfOperationType, { paymentId, success, ...metadata });
-      }
-    };
-  }
-
-  /**
-   * Legacy cache tracking methods for backward compatibility
-   */
-  trackCacheHit(orderId, hitType = 'full') {
-    if (!this.enabled) return;
-    
-    console.log(`💾 Cache ${hitType} hit for order ${orderId}`);
-    this.recordMetric('cache_hit', 0, {
-      orderId,
-      hitType,
-      operationType: 'cache_hit'
-    });
-  }
-
-  trackCacheMiss(orderId, reason = 'not_found') {
-    if (!this.enabled) return;
-    
-    console.log(`❌ Cache miss for order ${orderId}: ${reason}`);
-    this.recordMetric('cache_miss', 0, {
-      orderId,
-      reason,
-      operationType: 'cache_miss'
-    });
-  }
-}
-
-// Singleton instance
-export const performanceMonitor = new PerformanceMonitor();
-
-// Enhanced convenience functions for different operation types
-export const trackUIClick = (elementId, callback) => 
-  performanceMonitor.trackUIInteraction('click', elementId, callback);
-
-export const trackUITyping = (elementId, callback) => 
-  performanceMonitor.trackUIInteraction('typing', elementId, callback);
-
-export const trackUINavigation = (elementId, callback) => 
-  performanceMonitor.trackUIInteraction('navigation', elementId, callback);
-
-export const trackCartUpdate = (elementId, callback) => 
-  performanceMonitor.trackUIInteraction('cart_update', elementId, callback);
-
-export const trackAPICall = (endpoint, method) => 
-  performanceMonitor.trackAPICall(endpoint, method);
-
-export const trackCacheOperation = (cacheType, operation, key) => 
-  performanceMonitor.trackCacheOperation(cacheType, operation, key);
-
-export const trackMenuLoad = () => 
-  performanceMonitor.trackMenuOperation('load');
-
-export const trackMenuSearch = () => 
-  performanceMonitor.trackMenuOperation('search');
-
-export const trackMenuItemDetails = (itemId) => 
-  performanceMonitor.trackMenuOperation('item_details', itemId);
-
-export const trackPaymentValidation = (paymentId) => 
-  performanceMonitor.trackPaymentOperation('validation', paymentId);
-
-export const trackPaymentConfirmation = (paymentId) => 
-  performanceMonitor.trackPaymentOperation('confirmation', paymentId);
-
-export const trackPaymentError = (paymentId) => 
-  performanceMonitor.trackPaymentOperation('error', paymentId);
-
-export const trackKitchenUpdate = (orderId) => 
-  performanceMonitor.trackRealTimeUpdate('kitchen_update', orderId);
-
-export const trackClientUpdate = (clientId) => 
-  performanceMonitor.trackRealTimeUpdate('client_update', clientId);
-
-// Legacy compatibility functions
-export const startBillingTimer = (orderId) => 
-  performanceMonitor.startTiming(orderId, 'billing_load', { legacy: true });
-
-export const endBillingTimer = (orderId, metadata) => 
-  performanceMonitor.endTiming(orderId, 'billing_load', { legacy: true, ...metadata });
-
-export const trackCacheHit = (orderId, hitType) => 
-  performanceMonitor.trackCacheHit(orderId, hitType);
-
-export const trackCacheMiss = (orderId, reason) => 
-  performanceMonitor.trackCacheMiss(orderId, reason);
-
-// Global access for debugging and dashboard
-if (typeof window !== 'undefined') {
-  window.performanceMonitor = {
-    // Dashboard data access
-    getDashboard: () => performanceMonitor.getDashboardData(),
-    getStats: () => performanceMonitor.getStats(),
-    
-    // Control functions
-    clearStats: () => performanceMonitor.clearStats(),
-    setEnabled: (enabled) => performanceMonitor.setEnabled(enabled),
-    
-    // Alert management
-    onAlert: (callback) => performanceMonitor.onThresholdViolation(callback),
-    
-    // Direct access to monitor instance
-    monitor: performanceMonitor
-  };
   
-  // Legacy compatibility
-  window.billingPerformance = window.performanceMonitor;
+  /**
+   * Reset all metrics
+   */
+  reset() {
+    this.log('Resetting performance metrics');
+    
+    this.metrics = {
+      displayTimes: [],
+      cacheHits: 0,
+      cacheMisses: 0,
+      serverRequests: 0,
+      errors: 0,
+      totalOperations: 0
+    };
+    
+    this.alerts.consecutiveSlowOperations = 0;
+    this.alerts.lastAlert = 0;
+  }
+  
+  /**
+   * Enable or disable alerts
+   * @param {boolean} enabled - Whether to enable alerts
+   */
+  setAlertsEnabled(enabled) {
+    this.alerts.enabled = enabled;
+    this.log(`Performance alerts ${enabled ? 'enabled' : 'disabled'}`);
+  }
+  
+  /**
+   * Update performance thresholds
+   * @param {Object} newThresholds - New threshold values
+   */
+  updateThresholds(newThresholds) {
+    this.thresholds = { ...this.thresholds, ...newThresholds };
+    this.log('Performance thresholds updated', this.thresholds);
+  }
 }
 
+// Create singleton instance
+const performanceMonitor = new PerformanceMonitor();
+
+// Convenience functions for billing operations
+export function startBillingTimer(operationType, context = {}) {
+  return performanceMonitor.startTiming(`billing-${operationType}`, context);
+}
+
+export function endBillingTimer(timerFunction, result = {}) {
+  if (typeof timerFunction === 'function') {
+    return timerFunction(result);
+  }
+  return 0;
+}
+
+export function trackCacheHit(operationType, context = {}) {
+  performanceMonitor.recordDisplayTime(0, `cache-hit-${operationType}`, {
+    ...context,
+    fromCache: true
+  });
+}
+
+export function trackCacheMiss(operationType, context = {}) {
+  performanceMonitor.recordDisplayTime(0, `cache-miss-${operationType}`, {
+    ...context,
+    fromCache: false
+  });
+}
+
+// Export both class and singleton
+export { PerformanceMonitor };
 export default performanceMonitor;
