@@ -5497,7 +5497,7 @@ async def get_orders(
 
 @api_router.get("/orders/today-bills", response_model=List[Order])
 async def get_todays_bills(current_user: dict = Depends(get_current_user)):
-    """Get today's completed/paid bills with Redis caching and MongoDB fallback"""
+    """🚀 DIRECT DATABASE ACCESS - Get today's completed/paid bills INSTANTLY (NO CACHING)"""
     # Get user's organization_id - CRITICAL for data isolation
     user_org_id = current_user.get("organization_id")
     
@@ -5507,7 +5507,7 @@ async def get_todays_bills(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Organization not configured. Contact support.")
 
     # Security log
-    print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching today's bills")
+    print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching today's bills - DIRECT DB ACCESS")
 
     try:
         # Use IST (Indian Standard Time) for "today" calculation
@@ -5521,99 +5521,35 @@ async def get_todays_bills(current_user: dict = Depends(get_current_user)):
         # Convert to UTC for database query
         today_utc = today_ist.astimezone(timezone.utc)
         
-        # Strategy 1: Try Redis-cached service first
-        try:
-            cached_service = get_cached_order_service()
-            
-            # Check if we have today's bills cached
-            cache_key = f"todays_bills:{user_org_id}:{today_ist.strftime('%Y-%m-%d')}"
-            
-            # For now, go directly to MongoDB since we need specific today filtering
-            # TODO: Implement specific today's bills caching in Redis
-            print(f"📊 Fetching today's bills directly from MongoDB for org {user_org_id}")
-            
-        except Exception as cache_error:
-            print(f"❌ Cached service error: {cache_error}, falling back to direct MongoDB")
+        # 🚀 DIRECT MongoDB query - NO CACHING, NO DELAYS
+        # CRITICAL FIX: created_at is stored as ISO string in DB, not datetime object
+        print(f"⚡ DIRECT DB: Fetching today's bills from MongoDB for org {user_org_id} (from {today_utc.isoformat()})")
         
-        # Strategy 2: Direct MongoDB query for today's completed/paid orders
-        print(f"📊 Fetching today's bills from MongoDB for org {user_org_id} (from {today_utc.isoformat()})")
+        # Query for today's COMPLETED orders ONLY - compare with ISO string
+        query = {
+            "organization_id": user_org_id,
+            "created_at": {"$gte": today_utc.isoformat()},  # Compare with ISO string
+            "status": "completed"  # ONLY completed orders (not paid, not cancelled)
+        }
         
-        try:
-            # Query for today's COMPLETED orders ONLY
-            # FIXED: Use datetime object for comparison, not ISO string
-            query = {
-                "organization_id": user_org_id,
-                "created_at": {"$gte": today_utc},  # Use datetime object, not isoformat()
-                "status": {"$in": ["completed", "paid"]}  # ONLY completed or paid orders
-            }
-            
-            orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
-            
-            # Convert datetime objects to ISO strings for JSON serialization
-            for order in orders:
-                if isinstance(order.get("created_at"), datetime):
-                    order["created_at"] = order["created_at"].isoformat()
-                elif isinstance(order.get("created_at"), str):
-                    # Already a string, ensure it's valid
-                    try:
-                        datetime.fromisoformat(order["created_at"])
-                    except:
-                        order["created_at"] = datetime.now(timezone.utc).isoformat()
-                        
-                if isinstance(order.get("updated_at"), datetime):
-                    order["updated_at"] = order["updated_at"].isoformat()
-                elif isinstance(order.get("updated_at"), str):
-                    try:
-                        datetime.fromisoformat(order["updated_at"])
-                    except:
-                        order["updated_at"] = datetime.now(timezone.utc).isoformat()
-            
-            print(f"✅ Found {len(orders)} today's bills for org {user_org_id}")
-            return orders
-            
-        except Exception as db_error:
-            print(f"❌ MongoDB error in get_todays_bills: {db_error}")
-            # Continue to fallback
+        orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
         
-        # Strategy 3: Final fallback with basic query and client-side filtering
-        print(f"🆘 Using fallback query for today's bills org {user_org_id}")
+        # Ensure all datetime fields are strings for JSON serialization
+        for order in orders:
+            # created_at and updated_at should already be strings from DB
+            # But ensure they're valid
+            if not isinstance(order.get("created_at"), str):
+                order["created_at"] = datetime.now(timezone.utc).isoformat()
+            if not isinstance(order.get("updated_at"), str):
+                order["updated_at"] = datetime.now(timezone.utc).isoformat()
         
-        try:
-            # Get recent completed/paid orders only
-            basic_query = {
-                "organization_id": user_org_id,
-                "status": {"$in": ["completed", "paid"]}  # ONLY completed/paid, no cancelled
-            }
-            
-            orders = await db.orders.find(basic_query, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
-            
-            # Filter to today's orders
-            todays_orders = []
-            for order in orders:
-                try:
-                    if isinstance(order.get("created_at"), str):
-                        order_date = datetime.fromisoformat(order["created_at"])
-                    else:
-                        order_date = order.get("created_at")
-                    
-                    if order_date and order_date >= today_utc:
-                        # Only include orders that are actually completed or paid
-                        if order.get("status") in ["completed", "paid"]:
-                            todays_orders.append(order)
-                            
-                except Exception as date_error:
-                    print(f"⚠️ Date parsing error for order {order.get('id', 'unknown')}: {date_error}")
-                    continue
-            
-            print(f"🆘 Fallback returned {len(todays_orders)} today's bills")
-            return todays_orders
-            
-        except Exception as final_error:
-            print(f"❌ Final fallback failed: {final_error}")
-            return []
+        print(f"✅ DIRECT DB: Found {len(orders)} today's bills for org {user_org_id}")
+        return orders
         
     except Exception as e:
         print(f"❌ Critical error in get_todays_bills: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
