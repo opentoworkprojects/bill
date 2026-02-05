@@ -1,64 +1,122 @@
-// Test file for thermal printer functionality
-import { printThermal, generateReceiptHTML, printReceipt } from './printUtils';
+// Test file for printUtils.js
+import { printThermal, manualPrintReceipt } from './printUtils';
 
-// Mock order data for testing
-const mockOrder = {
-  id: 'test-123',
-  order_number: 'ORD001',
-  table_number: 5,
-  customer_name: 'Test Customer',
-  waiter_name: 'Test Waiter',
-  items: [
-    { name: 'Chicken Curry', quantity: 2, price: 250.00, notes: 'Extra spicy' },
-    { name: 'Naan Bread', quantity: 3, price: 50.00 },
-    { name: 'Rice', quantity: 1, price: 80.00 }
-  ],
-  subtotal: 680.00,
-  tax: 68.00,
-  total: 748.00,
-  payment_method: 'cash',
-  payment_received: 800.00,
-  balance_amount: 0,
-  created_at: new Date().toISOString()
+// Mock toast to avoid errors in tests
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn()
+  }
+}));
+
+// Mock localStorage
+const localStorageMock = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
 };
+global.localStorage = localStorageMock;
 
-const mockBusinessSettings = {
-  restaurant_name: 'Test Restaurant',
-  address: '123 Test Street, Test City',
-  phone: '+91 9876543210',
-  gstin: 'TEST123456789',
-  fssai: 'TEST987654321',
-  footer_message: 'Thank you for dining with us!'
-};
-
-// Test thermal printing functionality
-console.log('🧪 Testing thermal printer functionality...');
-
-// Test 1: Generate receipt HTML
-console.log('📄 Testing receipt HTML generation...');
-const receiptHTML = generateReceiptHTML(mockOrder, mockBusinessSettings);
-console.log('✅ Receipt HTML generated successfully');
-console.log('📏 Receipt HTML length:', receiptHTML.length, 'characters');
-
-// Test 2: Test print thermal function (will not actually print in test environment)
-console.log('🖨️ Testing printThermal function...');
-try {
-  const result = printThermal(receiptHTML, '80mm', false);
-  console.log('✅ printThermal function executed:', result);
-} catch (error) {
-  console.error('❌ printThermal function failed:', error);
-}
-
-// Test 3: Test print receipt function
-console.log('🧾 Testing printReceipt function...');
-try {
-  printReceipt(mockOrder, mockBusinessSettings).then(result => {
-    console.log('✅ printReceipt function executed:', result);
-  }).catch(error => {
-    console.error('❌ printReceipt function failed:', error);
+describe('printUtils', () => {
+  beforeEach(() => {
+    // Reset mocks
+    jest.clearAllMocks();
+    
+    // Mock user data in localStorage
+    localStorageMock.getItem.mockImplementation((key) => {
+      if (key === 'user') {
+        return JSON.stringify({
+          business_settings: {
+            print_customization: {
+              paper_width: '80mm',
+              font_size: 'medium',
+              auto_print: false
+            }
+          }
+        });
+      }
+      return null;
+    });
   });
-} catch (error) {
-  console.error('❌ printReceipt function failed:', error);
-}
 
-console.log('🎉 Thermal printer tests completed!');
+  test('printThermal with forceDialog=false should not trigger print dialogs', () => {
+    // Mock window.open to detect if print dialog is triggered
+    const mockOpen = jest.fn();
+    global.window.open = mockOpen;
+    
+    // Mock Electron API as not available
+    global.window.electronAPI = undefined;
+    
+    // Mock Bluetooth as not connected
+    global.navigator.bluetooth = undefined;
+    
+    // Mock Web Serial as not available
+    global.navigator.serial = undefined;
+    
+    const htmlContent = '<div>Test Receipt</div>';
+    
+    // Call printThermal with forceDialog=false
+    const result = printThermal(htmlContent, '80mm', false);
+    
+    // Should not open any print windows
+    expect(mockOpen).not.toHaveBeenCalled();
+    
+    // Should return true (silent print preparation)
+    expect(result).toBe(true);
+  });
+
+  test('manualPrintReceipt should use silent printing', async () => {
+    // Mock window.open to detect if print dialog is triggered
+    const mockOpen = jest.fn();
+    global.window.open = mockOpen;
+    
+    // Mock Electron API as not available
+    global.window.electronAPI = undefined;
+    
+    const mockOrder = {
+      id: 'test-123',
+      order_number: 'TEST001',
+      table_number: 1,
+      items: [
+        { name: 'Test Item', quantity: 1, price: 100 }
+      ],
+      subtotal: 100,
+      tax: 10,
+      total: 110,
+      created_at: new Date().toISOString()
+    };
+    
+    // Call manualPrintReceipt
+    const result = await manualPrintReceipt(mockOrder);
+    
+    // Should not open any print windows (no dialogs)
+    expect(mockOpen).not.toHaveBeenCalled();
+    
+    // Should return true (silent print preparation)
+    expect(result).toBe(true);
+  });
+
+  test('printThermal with forceDialog=true should trigger print dialog', () => {
+    // Mock window.open to simulate print dialog
+    const mockOpen = jest.fn().mockReturnValue({
+      document: {
+        write: jest.fn(),
+        close: jest.fn()
+      }
+    });
+    global.window.open = mockOpen;
+    
+    const htmlContent = '<div>Test Receipt</div>';
+    
+    // Call printThermal with forceDialog=true
+    const result = printThermal(htmlContent, '80mm', true);
+    
+    // Should open a print window
+    expect(mockOpen).toHaveBeenCalledWith('', '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
+    
+    // Should return true
+    expect(result).toBe(true);
+  });
+});
