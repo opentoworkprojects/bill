@@ -586,17 +586,22 @@ function App() {
         setPricing(response.data);
       } catch (error) {
         console.log('Failed to fetch pricing data:', error);
-        // Set fallback pricing to ensure banners can still show
+        // Set fallback pricing to ensure banners can still show - 5% Early Adopter Discount
         setPricing({
-          regular_price: 2999,
-          regular_price_display: '₹2999',
-          campaign_price: 2549,
-          campaign_price_display: '₹2549',
+          regular_price: 1999,
+          regular_price_display: '₹1999',
+          campaign_price: 1899,
+          campaign_price_display: '₹1899',
           campaign_active: true,
-          campaign_name: 'Early Adopter Special - 15% OFF',
+          campaign_name: 'Early Adopter Special - 5% OFF',
+          campaign_discount_percent: 5,
           early_adopter: true,
           early_adopter_eligible: true,
-          early_adopter_spots_left: 850
+          early_adopter_discount: 5,
+          early_adopter_spots_left: 850,
+          trial_expired_discount: 5,
+          trial_expired_price: 1899,
+          trial_expired_price_display: '₹1899'
         });
       }
     };

@@ -37,13 +37,15 @@ const TrialBanner = ({ user }) => {
       cache.timestamp = Date.now();
       setPricing(response.data);
     } catch (error) {
-      // Fallback pricing
+      // Fallback pricing with 5% early adopter discount
       setPricing({
         regular_price: 1999,
         regular_price_display: '₹1999',
-        trial_expired_discount: 10,
-        trial_expired_price: 1799,
-        trial_expired_price_display: '₹1799'
+        trial_expired_discount: 5,
+        trial_expired_price: 1899,
+        trial_expired_price_display: '₹1899',
+        early_adopter: true,
+        early_adopter_discount: 5
       });
     } finally {
       setLoading(false);
@@ -58,10 +60,10 @@ const TrialBanner = ({ user }) => {
   // Don't show if user has active subscription (not in trial)
   if (!is_trial && !trial_expired) return null;
 
-  // Get dynamic pricing from Super Admin
+  // Get dynamic pricing from Super Admin (5% early adopter discount)
   const regularPrice = pricing?.regular_price_display || '₹1999';
-  const discountPercent = pricing?.trial_expired_discount || 10;
-  const discountedPrice = pricing?.trial_expired_price_display || '₹1799';
+  const discountPercent = pricing?.early_adopter_discount || pricing?.trial_expired_discount || 5;
+  const discountedPrice = pricing?.trial_expired_price_display || '₹1899';
 
   // Determine banner color based on trial days
   const getBannerStyle = () => {

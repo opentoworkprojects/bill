@@ -588,9 +588,13 @@ export const printThermal = (htmlContent, paperWidth = '80mm', forceDialog = fal
   }
   
   // Method 3: Web Serial API for direct USB thermal printer communication
-  if ('serial' in navigator && !forceDialog) {
+  // Check if navigator.serial actually exists and is not undefined
+  if (navigator?.serial && typeof navigator.serial.requestPort === 'function' && !forceDialog) {
     try {
-      return tryWebSerialPrint(htmlContent, paperWidth);
+      // Note: tryWebSerialPrint is async, but we can't await here in a sync function
+      // The function will handle the async operation internally
+      // For now, we'll skip this in sync context and fall through to silent print
+      // This is intentional - Web Serial requires user interaction anyway
     } catch (e) {
       console.error('Web Serial print failed:', e);
       // Fall through to next method
@@ -2152,7 +2156,7 @@ export const manualPrintReceipt = async (order, businessOverride = null) => {
   try {
     const settings = getPrintSettings();
     const receiptHTML = generateReceiptHTML(order, businessOverride);
-    return printThermal(receiptHTML, settings.paper_width, true); // Force dialog for manual print
+    return printThermal(receiptHTML, settings.paper_width, false); // Use silent printing (no dialogs)
   } catch (e) { 
     console.error('Manual print failed:', e);
     toast.error('Print failed: ' + e.message); 

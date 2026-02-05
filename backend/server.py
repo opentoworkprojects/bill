@@ -15156,18 +15156,24 @@ async def get_public_pricing():
         pricing = await db.pricing_config.find_one({}, {"_id": 0})
         now = datetime.now(timezone.utc)
         
-        # Default pricing if no config exists
+        # Default pricing if no config exists - 5% Early Adopter Discount
         if not pricing:
             return {
                 "regular_price": 1999.0,
                 "regular_price_display": "₹1999",
-                "campaign_price": None,
-                "campaign_price_display": None,
-                "campaign_active": False,
-                "campaign_name": None,
-                "campaign_discount_percent": 0,
-                "campaign_start_date": None,
-                "campaign_end_date": None
+                "campaign_price": 1899.0,
+                "campaign_price_display": "₹1899",
+                "campaign_active": True,
+                "campaign_name": "Early Adopter Special - 5% OFF",
+                "campaign_discount_percent": 5,
+                "campaign_start_date": "2025-02-01T00:00:00+00:00",
+                "campaign_end_date": "2026-03-31T23:59:59+00:00",
+                "early_adopter": True,
+                "early_adopter_discount": 5,
+                "early_adopter_spots_left": 850,
+                "trial_expired_discount": 5,
+                "trial_expired_price": 1899.0,
+                "trial_expired_price_display": "₹1899"
             }
         
         regular_price = pricing.get("regular_price", 1999.0)

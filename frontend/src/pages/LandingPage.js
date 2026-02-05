@@ -15,6 +15,7 @@ import LeadCapturePopup from "../components/LeadCapturePopup";
 import MobileAppLeadPopup from "../components/MobileAppLeadPopup";
 import SaleBanner from "../components/SaleBanner";
 import TopBanner from "../components/TopBanner";
+import EarlyAdopterBanner from "../components/EarlyAdopterBanner";
 import useSaleOfferData from "../hooks/useSaleOfferData";
 import { HomepageSEO, FAQPageSchemaInjector } from "../seo";
 import {
@@ -1050,6 +1051,9 @@ const LandingPage = () => {
       ]} />
       
       <div className="min-h-screen bg-white" data-testid="landing-page">
+      {/* Early Adopter Banner - 5% Discount Offer */}
+      <EarlyAdopterBanner pricing={pricing} />
+      
       {/* Dynamic Top Banner - Multiple Designs from Super Admin */}
       {/* Pass centralized saleOffer data for consistency - Requirements: 8.1, 8.2 */}
       <TopBanner saleData={saleOffer} />
