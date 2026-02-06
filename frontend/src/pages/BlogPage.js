@@ -321,7 +321,7 @@ const BlogPage = () => {
           {/* Ad - Before Blog Grid */}
           <div className="mb-8">
             <AdSense 
-              slot="5544332211"
+              slot="1635338536"
               format="auto"
               responsive="true"
             />

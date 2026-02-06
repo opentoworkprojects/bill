@@ -111,7 +111,7 @@ const BlogPostPage = () => {
           {/* Ad - Top of Article */}
           <div className="my-8">
             <AdSense 
-              slot="1234567890"
+              slot="1635338536"
               format="auto"
               responsive="true"
               className="mb-8"
@@ -126,7 +126,7 @@ const BlogPostPage = () => {
           {/* Ad - Middle of Article */}
           <div className="my-8">
             <AdSense 
-              slot="9876543210"
+              slot="1635338536"
               format="auto"
               responsive="true"
               className="my-8"
@@ -151,7 +151,7 @@ const BlogPostPage = () => {
           {/* Ad - Bottom of Article */}
           <div className="mt-8">
             <AdSense 
-              slot="1122334455"
+              slot="1635338536"
               format="auto"
               responsive="true"
               className="mt-8"
