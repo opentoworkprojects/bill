@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp } from 'lucide-react';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { CategoryPageSEO } from '../seo';
+import AdSense from '../components/AdSense';
 
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -316,6 +317,16 @@ const BlogPage = () => {
               <p className="text-gray-600">Explore our complete collection of restaurant management guides</p>
             </div>
           )}
+
+          {/* Ad - Before Blog Grid */}
+          <div className="mb-8">
+            <AdSense 
+              slot="5544332211"
+              format="auto"
+              responsive="true"
+            />
+          </div>
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredPosts.map((post) => (
               <Card key={post.id} className="overflow-hidden hover:shadow-xl transition-shadow">

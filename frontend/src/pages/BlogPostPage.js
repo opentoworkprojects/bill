@@ -6,6 +6,7 @@ import { ChefHat, Calendar, User, Clock, ArrowLeft, Share2, BookmarkPlus } from 
 import { toast } from 'sonner';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { BlogPostSEO } from '../seo';
+import AdSense from '../components/AdSense';
 
 const BlogPostPage = () => {
   const { slug } = useParams();
@@ -107,9 +108,29 @@ const BlogPostPage = () => {
             {newBlogPost.title}
           </h1>
 
+          {/* Ad - Top of Article */}
+          <div className="my-8">
+            <AdSense 
+              slot="1234567890"
+              format="auto"
+              responsive="true"
+              className="mb-8"
+            />
+          </div>
+
           {/* Content */}
           <div className="prose prose-lg max-w-none">
             <div dangerouslySetInnerHTML={{ __html: newBlogPost.content.replace(/\n/g, '<br/>').replace(/###/g, '<h3>').replace(/##/g, '<h2>').replace(/\*\*/g, '<strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>') }} />
+          </div>
+
+          {/* Ad - Middle of Article */}
+          <div className="my-8">
+            <AdSense 
+              slot="9876543210"
+              format="auto"
+              responsive="true"
+              className="my-8"
+            />
           </div>
 
           {/* CTA */}
@@ -125,6 +146,16 @@ const BlogPostPage = () => {
             >
               Start Free Trial
             </Button>
+          </div>
+
+          {/* Ad - Bottom of Article */}
+          <div className="mt-8">
+            <AdSense 
+              slot="1122334455"
+              format="auto"
+              responsive="true"
+              className="mt-8"
+            />
           </div>
         </article>
         </div>
