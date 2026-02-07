@@ -138,3 +138,6 @@ psutil==5.9.6
 
 # Additional utilities
 aiofiles==23.2.1
+
+# AI Providers
+anthropic==0.40.0  # Anthropic Claude AI

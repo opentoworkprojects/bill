@@ -83,8 +83,8 @@ const Dashboard = ({ user }) => {
 
     fetchDashboardData();
 
-    // Set up polling for real-time updates
-    const interval = setInterval(fetchDashboardData, 3000); // Poll every 3 seconds
+    // Set up polling for real-time updates - increased to 30 seconds to prevent multiple refreshes
+    const interval = setInterval(fetchDashboardData, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
   }, []);
 

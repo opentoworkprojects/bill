@@ -86,6 +86,15 @@ from super_admin import super_admin_router, set_database as set_super_admin_db, 
 # Import ops panel router
 from ops_panel import ops_router, set_database as set_ops_db, set_redis_cache as set_ops_cache
 
+# Import AI Service
+try:
+    from ai_service import ai_service
+    # Silent initialization - no details exposed
+except Exception as e:
+    # Log internally but don't expose details
+    print(f"AI Service initialization issue")
+    ai_service = None
+
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv(
     "MONGO_URL",
@@ -8045,80 +8054,76 @@ class InventoryDeduction(BaseModel):
     quantity: int
 
 
-@api_router.post("/inventory/deduct")
+@api_router.post("/ai/chat")
 async def ai_chat(message: ChatMessage):
-    if not _LLM_AVAILABLE:
-        raise HTTPException(status_code=503, detail="LLM integration unavailable")
+    """BillByteKOT AI Assistant"""
     try:
-        chat = LlmChat(
-            api_key=os.environ.get("LLM_API_KEY"),
-            session_id=str(uuid.uuid4()),
-            system_message="You are a helpful restaurant assistant. Answer customer queries about menu, orders, and restaurant services.",
-        ).with_model("openai", "gpt-4o-mini")
-
-        user_msg = UserMessage(text=message.message)
-        response = await chat.send_message(user_msg)
-
+        if ai_service is None:
+            return {"response": "AI assistant is temporarily unavailable. Please try again later."}
+        
+        response = await ai_service.customer_support(
+            query=message.message,
+            context={"timestamp": datetime.now().isoformat()}
+        )
         return {"response": response}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log error internally but show generic message to user
+        print(f"AI Error: {str(e)}")
+        return {"response": "I'm having trouble processing your request. Please try again in a moment."}
 
 
 @api_router.post("/ai/recommendations")
 async def get_recommendations(current_user: dict = Depends(get_current_user)):
+    """Get AI-powered business recommendations"""
     try:
         user_org_id = get_secure_org_id(current_user)
         
+        # Get order history
         orders = await db.orders.find({
             "status": "completed",
             "organization_id": user_org_id
-        }, {"_id": 0}).limit(50).to_list(50)
+        }, {"_id": 0}).limit(100).to_list(100)
         
+        # Get menu items
         menu_items = await db.menu_items.find({
             "organization_id": user_org_id
         }, {"_id": 0}).to_list(1000)
 
         if not orders or not menu_items:
             return {
-                "recommendations": "Not enough data yet. Start taking orders to get AI recommendations!"
+                "recommendations": "📊 Start taking orders to get personalized business insights and recommendations!"
             }
 
+        # Calculate popular items
+        from collections import Counter
         order_items = []
         for order in orders:
-            order_items.extend([item["name"] for item in order["items"]])
-
-        from collections import Counter
-        popular_items = Counter(order_items).most_common(5)
-
-        if not _LLM_AVAILABLE:
-            # Fallback without AI
-            return {
-                "recommendations": f"Top selling items: {', '.join([item[0] for item in popular_items])}. Consider promoting these items!"
-            }
-
-        chat = LlmChat(
-            api_key=os.environ.get("LLM_API_KEY"),
-            session_id=str(uuid.uuid4()),
-            system_message="You are a restaurant menu analyst. Based on order history, suggest menu items that would pair well together.",
-        ).with_model("openai", "gpt-4o-mini")
-
-        prompt = f"Popular items: {popular_items}. Menu: {[item['name'] for item in menu_items[:20]]}. Suggest 5 complementary items."
-        user_msg = UserMessage(text=prompt)
-        response = await chat.send_message(user_msg)
-
+            order_items.extend([item["name"] for item in order.get("items", [])])
+        
+        popular_items = Counter(order_items).most_common(10)
+        
+        menu_data = {
+            "items": menu_items,
+            "popular_items": [{"name": item[0], "count": item[1]} for item in popular_items]
+        }
+        
+        response = await ai_service.menu_recommendations(menu_data, orders)
         return {"recommendations": response}
+        
     except Exception as e:
-        print(f"AI recommendations error: {str(e)}")
+        print(f"Recommendations error: {str(e)}")
         return {
-            "recommendations": "AI recommendations temporarily unavailable. Please try again later."
+            "recommendations": "Business insights are temporarily unavailable. Please try again later."
         }
 
 
 @api_router.post("/ai/sales-forecast")
 async def sales_forecast(current_user: dict = Depends(get_current_user)):
+    """Get intelligent sales forecast and analysis"""
     try:
         user_org_id = get_secure_org_id(current_user)
         
+        # Get completed orders
         orders = await db.orders.find({
             "status": "completed",
             "organization_id": user_org_id
@@ -8126,7 +8131,7 @@ async def sales_forecast(current_user: dict = Depends(get_current_user)):
 
         if not orders:
             return {
-                "forecast": "Not enough data yet. Complete some orders to get sales forecasts!",
+                "forecast": "📊 Complete some orders to get intelligent sales forecasts and business insights!",
                 "current_stats": {
                     "total_orders": 0,
                     "total_sales": 0,
@@ -8134,30 +8139,33 @@ async def sales_forecast(current_user: dict = Depends(get_current_user)):
                 },
             }
 
-        total_sales = sum(order["total"] for order in orders)
+        # Calculate statistics
+        total_sales = sum(order.get("total", 0) for order in orders)
         avg_order_value = total_sales / len(orders) if orders else 0
-
-        if not _LLM_AVAILABLE:
-            # Fallback without AI
-            return {
-                "forecast": f"Based on {len(orders)} orders with ₹{total_sales:.2f} total sales, your average order value is ₹{avg_order_value:.2f}. Keep up the good work!",
-                "current_stats": {
-                    "total_orders": len(orders),
-                    "total_sales": total_sales,
-                    "avg_order": avg_order_value,
-                },
-            }
-
-        chat = LlmChat(
-            api_key=os.environ.get("LLM_API_KEY"),
-            session_id=str(uuid.uuid4()),
-            system_message="You are a sales analyst. Provide sales predictions based on historical data.",
-        ).with_model("openai", "gpt-4o-mini")
-
-        prompt = f"Total orders: {len(orders)}, Total sales: ₹{total_sales:.2f}, Average order: ₹{avg_order_value:.2f}. Predict next week's sales."
-        user_msg = UserMessage(text=prompt)
-        response = await chat.send_message(user_msg)
-
+        
+        # Get peak hours
+        from collections import Counter
+        order_hours = [datetime.fromisoformat(order.get("created_at", "")).hour 
+                      for order in orders if order.get("created_at")]
+        peak_hours = Counter(order_hours).most_common(3)
+        
+        # Get top items
+        all_items = []
+        for order in orders:
+            all_items.extend([item.get("name") for item in order.get("items", [])])
+        top_items = Counter(all_items).most_common(5)
+        
+        sales_data = {
+            "total_sales": total_sales,
+            "total_orders": len(orders),
+            "avg_order_value": avg_order_value,
+            "top_items": [{"name": item[0], "count": item[1]} for item in top_items],
+            "peak_hours": [{"hour": f"{hour}:00", "orders": count} for hour, count in peak_hours]
+        }
+        
+        # Get intelligent analysis
+        response = await ai_service.analyze_sales(sales_data)
+        
         return {
             "forecast": response,
             "current_stats": {
@@ -8167,15 +8175,47 @@ async def sales_forecast(current_user: dict = Depends(get_current_user)):
             },
         }
     except Exception as e:
-        print(f"AI forecast error: {str(e)}")
+        print(f"Sales forecast error: {str(e)}")
         return {
-            "forecast": "AI forecast temporarily unavailable. Please try again later.",
+            "forecast": "Sales insights are temporarily unavailable. Please try again later.",
             "current_stats": {
                 "total_orders": 0,
                 "total_sales": 0,
                 "avg_order": 0,
             },
         }
+
+
+@api_router.post("/ai/inventory-insights")
+async def inventory_insights(current_user: dict = Depends(get_current_user)):
+    """Get intelligent inventory management insights"""
+    try:
+        user_org_id = get_secure_org_id(current_user)
+        
+        # Get inventory items
+        inventory = await db.inventory.find({
+            "organization_id": user_org_id
+        }, {"_id": 0}).to_list(1000)
+        
+        if not inventory:
+            return {"insights": "📦 Add inventory items to get intelligent management insights!"}
+        
+        # Analyze inventory
+        low_stock = [item for item in inventory if item.get("quantity", 0) < item.get("min_quantity", 10)]
+        out_of_stock = [item for item in inventory if item.get("quantity", 0) == 0]
+        
+        inventory_data = {
+            "total_items": len(inventory),
+            "low_stock": [{"name": item.get("name"), "quantity": item.get("quantity")} for item in low_stock[:10]],
+            "out_of_stock": [item.get("name") for item in out_of_stock[:10]]
+        }
+        
+        response = await ai_service.inventory_insights(inventory_data)
+        return {"insights": response}
+        
+    except Exception as e:
+        print(f"Inventory insights error: {str(e)}")
+        return {"insights": "Inventory insights are temporarily unavailable. Please try again later."}
 
 
 # Reports
