@@ -2351,8 +2351,7 @@ const BillingPage = ({ user }) => {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-4 gap-2 mt-3">
-              <Button variant="outline" size="sm" onClick={handlePreview} className="h-9"><Eye className="w-4 h-4 mr-1" />Preview</Button>
+            <div className="grid grid-cols-3 gap-2 mt-3">
               <Button variant="outline" size="sm" onClick={() => {
                 // Use manual print for user-initiated printing (shows dialog)
                 const receiptData = { 
@@ -2913,8 +2912,7 @@ const BillingPage = ({ user }) => {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-4 gap-3 mt-4">
-              <Button variant="outline" onClick={handlePreview} className="h-12 text-base"><Eye className="w-4 h-4 mr-1" />Preview</Button>
+            <div className="grid grid-cols-3 gap-3 mt-4">
               <Button variant="outline" onClick={() => {
                 // Use manual print for user-initiated printing (shows dialog)
                 const receiptData = { 
