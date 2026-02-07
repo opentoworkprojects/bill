@@ -9,7 +9,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { Plus, Eye, Printer, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw } from 'lucide-react';
 import TrialBanner from '../components/TrialBanner';
-import { printKOT as printKOTUtil, printReceipt as printReceiptUtil } from '../utils/printUtils';
+import { manualPrintKOT, manualPrintReceipt } from '../utils/printUtils';
 import OptimizedBillingButton from '../components/OptimizedBillingButton';
 import { billingCache } from '../utils/billingCache';
 import EditOrderModal from '../components/EditOrderModal';
