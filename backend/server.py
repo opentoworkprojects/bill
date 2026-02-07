@@ -474,6 +474,17 @@ class BusinessSettings(BaseModel):
     frontend_url: Optional[str] = None  # For generating QR codes
     # UPI Payment Settings
     upi_id: Optional[str] = None  # UPI ID for QR code payments
+    # Payment Methods Configuration
+    payment_methods_enabled: Optional[dict] = {
+        "cash": True,
+        "card": True,
+        "upi": True,
+        "credit": True
+    }
+    # Credit Payment Settings
+    credit_payment_enabled: bool = True
+    credit_requires_customer_info: bool = True  # Require name/phone for credit orders
+    credit_minimum_amount: float = 0.0  # Minimum amount for credit orders
 
 
 class User(BaseModel):

@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye } from 'lucide-react';
+import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye, FileText } from 'lucide-react';
 import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
 import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPayment';
 import { billingCache } from '../utils/billingCache';
@@ -478,6 +478,70 @@ const BillingPage = ({ user }) => {
       setMenuLoading(false);
     }
   };
+
+  // 🧠 SMART PAYMENT METHODS: Dynamic based on business logic
+  const getAvailablePaymentMethods = useMemo(() => {
+    const methods = [];
+    
+    // Cash - Always available for all restaurant types
+    methods.push({ 
+      id: 'cash', 
+      icon: Wallet, 
+      label: 'Cash', 
+      color: '#22c55e',
+      enabled: true,
+      description: 'Cash payment'
+    });
+    
+    // Card - Available for all except food trucks/stalls (typically no card machines)
+    const businessType = businessSettings?.business_type || 'restaurant';
+    const hasCardFacility = !['food-truck', 'stall'].includes(businessType);
+    methods.push({ 
+      id: 'card', 
+      icon: CreditCard, 
+      label: 'Card', 
+      color: '#3b82f6',
+      enabled: hasCardFacility,
+      description: hasCardFacility ? 'Card payment' : 'Not available for this business type'
+    });
+    
+    // UPI - Available if UPI ID is configured OR for modern business types
+    const hasUpiId = businessSettings?.upi_id && businessSettings.upi_id.trim().length > 0;
+    const isModernBusiness = ['restaurant', 'cafe', 'cloud-kitchen', 'takeaway-only'].includes(businessType);
+    const upiEnabled = hasUpiId || isModernBusiness;
+    methods.push({ 
+      id: 'upi', 
+      icon: Smartphone, 
+      label: 'UPI', 
+      color: '#8b5cf6',
+      enabled: upiEnabled,
+      description: upiEnabled ? 'UPI payment' : 'Configure UPI ID in settings'
+    });
+    
+    // Credit - Available for restaurants with KOT mode (table service) or if explicitly needed
+    const hasTableService = businessSettings?.kot_mode_enabled === true;
+    const isFullServiceRestaurant = ['restaurant', 'cafe'].includes(businessType);
+    const creditEnabled = hasTableService || isFullServiceRestaurant;
+    methods.push({ 
+      id: 'credit', 
+      icon: FileText, 
+      label: 'Credit', 
+      color: '#f97316',
+      enabled: creditEnabled,
+      description: creditEnabled ? 'Customer pays later' : 'Not available for quick-service businesses'
+    });
+    
+    return methods.filter(m => m.enabled);
+  }, [businessSettings]);
+
+  // Calculate grid columns based on available payment methods
+  const paymentGridCols = useMemo(() => {
+    const count = getAvailablePaymentMethods.length;
+    if (count === 1) return 'grid-cols-1';
+    if (count === 2) return 'grid-cols-2';
+    if (count === 3) return 'grid-cols-3';
+    return 'grid-cols-4';
+  }, [getAvailablePaymentMethods]);
 
   const getCurrencySymbol = () => {
     const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
@@ -2042,16 +2106,22 @@ const BillingPage = ({ user }) => {
             {/* Payment Method Selection */}
             <div className="bg-gray-50 p-2 sm:p-3 rounded-lg mt-2 sm:mt-3">
               <h4 className="font-semibold text-xs sm:text-sm mb-2">Payment Method</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {[{ id: 'cash', icon: Wallet, label: 'Cash', color: '#22c55e' }, { id: 'card', icon: CreditCard, label: 'Card', color: '#3b82f6' }, { id: 'upi', icon: Smartphone, label: 'UPI', color: '#8b5cf6' }].map(m => (
+              <div className={`grid ${paymentGridCols} gap-2`}>
+                {getAvailablePaymentMethods.map(m => (
                   <button 
                     key={m.id} 
                     onClick={() => {
                       setPaymentMethod(m.id);
                       setSplitPayment(false);
+                      // For credit orders, automatically set received amount to 0 and show the input
+                      if (m.id === 'credit') {
+                        setShowReceivedAmount(true);
+                        setReceivedAmount('0');
+                      }
                     }} 
                     className={`py-1.5 sm:py-2 rounded-lg flex flex-col items-center gap-1 border-2 transition-all ${paymentMethod === m.id && !splitPayment ? 'text-white border-transparent' : 'bg-white border-gray-200'}`} 
                     style={paymentMethod === m.id && !splitPayment ? { backgroundColor: m.color } : {}}
+                    title={m.description}
                   >
                     <m.icon className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span className="text-[11px] sm:text-xs font-medium">{m.label}</span>

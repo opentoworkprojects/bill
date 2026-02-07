@@ -234,7 +234,14 @@ const ReportsPage = ({ user }) => {
   const fetchCustomerBalances = useCallback(async () => {
     setCustomerBalanceLoading(true);
     try {
-      const response = await axios.get(`${API}/reports/customer-balances`);
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`${API}/reports/customer-balances`, { 
+        headers,
+        timeout: 10000 // 10 second timeout
+      });
+      
       const data = response.data || [];
       
       // Log for debugging
@@ -258,6 +265,8 @@ const ReportsPage = ({ user }) => {
         console.log("💡 Backend endpoint /reports/customer-balances not found");
       } else if (error.response?.status === 401) {
         toast.error("Authentication required for customer balances");
+      } else if (error.code === 'ECONNABORTED') {
+        toast.error("Request timeout - server took too long to respond");
       } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
         toast.error("Cannot connect to backend server");
         console.log("💡 Backend server might not be running");
@@ -289,6 +298,7 @@ const ReportsPage = ({ user }) => {
           ];
           setCustomerBalances(mockData);
           toast.info("Using mock data for testing (development mode)");
+          setCustomerBalanceLoading(false);
           return;
         }
       } else {
@@ -2609,31 +2619,39 @@ const ReportsPage = ({ user }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Outstanding Customer Balances</h3>
-                    <div className="text-sm text-gray-500 space-y-2 max-w-md mx-auto">
-                      <p>Customer balances appear here when:</p>
-                      <ul className="text-left space-y-1">
-                        <li>• Customers make partial payments on orders</li>
-                        <li>• Orders are marked as "Credit" with pending amounts</li>
-                        <li>• Payment received is less than the total bill amount</li>
-                      </ul>
-                      <p className="mt-4 text-xs text-gray-400">
-                        Create credit orders from the Billing page to see customer balances here
+                  <div className="text-center py-12">
+                    <div className="relative inline-block mb-6">
+                      <Users className="w-16 h-16 text-gray-300 mx-auto" />
+                      <CheckCircle className="w-6 h-6 text-green-500 absolute -bottom-1 -right-1 bg-white rounded-full" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">All Clear! No Outstanding Balances</h3>
+                    <div className="text-sm text-gray-600 space-y-3 max-w-lg mx-auto">
+                      <p className="text-base">Great news! All your customers have paid in full.</p>
+                      
+                      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="font-medium text-blue-900 mb-2">💡 How Customer Balances Work:</p>
+                        <ul className="text-left space-y-2 text-blue-800">
+                          <li>• Create orders with <strong>Credit</strong> payment method</li>
+                          <li>• Accept <strong>partial payments</strong> on orders</li>
+                          <li>• Track customers who owe money</li>
+                          <li>• View outstanding amounts here</li>
+                        </ul>
+                      </div>
+                      
+                      <p className="mt-4 text-xs text-gray-500 italic">
+                        Tip: Go to Billing → Select items → Choose "Credit" payment → Enter partial amount
                       </p>
                     </div>
                     
                     {/* Manual refresh button */}
-                    <div className="mt-6">
+                    <div className="mt-8 flex gap-3 justify-center">
                       <Button
                         onClick={fetchCustomerBalances}
                         disabled={customerBalanceLoading}
                         variant="outline"
-                        className="mx-auto"
                       >
                         <RefreshCw className={`w-4 h-4 mr-2 ${customerBalanceLoading ? 'animate-spin' : ''}`} />
-                        {customerBalanceLoading ? 'Checking...' : 'Check Again'}
+                        {customerBalanceLoading ? 'Checking...' : 'Refresh Data'}
                       </Button>
                     </div>
                   </div>

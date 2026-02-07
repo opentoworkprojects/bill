@@ -7,15 +7,16 @@ export class PaymentValidator {
   constructor() {
     this.supportedPaymentMethods = ['cash', 'card', 'upi', 'credit', 'split'];
     this.maxAmount = 999999.99; // Maximum payment amount
-    this.minAmount = 0.01; // Minimum payment amount
+    this.minAmount = 0; // Minimum payment amount (allow 0 for full credit orders)
   }
 
   /**
    * Validate payment amount
    * @param {number|string} amount - Payment amount to validate
+   * @param {boolean} allowZero - Whether to allow zero amount (for credit orders)
    * @returns {Object} - Validation result with isValid and error message
    */
-  validateAmount(amount) {
+  validateAmount(amount, allowZero = false) {
     try {
       // Convert to number if string
       const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -28,8 +29,16 @@ export class PaymentValidator {
         };
       }
       
-      // Check if positive
-      if (numAmount < this.minAmount) {
+      // Check if negative
+      if (numAmount < 0) {
+        return {
+          isValid: false,
+          error: 'Payment amount cannot be negative'
+        };
+      }
+      
+      // Check if zero (only allowed for credit orders)
+      if (numAmount === 0 && !allowZero) {
         return {
           isValid: false,
           error: `Payment amount must be at least ₹${this.minAmount}`
@@ -296,27 +305,37 @@ export class PaymentValidator {
         return methodValidation;
       }
       
-      // Validate payment amount
-      const amountValidation = this.validateAmount(paymentAmount);
+      // Determine if this is a credit transaction (allow zero payment)
+      const isCredit = paymentMethod === 'credit' || (splitAmounts && splitAmounts.credit_amount > 0);
+      
+      // Validate payment amount (allow zero ONLY for credit orders)
+      const amountValidation = this.validateAmount(paymentAmount, isCredit);
       if (!amountValidation.isValid) {
         return amountValidation;
       }
       
-      // Check if payment amount matches order total (for full payments)
-      if (paymentMethod !== 'credit' && paymentMethod !== 'split') {
-        const orderTotal = parseFloat(orderData.total);
+      // IMPORTANT: For non-credit payments, amount must be greater than 0
+      // Partial payments (₹200 on ₹1000 bill) are allowed
+      // Overpayments (₹1200 on ₹1000 bill) are allowed (change will be returned)
+      if (!isCredit && paymentMethod !== 'split') {
         const payAmount = amountValidation.validAmount;
         
-        if (Math.abs(orderTotal - payAmount) > 0.01) {
+        // Must have some payment for non-credit orders
+        if (payAmount <= 0) {
           return {
             isValid: false,
-            error: `Payment amount (₹${payAmount.toFixed(2)}) does not match order total (₹${orderTotal.toFixed(2)})`
+            error: 'Payment amount must be greater than ₹0. Use "Credit" payment method for pay-later orders.'
           };
         }
+        
+        // Payment can be any positive amount:
+        // - Less than total = Partial payment (balance tracked)
+        // - Equal to total = Full payment
+        // - More than total = Overpayment (change returned)
+        // All are valid!
       }
       
       // Validate customer info for credit transactions
-      const isCredit = paymentMethod === 'credit' || (splitAmounts && splitAmounts.credit_amount > 0);
       const customerValidation = this.validateCustomerInfo(customerInfo, isCredit);
       if (!customerValidation.isValid) {
         return customerValidation;
