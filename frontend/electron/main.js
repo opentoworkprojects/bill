@@ -271,11 +271,14 @@ ipcMain.on('show-notification', (event, { title, body }) => {
 
 // Handle print request - SILENT PRINT (direct to default printer)
 ipcMain.on('print-receipt', (event, content, options = {}) => {
+  console.log('[BillByteKOT] Print request received');
+  
   const printWindow = new BrowserWindow({ 
     show: false,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      offscreen: false
     }
   });
   
@@ -293,6 +296,7 @@ ipcMain.on('print-receipt', (event, content, options = {}) => {
         margin: 0 !important; 
         padding: 0 !important; 
         -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
       } 
     }
     body { 
@@ -345,60 +349,104 @@ ipcMain.on('print-receipt', (event, content, options = {}) => {
   printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
   
   printWindow.webContents.on('did-finish-load', () => {
-    // Get available printers
-    printWindow.webContents.getPrintersAsync().then(printers => {
-      console.log('[BillByteKOT] Available printers:', printers.map(p => p.name));
-      
-      // Find thermal printer or use default
-      const thermalPrinter = printers.find(p => 
-        p.name.toLowerCase().includes('thermal') ||
-        p.name.toLowerCase().includes('pos') ||
-        p.name.toLowerCase().includes('receipt') ||
-        p.name.toLowerCase().includes('58mm') ||
-        p.name.toLowerCase().includes('80mm')
-      );
-      
-      const printOptions = {
-        silent: true, // SILENT PRINT - no dialog!
-        printBackground: true,
-        deviceName: thermalPrinter ? thermalPrinter.name : '', // Use thermal printer if found
-        margins: { marginType: 'none' },
-        pageSize: { width: 80000, height: 297000 } // 80mm width in microns
-      };
-      
-      console.log('[BillByteKOT] Printing silently to:', printOptions.deviceName || 'default printer');
-      
-      printWindow.webContents.print(printOptions, (success, failureReason) => {
-        if (success) {
-          console.log('[BillByteKOT] Print successful');
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('print-result', { success: true });
+    console.log('[BillByteKOT] Print window loaded, getting printers...');
+    
+    // Add a small delay to ensure content is fully rendered
+    setTimeout(() => {
+      // Get available printers
+      printWindow.webContents.getPrintersAsync().then(printers => {
+        console.log('[BillByteKOT] Available printers:', printers.map(p => p.name));
+        
+        // Find thermal printer or use default
+        const thermalPrinter = printers.find(p => 
+          p.name.toLowerCase().includes('thermal') ||
+          p.name.toLowerCase().includes('pos') ||
+          p.name.toLowerCase().includes('receipt') ||
+          p.name.toLowerCase().includes('58mm') ||
+          p.name.toLowerCase().includes('80mm') ||
+          p.name.toLowerCase().includes('xprinter') ||
+          p.name.toLowerCase().includes('epson') ||
+          p.name.toLowerCase().includes('star')
+        );
+        
+        const printOptions = {
+          silent: true, // SILENT PRINT - no dialog!
+          printBackground: true,
+          color: false,
+          deviceName: thermalPrinter ? thermalPrinter.name : '', // Use thermal printer if found
+          margins: { marginType: 'none' },
+          pageSize: paperWidth === '58mm' ? 
+            { width: 58000, height: 297000 } : // 58mm width in microns
+            { width: 80000, height: 297000 }   // 80mm width in microns
+        };
+        
+        console.log('[BillByteKOT] Printing silently to:', printOptions.deviceName || 'default printer');
+        console.log('[BillByteKOT] Print options:', printOptions);
+        
+        printWindow.webContents.print(printOptions, (success, failureReason) => {
+          if (success) {
+            console.log('[BillByteKOT] Print successful');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('print-result', { success: true });
+            }
+          } else {
+            console.error('[BillByteKOT] Print failed:', failureReason);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('print-result', { success: false, error: failureReason });
+            }
           }
-        } else {
-          console.error('[BillByteKOT] Print failed:', failureReason);
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('print-result', { success: false, error: failureReason });
-          }
-        }
-        printWindow.close();
+          
+          // Close print window after a short delay
+          setTimeout(() => {
+            if (!printWindow.isDestroyed()) {
+              printWindow.close();
+            }
+          }, 500);
+        });
+      }).catch(err => {
+        console.error('[BillByteKOT] Failed to get printers:', err);
+        // Fallback to silent print with default printer
+        printWindow.webContents.print({ 
+          silent: true, 
+          printBackground: true,
+          color: false,
+          margins: { marginType: 'none' }
+        }, (success, failureReason) => {
+          console.log('[BillByteKOT] Fallback print result:', success ? 'success' : failureReason);
+          setTimeout(() => {
+            if (!printWindow.isDestroyed()) {
+              printWindow.close();
+            }
+          }, 500);
+        });
       });
-    }).catch(err => {
-      console.error('[BillByteKOT] Failed to get printers:', err);
-      // Fallback to silent print with default printer
-      printWindow.webContents.print({ silent: true, printBackground: true }, (success) => {
-        printWindow.close();
-      });
-    });
+    }, 300); // 300ms delay to ensure rendering is complete
+  });
+  
+  // Handle load errors
+  printWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[BillByteKOT] Print window failed to load:', errorCode, errorDescription);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('print-result', { success: false, error: errorDescription });
+    }
+    if (!printWindow.isDestroyed()) {
+      printWindow.close();
+    }
   });
 });
 
 // Handle print with dialog (for when user wants to choose printer)
 ipcMain.on('print-receipt-dialog', (event, content, options = {}) => {
+  console.log('[BillByteKOT] Print dialog request received');
+  
   const printWindow = new BrowserWindow({ 
     show: false,
+    width: 400,
+    height: 600,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      offscreen: false
     }
   });
   
@@ -416,6 +464,7 @@ ipcMain.on('print-receipt-dialog', (event, content, options = {}) => {
         margin: 0 !important; 
         padding: 0 !important; 
         -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
       } 
     }
     body { 
@@ -467,9 +516,45 @@ ipcMain.on('print-receipt-dialog', (event, content, options = {}) => {
   printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
   
   printWindow.webContents.on('did-finish-load', () => {
-    printWindow.webContents.print({ silent: false, printBackground: true }, (success) => {
+    console.log('[BillByteKOT] Print dialog window loaded');
+    
+    // Add a small delay to ensure content is fully rendered
+    setTimeout(() => {
+      const printOptions = {
+        silent: false, // Show print dialog
+        printBackground: true,
+        color: false,
+        margins: { marginType: 'none' },
+        pageSize: paperWidth === '58mm' ? 
+          { width: 58000, height: 297000 } : 
+          { width: 80000, height: 297000 }
+      };
+      
+      console.log('[BillByteKOT] Opening print dialog...');
+      
+      printWindow.webContents.print(printOptions, (success, failureReason) => {
+        if (success) {
+          console.log('[BillByteKOT] Print dialog completed successfully');
+        } else {
+          console.log('[BillByteKOT] Print dialog cancelled or failed:', failureReason);
+        }
+        
+        // Close print window after a short delay
+        setTimeout(() => {
+          if (!printWindow.isDestroyed()) {
+            printWindow.close();
+          }
+        }, 500);
+      });
+    }, 300);
+  });
+  
+  // Handle load errors
+  printWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[BillByteKOT] Print dialog window failed to load:', errorCode, errorDescription);
+    if (!printWindow.isDestroyed()) {
       printWindow.close();
-    });
+    }
   });
 });
 
