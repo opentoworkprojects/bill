@@ -2927,10 +2927,11 @@ const BillingPage = ({ user }) => {
                   discount_amount: calculateDiscountAmount(), 
                   tax_rate: getEffectiveTaxRate()
                 };
-                manualPrintReceipt(receiptData, businessSettings);
-              }} className="h-12 text-base"><Printer className="w-4 h-4 mr-1" />Print</Button>
-              <Button variant="outline" onClick={downloadBillPDF} className="h-12 text-base"><Download className="w-4 h-4 mr-1" />PDF</Button>
-              <Button variant="outline" onClick={() => setShowWhatsappModal(true)} className="h-12 text-base border-green-500 text-green-600 hover:bg-green-50"><MessageCircle className="w-4 h-4 mr-1" />Share</Button>
+                setPrintPreviewOrder(receiptData);
+                setShowPrintPreview(true);
+              }} className="h-12 text-base bg-cyan-500 hover:bg-cyan-600 text-white" data-testid="print-preview-btn"><Eye className="w-4 h-4 mr-1" />Preview & Print</Button>
+              <Button variant="outline" onClick={downloadBillPDF} className="h-12 text-base" data-testid="download-pdf-btn"><Download className="w-4 h-4 mr-1" />PDF</Button>
+              <Button variant="outline" onClick={() => setShowWhatsappModal(true)} className="h-12 text-base border-green-500 text-green-600 hover:bg-green-50" data-testid="share-whatsapp-btn"><MessageCircle className="w-4 h-4 mr-1" />Share</Button>
             </div>
             {paymentCompleted && <Button variant="ghost" onClick={() => navigate('/orders')} className="w-full mt-4 h-12 text-lg">← Back to Orders</Button>}
           </div>
