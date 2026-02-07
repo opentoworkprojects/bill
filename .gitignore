@@ -374,3 +374,7 @@ passwords.txt
 .passwords
 
 # ============ END ============
+-e 
+# Environment files
+*.env
+*.env.*
