@@ -13,6 +13,9 @@ import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
+import AIInsightsPanel from '../components/AIInsightsPanel';
+import QuickActionsPanel from '../components/QuickActionsPanel';
+import LiveMetricsBar from '../components/LiveMetricsBar';
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
