@@ -2128,11 +2128,26 @@ export const printKOT = async (order, businessOverride = null) => {
     const kotHTML = generateKOTHTML(order, businessOverride);
     
     // Use the enhanced printThermal function with proper fallback chain
+    // For auto-KOT, use silent printing (forceDialog = false)
     const success = printThermal(kotHTML, settings.paper_width, false);
     
     return success;
   } catch (e) { 
     console.error('KOT print error:', e);
+    toast.error('KOT print failed: ' + e.message); 
+    return false; 
+  }
+};
+
+// Manual KOT print function for user-initiated KOT printing (shows print dialog)
+export const manualPrintKOT = async (order, businessOverride = null) => {
+  try {
+    const settings = getPrintSettings();
+    const kotHTML = generateKOTHTML(order, businessOverride);
+    // Use forceDialog = true for user-initiated prints so the print dialog actually shows
+    return printThermal(kotHTML, settings.paper_width, true);
+  } catch (e) { 
+    console.error('Manual KOT print failed:', e);
     toast.error('KOT print failed: ' + e.message); 
     return false; 
   }
