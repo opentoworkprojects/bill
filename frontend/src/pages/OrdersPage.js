@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
@@ -94,6 +95,7 @@ const playSound = (type) => {
 };
 
 const OrdersPage = ({ user }) => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [todaysBills, setTodaysBills] = useState([]);
   const [tables, setTables] = useState([]);
@@ -2190,7 +2192,7 @@ const OrdersPage = ({ user }) => {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => window.open('/tables', '_blank')}
+                                  onClick={() => navigate('/tables')}
                                   className="w-full px-3 py-3 text-sm bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-colors font-medium touch-target"
                                 >
                                   Create New Table

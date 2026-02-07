@@ -1071,7 +1071,7 @@ const InventoryPage = ({ user }) => {
 
   const handlePrintInventory = () => {
     const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price_per_unit), 0);
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open('about:blank', '_blank');
     printWindow.document.write(`<!DOCTYPE html><html><head><title>Inventory Report</title>
       <style>body{font-family:Arial;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px}th{background:#7c3aed;color:white}.low{background:#fef3c7}</style></head>
       <body><h1>📦 Inventory Report</h1><p>Generated: ${new Date().toLocaleString()}</p>

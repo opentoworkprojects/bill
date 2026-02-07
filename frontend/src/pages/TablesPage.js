@@ -962,7 +962,7 @@ const TablesPage = ({ user }) => {
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={() => {
-                    const printWindow = window.open('', '', 'width=400,height=500');
+                    const printWindow = window.open('about:blank', '', 'width=400,height=500');
                     printWindow.document.write(`<html><head><title>Table ${qrModal.table.table_number} QR</title></head>
                       <body style="text-align:center;padding:20px;font-family:sans-serif;">
                       <h2>Table ${qrModal.table.table_number}</h2>

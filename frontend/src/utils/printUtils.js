@@ -962,7 +962,7 @@ const silentThermalPrint = (htmlContent, paperWidth = '80mm') => {
 
 // Function for when dialog is explicitly requested
 const printWithDialog = (htmlContent, paperWidth = '80mm') => {
-  const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
+  const printWindow = window.open('about:blank', '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
   if (!printWindow) {
     toast.error('Popup blocked! Please allow popups for printing.');
     return false;

@@ -1245,7 +1245,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         return;
       }
       
-      const printWindow = window.open('', '_blank', 'width=400,height=600');
+      const printWindow = window.open('about:blank', '_blank', 'width=400,height=600');
       
       if (!printWindow) {
         toast.error('Unable to open print window. Please check your popup blocker settings.');

@@ -34,7 +34,7 @@ export const useElectron = () => {
       window.electronAPI.printReceipt(htmlContent);
     } else {
       // Fallback for web: open print window
-      const printWindow = window.open('', '', 'width=400,height=600');
+      const printWindow = window.open('about:blank', '', 'width=400,height=600');
       printWindow.document.write(htmlContent);
       printWindow.document.close();
       printWindow.focus();

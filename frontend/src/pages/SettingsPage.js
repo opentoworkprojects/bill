@@ -857,7 +857,7 @@ const SettingsPage = ({ user }) => {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const printWindow = window.open('', '_blank');
+                              const printWindow = window.open('about:blank', '_blank');
                               const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getMenuUrl())}`;
                               const restaurantName = businessSettings.restaurant_name || 'Restaurant';
                               printWindow.document.write(`

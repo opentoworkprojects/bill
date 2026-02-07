@@ -446,7 +446,7 @@ const ReportsPage = ({ user }) => {
         toast.success("Stock report CSV exported successfully!");
       } else if (format === 'pdf') {
         // Export Stock Report as PDF
-        const printWindow = window.open('', '_blank');
+        const printWindow = window.open('about:blank', '_blank');
         printWindow.document.write(`
           <!DOCTYPE html>
           <html>
@@ -837,7 +837,7 @@ const ReportsPage = ({ user }) => {
       const totalSubtotal = orders.reduce((sum, order) => sum + order.subtotal, 0);
 
       // Create PDF-friendly print window
-      const printWindow = window.open('', '_blank');
+      const printWindow = window.open('about:blank', '_blank');
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -1042,7 +1042,7 @@ const ReportsPage = ({ user }) => {
       const totalSubtotal = orders.reduce((sum, order) => sum + order.subtotal, 0);
 
       // Create print window
-      const printWindow = window.open('', '_blank');
+      const printWindow = window.open('about:blank', '_blank');
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -1238,7 +1238,7 @@ const ReportsPage = ({ user }) => {
       const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
 
       // Create comprehensive PDF report
-      const printWindow = window.open('', '_blank');
+      const printWindow = window.open('about:blank', '_blank');
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -2875,7 +2875,7 @@ const DayBookTab = ({ dateRange }) => {
   // Fallback client-side PDF generation
   const handleExportDayBookPDFFallback = () => {
     try {
-      const printWindow = window.open('', '_blank');
+      const printWindow = window.open('about:blank', '_blank');
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
