@@ -94,23 +94,23 @@ button:active {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-/* Scrollbar */
+/* Scrollbar - Dark theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f3f5;
+  background: var(--bg-surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #adb5bd;
+  background: var(--bg-surface-highlight);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #868e96;
+  background: #3f3f46;
 }
 
 /* Loading animation */
