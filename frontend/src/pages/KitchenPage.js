@@ -11,7 +11,7 @@ import {
   Maximize, Minimize, Utensils, Coffee, AlertCircle, Grid3X3, List, Zap, Truck,
   Phone, Vibrate, Settings, Speaker
 } from 'lucide-react';
-import { printKOT as printKOTUtil } from '../utils/printUtils';
+import { manualPrintKOT } from '../utils/printUtils';
 
 const KitchenPage = ({ user }) => {
   const [orders, setOrders] = useState([]);
