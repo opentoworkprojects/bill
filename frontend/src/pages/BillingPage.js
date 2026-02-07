@@ -943,13 +943,13 @@ const BillingPage = ({ user }) => {
         receiptData.credit_amount = balance;
       }
 
-      // Only auto-print if enabled in settings (check businessSettings for auto_print preference)
-      const shouldAutoPrint = businessSettings?.print_customization?.auto_print ?? false; // Default to FALSE to avoid unwanted dialogs
+      // Auto-print for fast POS workflow - default to TRUE for instant printing
+      const shouldAutoPrint = businessSettings?.print_customization?.auto_print ?? true; // Default to TRUE for fast POS processing
       
       if (shouldAutoPrint) {
         try {
           await printReceipt(receiptData, businessSettings);
-          toast.success('Receipt prepared for printing!');
+          toast.success('✅ Payment completed! Receipt printing...');
         } catch (printError) {
           console.error('Print error:', printError);
           toast.info('Payment completed! Click Print button for receipt.');
@@ -2352,8 +2352,7 @@ const BillingPage = ({ user }) => {
               </div>
             )}
             <div className="grid grid-cols-3 gap-2 mt-3">
-              <Button variant="outline" size="sm" onClick={() => {
-                // Use manual print for user-initiated printing (shows dialog)
+              <Button variant="outline" size="sm" onClick={async () => {
                 const receiptData = { 
                   ...orderData, 
                   items: orderItems, 
@@ -2364,7 +2363,23 @@ const BillingPage = ({ user }) => {
                   discount_amount: calculateDiscountAmount(), 
                   tax_rate: getEffectiveTaxRate()
                 };
-                manualPrintReceipt(receiptData, businessSettings);
+                
+                // Check if auto-print is enabled
+                const shouldAutoPrint = businessSettings?.print_customization?.auto_print ?? false;
+                
+                if (shouldAutoPrint) {
+                  // Auto-print directly
+                  try {
+                    await printReceipt(receiptData, businessSettings);
+                    toast.success('Receipt sent to printer!');
+                  } catch (error) {
+                    console.error('Print error:', error);
+                    toast.error('Print failed. Please try again.');
+                  }
+                } else {
+                  // Use manual print (shows dialog)
+                  manualPrintReceipt(receiptData, businessSettings);
+                }
               }} className="h-9"><Printer className="w-4 h-4 mr-1" />Print</Button>
               <Button variant="outline" size="sm" onClick={downloadBillPDF} className="h-9"><Download className="w-4 h-4 mr-1" />PDF</Button>
               <Button variant="outline" size="sm" onClick={() => setShowWhatsappModal(true)} className="h-9 border-green-500 text-green-600"><MessageCircle className="w-4 h-4 mr-1" />Share</Button>
@@ -2913,8 +2928,7 @@ const BillingPage = ({ user }) => {
               </div>
             )}
             <div className="grid grid-cols-3 gap-3 mt-4">
-              <Button variant="outline" onClick={() => {
-                // Use manual print for user-initiated printing (shows dialog)
+              <Button variant="outline" onClick={async () => {
                 const receiptData = { 
                   ...orderData, 
                   items: orderItems, 
@@ -2925,8 +2939,24 @@ const BillingPage = ({ user }) => {
                   discount_amount: calculateDiscountAmount(), 
                   tax_rate: getEffectiveTaxRate()
                 };
-                setPrintPreviewOrder(receiptData);
-                setShowPrintPreview(true);
+                
+                // Check if auto-print is enabled
+                const shouldAutoPrint = businessSettings?.print_customization?.auto_print ?? false;
+                
+                if (shouldAutoPrint) {
+                  // Auto-print directly without showing preview
+                  try {
+                    await printReceipt(receiptData, businessSettings);
+                    toast.success('Receipt sent to printer!');
+                  } catch (error) {
+                    console.error('Print error:', error);
+                    toast.error('Print failed. Please try again.');
+                  }
+                } else {
+                  // Show preview modal
+                  setPrintPreviewOrder(receiptData);
+                  setShowPrintPreview(true);
+                }
               }} className="h-12 text-base bg-cyan-500 hover:bg-cyan-600 text-white" data-testid="print-preview-btn"><Eye className="w-4 h-4 mr-1" />Preview & Print</Button>
               <Button variant="outline" onClick={downloadBillPDF} className="h-12 text-base" data-testid="download-pdf-btn"><Download className="w-4 h-4 mr-1" />PDF</Button>
               <Button variant="outline" onClick={() => setShowWhatsappModal(true)} className="h-12 text-base border-green-500 text-green-600 hover:bg-green-50" data-testid="share-whatsapp-btn"><MessageCircle className="w-4 h-4 mr-1" />Share</Button>

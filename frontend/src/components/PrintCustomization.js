@@ -54,7 +54,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         qr_code_enabled: ps.qr_code_enabled ?? true,
         qr_code_size: ps.qr_code_size || 100,
         preferred_upi_provider: ps.preferred_upi_provider || 'paytm',
-        auto_print: ps.auto_print ?? false,
+        auto_print: ps.auto_print ?? true, // Default TRUE for fast POS workflow
         print_copies: Math.max(1, Math.min(5, ps.print_copies || 1)),
         kot_auto_print: ps.kot_auto_print ?? true,
         kot_font_size: ps.kot_font_size || 'large',
@@ -90,7 +90,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
         qr_code_enabled: true,
         qr_code_size: 100,
         preferred_upi_provider: 'paytm',
-        auto_print: false,
+        auto_print: true, // Default TRUE for fast POS workflow
         print_copies: 1,
         kot_auto_print: true,
         kot_font_size: 'large',
@@ -1224,7 +1224,7 @@ const PrintCustomization = ({ businessSettings, onUpdate }) => {
       qr_code_enabled: true,
       qr_code_size: 100,
       preferred_upi_provider: 'paytm',
-      auto_print: false,
+      auto_print: true, // Default TRUE for fast POS workflow
       print_copies: 1,
       kot_auto_print: true,
       kot_font_size: 'large',
