@@ -186,23 +186,24 @@ export class PaymentValidator {
       return { isValid: true }; // No validation needed for non-credit transactions
     }
     
+    // For credit transactions, customer info is optional but recommended
+    // If provided, validate the format
     if (!customerInfo || typeof customerInfo !== 'object') {
-      return {
-        isValid: false,
-        error: 'Customer information is required for credit transactions'
-      };
+      return { isValid: true }; // Allow credit without customer info
     }
     
-    // Validate customer name
-    if (!customerInfo.name || typeof customerInfo.name !== 'string' || customerInfo.name.trim().length < 2) {
-      return {
-        isValid: false,
-        error: 'Customer name is required for credit transactions (minimum 2 characters)'
-      };
+    // If name is provided, validate it
+    if (customerInfo.name && customerInfo.name.trim().length > 0) {
+      if (customerInfo.name.trim().length < 2) {
+        return {
+          isValid: false,
+          error: 'Customer name must be at least 2 characters'
+        };
+      }
     }
     
-    // Validate phone number if provided
-    if (customerInfo.phone) {
+    // If phone is provided, validate format
+    if (customerInfo.phone && customerInfo.phone.trim().length > 0) {
       const phoneRegex = /^[+]?[\d\s\-\(\)]{10,15}$/;
       if (!phoneRegex.test(customerInfo.phone)) {
         return {

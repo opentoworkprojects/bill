@@ -561,6 +561,11 @@ const BillingPage = ({ user }) => {
   };
 
   const calculateReceivedAmount = () => {
+    // For credit payment method, received amount is always 0
+    if (paymentMethod === 'credit' && !splitPayment && !showReceivedAmount) {
+      return 0;
+    }
+    // For other payment methods, if not showing custom amount, assume full payment
     if (!splitPayment && !showReceivedAmount) {
       return calculateTotal();
     }
@@ -1209,7 +1214,8 @@ const BillingPage = ({ user }) => {
         return;
       }
       
-      if ((showReceivedAmount || splitPayment) && received <= 0) {
+      // Allow ₹0 for credit payment method, but require positive amount for other methods
+      if ((showReceivedAmount || splitPayment) && received <= 0 && paymentMethod !== 'credit') {
         const error = new Error('Invalid received amount');
         logValidationError({ isValid: false, error: 'Invalid received amount' }, { received, total });
         paymentMonitor.markFailure(error);
@@ -1218,12 +1224,9 @@ const BillingPage = ({ user }) => {
         return;
       }
 
-      // Check if partial payment and customer info is missing
-      if (isCredit && (!customerName || !customerPhone)) {
-        setShowCustomerModal(true);
-        setLoading(false);
-        return;
-      }
+      // Customer info is optional for credit orders
+      // If provided, it will be saved; if not, order will show as "Unknown Customer"
+      // No need to block payment processing
       
       // 🎯 OPTIMISTIC UI UPDATE: Show success immediately for better UX
       setPaymentCompleted(true);
@@ -2113,10 +2116,14 @@ const BillingPage = ({ user }) => {
                     onClick={() => {
                       setPaymentMethod(m.id);
                       setSplitPayment(false);
-                      // For credit orders, automatically set received amount to 0 and show the input
+                      // For credit orders, don't show received amount input - it's automatically ₹0
                       if (m.id === 'credit') {
-                        setShowReceivedAmount(true);
-                        setReceivedAmount('0');
+                        setShowReceivedAmount(false);
+                        setReceivedAmount('');
+                      } else {
+                        // For other payment methods, reset to full payment
+                        setShowReceivedAmount(false);
+                        setReceivedAmount('');
                       }
                     }} 
                     className={`py-1.5 sm:py-2 rounded-lg flex flex-col items-center gap-1 border-2 transition-all ${paymentMethod === m.id && !splitPayment ? 'text-white border-transparent' : 'bg-white border-gray-200'}`} 

@@ -25,8 +25,17 @@ export const filterServerActiveOrders = (orders = [], recentPaymentCompletions =
   orders.filter((order) => isServerActiveOrder(order, recentPaymentCompletions));
 
 // Billing completion gating: only the billing flow can complete orders.
-export const determineBillingCompletionStatus = ({ waiterName, isCredit }) =>
-  waiterName === 'Self-Order' || isCredit ? 'pending' : 'completed';
+// Once payment is processed (even partial), order is completed
+// Balance is tracked separately in Customer Balance report
+export const determineBillingCompletionStatus = ({ waiterName, isCredit }) => {
+  // Self-Order (QR orders) stay pending until kitchen marks as completed
+  if (waiterName === 'Self-Order') return 'pending';
+  
+  // All other orders are completed once payment is processed
+  // Even if there's a balance, the order transaction is complete
+  // Balance tracking happens in Customer Balance report
+  return 'completed';
+};
 
 // Payment math used across edit modal and billing flows.
 export const computePaymentState = (total = 0, received = 0) => {

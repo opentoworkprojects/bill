@@ -8763,8 +8763,7 @@ async def customer_balances_report(current_user: dict = Depends(get_current_user
     
     # Also get all orders for each customer to calculate total statistics
     all_orders = await db.orders.find({
-        "organization_id": user_org_id,
-        "customer_phone": {"$exists": True, "$ne": None, "$ne": ""}
+        "organization_id": user_org_id
     }, {"_id": 0}).to_list(2000)
     
     from collections import defaultdict
@@ -8781,12 +8780,14 @@ async def customer_balances_report(current_user: dict = Depends(get_current_user
     
     # Process all orders to get complete customer statistics
     for order in all_orders:
+        # Use phone as key, or "unknown_<order_id>" if no phone
         phone = order.get("customer_phone", "").strip()
         if not phone:
-            continue
+            # For orders without phone, use order ID as unique key
+            phone = f"unknown_{order.get('id', 'no_id')}"
             
-        customer_stats[phone]["customer_name"] = order.get("customer_name", "Unknown")
-        customer_stats[phone]["customer_phone"] = phone
+        customer_stats[phone]["customer_name"] = order.get("customer_name") or "Unknown Customer"
+        customer_stats[phone]["customer_phone"] = order.get("customer_phone") or "No Phone"
         customer_stats[phone]["total_orders"] += 1
         customer_stats[phone]["total_amount_ordered"] += order.get("total", 0)
         customer_stats[phone]["total_paid"] += order.get("payment_received", 0)
@@ -8799,9 +8800,10 @@ async def customer_balances_report(current_user: dict = Depends(get_current_user
     
     # Process credit orders to get outstanding balances
     for order in credit_orders:
+        # Use phone as key, or "unknown_<order_id>" if no phone
         phone = order.get("customer_phone", "").strip()
         if not phone:
-            continue
+            phone = f"unknown_{order.get('id', 'no_id')}"
             
         balance = order.get("balance_amount", 0)
         if balance > 0:
