@@ -203,21 +203,21 @@ const Dashboard = ({ user }) => {
 
   return (
     <Layout user={user}>
-      <div className="space-y-6" data-testid="dashboard-page">
+      <div className="space-y-6 bg-zinc-950 min-h-screen" data-testid="dashboard-page">
         {/* Trial Banner */}
         <TrialBanner user={user} />
 
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Header Section - Updated Cyber Theme */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
           <div>
-            <p className="text-gray-500 text-sm font-medium">{getGreeting()}</p>
-            <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+            <p className="text-zinc-400 text-sm font-medium">{getGreeting()}</p>
+            <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent font-['Chivo']">
               {restaurantName || user?.username}
             </h1>
-            <p className="text-gray-500 mt-1 flex items-center gap-2">
+            <p className="text-zinc-500 mt-1 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               {currentTime.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              <span className="text-violet-600 font-mono font-bold">
+              <span className="text-cyan-400 font-mono font-bold">
                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </p>
@@ -226,14 +226,39 @@ const Dashboard = ({ user }) => {
             variant="outline" 
             onClick={handleRefresh} 
             disabled={isRefreshing}
-            className="self-start sm:self-auto"
+            className="self-start sm:self-auto bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 hover:border-cyan-500/50"
+            data-testid="dashboard-refresh-btn"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
 
-        {/* Main Stats Cards */}
+        {/* Live Metrics Bar - New Component */}
+        <LiveMetricsBar stats={stats} currency="₹" />
+
+        {/* AI Insights + Quick Actions Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* AI Insights Panel */}
+          <div className="lg:col-span-2">
+            <AIInsightsPanel 
+              stats={stats} 
+              recentOrders={recentOrders} 
+              topItems={topItems}
+              businessSettings={{ currency: '₹' }}
+            />
+          </div>
+          
+          {/* Quick Actions Panel */}
+          <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
+            <QuickActionsPanel 
+              user={user}
+              businessSettings={{ active_tables: stats.activeOrders, active_staff: 0 }}
+            />
+          </div>
+        </div>
+
+        {/* Legacy Stats Cards - Redesigned */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Today's Sales */}
           <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-green-600 text-white overflow-hidden relative">
