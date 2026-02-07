@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -13,134 +13,140 @@ import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import TrialBanner from '../components/TrialBanner';
-import AIInsightsPanel from '../components/AIInsightsPanel';
-import QuickActionsPanel from '../components/QuickActionsPanel';
-import LiveMetricsBar from '../components/LiveMetricsBar';
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    todayOrders: 0,
-    todaySales: 0,
-    activeOrders: 0,
-    avgOrderValue: 0,
-    pendingOrders: 0,
-    preparingOrders: 0,
-    readyOrders: 0
-  });
+
+  // TEMPORARY: Use direct API calls instead of offline hooks to debug dashboard issue
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [todaysBills, setTodaysBills] = useState([]);
+  const [businessSettingsData, setBusinessSettingsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Direct API calls for debugging
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No token found in localStorage');
+          setLoading(false);
+          return;
+        }
+
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+
+        console.log('🔍 Dashboard: Fetching data directly from API...');
+        
+        // Fetch all data in parallel
+        const [dashboardRes, ordersRes, billsRes, settingsRes] = await Promise.all([
+          fetch(`${API}/dashboard`, { headers }),
+          fetch(`${API}/orders`, { headers }),
+          fetch(`${API}/orders/today-bills`, { headers }),
+          fetch(`${API}/business/settings`, { headers })
+        ]);
+
+        if (dashboardRes.ok) {
+          const data = await dashboardRes.json();
+          setDashboardStats(data);
+          console.log('✅ Dashboard: Dashboard data loaded:', data);
+        }
+
+        if (ordersRes.ok) {
+          const data = await ordersRes.json();
+          setOrders(data);
+          console.log('✅ Dashboard: Orders data loaded:', data.length, 'orders');
+        }
+
+        if (billsRes.ok) {
+          const data = await billsRes.json();
+          setTodaysBills(data);
+          console.log('✅ Dashboard: Today\'s bills loaded:', data.length, 'bills');
+        }
+
+        if (settingsRes.ok) {
+          const data = await settingsRes.json();
+          setBusinessSettingsData(data);
+          console.log('✅ Dashboard: Business settings loaded');
+        }
+
+      } catch (error) {
+        console.error('❌ Dashboard: Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+
+    // Set up polling for real-time updates
+    const interval = setInterval(fetchDashboardData, 3000); // Poll every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   const [recentOrders, setRecentOrders] = useState([]);
   const [topItems, setTopItems] = useState([]);
   const [chatMessage, setChatMessage] = useState('');
   const [chatResponse, setChatResponse] = useState('');
   const [recommendations, setRecommendations] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [restaurantName, setRestaurantName] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Derived state from hooks
+  const restaurantName = businessSettingsData?.business_settings?.restaurant_name || user?.username || '';
+  const isOffline = !navigator.onLine;
+
+  // Calculate stats from dashboard data, orders, and today's bills
+  const stats = React.useMemo(() => {
+    const activeOrders = orders ? orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)) : [];
+    const completedOrders = todaysBills ? todaysBills.filter(o => o.status === 'completed') : [];
+    
+    // Calculate today's orders from both dashboard stats and completed bills
+    const todayOrdersCount = (dashboardStats?.todaysOrders || 0) + completedOrders.length;
+    
+    // Calculate today's sales from both dashboard stats and completed bills
+    const todaySalesAmount = (dashboardStats?.todaysRevenue || 0) + 
+      completedOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    
+    const avgValue = todayOrdersCount > 0 ? todaySalesAmount / todayOrdersCount : 0;
+    
+    return {
+      todayOrders: todayOrdersCount,
+      todaySales: todaySalesAmount,
+      activeOrders: activeOrders.length,
+      avgOrderValue: avgValue,
+      pendingOrders: activeOrders.filter(o => o.status === 'pending').length,
+      preparingOrders: activeOrders.filter(o => o.status === 'preparing').length,
+      readyOrders: activeOrders.filter(o => o.status === 'ready').length
+    };
+  }, [dashboardStats, orders, todaysBills]);
+
   useEffect(() => {
-    fetchStats();
     fetchRecommendations();
-    fetchBusinessSettings();
-    fetchRecentOrders();
-    fetchTopItems();
-    const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
-    const refreshInterval = setInterval(() => {
-      fetchStats();
-      fetchRecentOrders();
-      fetchTopItems();
-    }, 15000); // Auto refresh every 15s for more responsive dashboard
-    
-    // Refresh when window gains focus
-    const handleFocus = () => {
-      fetchStats();
-      fetchRecentOrders();
-      fetchTopItems();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    
-    return () => {
-      clearInterval(clockInterval);
-      clearInterval(refreshInterval);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
 
-  const fetchBusinessSettings = async () => {
-    try {
-      const response = await axios.get(`${API}/business/settings`);
-      setRestaurantName(response.data.business_settings?.restaurant_name || '');
-    } catch (error) {
-      console.error('Failed to fetch business settings', error);
-    }
-  };
+    // Process recent orders from both active orders and today's bills
+    const allOrders = [
+      ...(orders || []),
+      ...(todaysBills || [])
+    ];
 
-  const fetchStats = async () => {
-    try {
-      const [dashboardRes, ordersRes] = await Promise.all([
-        axios.get(`${API}/dashboard`),  // Use new real-time dashboard endpoint
-        axios.get(`${API}/orders`)
-      ]);
-      
-      const orders = ordersRes.data;
-      const activeOrders = orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status));
-      const dashboardData = dashboardRes.data;
-      
-      // Calculate average order value from dashboard data
-      const avgValue = dashboardData.todaysOrders > 0 
-        ? dashboardData.todaysRevenue / dashboardData.todaysOrders 
-        : 0;
-
-      setStats({
-        todayOrders: dashboardData.todaysOrders,
-        todaySales: dashboardData.todaysRevenue,
-        activeOrders: activeOrders.length,
-        avgOrderValue: avgValue,
-        pendingOrders: activeOrders.filter(o => o.status === 'pending').length,
-        preparingOrders: activeOrders.filter(o => o.status === 'preparing').length,
-        readyOrders: activeOrders.filter(o => o.status === 'ready').length
-      });
-    } catch (error) {
-      console.error('Failed to fetch stats', error);
-      
-      // Fallback to daily report endpoint if dashboard fails
-      try {
-        const dailyReport = await axios.get(`${API}/reports/daily`);
-        const orders = await axios.get(`${API}/orders`);
-        
-        const ordersData = orders.data;
-        const activeOrders = ordersData.filter(o => ['pending', 'preparing', 'ready'].includes(o.status));
-        const avgValue = dailyReport.data.total_orders > 0 
-          ? dailyReport.data.total_sales / dailyReport.data.total_orders 
-          : 0;
-
-        setStats({
-          todayOrders: dailyReport.data.total_orders,
-          todaySales: dailyReport.data.total_sales,
-          activeOrders: activeOrders.length,
-          avgOrderValue: avgValue,
-          pendingOrders: activeOrders.filter(o => o.status === 'pending').length,
-          preparingOrders: activeOrders.filter(o => o.status === 'preparing').length,
-          readyOrders: activeOrders.filter(o => o.status === 'ready').length
-        });
-      } catch (fallbackError) {
-        console.error('Both dashboard endpoints failed', fallbackError);
-      }
-    }
-  };
-
-  const fetchRecentOrders = async () => {
-    try {
-      const response = await axios.get(`${API}/orders`);
-      const recent = response.data
+    if (allOrders.length > 0) {
+      const recent = allOrders
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 5);
       setRecentOrders(recent);
-    } catch (error) {
-      console.error('Failed to fetch recent orders', error);
     }
-  };
+
+    const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    return () => {
+      clearInterval(clockInterval);
+    };
+  }, [orders, todaysBills]);
 
   const fetchTopItems = async () => {
     try {
@@ -176,9 +182,22 @@ const Dashboard = ({ user }) => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchStats(), fetchRecentOrders(), fetchTopItems()]);
-    toast.success('Dashboard refreshed!');
-    setTimeout(() => setIsRefreshing(false), 500);
+
+    try {
+      // Force refresh all data
+      await Promise.all([
+        // refreshStats(), // Removed - function no longer exists
+        fetchTopItems(),
+        // offlineDataManager.preloadCriticalData() // Removed - using direct API calls now
+      ]);
+
+      toast.success('Dashboard refreshed!');
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      toast.error('Refresh failed - showing cached data');
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
   };
 
   const getGreeting = () => {
@@ -203,30 +222,35 @@ const Dashboard = ({ user }) => {
 
   return (
     <Layout user={user}>
-      <div className="space-y-6 bg-zinc-950 min-h-screen" data-testid="dashboard-page">
+      <div className="space-y-6" data-testid="dashboard-page">
         {/* Trial Banner */}
         <TrialBanner user={user} />
 
-        {/* Header Section - Updated Cyber Theme */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-zinc-400 text-sm font-medium">{getGreeting()}</p>
-            <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent font-['Chivo']">
+            <div className="flex items-center gap-3 mb-1">
+              <p className="text-gray-500 text-sm font-medium">{getGreeting()}</p>
+              {/* <OfflineIndicator /> */}
+              {/* <SyncStatusBadge /> */}
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
               {restaurantName || user?.username}
             </h1>
-            <p className="text-zinc-500 mt-1 flex items-center gap-2">
+            <p className="text-gray-500 mt-1 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               {currentTime.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              <span className="text-cyan-400 font-mono font-bold">
+              <span className="text-violet-600 font-mono font-bold">
                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
+              {/* <DataFreshnessIndicator lastUpdated={statsLastUpdated} /> */}
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={handleRefresh} 
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
             disabled={isRefreshing}
-            className="self-start sm:self-auto bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 hover:border-cyan-500/50"
+            className="self-start sm:self-auto"
             data-testid="dashboard-refresh-btn"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -234,31 +258,7 @@ const Dashboard = ({ user }) => {
           </Button>
         </div>
 
-        {/* Live Metrics Bar - New Component */}
-        <LiveMetricsBar stats={stats} currency="₹" />
-
-        {/* AI Insights + Quick Actions Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* AI Insights Panel */}
-          <div className="lg:col-span-2">
-            <AIInsightsPanel 
-              stats={stats} 
-              recentOrders={recentOrders} 
-              topItems={topItems}
-              businessSettings={{ currency: '₹' }}
-            />
-          </div>
-          
-          {/* Quick Actions Panel */}
-          <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5">
-            <QuickActionsPanel 
-              user={user}
-              businessSettings={{ active_tables: stats.activeOrders, active_staff: 0 }}
-            />
-          </div>
-        </div>
-
-        {/* Legacy Stats Cards - Redesigned */}
+        {/* Main Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Today's Sales */}
           <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-green-600 text-white overflow-hidden relative">

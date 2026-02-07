@@ -115,7 +115,7 @@ const LiveMetricsBar = ({ stats, previousStats, currency = '₹' }) => {
           <Card 
             key={metric.id}
             className={`
-              bg-zinc-900/80 border ${colors.border} rounded-xl overflow-hidden
+              bg-white border ${colors.border} rounded-xl overflow-hidden shadow-md
               hover:${colors.border.replace('/20', '/40')} transition-all duration-300
               hover:-translate-y-0.5 hover:shadow-lg ${colors.glow}
               ${metric.pulse ? 'animate-pulse' : ''}
@@ -131,7 +131,7 @@ const LiveMetricsBar = ({ stats, previousStats, currency = '₹' }) => {
                 
                 {metric.change !== 0 && (
                   <div className={`flex items-center gap-0.5 text-xs font-medium ${
-                    isPositive ? 'text-emerald-400' : isNegative ? 'text-red-400' : 'text-zinc-500'
+                    isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-gray-500'
                   }`}>
                     {isPositive ? (
                       <ArrowUpRight className="w-3 h-3" />
@@ -147,7 +147,7 @@ const LiveMetricsBar = ({ stats, previousStats, currency = '₹' }) => {
                 <p className={`text-2xl font-bold ${colors.text} font-mono tracking-tight`}>
                   {formatValue(metric.value, metric.format)}
                 </p>
-                <p className="text-xs text-zinc-500 mt-1 font-medium">{metric.label}</p>
+                <p className="text-xs text-gray-600 mt-1 font-medium">{metric.label}</p>
               </div>
               
               {/* Mini progress bar */}

@@ -132,18 +132,18 @@ const PrintPreviewModal = ({
     >
       {/* Modal Container */}
       <div 
-        className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-        style={{ boxShadow: '0 0 60px rgba(6, 182, 212, 0.1)' }}
+        className="bg-white border border-gray-300 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        style={{ boxShadow: '0 0 60px rgba(124, 58, 237, 0.1)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
               <Eye className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white font-['Chivo']">Print Preview</h2>
-              <p className="text-sm text-zinc-400">Order #{order?.order_number || order?.id?.slice(0, 8)}</p>
+              <h2 className="text-xl font-bold text-gray-900 font-['Chivo']">Print Preview</h2>
+              <p className="text-sm text-gray-600">Order #{order?.order_number || order?.id?.slice(0, 8)}</p>
             </div>
           </div>
           
@@ -189,7 +189,7 @@ const PrintPreviewModal = ({
         {/* Content Area */}
         <div className="flex flex-col lg:flex-row h-[calc(90vh-180px)]">
           {/* Preview Panel */}
-          <div className="flex-1 p-6 overflow-auto bg-zinc-950/30">
+          <div className="flex-1 p-6 overflow-auto bg-gray-50">
             <div className="flex items-center justify-center min-h-full">
               {/* Thermal Paper Simulation */}
               <div 
@@ -225,7 +225,7 @@ const PrintPreviewModal = ({
           </div>
 
           {/* Info Panel */}
-          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/50 p-6 flex flex-col">
+          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-6 flex flex-col">
             {/* Order Summary */}
             <div className="space-y-4 flex-1">
               <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Order Summary</h3>
@@ -362,8 +362,8 @@ const PrintPreviewModal = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-zinc-800 bg-zinc-950/50 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
             <Settings className="w-3.5 h-3.5" />
             <span>Paper: {paperWidth} | Theme: {getPrintSettings().print_theme || 'default'}</span>
           </div>

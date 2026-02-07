@@ -172,16 +172,16 @@ const AIInsightsPanel = ({ stats, recentOrders, topItems, businessSettings }) =>
   };
 
   return (
-    <Card className="bg-zinc-900/80 border border-white/5 rounded-xl overflow-hidden hover:border-purple-500/30 transition-colors" data-testid="ai-insights-panel">
-      <CardHeader className="pb-3 border-b border-zinc-800">
+    <Card className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-purple-300 transition-colors shadow-lg" data-testid="ai-insights-panel">
+      <CardHeader className="pb-3 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <div>
-              <CardTitle className="text-base font-bold text-white font-['Chivo']">AI Insights</CardTitle>
-              <p className="text-xs text-zinc-500">Powered by BillByte AI</p>
+              <CardTitle className="text-base font-bold text-gray-900 font-['Chivo']">AI Insights</CardTitle>
+              <p className="text-xs text-gray-500">Powered by BillByte AI</p>
             </div>
           </div>
           <Button
@@ -189,7 +189,7 @@ const AIInsightsPanel = ({ stats, recentOrders, topItems, businessSettings }) =>
             size="sm"
             onClick={generateInsights}
             disabled={loading}
-            className="h-8 text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10"
+            className="h-8 text-gray-600 hover:text-purple-600 hover:bg-purple-50"
             data-testid="refresh-insights-btn"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -200,8 +200,8 @@ const AIInsightsPanel = ({ stats, recentOrders, topItems, businessSettings }) =>
       <CardContent className="p-4 space-y-3">
         {insights.length === 0 ? (
           <div className="py-8 text-center">
-            <Sparkles className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-            <p className="text-sm text-zinc-500">Analyzing your business data...</p>
+            <Sparkles className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Analyzing your business data...</p>
           </div>
         ) : (
           insights.map((insight, index) => {
@@ -221,7 +221,7 @@ const AIInsightsPanel = ({ stats, recentOrders, topItems, businessSettings }) =>
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-sm font-semibold ${style.text}`}>{insight.title}</h4>
-                    <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{insight.message}</p>
+                    <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">{insight.message}</p>
                     {insight.action && (
                       <button className={`text-xs ${style.icon} font-medium mt-2 flex items-center gap-1 hover:underline`}>
                         {insight.action}
@@ -237,7 +237,7 @@ const AIInsightsPanel = ({ stats, recentOrders, topItems, businessSettings }) =>
         
         {lastUpdated && (
           <div className="text-center pt-2">
-            <p className="text-[10px] text-zinc-600">
+            <p className="text-[10px] text-gray-500">
               Updated {lastUpdated.toLocaleTimeString()}
             </p>
           </div>
