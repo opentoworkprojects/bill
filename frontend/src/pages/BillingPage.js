@@ -3035,7 +3035,7 @@ const BillingPage = ({ user }) => {
                       receiptData.upi_amount = parseFloat(upiAmount) || 0;
                       receiptData.credit_amount = Math.max(0, calculateTotal() - calculateReceivedAmount());
                     }
-                    printReceipt(receiptData, businessSettings);
+                    manualPrintReceipt(receiptData, businessSettings);
                   }}
                   className="flex-1 bg-violet-600 hover:bg-violet-700"
                 >
