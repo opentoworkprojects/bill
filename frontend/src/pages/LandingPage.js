@@ -16,6 +16,7 @@ import MobileAppLeadPopup from "../components/MobileAppLeadPopup";
 import SaleBanner from "../components/SaleBanner";
 import TopBanner from "../components/TopBanner";
 import EarlyAdopterBanner from "../components/EarlyAdopterBanner";
+import QROrderingSection from "../components/QROrderingSection";
 import useSaleOfferData from "../hooks/useSaleOfferData";
 import { HomepageSEO, FAQPageSchemaInjector } from "../seo";
 import {
@@ -2121,6 +2122,9 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* QR Ordering Section - NEW ANIMATED SECTION */}
+      <QROrderingSection />
 
       {/* Features Section */}
       <section

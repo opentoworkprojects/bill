@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import TrialBanner from '../components/TrialBanner';
+import QRPromotionalBanner from '../components/QRPromotionalBanner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
@@ -443,10 +444,21 @@ const TablesPage = ({ user }) => {
     );
   }
 
+  const handleEnableQR = () => {
+    // Navigate to settings page
+    window.location.href = '/settings';
+  };
+
   return (
     <Layout user={user}>
       <div className="space-y-6" data-testid="tables-page">
         <TrialBanner user={user} />
+        
+        {/* QR Promotional Banner */}
+        <QRPromotionalBanner 
+          onEnableClick={handleEnableQR}
+          variant="full"
+        />
         
         {/* Enhanced Header */}
         <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-2xl p-6 text-white relative overflow-hidden">
