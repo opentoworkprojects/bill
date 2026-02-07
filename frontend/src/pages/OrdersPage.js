@@ -1470,7 +1470,7 @@ const OrdersPage = ({ user }) => {
   const handlePrintReceipt = (order) => {
     setPrintLoading(true);
     try {
-      printReceiptUtil(order, businessSettings);
+      manualPrintReceipt(order, businessSettings);
       toast.success('Receipt sent to printer');
     } catch (error) {
       console.error('Print receipt failed:', error);
