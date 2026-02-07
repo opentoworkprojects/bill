@@ -17,6 +17,7 @@ import { computePaymentState, determineBillingCompletionStatus } from '../utils/
 import { paymentValidator, validatePayment } from '../utils/paymentValidator';
 import { billingErrorLogger, logPaymentError, logValidationError, logNetworkError, logPerformanceIssue } from '../utils/billingErrorLogger';
 import { paymentPerformanceMonitor, startPaymentMonitoring } from '../utils/paymentPerformanceMonitor';
+import PrintPreviewModal from '../components/PrintPreviewModal';
 
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
