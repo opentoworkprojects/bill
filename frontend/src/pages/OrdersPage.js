@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
@@ -115,6 +115,7 @@ const OrdersPage = ({ user }) => {
   const [printLoading, setPrintLoading] = useState(false);
   const [menuSearch, setMenuSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [tableSearch, setTableSearch] = useState(''); // Search for tables
   
   // Simplified edit order state for new EditOrderModal component
   const [editOrderModal, setEditOrderModal] = useState({ open: false, order: null });
@@ -1631,7 +1632,29 @@ const OrdersPage = ({ user }) => {
       setFormData(prev => ({ ...prev, table_id: '' }));
     }
   };
-  const availableTables = tables.filter(t => t.status === 'available');
+  
+  // Filter available tables and apply search
+  const availableTables = useMemo(() => {
+    let filtered = tables.filter(t => t.status === 'available');
+    
+    // Apply search filter
+    if (tableSearch.trim()) {
+      const searchLower = tableSearch.toLowerCase().trim();
+      filtered = filtered.filter(table => {
+        const tableNum = table.table_number.toString();
+        const section = (table.section || '').toLowerCase();
+        const location = (table.location || '').toLowerCase();
+        const capacity = table.capacity.toString();
+        
+        return tableNum.includes(searchLower) ||
+               section.includes(searchLower) ||
+               location.includes(searchLower) ||
+               capacity.includes(searchLower);
+      });
+    }
+    
+    return filtered;
+  }, [tables, tableSearch]);
 
   return (
     <Layout user={user}>
@@ -2157,6 +2180,43 @@ const OrdersPage = ({ user }) => {
                             </button>
                           </div>
                           
+                          {/* Search Bar for Tables */}
+                          {tables.filter(t => t.status === 'available').length > 4 && (
+                            <div className="mb-3 relative">
+                              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Search tables by number, section, or capacity..."
+                                value={tableSearch}
+                                onChange={(e) => setTableSearch(e.target.value)}
+                                className="w-full pl-10 pr-10 py-3 text-base border-2 border-amber-300 rounded-xl bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all placeholder-gray-400"
+                              />
+                              {tableSearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTableSearch('')}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Search Results Count */}
+                          {tableSearch && (
+                            <div className="mb-2 text-sm text-gray-600">
+                              Found {availableTables.length} table{availableTables.length !== 1 ? 's' : ''}
+                              {availableTables.length === 0 && ' matching your search'}
+                            </div>
+                          )}
+                          
                           {/* Large Button Grid for Table Selection */}
                           {availableTables.length > 0 ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -2207,28 +2267,45 @@ const OrdersPage = ({ user }) => {
                           ) : (
                             <div className="space-y-3">
                               <div className="flex items-center gap-3 p-4 bg-orange-100 border-2 border-orange-300 rounded-xl">
-                                <span className="text-orange-500 text-3xl">⚠️</span>
+                                <span className="text-orange-500 text-3xl">{tableSearch ? '🔍' : '⚠️'}</span>
                                 <div>
-                                  <p className="text-base text-orange-800 font-bold">No tables available</p>
-                                  <p className="text-sm text-orange-600">All tables are currently occupied</p>
+                                  <p className="text-base text-orange-800 font-bold">
+                                    {tableSearch ? 'No tables found' : 'No tables available'}
+                                  </p>
+                                  <p className="text-sm text-orange-600">
+                                    {tableSearch 
+                                      ? `No tables match "${tableSearch}". Try a different search.`
+                                      : 'All tables are currently occupied'
+                                    }
+                                  </p>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {tableSearch ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleTableWiseOrderingToggle(false)}
+                                  onClick={() => setTableSearch('')}
                                   className="w-full px-4 py-4 text-base bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105"
                                 >
-                                  Skip Table Selection
+                                  Clear Search
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => navigate('/tables')}
-                                  className="w-full px-4 py-4 text-base bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105"
-                                >
-                                  Create New Table
-                                </button>
-                              </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTableWiseOrderingToggle(false)}
+                                    className="w-full px-4 py-4 text-base bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105"
+                                  >
+                                    Skip Table Selection
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate('/tables')}
+                                    className="w-full px-4 py-4 text-base bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105"
+                                  >
+                                    Create New Table
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                           {availableTables.length > 0 && (
