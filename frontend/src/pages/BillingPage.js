@@ -55,12 +55,44 @@ const BillingPage = ({ user }) => {
   // Add preview functionality
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
+  // Enhanced Print Preview Modal state
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [printPreviewOrder, setPrintPreviewOrder] = useState(null);
   
   // Advanced UI state for better UX
   const [dropdownPosition, setDropdownPosition] = useState('bottom');
   const [isDropdownAnimating, setIsDropdownAnimating] = useState(false);
   const [screenHeight, setScreenHeight] = useState(window.innerHeight);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Open Print Preview Modal
+  const openPrintPreview = () => {
+    const discountAmt = calculateDiscountAmount();
+    const receiptData = { 
+      ...order, 
+      items: orderItems, 
+      subtotal: calculateSubtotal(), 
+      tax: calculateTax(), 
+      total: calculateTotal(), 
+      discount: discountAmt, 
+      discount_amount: discountAmt, 
+      tax_rate: getEffectiveTaxRate(),
+      status: 'completed',
+      payment_method: splitPayment ? 'split' : paymentMethod,
+      payment_received: (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : calculateTotal(),
+      balance_amount: Math.max(0, calculateTotal() - ((showReceivedAmount || splitPayment) ? calculateReceivedAmount() : calculateTotal())),
+      customer_name: customerName || order.customer_name,
+      customer_phone: customerPhone || order.customer_phone
+    };
+    if (splitPayment) {
+      receiptData.cash_amount = parseFloat(cashAmount) || 0;
+      receiptData.card_amount = parseFloat(cardAmount) || 0;
+      receiptData.upi_amount = parseFloat(upiAmount) || 0;
+      receiptData.credit_amount = Math.max(0, calculateTotal() - calculateReceivedAmount());
+    }
+    setPrintPreviewOrder(receiptData);
+    setShowPrintPreview(true);
+  };
 
   const handlePreview = async () => {
     try {
