@@ -509,7 +509,7 @@ const KitchenPage = ({ user }) => {
 
   const printKOT = (order) => {
     try {
-      printKOTUtil(order, businessSettings);
+      manualPrintKOT(order, businessSettings);
       toast.success('KOT printed!');
     } catch (error) {
       toast.error('Failed to print KOT');
