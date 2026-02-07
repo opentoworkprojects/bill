@@ -2151,12 +2151,13 @@ export const printWithDialogExport = (html, paperWidth = '80mm') => {
   return printThermal(html, paperWidth, true); // Force dialog
 };
 
-// Manual print function for user-initiated printing
+// Manual print function for user-initiated printing (shows print dialog)
 export const manualPrintReceipt = async (order, businessOverride = null) => {
   try {
     const settings = getPrintSettings();
     const receiptHTML = generateReceiptHTML(order, businessOverride);
-    return printThermal(receiptHTML, settings.paper_width, false); // Use silent printing (no dialogs)
+    // FIXED: Use forceDialog = true for user-initiated prints so the print dialog actually shows
+    return printThermal(receiptHTML, settings.paper_width, true); // Show print dialog for manual printing
   } catch (e) { 
     console.error('Manual print failed:', e);
     toast.error('Print failed: ' + e.message); 
