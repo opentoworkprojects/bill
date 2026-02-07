@@ -1412,7 +1412,7 @@ const OrdersPage = ({ user }) => {
 
   const handlePrintKOT = (order) => {
     try {
-      printKOTUtil(order, businessSettings);
+      manualPrintKOT(order, businessSettings);
       toast.success('KOT sent to printer');
     } catch (error) {
       console.error('Print KOT failed:', error);
