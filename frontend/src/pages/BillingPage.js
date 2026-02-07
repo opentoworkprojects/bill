@@ -3088,6 +3088,14 @@ const BillingPage = ({ user }) => {
           </Card>
         </div>
       )}
+
+      {/* Enhanced Print Preview Modal */}
+      <PrintPreviewModal
+        isOpen={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        order={printPreviewOrder}
+        businessSettings={businessSettings}
+      />
     </Layout>
   );
 };
