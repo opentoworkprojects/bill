@@ -22,10 +22,7 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
       setUploadProgress(0);
       setProcessingStatus('');
       
-      // Show instant feedback
-      toast.success(`File selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB) - Starting upload...`);
-      
-      // Auto-upload immediately
+      // Auto-upload immediately (no toast to avoid delay)
       await handleUploadFile(selectedFile);
     } else {
       toast.error('Please select a CSV file');
@@ -50,9 +47,6 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
     try {
       const endpoint = type === 'menu' ? '/menu/bulk-upload' : '/inventory/bulk-upload';
       
-      // Show instant feedback
-      toast.info('Starting upload...', { duration: 2000 });
-      
       const response = await axios.post(`${API}${endpoint}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
@@ -74,11 +68,6 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
 
       setResult(response.data);
       setProcessingStatus('complete');
-      
-      // Show detailed success message with refresh notice
-      const successMessage = `✅ ${response.data.items_added} items uploaded successfully! Refreshing menu...`;
-      toast.success(successMessage, { duration: 3000 });
-      
       setFile(null);
       
       // CRITICAL: Invalidate cache BEFORE refreshing to force fresh data fetch
@@ -88,10 +77,10 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
       if (onSuccess) {
         // Call immediately to refresh the menu (will now fetch fresh data from server)
         await onSuccess();
-        
-        // Show completion message
-        toast.success('Menu refreshed! New items are now visible.', { duration: 2000 });
       }
+      
+      // Show success message AFTER refresh completes (non-blocking)
+      toast.success(`✅ ${response.data.items_added} items uploaded and visible!`, { duration: 2000 });
     } catch (error) {
       setProcessingStatus('error');
       const errorMessage = error.response?.data?.detail || error.message;
