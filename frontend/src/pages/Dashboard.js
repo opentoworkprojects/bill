@@ -105,11 +105,11 @@ const Dashboard = ({ user }) => {
     const activeOrders = orders ? orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)) : [];
     const completedOrders = todaysBills ? todaysBills.filter(o => o.status === 'completed') : [];
     
-    // Calculate today's orders from both dashboard stats and completed bills
-    const todayOrdersCount = (dashboardStats?.todaysOrders || 0) + completedOrders.length;
+    // Use dashboard stats if available (already includes all today's orders), otherwise count from bills
+    const todayOrdersCount = dashboardStats?.todaysOrders || completedOrders.length;
     
-    // Calculate today's sales from both dashboard stats and completed bills
-    const todaySalesAmount = (dashboardStats?.todaysRevenue || 0) + 
+    // Use dashboard stats if available (already includes all today's revenue), otherwise sum from bills
+    const todaySalesAmount = dashboardStats?.todaysRevenue || 
       completedOrders.reduce((sum, order) => sum + (order.total || 0), 0);
     
     const avgValue = todayOrdersCount > 0 ? todaySalesAmount / todayOrdersCount : 0;
