@@ -74,14 +74,19 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
       setResult(response.data);
       setProcessingStatus('complete');
       
-      // Show detailed success message
-      const successMessage = `✅ ${response.data.items_added} items uploaded successfully!`;
-      toast.success(successMessage, { duration: 5000 });
+      // Show detailed success message with refresh notice
+      const successMessage = `✅ ${response.data.items_added} items uploaded successfully! Refreshing menu...`;
+      toast.success(successMessage, { duration: 3000 });
       
       setFile(null);
       
+      // Force immediate refresh - call onSuccess which triggers fetchMenuItems
       if (onSuccess) {
-        onSuccess();
+        // Call immediately to refresh the menu
+        await onSuccess();
+        
+        // Show completion message
+        toast.success('Menu refreshed! New items are now visible.', { duration: 2000 });
       }
     } catch (error) {
       setProcessingStatus('error');
