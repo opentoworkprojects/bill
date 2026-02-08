@@ -503,6 +503,16 @@ class MenuCacheManager {
 // Create singleton instance
 const menuCache = new MenuCacheManager();
 
+// Export individual methods for convenience
+export const getCachedItems = () => menuCache.getCachedItems();
+export const setCachedItems = (items) => menuCache.setCachedItems(items);
+export const invalidateCache = () => menuCache.invalidateCache();
+export const isCacheStale = () => menuCache.isCacheStale();
+export const updateCachedItem = (item) => menuCache.updateCachedItem(item);
+export const removeCachedItem = (itemId) => menuCache.removeCachedItem(itemId);
+export const mergeCacheWithServerData = (serverItems) => menuCache.mergeCacheWithServerData(serverItems);
+export const getStats = () => menuCache.getStats();
+
 // Export both class and singleton
 export { MenuCacheManager };
 export default menuCache;
