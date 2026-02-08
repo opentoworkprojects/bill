@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Upload, Download, AlertCircle } from 'lucide-react';
+import { Upload, Download, AlertCircle, Loader2, CheckCircle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { API } from '../App';
@@ -9,6 +9,8 @@ import { API } from '../App';
 const BulkUpload = ({ type = 'menu', onSuccess }) => {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingStatus, setProcessingStatus] = useState(''); // 'parsing', 'validating', 'saving'
   const [result, setResult] = useState(null);
 
   const handleFileChange = (e) => {
@@ -16,6 +18,11 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
     if (selectedFile && selectedFile.name.endsWith('.csv')) {
       setFile(selectedFile);
       setResult(null);
+      setUploadProgress(0);
+      setProcessingStatus('');
+      
+      // Show instant feedback
+      toast.success(`File selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`);
     } else {
       toast.error('Please select a CSV file');
     }
@@ -28,26 +35,56 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
     }
 
     setUploading(true);
+    setUploadProgress(0);
+    setProcessingStatus('parsing');
+    
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       const endpoint = type === 'menu' ? '/menu/bulk-upload' : '/inventory/bulk-upload';
+      
+      // Show instant feedback
+      toast.info('Starting upload...', { duration: 2000 });
+      
       const response = await axios.post(`${API}${endpoint}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+          
+          // Update status based on progress
+          if (percentCompleted < 30) {
+            setProcessingStatus('uploading');
+          } else if (percentCompleted < 70) {
+            setProcessingStatus('parsing');
+          } else if (percentCompleted < 90) {
+            setProcessingStatus('validating');
+          } else {
+            setProcessingStatus('saving');
+          }
+        }
       });
 
       setResult(response.data);
-      toast.success(`${response.data.items_added} items uploaded successfully!`);
+      setProcessingStatus('complete');
+      
+      // Show detailed success message
+      const successMessage = `✅ ${response.data.items_added} items uploaded successfully!`;
+      toast.success(successMessage, { duration: 5000 });
+      
       setFile(null);
       
       if (onSuccess) {
         onSuccess();
       }
     } catch (error) {
-      toast.error('Upload failed: ' + (error.response?.data?.detail || error.message));
+      setProcessingStatus('error');
+      const errorMessage = error.response?.data?.detail || error.message;
+      toast.error(`Upload failed: ${errorMessage}`, { duration: 5000 });
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -84,48 +121,120 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
           </Button>
         </div>
 
-        <div className="border-2 border-dashed rounded-lg p-6 text-center">
+        <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-violet-400 transition-colors">
           <input
             type="file"
             accept=".csv"
             onChange={handleFileChange}
             className="hidden"
             id={`csv-upload-${type}`}
+            disabled={uploading}
           />
-          <label htmlFor={`csv-upload-${type}`} className="cursor-pointer">
-            <Upload className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-600">
-              {file ? file.name : 'Click to select CSV file'}
-            </p>
+          <label htmlFor={`csv-upload-${type}`} className={`cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {file ? (
+              <div className="space-y-2">
+                <FileText className="w-12 h-12 mx-auto mb-2 text-violet-600" />
+                <p className="text-sm font-medium text-gray-800">{file.name}</p>
+                <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                {!uploading && (
+                  <p className="text-xs text-violet-600 mt-2">Click to change file</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <Upload className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-600">Click to select CSV file</p>
+                <p className="text-xs text-gray-400 mt-1">or drag and drop</p>
+              </div>
+            )}
           </label>
         </div>
+
+        {/* Upload Progress */}
+        {uploading && (
+          <div className="space-y-3 p-4 bg-violet-50 rounded-lg border border-violet-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
+                <span className="text-sm font-medium text-violet-900">
+                  {processingStatus === 'uploading' && 'Uploading file...'}
+                  {processingStatus === 'parsing' && 'Parsing CSV data...'}
+                  {processingStatus === 'validating' && 'Validating items...'}
+                  {processingStatus === 'saving' && 'Saving to database...'}
+                </span>
+              </div>
+              <span className="text-sm font-bold text-violet-600">{uploadProgress}%</span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="w-full bg-violet-100 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-violet-600 h-2 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            
+            <p className="text-xs text-violet-700">
+              Please wait while we process your file...
+            </p>
+          </div>
+        )}
 
         <Button
           onClick={handleUpload}
           disabled={!file || uploading}
           className="w-full"
         >
-          {uploading ? 'Uploading...' : 'Upload CSV'}
+          {uploading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading... {uploadProgress}%
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Upload CSV
+            </span>
+          )}
         </Button>
 
         {result && (
-          <div className="mt-4 p-4 bg-green-50 rounded-lg">
-            <p className="text-green-800 font-medium">
-              ✅ {result.items_added} items uploaded successfully
-            </p>
-            {result.errors && result.errors.length > 0 && (
-              <div className="mt-2">
-                <p className="text-red-600 font-medium flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {result.errors.length} errors:
+          <div className={`mt-4 p-4 rounded-lg border-2 ${
+            result.errors && result.errors.length > 0 
+              ? 'bg-yellow-50 border-yellow-200' 
+              : 'bg-green-50 border-green-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-green-800 font-medium">
+                  ✅ {result.items_added} items uploaded successfully
                 </p>
-                <ul className="text-sm text-red-600 mt-1 list-disc list-inside max-h-40 overflow-y-auto">
-                  {result.errors.map((error, i) => (
-                    <li key={i}>{error}</li>
-                  ))}
-                </ul>
+                
+                {result.items_updated > 0 && (
+                  <p className="text-green-700 text-sm mt-1">
+                    📝 {result.items_updated} items updated
+                  </p>
+                )}
+                
+                {result.errors && result.errors.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-yellow-200">
+                    <p className="text-orange-800 font-medium flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {result.errors.length} errors occurred:
+                    </p>
+                    <ul className="text-sm text-orange-700 mt-2 space-y-1 max-h-40 overflow-y-auto">
+                      {result.errors.map((error, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-orange-500 flex-shrink-0">•</span>
+                          <span>{error}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
 
