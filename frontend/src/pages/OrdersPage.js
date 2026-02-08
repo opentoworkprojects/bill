@@ -1018,12 +1018,11 @@ const OrdersPage = ({ user }) => {
       
       // Instant feedback
       playSound('success');
-      toast.success('🚀 Creating quick bill...');
       
-      // Close menu immediately
+      // Close menu immediately - this makes it feel instant
       setShowMenuPage(false);
       setCartExpanded(false);
-
+      
       // Create order with ready status (skip preparation)
       const response = await apiWithRetry({
         method: 'post',
@@ -1038,7 +1037,7 @@ const OrdersPage = ({ user }) => {
           quick_billing: true, // Flag for quick billing
           frontend_origin: window.location.origin
         },
-        timeout: 12000
+        timeout: 8000 // Reduced timeout for faster response
       });
 
       const newOrder = response.data;
@@ -1048,11 +1047,9 @@ const OrdersPage = ({ user }) => {
       // Reset form
       resetForm();
       
-      // Success feedback
-      toast.success('✅ Redirecting to billing...');
-      
       // Navigate directly to billing page
-      navigate(`/billing/${newOrder.id}`);
+      // Use replace to avoid back button showing orders page
+      navigate(`/billing/${newOrder.id}`, { replace: true });
 
     } catch (error) {
       console.error('Quick bill failed:', error);
@@ -1726,6 +1723,22 @@ const OrdersPage = ({ user }) => {
 
   return (
     <Layout user={user}>
+      {/* 🚀 QUICK BILL LOADING OVERLAY - Covers screen during order creation */}
+      {isCreatingOrder && (
+        <div className="fixed inset-0 bg-gradient-to-br from-violet-600 to-purple-700 z-[9999] flex items-center justify-center">
+          <div className="text-center">
+            <div className="relative">
+              <div className="w-20 h-20 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-6"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ShoppingCart className="w-8 h-8 text-white animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Creating Quick Bill...</h2>
+            <p className="text-violet-200">Please wait a moment</p>
+          </div>
+        </div>
+      )}
+      
       <style jsx>{`
         .touch-target {
           min-height: 44px;
