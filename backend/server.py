@@ -176,7 +176,7 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 app = FastAPI(
     title="BillByteKOT API",
     description="Restaurant Billing & KOT Management System",
-    version="1.3.0",
+    version="2.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     # Performance optimizations
@@ -10033,7 +10033,7 @@ async def health_check():
         return {
             "status": "healthy",
             "message": "BillByteKOT Server is running",
-            "version": "1.0.0",
+            "version": "2.1.0",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "services": {"database": "connected", "api": "operational"},
             "database": db.name,
@@ -10161,17 +10161,17 @@ async def get_app_version():
         
         # Default version info
         return {
-            "version": "1.5.0",
-            "release_notes": "• Push notifications from admin\n• Enhanced UI/UX for order creation\n• Improved print flow\n• Better mobile experience\n• Bug fixes",
+            "version": "2.1.0",
+            "release_notes": "• Fixed Electron print popup blocking\n• Fixed performance monitor runtime errors\n• Enhanced print functionality\n• Improved stability and error handling\n• Bug fixes and optimizations",
             "force_update": False,
-            "message": "Update available with new features!",
+            "message": "Update available with bug fixes and improvements!",
             "download_url": None,
-            "min_version": "1.0.0",
+            "min_version": "2.0.0",
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         return {
-            "version": "1.5.0",
+            "version": "2.1.0",
             "release_notes": "",
             "force_update": False,
             "message": "",
@@ -10186,7 +10186,7 @@ async def root():
     """Root endpoint - basic server info"""
     return {
         "service": "BillByteKOT Server",
-        "version": "1.0.0",
+        "version": "2.1.0",
         "status": "running",
         "message": "Welcome to BillByteKOT - Restaurant Billing & KOT System",
         "endpoints": {

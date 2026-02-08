@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw } from 'lucide-react';
+import { Plus, Eye, Printer, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw, CreditCard } from 'lucide-react';
 import TrialBanner from '../components/TrialBanner';
 import { manualPrintKOT, manualPrintReceipt } from '../utils/printUtils';
 import OptimizedBillingButton from '../components/OptimizedBillingButton';
@@ -996,6 +996,74 @@ const OrdersPage = ({ user }) => {
     const updated = [...selectedItems];
     updated[index].quantity = quantity;
     setSelectedItems(updated);
+  };
+
+  // Quick Bill & Pay - Skip order creation, go directly to billing
+  const handleQuickBill = async () => {
+    if (selectedItems.length === 0) {
+      toast.error('Please add at least one item');
+      return;
+    }
+
+    // Prevent duplicate order creation
+    if (isCreatingOrder) {
+      toast.warning('Processing, please wait...');
+      return;
+    }
+
+    setIsCreatingOrder(true);
+
+    try {
+      const customerName = formData.customer_name?.trim() || 'Quick Sale';
+      
+      // Instant feedback
+      playSound('success');
+      toast.success('🚀 Creating quick bill...');
+      
+      // Close menu immediately
+      setShowMenuPage(false);
+      setCartExpanded(false);
+
+      // Create order with ready status (skip preparation)
+      const response = await apiWithRetry({
+        method: 'post',
+        url: `${API}/orders`,
+        data: {
+          table_id: null,
+          table_number: 0,
+          items: selectedItems,
+          customer_name: customerName,
+          customer_phone: formData.customer_phone || '',
+          status: 'ready', // Skip pending/preparing, go directly to ready
+          quick_billing: true, // Flag for quick billing
+          frontend_origin: window.location.origin
+        },
+        timeout: 12000
+      });
+
+      const newOrder = response.data;
+      
+      console.log('✅ Quick bill created:', newOrder.id);
+      
+      // Reset form
+      resetForm();
+      
+      // Success feedback
+      toast.success('✅ Redirecting to billing...');
+      
+      // Navigate directly to billing page
+      navigate(`/billing/${newOrder.id}`);
+
+    } catch (error) {
+      console.error('Quick bill failed:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create quick bill';
+      toast.error(`Quick bill failed: ${errorMsg}`);
+      
+      // Reopen menu on error
+      setShowMenuPage(true);
+    } finally {
+      setIsCreatingOrder(false);
+    }
   };
 
   // Submit order from full-screen menu page with instant feedback
@@ -2022,7 +2090,7 @@ const OrdersPage = ({ user }) => {
                     </div>
                   )}
                   
-                  {/* Total Bar - Always visible */}
+                  {/* Total Bar - Always visible with two action buttons */}
                   <div className={`flex items-center justify-between bg-violet-600 mx-2 mb-2 rounded-xl px-3 py-2 ${cartExpanded ? 'mb-4' : ''}`}>
                     <div className="flex items-center gap-2 text-white">
                       <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -2033,14 +2101,31 @@ const OrdersPage = ({ user }) => {
                         <p className="text-base font-bold leading-tight">₹{selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(0)}</p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => { playSound('success'); handleSubmitOrder(); }}
-                      disabled={selectedItems.length === 0}
-                      className="bg-white text-violet-600 font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform text-sm"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Create
-                    </button>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      {/* Regular Create Order */}
+                      <button 
+                        onClick={() => { playSound('success'); handleSubmitOrder(); }}
+                        disabled={selectedItems.length === 0}
+                        className="bg-white text-violet-600 font-bold px-3 py-2 rounded-lg flex items-center gap-1 disabled:opacity-50 active:scale-95 transition-transform text-xs"
+                        title="Create order for kitchen preparation"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="hidden sm:inline">Create</span>
+                      </button>
+                      
+                      {/* Quick Bill & Pay */}
+                      <button 
+                        onClick={() => { playSound('success'); handleQuickBill(); }}
+                        disabled={selectedItems.length === 0}
+                        className="bg-green-500 text-white font-bold px-3 py-2 rounded-lg flex items-center gap-1 disabled:opacity-50 active:scale-95 transition-transform text-xs shadow-lg"
+                        title="Skip preparation, bill immediately (for ready items)"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span className="hidden sm:inline">Quick Bill</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (

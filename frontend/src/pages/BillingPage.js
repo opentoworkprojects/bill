@@ -1016,13 +1016,18 @@ const BillingPage = ({ user }) => {
       const shouldAutoPrint = businessSettings?.print_customization?.auto_print ?? true; // Default to TRUE for fast POS processing
       
       if (shouldAutoPrint) {
-        try {
-          await printReceipt(receiptData, businessSettings);
-          toast.success('✅ Payment completed! Receipt printing...');
-        } catch (printError) {
-          console.error('Print error:', printError);
-          toast.info('Payment completed! Click Print button for receipt.');
-        }
+        // Print asynchronously without blocking UI - fire and forget
+        printReceipt(receiptData, businessSettings)
+          .then(() => {
+            console.log('✅ Receipt printed successfully');
+          })
+          .catch(printError => {
+            console.error('Print error:', printError);
+            toast.info('💡 Print failed. Click Print button to retry.');
+          });
+        
+        // Show success immediately without waiting for print
+        toast.success('✅ Payment completed! Receipt printing...');
       } else {
         toast.success('Payment completed! Click Print button for receipt.');
       }
