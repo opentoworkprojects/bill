@@ -4911,6 +4911,57 @@ We hope to see you again soon! 🙏
 async def create_order(
     order_data: OrderCreate, current_user: dict = Depends(get_current_user)
 ):
+    # 🚀 ULTRA-FAST PATH FOR QUICK BILLING - Skip all checks
+    if getattr(order_data, 'quick_billing', False):
+        user_org_id = get_secure_org_id(current_user)
+        business = current_user.get("business_settings") or {}
+        tax_rate_setting = business.get("tax_rate")
+        tax_rate = (tax_rate_setting if tax_rate_setting is not None else 5.0) / 100
+        
+        # Calculate totals
+        subtotal = sum(item.price * item.quantity for item in order_data.items)
+        tax = subtotal * tax_rate
+        total = subtotal + tax
+        
+        # Generate minimal order
+        tracking_token = str(uuid.uuid4())[:12]
+        invoice_number = await get_next_invoice_number(user_org_id)
+        
+        order_obj = Order(
+            table_id="counter",
+            table_number=0,
+            items=[item.model_dump() for item in order_data.items],
+            subtotal=subtotal,
+            tax=tax,
+            tax_rate=tax_rate_setting if tax_rate_setting is not None else 5.0,
+            total=total,
+            waiter_id=current_user["id"],
+            waiter_name=current_user["username"],
+            customer_name=order_data.customer_name or "Quick Sale",
+            customer_phone=order_data.customer_phone,
+            tracking_token=tracking_token,
+            order_type="takeaway",
+            organization_id=user_org_id,
+            invoice_number=invoice_number,
+            status=order_data.status or "ready"  # Use provided status (ready for quick bill)
+        )
+
+        doc = order_obj.model_dump()
+        doc["created_at"] = doc["created_at"].isoformat()
+        doc["updated_at"] = doc["updated_at"].isoformat()
+
+        await db.orders.insert_one(doc)
+        
+        # Async cache invalidation (don't wait)
+        try:
+            cached_service = get_cached_order_service()
+            asyncio.create_task(cached_service.invalidate_order_caches(user_org_id, order_obj.id))
+        except:
+            pass
+        
+        return order_obj
+    
+    # NORMAL PATH - Full validation and logic
     if not await check_subscription(current_user):
         # Check if trial expired or subscription expired
         created_at = current_user.get("created_at")

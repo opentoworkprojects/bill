@@ -1007,7 +1007,6 @@ const OrdersPage = ({ user }) => {
 
     // Prevent duplicate order creation
     if (isCreatingOrder) {
-      toast.warning('Processing, please wait...');
       return;
     }
 
@@ -1019,11 +1018,11 @@ const OrdersPage = ({ user }) => {
       // Instant feedback
       playSound('success');
       
-      // Close menu immediately - this makes it feel instant
+      // Close menu immediately
       setShowMenuPage(false);
       setCartExpanded(false);
       
-      // Create order with ready status (skip preparation)
+      // 🚀 ULTRA-FAST: Create order with minimal timeout
       const response = await apiWithRetry({
         method: 'post',
         url: `${API}/orders`,
@@ -1033,28 +1032,24 @@ const OrdersPage = ({ user }) => {
           items: selectedItems,
           customer_name: customerName,
           customer_phone: formData.customer_phone || '',
-          status: 'ready', // Skip pending/preparing, go directly to ready
-          quick_billing: true, // Flag for quick billing
+          status: 'ready',
+          quick_billing: true,
           frontend_origin: window.location.origin
         },
-        timeout: 8000 // Reduced timeout for faster response
+        timeout: 5000 // Ultra-fast timeout
       });
 
       const newOrder = response.data;
       
-      console.log('✅ Quick bill created:', newOrder.id);
-      
       // Reset form
       resetForm();
       
-      // Navigate directly to billing page
-      // Use replace to avoid back button showing orders page
+      // Navigate instantly
       navigate(`/billing/${newOrder.id}`, { replace: true });
 
     } catch (error) {
       console.error('Quick bill failed:', error);
-      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create quick bill';
-      toast.error(`Quick bill failed: ${errorMsg}`);
+      toast.error('Quick bill failed');
       
       // Reopen menu on error
       setShowMenuPage(true);
@@ -1723,18 +1718,47 @@ const OrdersPage = ({ user }) => {
 
   return (
     <Layout user={user}>
-      {/* 🚀 QUICK BILL LOADING OVERLAY - Covers screen during order creation */}
+      {/* 🚀 ENHANCED QUICK BILL LOADING */}
       {isCreatingOrder && (
-        <div className="fixed inset-0 bg-gradient-to-br from-violet-600 to-purple-700 z-[9999] flex items-center justify-center">
-          <div className="text-center">
-            <div className="relative">
-              <div className="w-20 h-20 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-6"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <ShoppingCart className="w-8 h-8 text-white animate-pulse" />
+        <div className="fixed inset-0 bg-gradient-to-br from-violet-600/95 to-purple-700/95 backdrop-blur-md z-[9999] flex items-center justify-center">
+          <div className="relative">
+            {/* Animated background circles */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-32 h-32 bg-white/10 rounded-full animate-ping"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-24 h-24 bg-white/20 rounded-full animate-pulse"></div>
+            </div>
+            
+            {/* Main content card */}
+            <div className="relative bg-white rounded-3xl p-8 shadow-2xl transform hover:scale-105 transition-transform">
+              <div className="flex flex-col items-center gap-4">
+                {/* Animated icon */}
+                <div className="relative">
+                  <div className="w-16 h-16 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <CreditCard className="w-7 h-7 text-violet-600 animate-pulse" />
+                  </div>
+                </div>
+                
+                {/* Text content */}
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-1">
+                    Creating Bill
+                  </h3>
+                  <p className="text-sm text-gray-500 animate-pulse">
+                    Almost ready...
+                  </p>
+                </div>
+                
+                {/* Progress dots */}
+                <div className="flex gap-2">
+                  <div className="w-2 h-2 bg-violet-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-violet-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-violet-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Creating Quick Bill...</h2>
-            <p className="text-violet-200">Please wait a moment</p>
           </div>
         </div>
       )}
