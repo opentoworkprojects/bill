@@ -286,7 +286,12 @@ class PerformanceMonitor {
         cacheHitRate: 0,
         errorRate: 0,
         performanceDistribution: {},
-        recentPerformance: {}
+        recentPerformance: {},
+        thresholds: { ...this.thresholds },
+        alerts: {
+          consecutiveSlowOperations: this.alerts.consecutiveSlowOperations,
+          lastAlert: this.alerts.lastAlert
+        }
       };
     }
     

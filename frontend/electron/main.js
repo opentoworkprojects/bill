@@ -172,8 +172,16 @@ function createWindow() {
     }
   });
 
-  // Handle external links
+  // Handle external links and print popups
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow about:blank for print popups
+    if (url === 'about:blank' || url.startsWith('about:blank')) {
+      console.log('[BillByteKOT Desktop] Allowing popup for printing:', url);
+      return { action: 'allow' };
+    }
+    
+    // Open external URLs in default browser
+    console.log('[BillByteKOT Desktop] Opening external URL:', url);
     shell.openExternal(url);
     return { action: 'deny' };
   });

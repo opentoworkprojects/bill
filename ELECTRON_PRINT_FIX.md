@@ -226,3 +226,113 @@ If users still experience issues after this fix:
 3. Verify printer compatibility
 4. Test with different thermal printer models
 5. Consider adding telemetry for print failures
+
+
+---
+
+## UPDATE: Popup Blocking Fix (February 8, 2026)
+
+### New Issue Discovered
+Users were seeing: **"Popup blocked! Please allow popups for printing."**
+
+### Root Cause
+Electron blocks `window.open()` by default for security. When web code uses `window.open()` → `window.print()`, Electron denies the popup unless explicitly allowed.
+
+### Solution Applied
+
+Updated `setWindowOpenHandler` in `frontend/electron/main.js` to allow `about:blank` popups (used for printing):
+
+```javascript
+// Handle external links and print popups
+mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  // Allow about:blank for print popups
+  if (url === 'about:blank' || url.startsWith('about:blank')) {
+    console.log('[BillByteKOT Desktop] Allowing popup for printing:', url);
+    return { action: 'allow' };
+  }
+  
+  // Open external URLs in default browser
+  console.log('[BillByteKOT Desktop] Opening external URL:', url);
+  shell.openExternal(url);
+  return { action: 'deny' };
+});
+```
+
+### What Changed
+**Before:**
+```javascript
+mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  shell.openExternal(url);
+  return { action: 'deny' }; // ❌ Blocked ALL popups
+});
+```
+
+**After:**
+```javascript
+mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  if (url === 'about:blank' || url.startsWith('about:blank')) {
+    return { action: 'allow' }; // ✅ Allow print popups
+  }
+  shell.openExternal(url);
+  return { action: 'deny' }; // ❌ Still block external popups
+});
+```
+
+### Security Considerations
+- ✅ Only `about:blank` popups are allowed (safe for printing)
+- ✅ External URLs still open in default browser
+- ✅ No malicious popups can be triggered
+- ✅ Maintains security while enabling printing
+
+### Two Printing Methods Now Available
+
+#### Method A: window.open() → window.print() (Now Fixed)
+Web code can now use standard print popups:
+```javascript
+const printWindow = window.open('', '', 'width=800,height=600');
+printWindow.document.write(htmlContent);
+printWindow.print();
+```
+
+#### Method B: Electron IPC (Recommended)
+Direct printing without popups (already implemented):
+```javascript
+import { printReceipt } from './utils/printUtils';
+
+// Silent print
+printReceipt(htmlContent, {
+  paperWidth: '80mm',
+  silent: true
+});
+
+// Print with dialog
+printReceipt(htmlContent, {
+  paperWidth: '80mm',
+  silent: false
+});
+```
+
+### Testing the Fix
+1. Rebuild Electron app: `npm run electron:build:win`
+2. Test print from Orders page
+3. Test print from Billing page
+4. Verify no "popup blocked" messages appear
+5. Confirm print dialog opens correctly
+
+### Benefits
+- ✅ No more "popup blocked" messages
+- ✅ Works with both web and Electron printing methods
+- ✅ Maintains security (only safe popups allowed)
+- ✅ Compatible with existing print code
+- ✅ No breaking changes
+
+### Files Modified
+- `frontend/electron/main.js` - Updated `setWindowOpenHandler` (line ~189)
+
+### Rebuild Required
+Yes, you need to rebuild the Electron app for this fix:
+```bash
+npm run electron:build:win
+```
+
+Then distribute the new installer to users.
