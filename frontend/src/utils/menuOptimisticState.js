@@ -380,6 +380,26 @@ class MenuOptimisticStateManager {
 // Create singleton instance
 const menuOptimisticState = new MenuOptimisticStateManager();
 
+// Export individual methods for convenience
+export const applyOptimisticUpdate = (type, item, originalState) => 
+  menuOptimisticState.applyOptimisticUpdate(type, item, originalState);
+export const confirmOperation = (operationId, serverData) => 
+  menuOptimisticState.confirmOperation(operationId, serverData);
+export const rollbackOperation = (operationId, errorMessage) => 
+  menuOptimisticState.rollbackOperation(operationId, errorMessage);
+export const generateTemporaryId = () => 
+  menuOptimisticState.generateTemporaryId();
+export const getPendingOperations = () => 
+  menuOptimisticState.getPendingOperations();
+export const getOptimisticItems = () => 
+  menuOptimisticState.getOptimisticItems();
+export const getRollbackQueue = () => 
+  menuOptimisticState.getRollbackQueue();
+export const clearRollbackQueue = () => 
+  menuOptimisticState.clearRollbackQueue();
+export const getStats = () => 
+  menuOptimisticState.getStats();
+
 // Export both class and singleton
 export { MenuOptimisticStateManager };
 export default menuOptimisticState;

@@ -388,6 +388,16 @@ class MenuRequestDeduplication {
 // Create singleton instance
 const menuRequestDeduplication = new MenuRequestDeduplication();
 
+// Export individual methods for convenience
+export const executeWithDeduplication = (requestKey, requestFn, options) => 
+  menuRequestDeduplication.executeWithDeduplication(requestKey, requestFn, options);
+export const isRequestInFlight = (requestKey) => 
+  menuRequestDeduplication.isRequestInFlight(requestKey);
+export const cancelRequest = (requestKey) => 
+  menuRequestDeduplication.cancelRequest(requestKey);
+export const getStats = () => 
+  menuRequestDeduplication.getStats();
+
 // Export both class and singleton
 export { MenuRequestDeduplication };
 export default menuRequestDeduplication;

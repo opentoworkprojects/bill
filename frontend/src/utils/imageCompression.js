@@ -506,6 +506,22 @@ class ImageCompressionUtility {
 // Create singleton instance
 const imageCompression = new ImageCompressionUtility();
 
+// Export individual methods for convenience
+export const compressImage = (file, options, onProgress) => 
+  imageCompression.compressImage(file, options, onProgress);
+export const uploadImageWithProgress = (file, uploadUrl, uploadOptions, onProgress) => 
+  imageCompression.uploadImageWithProgress(file, uploadUrl, uploadOptions, onProgress);
+export const cancelCompression = (compressionId) => 
+  imageCompression.cancelCompression(compressionId);
+export const cancelUpload = (uploadId) => 
+  imageCompression.cancelUpload(uploadId);
+export const getActiveCompressions = () => 
+  imageCompression.getActiveCompressions();
+export const getActiveUploads = () => 
+  imageCompression.getActiveUploads();
+export const getStats = () => 
+  imageCompression.getStats();
+
 // Export both class and singleton
 export { ImageCompressionUtility };
 export default imageCompression;
