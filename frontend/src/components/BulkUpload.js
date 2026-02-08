@@ -5,6 +5,7 @@ import { Upload, Download, AlertCircle, Loader2, CheckCircle, FileText } from 'l
 import { toast } from 'sonner';
 import axios from 'axios';
 import { API } from '../App';
+import { invalidateCache } from '../utils/menuCache';
 
 const BulkUpload = ({ type = 'menu', onSuccess }) => {
   const [file, setFile] = useState(null);
@@ -80,9 +81,12 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
       
       setFile(null);
       
+      // CRITICAL: Invalidate cache BEFORE refreshing to force fresh data fetch
+      invalidateCache();
+      
       // Force immediate refresh - call onSuccess which triggers fetchMenuItems
       if (onSuccess) {
-        // Call immediately to refresh the menu
+        // Call immediately to refresh the menu (will now fetch fresh data from server)
         await onSuccess();
         
         // Show completion message
