@@ -13,7 +13,7 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
   const [processingStatus, setProcessingStatus] = useState(''); // 'parsing', 'validating', 'saving'
   const [result, setResult] = useState(null);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile && selectedFile.name.endsWith('.csv')) {
       setFile(selectedFile);
@@ -22,14 +22,19 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
       setProcessingStatus('');
       
       // Show instant feedback
-      toast.success(`File selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`);
+      toast.success(`File selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB) - Starting upload...`);
+      
+      // Auto-upload immediately
+      await handleUploadFile(selectedFile);
     } else {
       toast.error('Please select a CSV file');
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) {
+  const handleUploadFile = async (fileToUpload) => {
+    const uploadFile = fileToUpload || file;
+    
+    if (!uploadFile) {
       toast.error('Please select a file first');
       return;
     }
@@ -39,7 +44,7 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
     setProcessingStatus('parsing');
     
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', uploadFile);
 
     try {
       const endpoint = type === 'menu' ? '/menu/bulk-upload' : '/inventory/bulk-upload';
@@ -88,6 +93,10 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
     }
   };
 
+  const handleUpload = async () => {
+    await handleUploadFile(file);
+  };
+
   const downloadTemplate = async () => {
     try {
       const endpoint = type === 'menu' ? '/templates/menu-csv' : '/templates/inventory-csv';
@@ -121,7 +130,7 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
           </Button>
         </div>
 
-        <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-violet-400 transition-colors">
+        <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-violet-400 transition-colors bg-gradient-to-br from-violet-50 to-purple-50">
           <input
             type="file"
             accept=".csv"
@@ -130,21 +139,26 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
             id={`csv-upload-${type}`}
             disabled={uploading}
           />
-          <label htmlFor={`csv-upload-${type}`} className={`cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {file ? (
+          <label htmlFor={`csv-upload-${type}`} className={`cursor-pointer block ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {uploading ? (
+              <div className="space-y-3">
+                <Loader2 className="w-16 h-16 mx-auto text-violet-600 animate-spin" />
+                <p className="text-lg font-semibold text-violet-900">Uploading...</p>
+                <p className="text-sm text-violet-600">{uploadProgress}% Complete</p>
+              </div>
+            ) : file ? (
               <div className="space-y-2">
                 <FileText className="w-12 h-12 mx-auto mb-2 text-violet-600" />
                 <p className="text-sm font-medium text-gray-800">{file.name}</p>
                 <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
-                {!uploading && (
-                  <p className="text-xs text-violet-600 mt-2">Click to change file</p>
-                )}
+                <p className="text-xs text-violet-600 mt-2">✓ Uploading automatically...</p>
               </div>
             ) : (
               <div>
-                <Upload className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-600">Click to select CSV file</p>
-                <p className="text-xs text-gray-400 mt-1">or drag and drop</p>
+                <Upload className="w-16 h-16 mx-auto mb-3 text-violet-500" />
+                <p className="text-lg font-semibold text-gray-800 mb-1">Click to Upload CSV</p>
+                <p className="text-sm text-gray-600">or drag and drop your file here</p>
+                <p className="text-xs text-gray-400 mt-2">File will upload automatically</p>
               </div>
             )}
           </label>
@@ -180,23 +194,18 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
           </div>
         )}
 
-        <Button
-          onClick={handleUpload}
-          disabled={!file || uploading}
-          className="w-full"
-        >
-          {uploading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Uploading... {uploadProgress}%
-            </span>
-          ) : (
+        {/* Manual Upload Button (Optional - for retry) */}
+        {file && !uploading && (
+          <Button
+            onClick={handleUpload}
+            className="w-full bg-violet-600 hover:bg-violet-700"
+          >
             <span className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
-              Upload CSV
+              Retry Upload
             </span>
-          )}
-        </Button>
+          </Button>
+        )}
 
         {result && (
           <div className={`mt-4 p-4 rounded-lg border-2 ${
