@@ -7,11 +7,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Search, Upload, X, Filter, Grid, List, Eye, EyeOff, Star, Clock, DollarSign, TrendingUp, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Upload, X, Filter, Grid, List, Eye, EyeOff, Star, Clock, DollarSign, RefreshCw, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
 import TrialBanner from '../components/TrialBanner';
 import ValidationAlert from '../components/ValidationAlert';
-import { apiWithRetry, apiSilent } from '../utils/apiClient';
+import { apiWithRetry } from '../utils/apiClient';
+import { 
+  applyOptimisticUpdate, 
+  confirmOperation, 
+  rollbackOperation, 
+  generateTemporaryId,
+  getPendingOperations 
+} from '../utils/menuOptimisticState';
+import { executeWithDeduplication } from '../utils/menuRequestDeduplication';
+import { getCachedItems, setCachedItems, invalidateCache, isCacheStale } from '../utils/menuCache';
+import { compressImage, uploadImageWithProgress } from '../utils/imageCompression';
 
 const MenuPage = ({ user }) => {
   const [menuItems, setMenuItems] = useState([]);
@@ -20,6 +30,9 @@ const MenuPage = ({ user }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadCanceller, setUploadCanceller] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef(null);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -47,6 +60,15 @@ const MenuPage = ({ user }) => {
     is_spicy: false,
     allergens: ''
   });
+  
+  // Optimistic update state
+  const [pendingOperations, setPendingOperations] = useState(new Map());
+  const [operationLoading, setOperationLoading] = useState(new Map());
+  const [deletedItems, setDeletedItems] = useState(new Map()); // For undo functionality
+  const [submitting, setSubmitting] = useState(false);
+  const [cacheStale, setCacheStale] = useState(false);
+  const [backgroundSyncing, setBackgroundSyncing] = useState(false);
+  const syncIntervalRef = useRef(null);
 
   // Enhanced filtered and sorted items with multiple filters
   const filteredAndSortedItems = useMemo(() => {
@@ -162,17 +184,102 @@ const MenuPage = ({ user }) => {
 
   useEffect(() => {
     fetchMenuItems();
+    
+    // Start background sync
+    startBackgroundSync();
+    
+    // Cleanup on unmount
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
+    };
   }, []);
 
-  // Optimized fetch function with better error handling and caching
+  // Background synchronization
+  const startBackgroundSync = () => {
+    const pollInterval = 30000; // 30 seconds
+    
+    const poll = async () => {
+      if (document.hidden) return; // Don't poll when page is hidden
+      
+      try {
+        setBackgroundSyncing(true);
+        const response = await apiWithRetry({
+          method: 'get',
+          url: `${API}/menu`,
+          timeout: 10000
+        });
+        
+        const freshItems = Array.isArray(response.data) ? response.data : [];
+        
+        // Merge with local state, prioritizing server state
+        setMenuItems(prevItems => {
+          const merged = [...freshItems];
+          const freshIds = new Set(freshItems.map(item => item.id));
+          
+          // Check for new items from other users
+          const newItems = freshItems.filter(item => 
+            !prevItems.find(prev => prev.id === item.id)
+          );
+          
+          if (newItems.length > 0) {
+            toast.info(`${newItems.length} new item(s) added by other users`, {
+              duration: 3000
+            });
+          }
+          
+          return merged;
+        });
+        
+        // Update cache
+        setCachedItems(freshItems);
+      } catch (error) {
+        console.warn('Background sync failed:', error);
+      } finally {
+        setBackgroundSyncing(false);
+      }
+    };
+    
+    // Start polling
+    syncIntervalRef.current = setInterval(poll, pollInterval);
+    
+    // Listen to visibility changes
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (syncIntervalRef.current) {
+          clearInterval(syncIntervalRef.current);
+        }
+      } else {
+        syncIntervalRef.current = setInterval(poll, pollInterval);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  };
+
+  // Optimized fetch function with caching (stale-while-revalidate)
   const fetchMenuItems = useCallback(async (showRefreshIndicator = false) => {
-    // Don't show loading spinner for subsequent fetches
-    if (initialLoad) {
+    // Check cache first
+    const cachedItems = getCachedItems();
+    const isStale = isCacheStale();
+    
+    if (cachedItems && cachedItems.length > 0) {
+      // Show cached data immediately
+      setMenuItems(cachedItems);
+      setLoading(false);
+      setInitialLoad(false);
+      setCacheStale(isStale);
+      
+      if (isStale && !showRefreshIndicator) {
+        toast.info('Showing cached data. Refreshing...', { duration: 2000 });
+      }
+    } else if (initialLoad) {
       setLoading(true);
     }
     
     try {
-      // Use the new API client with retry logic
+      // Fetch fresh data in background
       const response = await apiWithRetry({
         method: 'get',
         url: `${API}/menu`,
@@ -182,6 +289,8 @@ const MenuPage = ({ user }) => {
       const items = Array.isArray(response.data) ? response.data : [];
       
       setMenuItems(items);
+      setCachedItems(items); // Update cache
+      setCacheStale(false);
       
       if (items.length === 0 && initialLoad) {
         toast.info('No menu items found. Add your first menu item below!');
@@ -192,10 +301,19 @@ const MenuPage = ({ user }) => {
       }
       
     } catch (error) {
+      // If we have cached data, keep showing it
+      if (cachedItems && cachedItems.length > 0) {
+        toast.warning('Using cached data. Failed to fetch fresh data.', {
+          duration: 3000
+        });
+        return;
+      }
+      
       let errorMessage = 'Failed to fetch menu items';
       
       if (error.response?.status === 401) {
         errorMessage = 'Authentication expired. Please login again.';
+        invalidateCache(); // Clear cache on auth error
       } else if (error.response?.status === 403) {
         errorMessage = 'Not authorized to view menu items.';
       } else if (error.response?.data?.detail) {
@@ -229,26 +347,73 @@ const MenuPage = ({ user }) => {
       return;
     }
 
+    // Store file for retry
+    setSelectedFile(file);
+    
+    // Show preview immediately
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload with compression and progress
     setUploading(true);
+    setUploadProgress(0);
+    
     try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-
-      const response = await apiWithRetry({
-        method: 'post',
-        url: `${API}/upload/image`,
-        data: formDataUpload,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000 // Longer timeout for file uploads
-      });
-
-      setFormData({ ...formData, image_url: response.data.image_url });
-      setImagePreview(response.data.image_url);
+      // Compress image first
+      const compressedBlob = await compressImage(file);
+      const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+      
+      toast.success(`Image compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
+      
+      // Upload with progress tracking
+      const { imageUrl, cancel } = await uploadImageWithProgress(
+        compressedFile,
+        (progress) => setUploadProgress(progress),
+        API
+      );
+      
+      setUploadCanceller(() => cancel);
+      
+      setFormData({ ...formData, image_url: imageUrl });
+      setImagePreview(imageUrl);
       toast.success('Image uploaded successfully!');
     } catch (error) {
-      toast.error('Failed to upload image');
+      if (error.message === 'Upload cancelled') {
+        toast.info('Upload cancelled');
+      } else {
+        toast.error('Failed to upload image', {
+          action: {
+            label: 'Retry',
+            onClick: () => retryImageUpload()
+          }
+        });
+      }
     } finally {
       setUploading(false);
+      setUploadProgress(0);
+      setUploadCanceller(null);
+    }
+  };
+  
+  const retryImageUpload = async () => {
+    if (!selectedFile) return;
+    
+    // Trigger upload with stored file
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(selectedFile);
+    const event = { target: { files: dataTransfer.files } };
+    await handleImageUpload(event);
+  };
+  
+  const cancelImageUpload = () => {
+    if (uploadCanceller) {
+      uploadCanceller();
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadCanceller(null);
     }
   };
 
@@ -276,51 +441,349 @@ const MenuPage = ({ user }) => {
       return;
     }
     
+    setSubmitting(true);
+    
+    const submitData = {
+      ...formData,
+      price: parseFloat(formData.price),
+      preparation_time: parseInt(formData.preparation_time) || 15
+    };
+    
+    const operationType = editingItem ? 'update' : 'create';
+    const operationId = generateTemporaryId();
+    
     try {
-      const submitData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        preparation_time: parseInt(formData.preparation_time) || 15
-      };
-
       if (editingItem) {
-        await apiWithRetry({
-          method: 'put',
-          url: `${API}/menu/${editingItem.id}`,
-          data: submitData,
-          timeout: 10000
-        });
-        toast.success('Menu item updated successfully!');
+        // UPDATE with optimistic update
+        const optimisticItem = { ...editingItem, ...submitData };
+        
+        // Apply optimistic update
+        const operation = applyOptimisticUpdate(
+          operationId,
+          'update',
+          editingItem.id,
+          editingItem,
+          optimisticItem
+        );
+        
+        setMenuItems(prevItems => 
+          prevItems.map(item => item.id === editingItem.id ? optimisticItem : item)
+        );
+        
+        setPendingOperations(prev => new Map(prev).set(operationId, operation));
+        setOperationLoading(prev => new Map(prev).set(editingItem.id, 'Updating...'));
+        
+        // Execute with deduplication
+        await executeWithDeduplication(
+          `update_${editingItem.id}`,
+          async (signal) => {
+            const response = await apiWithRetry({
+              method: 'put',
+              url: `${API}/menu/${editingItem.id}`,
+              data: submitData,
+              timeout: 10000,
+              signal
+            });
+            
+            // Confirm operation
+            confirmOperation(operationId);
+            setPendingOperations(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(operationId);
+              return newMap;
+            });
+            setOperationLoading(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(editingItem.id);
+              return newMap;
+            });
+            
+            // Update with server data
+            setMenuItems(prevItems =>
+              prevItems.map(item => item.id === editingItem.id ? response.data : item)
+            );
+            
+            // Update cache
+            const allItems = await apiWithRetry({
+              method: 'get',
+              url: `${API}/menu`,
+              timeout: 10000
+            });
+            setCachedItems(allItems.data);
+            
+            toast.success('Menu item updated successfully!');
+          }
+        );
       } else {
-        await apiWithRetry({
-          method: 'post',
-          url: `${API}/menu`,
-          data: submitData,
-          timeout: 10000
-        });
-        toast.success('Menu item created successfully!');
+        // CREATE with optimistic update
+        const tempId = generateTemporaryId();
+        const optimisticItem = {
+          ...submitData,
+          id: tempId,
+          _optimistic: true,
+          _pendingOperationId: operationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // Apply optimistic update
+        const operation = applyOptimisticUpdate(
+          operationId,
+          'create',
+          tempId,
+          null,
+          optimisticItem
+        );
+        
+        setMenuItems(prevItems => [...prevItems, optimisticItem]);
+        setPendingOperations(prev => new Map(prev).set(operationId, operation));
+        setOperationLoading(prev => new Map(prev).set(tempId, 'Creating...'));
+        
+        // Execute with deduplication
+        await executeWithDeduplication(
+          `create_${JSON.stringify(submitData)}`,
+          async (signal) => {
+            const response = await apiWithRetry({
+              method: 'post',
+              url: `${API}/menu`,
+              data: submitData,
+              timeout: 10000,
+              signal
+            });
+            
+            // Confirm operation and replace temp item with real item
+            confirmOperation(operationId);
+            setPendingOperations(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(operationId);
+              return newMap;
+            });
+            setOperationLoading(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(tempId);
+              return newMap;
+            });
+            
+            setMenuItems(prevItems =>
+              prevItems.map(item => item.id === tempId ? response.data : item)
+            );
+            
+            // Update cache
+            const allItems = await apiWithRetry({
+              method: 'get',
+              url: `${API}/menu`,
+              timeout: 10000
+            });
+            setCachedItems(allItems.data);
+            
+            toast.success('Menu item created successfully!');
+          }
+        );
       }
+      
       setDialogOpen(false);
-      fetchMenuItems();
       resetForm();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save menu item');
+      // Rollback on failure
+      rollbackOperation(operationId, error);
+      
+      if (editingItem) {
+        setMenuItems(prevItems =>
+          prevItems.map(item => item.id === editingItem.id ? editingItem : item)
+        );
+      } else {
+        setMenuItems(prevItems =>
+          prevItems.filter(item => item._pendingOperationId !== operationId)
+        );
+      }
+      
+      setPendingOperations(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(operationId);
+        return newMap;
+      });
+      setOperationLoading(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(editingItem?.id || operationId);
+        return newMap;
+      });
+      
+      const errorMessage = error.response?.data?.detail || `Failed to ${operationType} menu item`;
+      toast.error(errorMessage, {
+        duration: 5000,
+        action: {
+          label: 'Retry',
+          onClick: () => handleSubmit(e)
+        }
+      });
+      
+      // Keep form open and preserve data on failure
+      setDialogOpen(true);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
+    
+    const operationId = generateTemporaryId();
+    const itemToDelete = menuItems.find(item => item.id === id);
+    
+    if (!itemToDelete) return;
+    
     try {
-      await apiWithRetry({
-        method: 'delete',
-        url: `${API}/menu/${id}`,
-        timeout: 10000
+      // Apply optimistic update - remove immediately with fade animation
+      const operation = applyOptimisticUpdate(
+        operationId,
+        'delete',
+        id,
+        itemToDelete,
+        null
+      );
+      
+      // Store for undo
+      setDeletedItems(prev => new Map(prev).set(id, {
+        item: itemToDelete,
+        operationId,
+        timestamp: Date.now()
+      }));
+      
+      setMenuItems(prevItems => prevItems.filter(item => item.id !== id));
+      setPendingOperations(prev => new Map(prev).set(operationId, operation));
+      setOperationLoading(prev => new Map(prev).set(id, 'Deleting...'));
+      
+      // Show undo toast for 3 seconds
+      const undoToastId = toast.success('Item deleted', {
+        duration: 3000,
+        action: {
+          label: 'Undo',
+          onClick: () => handleUndoDelete(id)
+        }
       });
-      toast.success('Menu item deleted successfully!');
-      fetchMenuItems();
+      
+      // Wait 3 seconds before actually deleting
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Check if undo was clicked
+      if (!deletedItems.has(id)) {
+        return; // Undo was clicked
+      }
+      
+      // Execute delete with deduplication
+      await executeWithDeduplication(
+        `delete_${id}`,
+        async (signal) => {
+          await apiWithRetry({
+            method: 'delete',
+            url: `${API}/menu/${id}`,
+            timeout: 10000,
+            signal
+          });
+          
+          // Confirm operation
+          confirmOperation(operationId);
+          setPendingOperations(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(operationId);
+            return newMap;
+          });
+          setOperationLoading(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(id);
+            return newMap;
+          });
+          setDeletedItems(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(id);
+            return newMap;
+          });
+          
+          // Update cache
+          const allItems = await apiWithRetry({
+            method: 'get',
+            url: `${API}/menu`,
+            timeout: 10000
+          });
+          setCachedItems(allItems.data);
+          
+          toast.success('Menu item deleted successfully!');
+        }
+      );
     } catch (error) {
-      toast.error('Failed to delete menu item');
+      // Rollback on failure - restore item
+      rollbackOperation(operationId, error);
+      
+      const deletedData = deletedItems.get(id);
+      if (deletedData) {
+        setMenuItems(prevItems => {
+          // Restore to original position
+          const newItems = [...prevItems];
+          const originalIndex = menuItems.findIndex(item => item.id === id);
+          if (originalIndex >= 0) {
+            newItems.splice(originalIndex, 0, deletedData.item);
+          } else {
+            newItems.push(deletedData.item);
+          }
+          return newItems;
+        });
+      }
+      
+      setPendingOperations(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(operationId);
+        return newMap;
+      });
+      setOperationLoading(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(id);
+        return newMap;
+      });
+      setDeletedItems(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(id);
+        return newMap;
+      });
+      
+      toast.error('Failed to delete menu item', {
+        duration: 5000,
+        action: {
+          label: 'Retry',
+          onClick: () => handleDelete(id)
+        }
+      });
     }
+  };
+  
+  const handleUndoDelete = (id) => {
+    const deletedData = deletedItems.get(id);
+    if (!deletedData) return;
+    
+    // Restore item
+    setMenuItems(prevItems => {
+      const newItems = [...prevItems];
+      const originalIndex = menuItems.findIndex(item => item.id === id);
+      if (originalIndex >= 0) {
+        newItems.splice(originalIndex, 0, deletedData.item);
+      } else {
+        newItems.push(deletedData.item);
+      }
+      return newItems;
+    });
+    
+    // Clean up
+    setPendingOperations(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(deletedData.operationId);
+      return newMap;
+    });
+    setDeletedItems(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(id);
+      return newMap;
+    });
+    
+    toast.info('Deletion cancelled');
   };
 
   // Bulk operations
@@ -387,6 +850,9 @@ const MenuPage = ({ user }) => {
     });
     setEditingItem(null);
     setImagePreview('');
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setUploadCanceller(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -411,34 +877,180 @@ const MenuPage = ({ user }) => {
     setDialogOpen(true);
   };
 
-  // Quick actions
+  // Quick actions with optimistic updates
   const toggleItemAvailability = async (item) => {
+    const operationId = generateTemporaryId();
+    const optimisticItem = { ...item, available: !item.available };
+    
     try {
-      await apiWithRetry({
-        method: 'put',
-        url: `${API}/menu/${item.id}`,
-        data: { ...item, available: !item.available },
-        timeout: 10000
-      });
-      toast.success(`${item.name} is now ${!item.available ? 'available' : 'unavailable'}`);
-      fetchMenuItems();
+      // Apply optimistic update
+      const operation = applyOptimisticUpdate(
+        operationId,
+        'toggle_availability',
+        item.id,
+        item,
+        optimisticItem
+      );
+      
+      setMenuItems(prevItems =>
+        prevItems.map(i => i.id === item.id ? optimisticItem : i)
+      );
+      setPendingOperations(prev => new Map(prev).set(operationId, operation));
+      setOperationLoading(prev => new Map(prev).set(item.id, 'Updating...'));
+      
+      // Execute with deduplication
+      await executeWithDeduplication(
+        `toggle_availability_${item.id}`,
+        async (signal) => {
+          const response = await apiWithRetry({
+            method: 'put',
+            url: `${API}/menu/${item.id}`,
+            data: optimisticItem,
+            timeout: 10000,
+            signal
+          });
+          
+          // Confirm operation
+          confirmOperation(operationId);
+          setPendingOperations(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(operationId);
+            return newMap;
+          });
+          setOperationLoading(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(item.id);
+            return newMap;
+          });
+          
+          setMenuItems(prevItems =>
+            prevItems.map(i => i.id === item.id ? response.data : i)
+          );
+          
+          // Update cache
+          const allItems = await apiWithRetry({
+            method: 'get',
+            url: `${API}/menu`,
+            timeout: 10000
+          });
+          setCachedItems(allItems.data);
+          
+          toast.success(`${item.name} is now ${!item.available ? 'available' : 'unavailable'}`);
+        }
+      );
     } catch (error) {
-      toast.error('Failed to update item availability');
+      // Rollback on failure
+      rollbackOperation(operationId, error);
+      
+      setMenuItems(prevItems =>
+        prevItems.map(i => i.id === item.id ? item : i)
+      );
+      
+      setPendingOperations(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(operationId);
+        return newMap;
+      });
+      setOperationLoading(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(item.id);
+        return newMap;
+      });
+      
+      toast.error('Failed to update item availability', {
+        action: {
+          label: 'Retry',
+          onClick: () => toggleItemAvailability(item)
+        }
+      });
     }
   };
 
   const toggleItemPopularity = async (item) => {
+    const operationId = generateTemporaryId();
+    const optimisticItem = { ...item, is_popular: !item.is_popular };
+    
     try {
-      await apiWithRetry({
-        method: 'put',
-        url: `${API}/menu/${item.id}`,
-        data: { ...item, is_popular: !item.is_popular },
-        timeout: 10000
-      });
-      toast.success(`${item.name} ${!item.is_popular ? 'marked as popular' : 'removed from popular'}`);
-      fetchMenuItems();
+      // Apply optimistic update
+      const operation = applyOptimisticUpdate(
+        operationId,
+        'toggle_popularity',
+        item.id,
+        item,
+        optimisticItem
+      );
+      
+      setMenuItems(prevItems =>
+        prevItems.map(i => i.id === item.id ? optimisticItem : i)
+      );
+      setPendingOperations(prev => new Map(prev).set(operationId, operation));
+      setOperationLoading(prev => new Map(prev).set(item.id, 'Updating...'));
+      
+      // Execute with deduplication
+      await executeWithDeduplication(
+        `toggle_popularity_${item.id}`,
+        async (signal) => {
+          const response = await apiWithRetry({
+            method: 'put',
+            url: `${API}/menu/${item.id}`,
+            data: optimisticItem,
+            timeout: 10000,
+            signal
+          });
+          
+          // Confirm operation
+          confirmOperation(operationId);
+          setPendingOperations(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(operationId);
+            return newMap;
+          });
+          setOperationLoading(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(item.id);
+            return newMap;
+          });
+          
+          setMenuItems(prevItems =>
+            prevItems.map(i => i.id === item.id ? response.data : i)
+          );
+          
+          // Update cache
+          const allItems = await apiWithRetry({
+            method: 'get',
+            url: `${API}/menu`,
+            timeout: 10000
+          });
+          setCachedItems(allItems.data);
+          
+          toast.success(`${item.name} ${!item.is_popular ? 'marked as popular' : 'removed from popular'}`);
+        }
+      );
     } catch (error) {
-      toast.error('Failed to update item popularity');
+      // Rollback on failure
+      rollbackOperation(operationId, error);
+      
+      setMenuItems(prevItems =>
+        prevItems.map(i => i.id === item.id ? item : i)
+      );
+      
+      setPendingOperations(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(operationId);
+        return newMap;
+      });
+      setOperationLoading(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(item.id);
+        return newMap;
+      });
+      
+      toast.error('Failed to update item popularity', {
+        action: {
+          label: 'Retry',
+          onClick: () => toggleItemPopularity(item)
+        }
+      });
     }
   };
 
@@ -476,163 +1088,182 @@ const MenuPage = ({ user }) => {
   );
 
   // Enhanced menu item component with more features
-  const MenuItemCard = useCallback(({ item, isSelected, onSelect }) => (
-    <Card 
-      key={item.id} 
-      className={`card-hover border-0 shadow-lg transition-all duration-200 relative ${
-        !item.available ? 'opacity-60' : ''
-      } ${isSelected ? 'ring-2 ring-violet-500' : ''} ${
-        viewMode === 'list' ? 'flex-row' : ''
-      }`} 
-      data-testid={`menu-item-${item.id}`}
-    >
-      {/* Bulk edit checkbox */}
-      {bulkEditMode && (
-        <div className="absolute top-2 left-2 z-10">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => onSelect(item.id)}
-            className="w-4 h-4 text-violet-600 rounded focus:ring-violet-500"
-          />
-        </div>
-      )}
-
-      {/* Popular badge */}
-      {item.is_popular && (
-        <div className="absolute top-2 right-2 z-10">
-          <div className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-            <Star className="w-3 h-3" />
-            Popular
+  const MenuItemCard = useCallback(({ item, isSelected, onSelect }) => {
+    const isPending = item._optimistic || operationLoading.has(item.id);
+    const loadingMessage = operationLoading.get(item.id);
+    
+    return (
+      <Card 
+        key={item.id} 
+        className={`card-hover border-0 shadow-lg transition-all duration-200 relative ${
+          !item.available ? 'opacity-60' : ''
+        } ${isSelected ? 'ring-2 ring-violet-500' : ''} ${
+          viewMode === 'list' ? 'flex-row' : ''
+        } ${isPending ? 'ring-2 ring-yellow-400 animate-pulse' : ''}`} 
+        data-testid={`menu-item-${item.id}`}
+      >
+        {/* Pending indicator */}
+        {isPending && (
+          <div className="absolute top-2 left-2 z-10">
+            <div className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {loadingMessage || 'Pending...'}
+            </div>
           </div>
-        </div>
-      )}
-
-      <div className={`${viewMode === 'list' ? 'flex w-full' : ''}`}>
-        {/* Image section */}
-        {item.image_url && (
-          <div className={`overflow-hidden ${
-            viewMode === 'list' 
-              ? 'w-32 h-32 rounded-l-lg flex-shrink-0' 
-              : 'h-40 rounded-t-lg'
-          }`}>
-            <img 
-              src={item.image_url} 
-              alt={item.name} 
-              className="w-full h-full object-cover transition-transform duration-200 hover:scale-105" 
-              onError={(e) => e.target.style.display = 'none'}
-              loading="lazy"
+        )}
+        
+        {/* Bulk edit checkbox */}
+        {bulkEditMode && (
+          <div className={`absolute ${isPending ? 'top-10' : 'top-2'} left-2 z-10`}>
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onSelect(item.id)}
+              className="w-4 h-4 text-violet-600 rounded focus:ring-violet-500"
             />
           </div>
         )}
 
-        {/* Content section */}
-        <div className={`${viewMode === 'list' ? 'flex-1 flex flex-col' : ''}`}>
-          <CardHeader className={`${viewMode === 'list' ? 'pb-2 flex-shrink-0' : 'pb-2'}`}>
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <CardTitle className={`${viewMode === 'list' ? 'text-base' : 'text-lg'} flex items-center gap-2`}>
-                  {item.name}
-                  {item.is_vegetarian && <span className="text-green-600 text-sm">🌱</span>}
-                  {item.is_spicy && <span className="text-red-600 text-sm">🌶️</span>}
-                </CardTitle>
-                <p className="text-sm text-gray-500 capitalize">{item.category}</p>
-                {item.preparation_time && (
-                  <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
-                    <Clock className="w-3 h-3" />
-                    {item.preparation_time} mins
-                  </div>
+        {/* Popular badge */}
+        {item.is_popular && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+              <Star className="w-3 h-3" />
+              Popular
+            </div>
+          </div>
+        )}
+
+        <div className={`${viewMode === 'list' ? 'flex w-full' : ''}`}>
+          {/* Image section */}
+          {item.image_url && (
+            <div className={`overflow-hidden ${
+              viewMode === 'list' 
+                ? 'w-32 h-32 rounded-l-lg flex-shrink-0' 
+                : 'h-40 rounded-t-lg'
+            }`}>
+              <img 
+                src={item.image_url} 
+                alt={item.name} 
+                className="w-full h-full object-cover transition-transform duration-200 hover:scale-105" 
+                onError={(e) => e.target.style.display = 'none'}
+                loading="lazy"
+              />
+            </div>
+          )}
+
+          {/* Content section */}
+          <div className={`${viewMode === 'list' ? 'flex-1 flex flex-col' : ''}`}>
+            <CardHeader className={`${viewMode === 'list' ? 'pb-2 flex-shrink-0' : 'pb-2'}`}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <CardTitle className={`${viewMode === 'list' ? 'text-base' : 'text-lg'} flex items-center gap-2`}>
+                    {item.name}
+                    {item.is_vegetarian && <span className="text-green-600 text-sm">🌱</span>}
+                    {item.is_spicy && <span className="text-red-600 text-sm">🌶️</span>}
+                  </CardTitle>
+                  <p className="text-sm text-gray-500 capitalize">{item.category}</p>
+                  {item.preparation_time && (
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                      <Clock className="w-3 h-3" />
+                      {item.preparation_time} mins
+                    </div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <span className={`${viewMode === 'list' ? 'text-lg' : 'text-lg'} font-bold text-violet-600`}>
+                    ₹{item.price}
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className={`${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
+              <div>
+                {item.description && (
+                  <p className={`text-sm text-gray-600 mb-3 ${
+                    viewMode === 'list' ? 'line-clamp-2' : 'line-clamp-2'
+                  }`}>
+                    {item.description}
+                  </p>
+                )}
+                
+                {item.allergens && (
+                  <p className="text-xs text-orange-600 mb-2">
+                    <strong>Allergens:</strong> {item.allergens}
+                  </p>
                 )}
               </div>
-              <div className="text-right">
-                <span className={`${viewMode === 'list' ? 'text-lg' : 'text-lg'} font-bold text-violet-600`}>
-                  ₹{item.price}
-                </span>
-              </div>
-            </div>
-          </CardHeader>
 
-          <CardContent className={`${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
-            <div>
-              {item.description && (
-                <p className={`text-sm text-gray-600 mb-3 ${
-                  viewMode === 'list' ? 'line-clamp-2' : 'line-clamp-2'
-                }`}>
-                  {item.description}
-                </p>
-              )}
-              
-              {item.allergens && (
-                <p className="text-xs text-orange-600 mb-2">
-                  <strong>Allergens:</strong> {item.allergens}
-                </p>
-              )}
-            </div>
+              <div className="flex justify-between items-center mt-auto">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {item.available ? 'Available' : 'Unavailable'}
+                  </span>
+                </div>
 
-            <div className="flex justify-between items-center mt-auto">
-              <div className="flex items-center gap-2">
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}>
-                  {item.available ? 'Available' : 'Unavailable'}
-                </span>
-              </div>
-
-              {['admin', 'cashier'].includes(user?.role) && (
-                <div className="flex gap-1">
-                  {/* Quick availability toggle */}
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => toggleItemAvailability(item)}
-                    className="p-1 h-8 w-8"
-                    title={`Mark as ${item.available ? 'unavailable' : 'available'}`}
-                  >
-                    {item.available ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                  </Button>
-
-                  {/* Quick popularity toggle */}
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => toggleItemPopularity(item)}
-                    className={`p-1 h-8 w-8 ${item.is_popular ? 'bg-yellow-100 text-yellow-700' : ''}`}
-                    title={`${item.is_popular ? 'Remove from' : 'Mark as'} popular`}
-                  >
-                    <Star className="w-3 h-3" />
-                  </Button>
-
-                  {/* Edit button */}
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handleEdit(item)} 
-                    className="p-1 h-8 w-8"
-                    data-testid={`edit-menu-${item.id}`}
-                  >
-                    <Edit className="w-3 h-3" />
-                  </Button>
-
-                  {/* Delete button - admin only */}
-                  {user?.role === 'admin' && (
+                {['admin', 'cashier'].includes(user?.role) && (
+                  <div className="flex gap-1">
+                    {/* Quick availability toggle */}
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="text-red-600 p-1 h-8 w-8" 
-                      onClick={() => handleDelete(item.id)} 
-                      data-testid={`delete-menu-${item.id}`}
+                      onClick={() => toggleItemAvailability(item)}
+                      className="p-1 h-8 w-8"
+                      title={`Mark as ${item.available ? 'unavailable' : 'available'}`}
+                      disabled={isPending}
                     >
-                      <Trash2 className="w-3 h-3" />
+                      {item.available ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                     </Button>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardContent>
+
+                    {/* Quick popularity toggle */}
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => toggleItemPopularity(item)}
+                      className={`p-1 h-8 w-8 ${item.is_popular ? 'bg-yellow-100 text-yellow-700' : ''}`}
+                      title={`${item.is_popular ? 'Remove from' : 'Mark as'} popular`}
+                      disabled={isPending}
+                    >
+                      <Star className="w-3 h-3" />
+                    </Button>
+
+                    {/* Edit button */}
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => handleEdit(item)} 
+                      className="p-1 h-8 w-8"
+                      data-testid={`edit-menu-${item.id}`}
+                      disabled={isPending}
+                    >
+                      <Edit className="w-3 h-3" />
+                    </Button>
+
+                    {/* Delete button - admin only */}
+                    {user?.role === 'admin' && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-red-600 p-1 h-8 w-8" 
+                        onClick={() => handleDelete(item.id)} 
+                        data-testid={`delete-menu-${item.id}`}
+                        disabled={isPending}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
         </div>
-      </div>
-    </Card>
-  ), [user?.role, viewMode, bulkEditMode]);
+      </Card>
+    );
+  }, [user?.role, viewMode, bulkEditMode, operationLoading]);
 
   // Stats cards component
   const StatsCards = () => (
@@ -697,7 +1328,21 @@ const MenuPage = ({ user }) => {
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Menu Management</h1>
-            <p className="text-gray-600 mt-2">Manage your restaurant menu items • {menuStats.total} items total</p>
+            <p className="text-gray-600 mt-2 flex items-center gap-2">
+              Manage your restaurant menu items • {menuStats.total} items total
+              {cacheStale && (
+                <span className="text-orange-600 text-sm flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Cache stale
+                </span>
+              )}
+              {backgroundSyncing && (
+                <span className="text-blue-600 text-sm flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Syncing...
+                </span>
+              )}
+            </p>
           </div>
           
           <div className="flex items-center gap-3 flex-wrap">
@@ -813,6 +1458,16 @@ const MenuPage = ({ user }) => {
                             <Upload className="w-4 h-4 mr-2" />
                             {uploading ? 'Uploading...' : 'Upload Image'}
                           </Button>
+                          {uploading && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={cancelImageUpload}
+                              className="text-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
                           <input
                             ref={fileInputRef}
                             type="file"
@@ -821,6 +1476,20 @@ const MenuPage = ({ user }) => {
                             className="hidden"
                           />
                         </div>
+                        
+                        {/* Upload progress bar */}
+                        {uploading && (
+                          <div className="space-y-1">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-violet-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-500 text-center">{uploadProgress}% uploaded</p>
+                          </div>
+                        )}
+                        
                         {imagePreview && (
                           <div className="relative">
                             <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
@@ -829,6 +1498,7 @@ const MenuPage = ({ user }) => {
                               onClick={() => {
                                 setImagePreview('');
                                 setFormData({ ...formData, image_url: '' });
+                                setSelectedFile(null);
                                 if (fileInputRef.current) fileInputRef.current.value = '';
                               }}
                               className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
@@ -897,8 +1567,20 @@ const MenuPage = ({ user }) => {
                     </div>
                     
                     <div className="flex gap-2">
-                      <Button type="submit" className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" data-testid="save-menu-button">
-                        {editingItem ? 'Update' : 'Create'}
+                      <Button 
+                        type="submit" 
+                        className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600" 
+                        data-testid="save-menu-button"
+                        disabled={submitting || uploading}
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {editingItem ? 'Updating...' : 'Creating...'}
+                          </>
+                        ) : (
+                          editingItem ? 'Update' : 'Create'
+                        )}
                       </Button>
                       <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
                     </div>

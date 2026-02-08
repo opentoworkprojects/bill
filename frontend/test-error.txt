@@ -1,0 +1,100 @@
+﻿
+> billbytekot@2.1.0 test
+> craco test menuCache.unit.test.js --testTimeout=30000 --watchAll=false
+
+node.exe : FAIL src/utils/__tests__/menuCache.unit.test.js
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/utils/...he.un 
+   it.test.js:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  MenuCache Unit Tests - Edge Cases
+    localStorage quota exceeded
+      ├ù handles quota exceeded gracefully (10 ms)
+      ΓêÜ clears cache on quota exceeded (1 ms)
+      ΓêÜ continues to work with memory cache when localStorage 
+fails (2 ms)
+    cache corruption handling
+      ΓêÜ handles corrupted JSON in localStorage (1 ms)
+      ΓêÜ handles missing properties in cached data (1 ms)
+      ΓêÜ handles invalid timestamp in cached data (1 ms)
+      ΓêÜ handles missing version in cached data (1 ms)
+    cache with missing data
+      ΓêÜ returns null when cache is empty (1 ms)
+      ΓêÜ returns null when memory cache is empty and localStorage 
+is empty (1 ms)
+      ΓêÜ handles empty array gracefully (1 ms)
+      ΓêÜ updateCachedItem returns false when cache is empty
+      ΓêÜ removeCachedItem returns false when cache is empty
+      ΓêÜ removeCachedItem returns false when item not found (1 ms)
+    cache with null/undefined values
+      ΓêÜ handles null items array
+      ΓêÜ handles undefined items array
+      ΓêÜ handles null item in updateCachedItem
+      ΓêÜ handles undefined item in updateCachedItem
+      ΓêÜ handles null itemId in removeCachedItem
+      ΓêÜ handles undefined itemId in removeCachedItem
+      ΓêÜ handles empty string itemId in removeCachedItem
+    cache size limits
+      ΓêÜ limits cache to maxCacheSize (1 ms)
+      ΓêÜ stores first N items when exceeding limit
+    cache expiration
+      ΓêÜ memory cache expires after TTL (1 ms)
+      ΓêÜ localStorage cache expires after persistent TTL
+      ΓêÜ fresh cache is not stale
+    user isolation
+      ΓêÜ invalidates cache when user changes
+      ΓêÜ allows cache when no user ID available
+    cache statistics
+      ΓêÜ returns accurate statistics (2 ms)
+      ΓêÜ statistics reflect empty cache (1 ms)
+    cache metadata
+      ΓêÜ creates metadata on cache update
+      ΓêÜ returns null when no metadata exists
+      ΓêÜ handles corrupted metadata (1 ms)
+    item change detection
+      ΓêÜ detects changed items
+      ΓêÜ detects unchanged items
+    cache merge
+      ΓêÜ returns server items when cache is empty
+      ΓêÜ detects added items
+      ΓêÜ detects removed items (1 ms)
+
+  ΓùÅ MenuCache Unit Tests - Edge Cases ΓÇ║ localStorage quota 
+exceeded ΓÇ║ handles quota exceeded gracefully
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+    [0m [90m 85 |[39m       [90m// Should return false because 
+localStorage failed[39m
+     [90m 86 |[39m       [36mconst[39m result [33m=[39m 
+cache[33m.[39msetCachedItems(items)[33m;[39m
+    [31m[1m>[22m[39m[90m 87 |[39m       
+expect(result)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m    |[39m                      [31m[1m^[22m[39m
+     [90m 88 |[39m
+     [90m 89 |[39m       [90m// But memory cache should still be 
+updated[39m
+     [90m 90 |[39m       expect(cache[33m.[39mmemoryCache[33m.[
+39mitems)[33m.[39mtoEqual(items)[33m;[39m[0m
+
+      at Object.<anonymous> 
+(src/utils/__tests__/menuCache.unit.test.js:87:22)
+      at TestScheduler.scheduleTests 
+(node_modules/@jest/core/build/TestScheduler.js:333:13)
+      at runJest (node_modules/@jest/core/build/runJest.js:404:19)
+      at _run10000 (node_modules/@jest/core/build/cli/index.js:320:7)
+      at runCLI (node_modules/@jest/core/build/cli/index.js:173:3)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 36 passed, 37 total
+Snapshots:   0 total
+Time:        1.579 s
+Ran all test suites matching /menuCache.unit.test.js/i.
