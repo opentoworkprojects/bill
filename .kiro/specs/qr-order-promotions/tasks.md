@@ -20,7 +20,7 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Return boolean indicating motion preference
     - _Requirements: 4.1_
   
-  - [~] 1.3 Write property test for useReducedMotion
+  - [ ] 1.3 Write property test for useReducedMotion
     - **Property 11: Reduced Motion Respect**
     - **Validates: Requirements 4.1**
   
@@ -33,13 +33,13 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Clean up styles after animation completes
     - _Requirements: 3.1, 3.5, 4.1_
   
-  - [~] 1.5 Write property tests for useAnimation
+  - [ ] 1.5 Write property tests for useAnimation
     - **Property 7: GPU-Accelerated Transforms**
     - **Property 10: Animation Cleanup**
     - **Property 11: Reduced Motion Respect**
     - **Validates: Requirements 3.1, 3.5, 4.1**
   
-  - [~] 1.6 Write unit tests for useAnimation edge cases
+  - [ ] 1.6 Write unit tests for useAnimation edge cases
     - Test with null/undefined config
     - Test rapid trigger/reset cycles
     - Test cleanup on unmount
@@ -55,11 +55,11 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Provide fallback for unsupported browsers
     - _Requirements: 2.2, 3.3_
   
-  - [~] 2.2 Write property test for scroll triggers
+  - [ ] 2.2 Write property test for scroll triggers
     - **Property 4: Scroll-Triggered Animations**
     - **Validates: Requirements 2.2**
   
-  - [~] 2.3 Write unit tests for useScrollTrigger
+  - [ ] 2.3 Write unit tests for useScrollTrigger
     - Test Intersection Observer callback
     - Test cleanup on unmount
     - Test fallback when API unavailable
@@ -67,7 +67,7 @@ This implementation plan breaks down the QR order promotions feature into discre
     - _Requirements: 2.2, 3.3_
 
 - [ ] 3. Implement performance monitoring
-  - [~] 3.1 Create performance monitor utility
+  - [ ] 3.1 Create performance monitor utility
     - Create `src/utils/animationPerformanceMonitor.js`
     - Track FPS using requestAnimationFrame
     - Detect layout thrashing and excessive repaints
@@ -76,20 +76,20 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Track concurrent animation count
     - _Requirements: 3.4, 8.1, 8.2, 8.3_
   
-  - [~] 3.2 Write property tests for performance monitoring
+  - [ ] 3.2 Write property tests for performance monitoring
     - **Property 9: Concurrent Animation Limiting**
     - **Property 21: Performance Monitoring and Logging**
     - **Property 22: Adaptive Performance Response**
     - **Validates: Requirements 3.4, 8.1, 8.2, 8.3**
   
-  - [~] 3.3 Implement device capability detection
+  - [ ] 3.3 Implement device capability detection
     - Add device detection to performance monitor
     - Detect mobile vs desktop
     - Detect low-powered devices
     - Adjust animation complexity based on device
     - _Requirements: 4.2, 8.4_
   
-  - [~] 3.4 Write property test for device adaptation
+  - [ ] 3.4 Write property test for device adaptation
     - **Property 12: Device-Adaptive Animations**
     - **Validates: Requirements 4.2, 8.4**
 
@@ -97,20 +97,20 @@ This implementation plan breaks down the QR order promotions feature into discre
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Create QR statistics data model and utilities
-  - [~] 5.1 Define QR statistics TypeScript interfaces
+  - [ ] 5.1 Define QR statistics TypeScript interfaces
     - Create `src/types/qrStatistics.ts` (or add to existing types file)
     - Define QRStatistics, QRMetrics, TableMetrics interfaces
     - Add validation functions for statistics data
     - _Requirements: 1.3, 2.4_
   
-  - [~] 5.2 Create statistics formatting utilities
+  - [ ] 5.2 Create statistics formatting utilities
     - Create `src/utils/statisticsFormatter.js`
     - Format percentages, time reductions, ratings
     - Handle null/undefined values gracefully
     - Add number formatting with separators
     - _Requirements: 1.3, 5.2_
   
-  - [~] 5.3 Write unit tests for statistics utilities
+  - [ ] 5.3 Write unit tests for statistics utilities
     - Test formatting with various number ranges
     - Test null/undefined handling
     - Test edge cases (zero, negative, very large numbers)
@@ -126,11 +126,11 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Make accessible with ARIA live regions
     - _Requirements: 2.4, 4.3_
   
-  - [~] 6.2 Write property test for stats counter
+  - [ ] 6.2 Write property test for stats counter
     - **Property 5: Statistics Animation Application**
     - **Validates: Requirements 2.4**
   
-  - [~] 6.3 Write unit tests for AnimatedStatsCounter
+  - [ ] 6.3 Write unit tests for AnimatedStatsCounter
     - Test count-up animation timing
     - Test with various number formats
     - Test accessibility attributes
@@ -147,11 +147,11 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Integrate with useAnimation hook
     - _Requirements: 1.1, 1.2, 5.1_
   
-  - [~] 7.2 Write property test for promotional banner
+  - [ ] 7.2 Write property test for promotional banner
     - **Property 1: Conditional QR System State Rendering**
     - **Validates: Requirements 1.2**
   
-  - [~] 7.3 Create QRStatisticsCard component
+  - [ ] 7.3 Create QRStatisticsCard component
     - Create `src/components/QRStatisticsCard.js`
     - Display QR metrics with AnimatedStatsCounter
     - Show comparison with non-QR orders
@@ -159,11 +159,11 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Integrate with statistics formatter
     - _Requirements: 1.3, 5.2_
   
-  - [~] 7.4 Write property test for statistics card
+  - [ ] 7.4 Write property test for statistics card
     - **Property 1: Conditional QR System State Rendering**
     - **Validates: Requirements 1.3**
   
-  - [~] 7.5 Create TableQRIndicator component
+  - [ ] 7.5 Create TableQRIndicator component
     - Create `src/components/TableQRIndicator.js`
     - Display badge overlay on table elements
     - Implement pulse animation for newly generated QR codes
@@ -171,23 +171,23 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Show QR preview on hover
     - _Requirements: 1.4, 6.1_
   
-  - [~] 7.6 Write property test for table indicators
+  - [ ] 7.6 Write property test for table indicators
     - **Property 2: Table QR Status Indicators**
     - **Validates: Requirements 1.4, 6.1**
   
-  - [~] 7.7 Create QRBenefitsTooltip component
+  - [ ] 7.7 Create QRBenefitsTooltip component
     - Create `src/components/QRBenefitsTooltip.js`
     - Display on hover/focus of promotional elements
     - Show benefit descriptions
     - Make keyboard accessible
     - _Requirements: 1.5_
   
-  - [~] 7.8 Write property test for tooltips
+  - [ ] 7.8 Write property test for tooltips
     - **Property 3: Interactive Element Tooltips**
     - **Validates: Requirements 1.5**
 
 - [ ] 8. Integrate QR promotions into Tables page
-  - [~] 8.1 Update TablesPage component
+  - [ ] 8.1 Update TablesPage component
     - Import and integrate QRPromotionalBanner
     - Import and integrate QRStatisticsCard
     - Add conditional rendering based on QR enabled state
@@ -195,25 +195,25 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Add CTA button click handler for navigation
     - _Requirements: 1.1, 1.2, 1.3, 6.2_
   
-  - [~] 8.2 Add QR indicators to table elements
+  - [ ] 8.2 Add QR indicators to table elements
     - Update table rendering to include TableQRIndicator
     - Pass QR code status for each table
     - Add hover handlers for QR preview
     - _Requirements: 1.4, 6.1_
   
-  - [~] 8.3 Add QR setup progress and quick actions
+  - [ ] 8.3 Add QR setup progress and quick actions
     - Display count of tables without QR codes
     - Show progress indicator for partial setup
     - Add quick action buttons (generate for all, generate individual)
     - _Requirements: 6.3, 6.4, 6.5_
   
-  - [~] 8.4 Write property tests for Tables page integration
+  - [ ] 8.4 Write property tests for Tables page integration
     - **Property 18: CTA Navigation Behavior**
     - **Property 19: QR Code Gap Display**
     - **Property 20: Setup Progress Indication**
     - **Validates: Requirements 6.2, 6.3, 6.4**
   
-  - [~] 8.5 Write integration tests for Tables page
+  - [ ] 8.5 Write integration tests for Tables page
     - Test full page render with QR components
     - Test conditional rendering scenarios
     - Test user interactions (CTA clicks, hover states)
@@ -231,7 +231,7 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Integrate with useAnimation hook
     - _Requirements: 2.1_
   
-  - [~] 10.2 Write unit test for hero section
+  - [ ] 10.2 Write unit test for hero section
     - Test component renders with all elements
     - Test animation sequence timing
     - Test CTA button click handler
@@ -246,25 +246,25 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Make expandable for detailed info
     - _Requirements: 2.3, 5.3, 5.4_
   
-  - [~] 10.4 Write property tests for feature cards
+  - [ ] 10.4 Write property tests for feature cards
     - **Property 8: Animation Staggering**
     - **Property 16: Feature Card Icon Presence**
     - **Property 17: Benefit Detail Expansion**
     - **Validates: Requirements 3.3, 5.3, 5.4**
   
-  - [~] 10.5 Create QRDemoPreview component
+  - [ ] 10.5 Create QRDemoPreview component
     - Create `src/components/QRDemoPreview.js`
     - Display animated preview of QR ordering flow
     - Add step-by-step animation sequence
     - Make interactive with click-through
     - _Requirements: 2.5_
   
-  - [~] 10.6 Write property test for demo preview
+  - [ ] 10.6 Write property test for demo preview
     - **Property 6: Conditional Demo Display**
     - **Validates: Requirements 2.5**
 
 - [ ] 11. Integrate animated components into Landing page
-  - [~] 11.1 Update LandingPage component
+  - [ ] 11.1 Update LandingPage component
     - Import and integrate AnimatedHeroSection
     - Add QRFeatureCard components (minimum 3)
     - Integrate AnimatedStatsCounter for metrics
@@ -272,17 +272,17 @@ This implementation plan breaks down the QR order promotions feature into discre
     - Add customer testimonials section
     - _Requirements: 2.1, 2.3, 2.4, 2.5, 5.5_
   
-  - [~] 11.2 Implement scroll-triggered section animations
+  - [ ] 11.2 Implement scroll-triggered section animations
     - Wrap sections with useScrollTrigger
     - Configure stagger delays for multiple cards
     - Test animation triggers at various scroll positions
     - _Requirements: 2.2, 3.3_
   
-  - [~] 11.3 Write property test for scroll animations
+  - [ ] 11.3 Write property test for scroll animations
     - **Property 4: Scroll-Triggered Animations**
     - **Validates: Requirements 2.2**
   
-  - [~] 11.4 Write integration tests for Landing page
+  - [ ] 11.4 Write integration tests for Landing page
     - Test full page render with all animated components
     - Test scroll-triggered animations
     - Test feature card interactions
@@ -290,31 +290,31 @@ This implementation plan breaks down the QR order promotions feature into discre
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
 - [ ] 12. Implement accessibility features
-  - [~] 12.1 Add keyboard navigation support
+  - [ ] 12.1 Add keyboard navigation support
     - Ensure all interactive elements are keyboard accessible
     - Add focus indicators for animated elements
     - Test tab order through animated sections
     - _Requirements: 4.3_
   
-  - [~] 12.2 Add ARIA attributes and screen reader support
+  - [ ] 12.2 Add ARIA attributes and screen reader support
     - Add ARIA labels to animated components
     - Add ARIA live regions for dynamic content
     - Ensure animations don't hide content from screen readers
     - _Requirements: 4.3_
   
-  - [~] 12.3 Implement graceful degradation
+  - [ ] 12.3 Implement graceful degradation
     - Ensure content visible when animations disabled
     - Test with reduced motion preference
     - Test with JavaScript disabled
     - _Requirements: 4.4_
   
-  - [~] 12.4 Write property tests for accessibility
+  - [ ] 12.4 Write property tests for accessibility
     - **Property 13: Animation Accessibility Preservation**
     - **Property 14: Graceful Animation Degradation**
     - **Property 15: Non-Blocking Animations**
     - **Validates: Requirements 4.3, 4.4, 4.5**
   
-  - [~] 12.5 Write accessibility unit tests
+  - [ ] 12.5 Write accessibility unit tests
     - Test with jest-axe for violations
     - Test keyboard navigation
     - Test screen reader announcements
@@ -322,27 +322,27 @@ This implementation plan breaks down the QR order promotions feature into discre
     - _Requirements: 4.3, 4.4, 4.5_
 
 - [ ] 13. Add error handling and fallbacks
-  - [~] 13.1 Implement animation error handling
+  - [ ] 13.1 Implement animation error handling
     - Add try-catch blocks around animation triggers
     - Implement graceful degradation on errors
     - Log errors with context for debugging
     - Add session flag to disable animations on repeated failures
     - _Requirements: 3.1, 4.4_
   
-  - [~] 13.2 Add Intersection Observer fallback
+  - [ ] 13.2 Add Intersection Observer fallback
     - Detect API availability on initialization
     - Fall back to immediate display if unavailable
     - Log warning for monitoring
     - _Requirements: 2.2_
   
-  - [~] 13.3 Handle missing statistics data
+  - [ ] 13.3 Handle missing statistics data
     - Display placeholder or "N/A" for missing data
     - Show message about data collection
     - Disable animations for missing data
     - Provide fallback content
     - _Requirements: 1.3, 2.4_
   
-  - [~] 13.4 Write unit tests for error handling
+  - [ ] 13.4 Write unit tests for error handling
     - Test animation failures
     - Test API unavailability
     - Test missing data scenarios
@@ -350,21 +350,21 @@ This implementation plan breaks down the QR order promotions feature into discre
     - _Requirements: 3.1, 2.2, 1.3_
 
 - [ ] 14. Performance optimization and testing
-  - [~] 14.1 Optimize animation performance
+  - [ ] 14.1 Optimize animation performance
     - Use CSS transforms instead of position/dimensions
     - Add will-change hints for animated properties
     - Implement animation throttling for multiple elements
     - Optimize re-renders with React.memo
     - _Requirements: 3.1, 3.2, 3.4_
   
-  - [~] 14.2 Add performance monitoring integration
+  - [ ] 14.2 Add performance monitoring integration
     - Integrate performance monitor with components
     - Add FPS tracking in development mode
     - Log performance warnings
     - Implement automatic complexity reduction
     - _Requirements: 8.1, 8.2, 8.3, 8.5_
   
-  - [~] 14.3 Write performance unit tests
+  - [ ] 14.3 Write performance unit tests
     - Test concurrent animation limiting
     - Test performance degradation response
     - Test device capability detection
@@ -372,27 +372,27 @@ This implementation plan breaks down the QR order promotions feature into discre
     - _Requirements: 3.4, 8.1, 8.2, 8.4, 8.5_
 
 - [ ] 15. Final integration and polish
-  - [~] 15.1 Add responsive design adjustments
+  - [ ] 15.1 Add responsive design adjustments
     - Test all components on mobile devices
     - Adjust animation complexity for mobile
     - Ensure touch interactions work properly
     - Test on various screen sizes
     - _Requirements: 4.2_
   
-  - [~] 15.2 Integrate with existing design system
+  - [ ] 15.2 Integrate with existing design system
     - Use existing color tokens and spacing
     - Match existing component patterns
     - Ensure consistent styling
     - _Requirements: 7.1, 7.2_
   
-  - [~] 15.3 Add documentation and comments
+  - [ ] 15.3 Add documentation and comments
     - Document animation utilities and hooks
     - Add JSDoc comments to components
     - Create usage examples
     - Document accessibility features
     - _Requirements: 7.5_
   
-  - [~] 15.4 Write end-to-end integration tests
+  - [ ] 15.4 Write end-to-end integration tests
     - Test complete user flows on Tables page
     - Test complete user flows on Landing page
     - Test cross-component interactions

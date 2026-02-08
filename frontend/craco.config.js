@@ -141,6 +141,13 @@ webpackConfig.jest = {
     jestConfig.transformIgnorePatterns = [
       '/node_modules/(?!(fast-check|pure-rand)/)',
     ];
+    
+    // Add module name mapper for @ alias
+    jestConfig.moduleNameMapper = {
+      ...jestConfig.moduleNameMapper,
+      '^@/(.*)$': '<rootDir>/src/$1',
+    };
+    
     return jestConfig;
   },
 };

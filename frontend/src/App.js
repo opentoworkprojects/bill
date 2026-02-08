@@ -25,6 +25,7 @@ import InventoryPage from './pages/InventoryPage';
 import ExpensePage from './pages/ExpensePage';
 import ReportsPage from './pages/ReportsPage';
 import BillingPage from './pages/BillingPage';
+import CounterSalePage from './pages/CounterSalePage';
 import SettingsPage from './pages/SettingsPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import BusinessSetupPage from './pages/BusinessSetupPage';
@@ -861,6 +862,14 @@ function App() {
             element={
               <PrivateRoute isAuthChecking={isAuthChecking}>
                 <BillingPage user={user} />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/counter-sale"
+            element={
+              <PrivateRoute isAuthChecking={isAuthChecking}>
+                <CounterSalePage user={user} />
               </PrivateRoute>
             }
           />
