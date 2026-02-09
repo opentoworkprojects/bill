@@ -7256,14 +7256,130 @@ async def get_expense_categories():
     return {"categories": EXPENSE_CATEGORIES}
 
 
+@api_router.get("/expense-categories")
+async def get_expense_categories_alt(current_user: dict = Depends(get_current_user)):
+    """Get list of expense categories (alternative endpoint for frontend compatibility)"""
+    try:
+        user_org_id = get_secure_org_id(current_user)
+        
+        # Get custom categories from database
+        custom_categories = await db.expense_categories.find(
+            {"organization_id": user_org_id}, {"_id": 0}
+        ).sort("created_at", -1).to_list(100)
+        
+        print(f"📋 Retrieved {len(custom_categories)} custom categories for org {user_org_id}")
+        
+        return custom_categories
+        
+    except Exception as e:
+        print(f"❌ Error retrieving expense categories: {e}")
+        return []
+
+
+@api_router.delete("/expense-categories/{category_id}")
+async def delete_expense_category(
+    category_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a custom expense category"""
+    try:
+        user_org_id = get_secure_org_id(current_user)
+        
+        result = await db.expense_categories.delete_one({
+            "id": category_id,
+            "organization_id": user_org_id
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Category not found")
+        
+        print(f"🗑️ Deleted expense category {category_id}")
+        
+        return {"message": "Category deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error deleting expense category: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete category: {str(e)}")
+
+
+@api_router.post("/expense-categories")
+async def create_expense_category(
+    category_data: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new custom expense category"""
+    try:
+        user_org_id = get_secure_org_id(current_user)
+        
+        print(f"📝 Creating expense category for org {user_org_id}: {category_data}")
+        
+        category_name = category_data.get("name", "").strip()
+        if not category_name:
+            print(f"❌ Category name is empty")
+            raise HTTPException(status_code=400, detail="Category name is required")
+        
+        # Check if category already exists (case-insensitive)
+        existing = await db.expense_categories.find_one({
+            "organization_id": user_org_id,
+            "name": {"$regex": f"^{category_name}$", "$options": "i"}
+        })
+        
+        if existing:
+            print(f"⚠️ Category '{category_name}' already exists")
+            raise HTTPException(status_code=400, detail="Category already exists")
+        
+        new_category = {
+            "id": str(uuid.uuid4()),
+            "name": category_name,
+            "organization_id": user_org_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.expense_categories.insert_one(new_category)
+        
+        print(f"✅ Category '{category_name}' created successfully")
+        
+        # Return without _id field
+        return_category = {k: v for k, v in new_category.items() if k != "_id"}
+        
+        return {"message": "Category created successfully", "category": return_category}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error creating expense category: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create category: {str(e)}")
+
+
 @api_router.get("/expenses/summary")
 async def get_expense_summary(
     start_date: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
+    date_range: Optional[str] = Query("month", description="Date range: today, week, month, year"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get expense summary with totals by category"""
+    """Get expense summary with totals by category and trend data"""
     user_org_id = get_secure_org_id(current_user)
+    
+    # Calculate date range if not provided
+    if not start_date or not end_date:
+        today = datetime.now(timezone.utc).date()
+        if date_range == "today":
+            start_date = today.isoformat()
+            end_date = today.isoformat()
+        elif date_range == "week":
+            start_date = (today - timedelta(days=7)).isoformat()
+            end_date = today.isoformat()
+        elif date_range == "month":
+            start_date = (today - timedelta(days=30)).isoformat()
+            end_date = today.isoformat()
+        elif date_range == "year":
+            start_date = (today - timedelta(days=365)).isoformat()
+            end_date = today.isoformat()
     
     query = {"organization_id": user_org_id}
     
@@ -7290,11 +7406,43 @@ async def get_expense_summary(
         by_category[cat] = by_category.get(cat, 0) + expense["amount"]
         by_payment_method[method] = by_payment_method.get(method, 0) + expense["amount"]
     
+    # Calculate trend (compare with previous period)
+    try:
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            period_days = (end_dt - start_dt).days + 1
+            
+            # Get previous period
+            prev_start = (start_dt - timedelta(days=period_days)).date().isoformat()
+            prev_end = (start_dt - timedelta(days=1)).date().isoformat()
+            
+            prev_query = {
+                "organization_id": user_org_id,
+                "date": {"$gte": prev_start, "$lte": prev_end}
+            }
+            
+            prev_expenses = await db.expenses.find(prev_query, {"_id": 0}).to_list(1000)
+            prev_total = sum(e["amount"] for e in prev_expenses)
+            
+            change = total - prev_total
+            trend = {
+                "current": total,
+                "previous": prev_total,
+                "change": change
+            }
+        else:
+            trend = {"current": total, "previous": 0, "change": 0}
+    except Exception as e:
+        print(f"Error calculating trend: {e}")
+        trend = {"current": total, "previous": 0, "change": 0}
+    
     return {
         "total": total,
         "count": len(expenses),
         "by_category": by_category,
-        "by_payment_method": by_payment_method
+        "by_payment_method": by_payment_method,
+        "trend": trend
     }
 
 
