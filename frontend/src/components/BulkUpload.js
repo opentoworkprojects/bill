@@ -70,17 +70,23 @@ const BulkUpload = ({ type = 'menu', onSuccess }) => {
       setProcessingStatus('complete');
       setFile(null);
       
-      // CRITICAL: Invalidate cache BEFORE refreshing to force fresh data fetch
+      // CRITICAL: Invalidate cache FIRST to ensure fresh data fetch
       invalidateCache();
+      
+      // Small delay to ensure cache invalidation completes
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Force immediate refresh - call onSuccess which triggers fetchMenuItems
       if (onSuccess) {
-        // Call immediately to refresh the menu (will now fetch fresh data from server)
+        // This will now fetch fresh data from server (cache is invalidated)
         await onSuccess();
       }
       
-      // Show success message AFTER refresh completes (non-blocking)
-      toast.success(`✅ ${response.data.items_added} items uploaded and visible!`, { duration: 2000 });
+      // Show success message with item count
+      toast.success(`✅ ${response.data.items_added} items uploaded successfully!`, { 
+        duration: 3000,
+        description: 'Menu refreshed with new items'
+      });
     } catch (error) {
       setProcessingStatus('error');
       const errorMessage = error.response?.data?.detail || error.message;

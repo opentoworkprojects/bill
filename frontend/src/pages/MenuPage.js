@@ -1763,7 +1763,10 @@ const MenuPage = ({ user }) => {
         {['admin', 'manager'].includes(user?.role) && (
           <BulkUpload 
             type="menu" 
-            onSuccess={fetchMenuItems}
+            onSuccess={async () => {
+              // Force fresh fetch after CSV upload (cache already invalidated in BulkUpload)
+              await fetchMenuItems(false);
+            }}
           />
         )}
 
