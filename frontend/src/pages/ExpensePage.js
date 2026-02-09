@@ -210,7 +210,14 @@ const ExpensePage = ({ user }) => {
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error('Failed to load expenses:', error);
-        toast.error('Failed to load expenses');
+        
+        // Only show error toast for actual errors (not 404 or empty responses)
+        const isRealError = error.response && error.response.status !== 404 && error.response.status >= 500;
+        if (isRealError) {
+          toast.error('Failed to load expenses. Please try again.');
+        }
+        
+        // Set empty data (don't show error for empty state)
         setExpenses([]);
         setSummary({ total: 0, count: 0, by_category: {}, by_payment_method: {}, trend: { current: 0, previous: 0, change: 0 } });
       }
