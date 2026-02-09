@@ -11590,6 +11590,14 @@ async def bulk_upload_menu(
             except Exception as e:
                 errors.append(f"Row {row_num}: {str(e)}")
         
+        # 🔥 CRITICAL: Invalidate Redis cache after bulk upload
+        try:
+            cached_service = get_cached_order_service()
+            await cached_service.invalidate_menu_caches(user_org_id)
+            print(f"🗑️ Menu cache invalidated after bulk upload ({items_added} items added)")
+        except Exception as e:
+            print(f"⚠️ Menu cache invalidation error after bulk upload: {e}")
+        
         return {
             "message": f"Bulk upload completed",
             "items_added": items_added,
