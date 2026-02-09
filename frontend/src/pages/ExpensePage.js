@@ -785,7 +785,7 @@ const ExpensePage = ({ user }) => {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <Button 
-                    variant="secondary" 
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 font-semibold" 
                     size="sm" 
                     onClick={() => setReportsDialogOpen(true)}
                   >
@@ -793,7 +793,7 @@ const ExpensePage = ({ user }) => {
                     Reports
                   </Button>
                   <Button 
-                    variant="secondary" 
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 font-semibold" 
                     size="sm" 
                     onClick={() => setCategoryDialogOpen(true)}
                   >
@@ -801,7 +801,7 @@ const ExpensePage = ({ user }) => {
                     Category
                   </Button>
                   <Button 
-                    variant="secondary" 
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 font-semibold" 
                     size="sm" 
                     onClick={handleExportCSV}
                     disabled={filteredExpenses.length === 0}
@@ -810,7 +810,7 @@ const ExpensePage = ({ user }) => {
                     Export
                   </Button>
                   <Button 
-                    variant="secondary" 
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 font-semibold" 
                     size="sm" 
                     onClick={() => loadExpensesOptimized()}
                   >
@@ -899,9 +899,9 @@ const ExpensePage = ({ user }) => {
               {/* Filters */}
               <div className="flex flex-wrap gap-3">
                 <Select value={filterDateRange} onValueChange={setFilterDateRange}>
-                  <SelectTrigger className="w-[150px] h-11">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    <SelectValue />
+                  <SelectTrigger className="w-[150px] h-11 bg-white font-medium text-gray-900">
+                    <Calendar className="w-4 h-4 mr-2 text-gray-600" />
+                    <SelectValue className="font-medium text-gray-900" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="today">Today</SelectItem>
@@ -914,9 +914,9 @@ const ExpensePage = ({ user }) => {
                 </Select>
                 
                 <Select value={filterCategory} onValueChange={setFilterCategory}>
-                  <SelectTrigger className="w-[180px] h-11">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="All Categories" />
+                  <SelectTrigger className="w-[180px] h-11 bg-white font-medium text-gray-900">
+                    <Filter className="w-4 h-4 mr-2 text-gray-600" />
+                    <SelectValue placeholder="All Categories" className="font-medium text-gray-900" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
@@ -927,9 +927,9 @@ const ExpensePage = ({ user }) => {
                 </Select>
                 
                 <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
-                  <SelectTrigger className="w-[160px] h-11">
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Payment Method" />
+                  <SelectTrigger className="w-[160px] h-11 bg-white font-medium text-gray-900">
+                    <CreditCard className="w-4 h-4 mr-2 text-gray-600" />
+                    <SelectValue placeholder="Payment Method" className="font-medium text-gray-900" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Methods</SelectItem>
