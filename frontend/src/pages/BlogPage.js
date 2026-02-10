@@ -13,6 +13,45 @@ const BlogPage = () => {
 
   const blogPosts = blogPostsData.concat([
     {
+      id: 0,
+      title: 'Lightning-Fast Restaurant Billing: The Future is Here ⚡',
+      excerpt: 'Discover how lightning-fast restaurant billing systems are transforming restaurants worldwide. Learn why 10,000+ restaurants switched to instant payment processing. Includes case studies and ROI analysis.',
+      author: 'BillByteKOT Team',
+      date: '2025-02-10',
+      category: 'Business Strategy',
+      readTime: '12 min read',
+      image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+      slug: 'lightning-fast-restaurant-billing',
+      featured: true,
+      content: 'Restaurant owners worldwide are facing the same problem: long billing queues are killing their efficiency and customer satisfaction. But what if the future of restaurant billing is here—and it\'s transforming how restaurants operate globally? Modern POS systems now offer instant billing, thermal printing, mobile-first design, keyboard shortcuts, and split payments. See how restaurants increased their revenue by 20-40% with faster billing.'
+    },
+    {
+      id: -1,
+      title: 'How to 10X Your Restaurant Revenue Without Hiring More Staff 📈',
+      excerpt: 'Discover how top restaurants are increasing revenue 10x without hiring more staff. The secret? Smart billing systems and automation. Includes detailed case studies showing 20-100% revenue increase.',
+      author: 'BillByteKOT Team',
+      date: '2025-02-10',
+      category: 'Revenue Growth',
+      readTime: '14 min read',
+      image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800',
+      slug: 'restaurant-revenue-10x-without-hiring',
+      featured: true,
+      content: 'Instead of hiring 10 more staff members, optimize your existing systems. Learn the 6 strategies that changed everything: eliminate billing delays (20% increase), reduce billing errors (15%), optimize payment methods (10%), maximize table turnover (25%), real-time data insights (15%), and credit sales management (10%). Total potential: 95% revenue increase without hiring!'
+    },
+    {
+      id: -2,
+      title: 'Why Your Restaurant Lost That Customer (And How to Get Them Back) 💔',
+      excerpt: 'Did your restaurant lose a customer today? Find out the #1 reason customers leave and how simple fixes like instant billing can bring them back. Includes recovery strategy.',
+      author: 'BillByteKOT Team',
+      date: '2025-02-10',
+      category: 'Customer Retention',
+      readTime: '11 min read',
+      image: 'https://images.unsplash.com/photo-1554224311-beee415c15c?w=800',
+      slug: 'restaurant-lost-customer-recovery',
+      featured: true,
+      content: '80% of service complaints are about speed, not food quality. The biggest culprit? Waiting at checkout. Learn how slow checkout is costing you ₹2.5-5 lakhs annually. See real customer stories and discover how instant billing transforms the checkout experience from frustrating to delightful.'
+    },
+    {
       id: 1,
       title: 'Complete Guide to Restaurant Billing Software in India 2024',
       excerpt: 'Everything you need to know about choosing the right billing software for your restaurant. Compare features, pricing, and benefits. Includes ROI calculator and implementation guide.',
