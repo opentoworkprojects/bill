@@ -374,6 +374,7 @@ const CounterSalePage = ({ user }) => {
           customer_name: customerName || 'Counter Sale',
           customer_phone: customerPhone || '',
           order_type: 'takeaway',
+          status: 'completed',  // Counter sales are completed immediately
           frontend_origin: window.location.origin,
           quick_billing: true
         },
