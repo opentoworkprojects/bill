@@ -91,6 +91,7 @@ const CounterSalePage = ({ user }) => {
   const [completedSaleOrder, setCompletedSaleOrder] = useState(null);
   const [showPrintReceipt, setShowPrintReceipt] = useState(false);
   const [customerFocusTarget, setCustomerFocusTarget] = useState('name');
+  const [showViewItemsModal, setShowViewItemsModal] = useState(false);
 
   const currency = useMemo(() => getCurrencySymbol(businessSettings?.currency), [businessSettings?.currency]);
   const taxRate = businessSettings?.tax_rate ?? 5;
@@ -486,6 +487,13 @@ const CounterSalePage = ({ user }) => {
         return;
       }
 
+      // V key to open View Items modal
+      if (key === 'v' && selectedItems.length > 0 && !isInput) {
+        event.preventDefault();
+        setShowViewItemsModal(true);
+        return;
+      }
+
       if (isCmd && key === 'enter') {
         event.preventDefault();
         handleCompleteSale();
@@ -659,6 +667,7 @@ const CounterSalePage = ({ user }) => {
               <span className="bg-white px-2 py-1 rounded-full border">Alt + 4 Credit</span>
               <span className="bg-white px-2 py-1 rounded-full border">Alt + 5 Split</span>
               <span className="bg-white px-2 py-1 rounded-full border">+ / - Last Item Qty</span>
+              <span className="bg-white px-2 py-1 rounded-full border font-bold bg-violet-100 text-violet-700 border-violet-300">V View Items</span>
               <span className="bg-white px-2 py-1 rounded-full border">Esc Clear Search</span>
             </div>
           </Card>
@@ -816,10 +825,21 @@ const CounterSalePage = ({ user }) => {
                     <p className="text-lg font-bold">{totalItems} items</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={resetSale} disabled={selectedItems.length === 0}>
-                  <RotateCcw className="w-3 h-3 mr-1" />
-                  New Sale
-                </Button>
+                <div className="flex gap-2">
+                  {selectedItems.length > 0 && (
+                    <Button 
+                      onClick={() => setShowViewItemsModal(true)}
+                      className="bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white font-bold h-9 px-4 shadow-lg hover:shadow-xl transition-all active:scale-95"
+                      title="View and edit all items in cart"
+                    >
+                      <span className="text-lg mr-2">📋</span> View Items
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={resetSale} disabled={selectedItems.length === 0}>
+                    <RotateCcw className="w-3 h-3 mr-1" />
+                    New Sale
+                  </Button>
+                </div>
               </div>
 
               {selectedItems.length === 0 ? (
@@ -1200,6 +1220,124 @@ const CounterSalePage = ({ user }) => {
           </Card>
         </div>
       )}
+
+      {/* View/Edit Items Modal - Simple */}
+      <Dialog open={showViewItemsModal} onOpenChange={setShowViewItemsModal}>
+        <DialogContent className="max-w-2xl w-[95vw] sm:w-[90%] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              📋 Added Items <span className="text-violet-600 text-xl">({selectedItems.length})</span>
+            </DialogTitle>
+            <p className="text-sm text-gray-500 mt-1">Click +/- to adjust quantities</p>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-3 space-y-2">
+            {selectedItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <div className="text-4xl mb-2">📭</div>
+                <p className="text-base font-medium">No items added yet</p>
+                <p className="text-sm">Add items from the menu to get started</p>
+              </div>
+            ) : (
+              selectedItems.map((item) => (
+                <div
+                  key={item.menu_item_id}
+                  className="border-2 border-gray-200 rounded-xl p-4 bg-white hover:border-violet-300 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Item Details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-lg text-gray-900">{item.name}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-sm font-medium text-gray-600">
+                          {currency}{item.price}
+                        </span>
+                        <span className="text-xs text-gray-400">each</span>
+                      </div>
+                    </div>
+
+                    {/* Quantity Controls */}
+                    <div className="flex items-center gap-2">
+                      {/* Minus Button */}
+                      <button
+                        onClick={() => {
+                          if (item.quantity > 1) {
+                            adjustItemQuantity(item.menu_item_id, -1);
+                          }
+                        }}
+                        className="w-10 h-10 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 font-bold text-lg rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={item.quantity <= 1}
+                        title="Decrease quantity"
+                      >
+                        −
+                      </button>
+
+                      {/* Quantity Display */}
+                      <div className="w-14 h-10 flex items-center justify-center bg-violet-100 text-violet-600 font-bold text-lg rounded-lg border-2 border-violet-200">
+                        {item.quantity}
+                      </div>
+
+                      {/* Plus Button */}
+                      <button
+                        onClick={() => adjustItemQuantity(item.menu_item_id, 1)}
+                        className="w-10 h-10 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-600 font-bold text-lg rounded-lg transition-colors"
+                        title="Increase quantity"
+                      >
+                        +
+                      </button>
+
+                      {/* Remove Button */}
+                      <button
+                        onClick={() => adjustItemQuantity(item.menu_item_id, -item.quantity)}
+                        className="w-10 h-10 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 font-bold text-lg rounded-lg transition-colors ml-1"
+                        title="Remove item"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Total for this item */}
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      Total: <span className="font-bold text-green-600">{currency}{(item.price * item.quantity).toFixed(0)}</span>
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Summary Section */}
+          {selectedItems.length > 0 && (
+            <div className="border-t-2 pt-4 mt-4 space-y-3 bg-gradient-to-br from-violet-50 to-blue-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold">Total Items</p>
+                  <p className="text-2xl font-bold text-violet-600 mt-1">{totalItems}</p>
+                  <p className="text-xs text-gray-500">{selectedItems.length} SKUs</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase tracking-wide font-semibold">Total Amount</p>
+                  <p className="text-2xl font-bold text-green-600 mt-1">{currency}{subtotal.toFixed(0)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Close Button */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              className="flex-1 h-11 bg-violet-600 hover:bg-violet-700 text-white font-semibold"
+              onClick={() => {
+                setShowViewItemsModal(false);
+              }}
+            >
+              Close & Continue
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };
