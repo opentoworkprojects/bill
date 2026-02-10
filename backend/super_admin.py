@@ -551,9 +551,38 @@ async def get_users_list(
                 "created_at": 1,
                 "bill_count": 1,
                 "last_login": 1,  # For activity metrics
-                "business_settings": 1  # For restaurant name display
+                "business_settings": 1,  # For restaurant name display
+                "organization_id": 1  # For calculating actual bill count
             }
         ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        
+        # Get bill counts for all users in this batch using aggregation (more efficient)
+        user_ids = [user.get("id") for user in users]
+        if user_ids:
+            bill_counts_pipeline = [
+                {
+                    "$match": {
+                        "organization_id": {"$in": [user.get("organization_id") for user in users if user.get("organization_id")]}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$organization_id",
+                        "count": {"$sum": 1}
+                    }
+                }
+            ]
+            
+            bill_counts_result = await db.orders.aggregate(bill_counts_pipeline).to_list(None)
+            bill_counts_map = {item["_id"]: item["count"] for item in bill_counts_result}
+            
+            # Update bill count for each user
+            for user in users:
+                org_id = user.get("organization_id")
+                if org_id and org_id in bill_counts_map:
+                    user["bill_count"] = bill_counts_map[org_id]
+                else:
+                    user["bill_count"] = 0
         
         # Get total count for pagination
         total = await db.users.count_documents({})
@@ -573,6 +602,66 @@ async def get_users_list(
     except Exception as e:
         print(f"❌ Users list error: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# ============ REFRESH BILL COUNTS ============
+
+@super_admin_router.post("/users/refresh-bill-counts")
+async def refresh_bill_counts(
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """
+    Force refresh bill counts for all users by recalculating from orders table.
+    This ensures counts are always up-to-date without relying on stale bill_count field.
+    """
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    
+    db = get_db()
+    
+    try:
+        print("🔄 REFRESH: Recalculating bill counts for all users...")
+        
+        # Get all users
+        all_users = await db.users.find({}, {"_id": 0, "id": 1, "organization_id": 1}).to_list(None)
+        
+        # Get bill counts aggregated by organization
+        bill_counts_pipeline = [
+            {
+                "$group": {
+                    "_id": "$organization_id",
+                    "count": {"$sum": 1}
+                }
+            }
+        ]
+        
+        bill_counts_result = await db.orders.aggregate(bill_counts_pipeline).to_list(None)
+        bill_counts_map = {item["_id"]: item["count"] for item in bill_counts_result}
+        
+        # Update each user's bill_count
+        updated_count = 0
+        for user in all_users:
+            org_id = user.get("organization_id")
+            new_bill_count = bill_counts_map.get(org_id, 0)
+            
+            # Update the user document with correct bill count
+            await db.users.update_one(
+                {"id": user.get("id")},
+                {"$set": {"bill_count": new_bill_count, "updated_at": datetime.now(timezone.utc)}}
+            )
+            updated_count += 1
+        
+        print(f"✅ REFRESH COMPLETE: Updated bill counts for {updated_count} users")
+        
+        return {
+            "success": True,
+            "message": f"Bill counts refreshed for {updated_count} users",
+            "users_updated": updated_count
+        }
+        
+    except Exception as e:
+        print(f"❌ Refresh bill counts error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to refresh bill counts: {str(e)}")
 
 # ============ SEARCH USERS (LIGHTWEIGHT) - MUST BE BEFORE /users/{user_email} ============
 
@@ -2157,7 +2246,7 @@ async def get_user_business_details(
             
             # Additional Info
             "created_at": created_at,
-            "bill_count": user.get("bill_count", 0),
+            "bill_count": orders_count,  # Use actual orders count as bill count
             
             # Referral Info
             "referral_code": user.get("referral_code"),
