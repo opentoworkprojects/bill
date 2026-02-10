@@ -1083,34 +1083,47 @@ const CounterSalePage = ({ user }) => {
       <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
         <DialogContent className="max-w-sm sm:max-w-md w-[90vw] sm:w-auto">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">Customer Details</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl font-bold">Customer Details</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              ref={customerNameRef}
-              value={customerName}
-              onChange={(event) => setCustomerName(event.target.value)}
-              placeholder="Customer name"
-              className="text-xs sm:text-sm h-8 sm:h-9"
-            />
-            <Input
-              ref={customerPhoneRef}
-              value={customerPhone}
-              onChange={(event) => setCustomerPhone(event.target.value)}
-              placeholder="Phone (optional)"
-              className="text-xs sm:text-sm h-8 sm:h-9"
-            />
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">Customer Name *</label>
+              <Input
+                ref={customerNameRef}
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
+                placeholder="Enter customer name"
+                className="text-sm h-10 sm:h-11"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">Phone Number</label>
+              <Input
+                ref={customerPhoneRef}
+                value={customerPhone}
+                onChange={(event) => setCustomerPhone(event.target.value)}
+                placeholder="Enter phone number (optional)"
+                className="text-sm h-10 sm:h-11"
+              />
+            </div>
             {paymentMethod === 'credit' && businessSettings?.credit_requires_customer_info && (
-              <p className="text-xs text-amber-600">
-                Credit sales require name and phone.
-              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-amber-800">
+                  ⚠️ Credit sales require name and phone
+                </p>
+              </div>
             )}
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setCustomerModalOpen(false)}>
+            <div className="flex gap-3 pt-2">
+              <Button 
+                variant="outline" 
+                className="flex-1 h-11 text-base font-semibold"
+                onClick={() => setCustomerModalOpen(false)}
+              >
                 Cancel
               </Button>
               <Button
-                className="flex-1"
+                className="flex-1 h-11 text-base font-semibold bg-violet-600 hover:bg-violet-700"
                 onClick={() => {
                   setCustomerModalOpen(false);
                   if (pendingComplete) {
@@ -1119,7 +1132,7 @@ const CounterSalePage = ({ user }) => {
                   }
                 }}
               >
-                Save
+                Save & Continue
               </Button>
             </div>
           </div>
