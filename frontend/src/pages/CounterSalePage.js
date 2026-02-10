@@ -832,7 +832,7 @@ const CounterSalePage = ({ user }) => {
                 <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 bg-violet-100 rounded-lg flex items-center justify-center">
-                    <ShoppingCart className="w-4 h-4 text-violet-600" />
+                    <Zap className="w-4 h-4 text-violet-600" />
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Cart</p>
