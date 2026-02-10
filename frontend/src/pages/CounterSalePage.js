@@ -836,65 +836,64 @@ const CounterSalePage = ({ user }) => {
 
               <Card className="p-4">
                 <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="font-semibold">{currency}{subtotal.toFixed(0)}</span>
-              </div>
+                  <span className="text-gray-500">Subtotal</span>
+                  <span className="font-semibold">{currency}{subtotal.toFixed(0)}</span>
+                </div>
 
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <select
-                    value={discountType}
-                    onChange={(event) => {
-                      setDiscountType(event.target.value);
-                      setDiscountValue('');
-                    }}
-                    className="h-8 px-2 text-xs border rounded-lg bg-white"
-                  >
-                    <option value="amount">₹</option>
-                    <option value="percent">%</option>
-                  </select>
-                  <Input
-                    type="number"
-                    value={discountValue}
-                    onChange={(event) => setDiscountValue(event.target.value)}
-                    placeholder="Discount"
-                    className="h-8 text-xs"
-                  />
-                  <div className="flex gap-1">
-                    {[5, 10, 15].map((pct) => (
-                      <button
-                        key={pct}
-                        onClick={() => {
-                          setDiscountType('percent');
-                          setDiscountValue(pct.toString());
-                        }}
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          discountType === 'percent' && discountValue === pct.toString()
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {pct}%
-                      </button>
-                    ))}
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={discountType}
+                      onChange={(event) => {
+                        setDiscountType(event.target.value);
+                        setDiscountValue('');
+                      }}
+                      className="h-8 px-2 text-xs border rounded-lg bg-white"
+                    >
+                      <option value="amount">₹</option>
+                      <option value="percent">%</option>
+                    </select>
+                    <Input
+                      type="number"
+                      value={discountValue}
+                      onChange={(event) => setDiscountValue(event.target.value)}
+                      placeholder="Discount"
+                      className="h-8 text-xs"
+                    />
+                    <div className="flex gap-1">
+                      {[5, 10, 15].map((pct) => (
+                        <button
+                          key={pct}
+                          onClick={() => {
+                            setDiscountType('percent');
+                            setDiscountValue(pct.toString());
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            discountType === 'percent' && discountValue === pct.toString()
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Tax ({taxRate}%)</span>
+                    <span>{currency}{tax.toFixed(0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">Discount</span>
+                    <span className="font-semibold text-rose-600">-{currency}{discountAmount.toFixed(0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-base font-bold border-t pt-2">
+                    <span>Total</span>
+                    <span className="text-violet-600">{currency}{total.toFixed(0)}</span>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>Tax ({taxRate}%)</span>
-                  <span>{currency}{tax.toFixed(0)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Discount</span>
-                  <span className="font-semibold text-rose-600">-{currency}{discountAmount.toFixed(0)}</span>
-                </div>
-                <div className="flex items-center justify-between text-base font-bold border-t pt-2">
-                  <span>Total</span>
-                  <span className="text-violet-600">{currency}{total.toFixed(0)}</span>
-                </div>
-                </div>
-              </div>
-            </Card>
+              </Card>
 
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-2">
