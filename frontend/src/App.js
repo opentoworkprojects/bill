@@ -18,6 +18,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import Dashboard from './pages/Dashboard';
 import MenuPage from './pages/MenuPage';
+import CounterSalePage from './pages/CounterSalePage';
 import OrdersPage from './pages/OrdersPage';
 import TablesPage from './pages/TablesPage';
 import KitchenPage from './pages/KitchenPage';
@@ -837,6 +838,14 @@ function App() {
             element={
               <PrivateRoute isAuthChecking={isAuthChecking}>
                 <MenuPage user={user} />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/counter-sale"
+            element={
+              <PrivateRoute isAuthChecking={isAuthChecking}>
+                <CounterSalePage user={user} />
               </PrivateRoute>
             }
           />

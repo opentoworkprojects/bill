@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { logout } from '../App';
 import { 
   Home, UtensilsCrossed, ShoppingBag, Table, ChefHat, Package, 
-  FileText, LogOut, Menu, X, Settings as SettingsIcon, Crown, Users,
+  FileText, LogOut, Menu, X, Settings as SettingsIcon, Crown, Users, ShoppingCart,
   MoreHorizontal, HelpCircle, TrendingDown, Gift
 } from 'lucide-react';
 
@@ -25,6 +25,7 @@ const Layout = ({ user, children }) => {
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu' },
     { path: '/orders', icon: ShoppingBag, label: 'Orders' },
     { path: '/tables', icon: Table, label: 'Tables' },
+    { path: '/counter-sale', icon: ShoppingCart, label: 'Counter Sale' },
     { path: '/kitchen', icon: ChefHat, label: 'Kitchen' },
     { path: '/inventory', icon: Package, label: 'Inventory' },
     { path: '/expenses', icon: TrendingDown, label: 'Expenses' },

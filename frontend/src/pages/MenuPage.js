@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
@@ -7,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Search, Upload, X, Filter, Grid, List, Eye, EyeOff, Star, Clock, DollarSign, RefreshCw, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Upload, X, Filter, Grid, List, Eye, EyeOff, Star, Clock, DollarSign, RefreshCw, Loader2, AlertCircle, CheckCircle, ShoppingCart } from 'lucide-react';
 import BulkUpload from '../components/BulkUpload';
 import TrialBanner from '../components/TrialBanner';
 import ValidationAlert from '../components/ValidationAlert';
@@ -24,6 +25,7 @@ import { getCachedItems, setCachedItems, invalidateCache, isCacheStale } from '.
 import { compressImage, uploadImageWithProgress } from '../utils/imageCompression';
 
 const MenuPage = ({ user }) => {
+  const navigate = useNavigate();
   const [menuItems, setMenuItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -1355,6 +1357,15 @@ const MenuPage = ({ user }) => {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => navigate('/counter-sale')}
+              className="flex items-center gap-2"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              Counter Sale
             </Button>
 
             {/* Bulk edit toggle */}
