@@ -19,13 +19,16 @@ import {
   Trash2,
   RotateCcw,
   SlidersHorizontal,
-  Zap
+  Zap,
+  Printer,
+  Download
 } from 'lucide-react';
 import { API } from '../App';
 import { apiWithRetry } from '../utils/apiClient';
 import { processPaymentFast } from '../utils/optimizedPayment';
 import { computePaymentState, determineBillingCompletionStatus } from '../utils/orderWorkflowRules';
 import { validatePayment } from '../utils/paymentValidator';
+import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
 
 const getCurrencySymbol = (code) => {
   const symbols = { INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'AED', SAR: 'SAR', JPY: '¥', CNY: '¥', AUD: 'A$', CAD: 'C$' };
@@ -85,6 +88,8 @@ const CounterSalePage = ({ user }) => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [pendingComplete, setPendingComplete] = useState(false);
+  const [completedSaleOrder, setCompletedSaleOrder] = useState(null);
+  const [showPrintReceipt, setShowPrintReceipt] = useState(false);
   const [customerFocusTarget, setCustomerFocusTarget] = useState('name');
 
   const currency = useMemo(() => getCurrencySymbol(businessSettings?.currency), [businessSettings?.currency]);
@@ -362,6 +367,46 @@ const CounterSalePage = ({ user }) => {
 
       toast.success(paymentStats.is_credit ? 'Partial payment recorded!' : 'Counter sale completed!');
 
+      // Prepare receipt data for printing
+      const receiptData = {
+        ...order,
+        items: selectedItems,
+        subtotal: subtotal,
+        tax: tax,
+        tax_rate: taxRate,
+        total: total,
+        discount: discountAmount,
+        discount_amount: discountAmount,
+        discount_type: discountType,
+        status: completionStatus,
+        payment_method: paymentData.payment_method,
+        payment_received: paymentStats.payment_received,
+        balance_amount: paymentStats.balance_amount,
+        is_credit: paymentStats.is_credit,
+        customer_name: customerName || order?.customer_name,
+        customer_phone: customerPhone || order?.customer_phone,
+        order_id: createdOrderId
+      };
+
+      // Store completed order for manual print option
+      setCompletedSaleOrder(receiptData);
+      setShowPrintReceipt(true);
+
+      // Trigger instant thermal print (fire and forget - non-blocking)
+      setTimeout(() => {
+        const shouldAutoPrint = businessSettings?.print_customization?.auto_print ?? true;
+        if (shouldAutoPrint) {
+          printReceipt(receiptData, businessSettings)
+            .then(() => {
+              console.log('✅ Receipt printed successfully');
+            })
+            .catch(printError => {
+              console.error('Print error:', printError);
+              // User still has manual print button available
+            });
+        }
+      }, 0);
+
       const paymentEvent = new CustomEvent('paymentCompleted', {
         detail: {
           orderId: createdOrderId,
@@ -398,9 +443,12 @@ const CounterSalePage = ({ user }) => {
         localStorage.removeItem('paymentCompleted');
       }, 5000);
 
-      resetSale();
-      setMenuSearch('');
-      searchRef.current?.focus();
+      // Delay reset to show print receipt UI
+      setTimeout(() => {
+        resetSale();
+        setMenuSearch('');
+        searchRef.current?.focus();
+      }, 500);
     } catch (error) {
       console.error('Counter sale failed:', error);
       if (createdOrderId) {
@@ -579,10 +627,10 @@ const CounterSalePage = ({ user }) => {
       <div className="space-y-6 h-[calc(100vh-160px)] flex flex-col overflow-hidden" data-testid="counter-sale-page">
         <TrialBanner user={user} />
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
                 Counter Sale
               </h1>
               <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">
@@ -590,23 +638,23 @@ const CounterSalePage = ({ user }) => {
                 Fast Billing
               </span>
             </div>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            <p className="text-gray-600 mt-1 text-xs sm:text-sm md:text-base hidden sm:block">
               Single-screen checkout built for speed and shortcuts.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={fetchData} disabled={menuLoading} className="gap-2">
-              <RotateCcw className={`w-4 h-4 ${menuLoading ? 'animate-spin' : ''}`} />
-              Refresh Menu
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-start sm:justify-end">
+            <Button variant="outline" onClick={fetchData} disabled={menuLoading} className="gap-1 sm:gap-2 h-9 sm:h-10 text-xs sm:text-sm px-2 sm:px-3">
+              <RotateCcw className={`w-3.5 h-3.5 ${menuLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh Menu</span>
             </Button>
-            <Button variant="outline" onClick={() => setShowShortcuts((prev) => !prev)} className="gap-2">
-              <SlidersHorizontal className="w-4 h-4" />
-              Shortcuts
+            <Button variant="outline" onClick={() => setShowShortcuts((prev) => !prev)} className="gap-1 sm:gap-2 h-9 sm:h-10 text-xs sm:text-sm px-2 sm:px-3">
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Shortcuts</span>
             </Button>
-            <Button variant="outline" onClick={() => navigate('/orders')} className="gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Orders
+            <Button variant="outline" onClick={() => navigate('/orders')} className="gap-1 sm:gap-2 h-9 sm:h-10 text-xs sm:text-sm px-2 sm:px-3">
+              <ShoppingCart className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Orders</span>
             </Button>
           </div>
         </div>
@@ -639,42 +687,42 @@ const CounterSalePage = ({ user }) => {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[1fr_360px] lg:grid-rows-1 gap-4 flex-1 min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] lg:grid-cols-[1fr_360px] gap-3 sm:gap-4 flex-1 min-h-0">
           {/* Menu Section */}
           <div className="space-y-3 flex flex-col min-h-0">
-            <Card className="p-3">
-              <div className="flex flex-col sm:flex-row gap-3">
+            <Card className="p-2 sm:p-3">
+              <div className="flex flex-col gap-2 sm:gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
                     ref={searchRef}
-                    placeholder="Search items..."
+                    placeholder="Search..."
                     value={menuSearch}
                     onChange={(event) => setMenuSearch(event.target.value)}
-                    className="pl-9 h-10 text-sm rounded-full border-gray-200 focus:border-violet-400 bg-gray-50 focus:bg-white"
+                    className="pl-9 h-9 sm:h-10 text-xs sm:text-sm rounded-full border-gray-200 focus:border-violet-400 bg-gray-50 focus:bg-white"
                   />
                   {menuSearch && (
                     <button
                       onClick={() => setMenuSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-gray-300 rounded-full flex items-center justify-center text-white hover:bg-gray-400"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-gray-300 rounded-full flex items-center justify-center text-white hover:bg-gray-400 text-xs"
                     >
                       x
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={resetSale} disabled={selectedItems.length === 0}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Clear
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Button variant="outline" onClick={resetSale} disabled={selectedItems.length === 0} className="h-9 sm:h-10 text-xs sm:text-sm px-2 sm:px-3">
+                    <Trash2 className="w-3.5 h-3.5 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Clear</span>
                   </Button>
                 </div>
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 mt-3 scrollbar-hide">
+              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 mt-2 sm:mt-3 scrollbar-hide -mx-2 sm:-mx-3 px-2 sm:px-3">
                 {categories.map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                       activeCategory === cat ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600'
                     }`}
                   >
@@ -684,7 +732,7 @@ const CounterSalePage = ({ user }) => {
               </div>
             </Card>
 
-            <Card className="p-3 flex-1 min-h-0">
+            <Card className="p-2 sm:p-3 flex-1 min-h-0">
               {menuLoading ? (
                 <div className="text-center py-12">
                   <div className="w-14 h-14 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -703,7 +751,7 @@ const CounterSalePage = ({ user }) => {
                       <p className="text-xs text-gray-400 mt-1">Try a different search or category</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
                       {filteredItems.map((item) => {
                         const selectedItem = selectedItems.find((si) => si.menu_item_id === String(item.id));
                         const quantity = selectedItem?.quantity || 0;
@@ -712,10 +760,10 @@ const CounterSalePage = ({ user }) => {
                         const bgColor = colors[colorIndex];
 
                         return (
-                          <div key={item.id} className="flex flex-col items-center py-1">
+                          <div key={item.id} className="flex flex-col items-center py-0.5 sm:py-1">
                             <div
                               onClick={() => handleAddItem(item)}
-                              className={`relative w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full cursor-pointer select-none transition-transform duration-150 active:scale-90 ${
+                              className={`relative w-16 sm:w-20 lg:w-24 h-16 sm:h-20 lg:h-24 rounded-full cursor-pointer select-none transition-transform duration-150 active:scale-90 touch-manipulation ${
                                 quantity > 0 ? 'ring-2 ring-violet-500 ring-offset-1' : ''
                               }`}
                             >
@@ -728,45 +776,45 @@ const CounterSalePage = ({ user }) => {
                                   decoding="async"
                                 />
                               ) : (
-                                <div className={`w-full h-full rounded-full border-3 border-white shadow-md flex items-center justify-center ${bgColor}`}>
-                                  <span className="text-2xl sm:text-3xl">{getItemEmoji(item)}</span>
+                                <div className={`w-full h-full rounded-full border-2 sm:border-3 border-white shadow-md flex items-center justify-center ${bgColor}`}>
+                                  <span className="text-xl sm:text-2xl lg:text-3xl">{getItemEmoji(item)}</span>
                                 </div>
                               )}
 
                               {quantity > 0 && (
-                                <div className="absolute -top-0.5 -right-0.5 w-6 h-6 bg-violet-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow border-2 border-white">
+                                <div className="absolute -top-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 bg-violet-600 text-white rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold shadow border-2 border-white">
                                   {quantity}
                                 </div>
                               )}
 
                               {quantity === 0 && (
-                                <div className="absolute bottom-0 right-0 w-5 h-5 bg-violet-600 rounded-full flex items-center justify-center shadow border border-white">
-                                  <Plus className="w-3 h-3 text-white" />
+                                <div className="absolute bottom-0 right-0 w-4 h-4 sm:w-5 sm:h-5 bg-violet-600 rounded-full flex items-center justify-center shadow border border-white">
+                                  <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
                                 </div>
                               )}
                             </div>
 
                             {quantity > 0 && (
-                              <div className="flex items-center gap-0.5 mt-1 bg-white rounded-full shadow-sm border border-gray-100 px-0.5 py-0.5">
+                              <div className="flex items-center gap-0.5 mt-0.5 sm:mt-1 bg-white rounded-full shadow-sm border border-gray-100 px-0.5 py-0.5">
                                 <button
                                   onClick={() => adjustItemQuantity(String(item.id), -1)}
-                                  className="w-6 h-6 flex items-center justify-center bg-red-50 text-red-500 rounded-full text-sm font-bold"
+                                  className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center bg-red-50 text-red-500 rounded-full text-xs sm:text-sm font-bold active:scale-95 transition-transform"
                                 >
-                                  -
+                                  −
                                 </button>
                                 <button
                                   onClick={() => adjustItemQuantity(String(item.id), 1)}
-                                  className="w-6 h-6 flex items-center justify-center bg-violet-600 text-white rounded-full text-sm font-bold"
+                                  className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center bg-violet-600 text-white rounded-full text-xs sm:text-sm font-bold active:scale-95 transition-transform"
                                 >
                                   +
                                 </button>
                               </div>
                             )}
 
-                            <p className="text-[10px] font-medium text-gray-600 text-center mt-0.5 line-clamp-1 w-full leading-tight">
+                            <p className="text-[9px] sm:text-[10px] font-medium text-gray-600 text-center mt-0.5 line-clamp-1 w-full leading-tight">
                               {item.name}
                             </p>
-                            <p className="text-xs font-bold text-violet-600">{currency}{item.price}</p>
+                            <p className="text-[10px] sm:text-xs font-bold text-violet-600">{currency}{item.price}</p>
                           </div>
                         );
                       })}
@@ -784,7 +832,7 @@ const CounterSalePage = ({ user }) => {
                 <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 bg-violet-100 rounded-lg flex items-center justify-center">
-                    <ShoppingCart className="w-4 h-4 text-violet-600" />
+                    <Zap className="w-4 h-4 text-violet-600" />
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Cart</p>
@@ -802,30 +850,30 @@ const CounterSalePage = ({ user }) => {
                   Tap menu items to add them here.
                 </div>
               ) : (
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                <div className="space-y-1.5 sm:space-y-2 max-h-48 sm:max-h-52 overflow-y-auto pr-1">
                   {selectedItems.map((item) => (
-                    <div key={item.menu_item_id} className="flex items-center justify-between bg-gray-50 rounded-xl p-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 bg-violet-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    <div key={item.menu_item_id} className="flex items-center justify-between bg-gray-50 rounded-lg sm:rounded-xl p-1.5 sm:p-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-violet-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {item.quantity}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-500">{currency}{item.price} each</p>
+                          <p className="text-xs sm:text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                          <p className="text-[10px] sm:text-xs text-gray-500">{currency}{item.price} each</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                         <button
                           onClick={() => adjustItemQuantity(item.menu_item_id, -1)}
-                          className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-full text-sm font-bold"
+                          className="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-full text-xs sm:text-sm font-bold active:scale-95"
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         </button>
                         <button
                           onClick={() => adjustItemQuantity(item.menu_item_id, 1)}
-                          className="w-7 h-7 flex items-center justify-center bg-violet-600 text-white rounded-full text-sm font-bold"
+                          className="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center bg-violet-600 text-white rounded-full text-xs sm:text-sm font-bold active:scale-95"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         </button>
                       </div>
                     </div>
@@ -834,14 +882,14 @@ const CounterSalePage = ({ user }) => {
               )}
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center justify-between text-sm">
+              <Card className="p-3 sm:p-4">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-gray-500">Subtotal</span>
                   <span className="font-semibold">{currency}{subtotal.toFixed(0)}</span>
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <select
                       value={discountType}
                       onChange={(event) => {
@@ -912,29 +960,29 @@ const CounterSalePage = ({ user }) => {
                 )}
               </Card>
 
-              <Card className="p-4">
-                <div className="text-sm font-semibold text-gray-700 mb-2">Payment Method</div>
-                <div className="grid grid-cols-3 gap-2">
+              <Card className="p-3 sm:p-4">
+                <div className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Payment Method</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
                   {paymentOptions.map((method) => (
                     <button
                       key={method.id}
                       onClick={() => setPaymentMethod(method.id)}
                       disabled={method.disabled}
-                      className={`py-2 rounded-lg flex flex-col items-center gap-1 border-2 transition-all text-xs ${
+                      className={`py-2 rounded-lg flex flex-col items-center gap-0.5 sm:gap-1 border-2 transition-all text-[10px] sm:text-xs ${
                         paymentMethod === method.id
                           ? 'text-white border-transparent'
                           : 'bg-white border-gray-200 text-gray-700'
                       } ${method.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                       style={paymentMethod === method.id ? { backgroundColor: method.color } : {}}
                     >
-                      <method.icon className="w-4 h-4" />
-                      <span>{method.label}</span>
+                      <method.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span className="text-center leading-tight">{method.label}</span>
                     </button>
                   ))}
                 </div>
 
                 {paymentMethod !== 'split' ? (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-2 sm:mt-3 space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>Amount Received</span>
                       {paymentMethod === 'credit' && <span className="text-amber-600">Credit Sale</span>}
@@ -945,25 +993,25 @@ const CounterSalePage = ({ user }) => {
                       value={paymentMethod === 'credit' ? '0' : receivedAmount}
                       onChange={(event) => setReceivedAmount(event.target.value)}
                       placeholder={total ? total.toFixed(0) : '0'}
-                      className="text-sm"
+                      className="text-xs sm:text-sm h-8 sm:h-9"
                       disabled={paymentMethod === 'credit'}
                     />
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
                       <button
                         onClick={() => setReceivedAmount(total.toFixed(0))}
-                        className="py-1 text-xs rounded-lg bg-gray-100 text-gray-600"
+                        className="py-1 text-xs rounded-lg bg-gray-100 text-gray-600 active:scale-95 transition-transform"
                       >
                         Exact
                       </button>
                       <button
                         onClick={() => setReceivedAmount((total * 0.5).toFixed(0))}
-                        className="py-1 text-xs rounded-lg bg-gray-100 text-gray-600"
+                        className="py-1 text-xs rounded-lg bg-gray-100 text-gray-600 active:scale-95 transition-transform"
                       >
                         50%
                       </button>
                       <button
                         onClick={() => setReceivedAmount(Math.ceil(total).toString())}
-                        className="py-1 text-xs rounded-lg bg-gray-100 text-gray-600"
+                        className="py-1 text-xs rounded-lg bg-gray-100 text-gray-600 active:scale-95 transition-transform"
                       >
                         Round
                       </button>
@@ -981,14 +1029,14 @@ const CounterSalePage = ({ user }) => {
                   </div>
                 ) : (
                   <div className="mt-3 space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-3 gap-1 sm:gap-2 text-xs">
                       <Input
                         ref={cashRef}
                         type="number"
                         value={cashAmount}
                         onChange={(event) => setCashAmount(event.target.value)}
                         placeholder="Cash"
-                        className="text-xs"
+                        className="text-xs h-8 sm:h-9"
                       />
                       <Input
                         ref={cardRef}
@@ -996,7 +1044,7 @@ const CounterSalePage = ({ user }) => {
                         value={cardAmount}
                         onChange={(event) => setCardAmount(event.target.value)}
                         placeholder="Card"
-                        className="text-xs"
+                        className="text-xs h-8 sm:h-9"
                       />
                       <Input
                         ref={upiRef}
@@ -1004,7 +1052,7 @@ const CounterSalePage = ({ user }) => {
                         value={upiAmount}
                         onChange={(event) => setUpiAmount(event.target.value)}
                         placeholder="UPI"
-                        className="text-xs"
+                        className="text-xs h-8 sm:h-9"
                       />
                     </div>
                     <div className="flex items-center justify-between text-xs text-gray-600">
@@ -1016,14 +1064,15 @@ const CounterSalePage = ({ user }) => {
               </Card>
             </div>
 
-            <div className="pt-3">
-              <Card className="p-3 border-emerald-200 bg-white/95">
+            <div className="pt-2 sm:pt-3">
+              <Card className="p-2 sm:p-3 border-emerald-200 bg-white/95">
                 <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>Paying by {paymentMethod.toUpperCase()}</span>
+                  <span className="hidden sm:inline">Paying by {paymentMethod.toUpperCase()}</span>
+                  <span className="sm:hidden">{paymentMethod.toUpperCase()}</span>
                   <span>Total: {currency}{total.toFixed(0)}</span>
                 </div>
                 <Button
-                  className="w-full mt-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
+                  className="w-full mt-2 h-10 sm:h-11 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-sm sm:text-base"
                   onClick={handleCompleteSale}
                   disabled={processing || selectedItems.length === 0}
                 >
@@ -1032,14 +1081,19 @@ const CounterSalePage = ({ user }) => {
                   ) : (
                     <>
                       <Zap className="w-4 h-4 mr-2" />
-                      {paymentMethod === 'credit'
-                        ? `Record Credit ${currency}${total.toFixed(0)}`
-                        : `Complete Sale ${currency}${(paymentMethod === 'split' ? splitPaid || total : effectiveReceived || total).toFixed(0)}`}
+                      <span className="hidden sm:inline">
+                        {paymentMethod === 'credit'
+                          ? `Record Credit ${currency}${total.toFixed(0)}`
+                          : `Complete Sale ${currency}${(paymentMethod === 'split' ? splitPaid || total : effectiveReceived || total).toFixed(0)}`}
+                      </span>
+                      <span className="inline sm:hidden">
+                        {paymentMethod === 'credit' ? 'Record' : 'Complete'} {currency}{total.toFixed(0)}
+                      </span>
                     </>
                   )}
                 </Button>
                 {paymentMethod === 'split' && Math.abs(splitPaid + splitCredit - total) > 0.01 && (
-                  <p className="text-xs text-red-500 mt-2">
+                  <p className="text-xs text-red-500 mt-1 sm:mt-2">
                     Split amounts must equal total to proceed.
                   </p>
                 )}
@@ -1050,9 +1104,9 @@ const CounterSalePage = ({ user }) => {
       </div>
 
       <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-sm sm:max-w-md w-[90vw] sm:w-auto">
           <DialogHeader>
-            <DialogTitle>Customer Details</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">Customer Details</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
@@ -1060,14 +1114,14 @@ const CounterSalePage = ({ user }) => {
               value={customerName}
               onChange={(event) => setCustomerName(event.target.value)}
               placeholder="Customer name"
-              className="text-sm"
+              className="text-xs sm:text-sm h-8 sm:h-9"
             />
             <Input
               ref={customerPhoneRef}
               value={customerPhone}
               onChange={(event) => setCustomerPhone(event.target.value)}
               placeholder="Phone (optional)"
-              className="text-sm"
+              className="text-xs sm:text-sm h-8 sm:h-9"
             />
             {paymentMethod === 'credit' && businessSettings?.credit_requires_customer_info && (
               <p className="text-xs text-amber-600">
@@ -1094,6 +1148,68 @@ const CounterSalePage = ({ user }) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Print Receipt Modal - Show after sale completion */}
+      {showPrintReceipt && completedSaleOrder && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-white">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3 justify-center text-green-600">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                  ✓
+                </div>
+                <div>
+                  <div className="font-bold text-lg text-gray-800">Sale Completed!</div>
+                  <div className="text-sm text-gray-600">{currency}{completedSaleOrder.total.toFixed(0)}</div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
+                <div className="flex justify-between">
+                  <span>Items:</span>
+                  <span className="font-medium">{completedSaleOrder.items.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment Method:</span>
+                  <span className="font-medium">{completedSaleOrder.payment_method.toUpperCase()}</span>
+                </div>
+                {completedSaleOrder.is_credit && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>Balance Due:</span>
+                    <span className="font-medium">{currency}{completedSaleOrder.balance_amount.toFixed(0)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <Button
+                  className="w-full bg-violet-600 hover:bg-violet-700"
+                  onClick={() => {
+                    manualPrintReceipt(completedSaleOrder, businessSettings);
+                    setShowPrintReceipt(false);
+                  }}
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Receipt
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowPrintReceipt(false)}
+                >
+                  Done
+                </Button>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                {businessSettings?.print_customization?.auto_print 
+                  ? '🖨️ Receipt is being printed automatically to thermal printer'
+                  : '💡 Click Print Receipt to send to thermal printer'}
+              </p>
+            </div>
+          </Card>
+        </div>
+      )}
     </Layout>
   );
 };
