@@ -18,12 +18,32 @@ async def get_database() -> AsyncIOMotorDatabase:
 
 async def connect_to_mongo():
     """Initialize MongoDB connection"""
-    db.client = AsyncIOMotorClient(settings.MONGODB_URI)
+    # Configure connection pooling for stability
+    client_options = {
+        "maxPoolSize": 10,           # Max connections in pool (reduced for stability)
+        "minPoolSize": 2,            # Min connections kept alive
+        "maxIdleTimeMS": 45000,      # 45 seconds idle before closing
+        "serverSelectionTimeoutMS": 10000,   # 10s server selection timeout
+        "connectTimeoutMS": 15000,    # 15s connection timeout
+        "socketTimeoutMS": 30000,     # 30s socket timeout
+        "waitQueueTimeoutMS": 10000,  # 10s wait for connection from pool
+        "retryWrites": True,          # Automatic write retries
+        "w": "majority",              # Write concern
+    }
+    
+    db.client = AsyncIOMotorClient(settings.MONGODB_URI, **client_options)
     db.db = db.client[settings.MONGODB_NAME]
+    
+    # Test connection
+    try:
+        await db.db.command("ping")
+        print("✅ Connected to MongoDB with optimized pooling")
+    except Exception as e:
+        print(f"❌ Failed to connect to MongoDB: {e}")
+        raise
     
     # Create indexes
     await create_indexes()
-    print("✅ Connected to MongoDB")
 
 async def close_mongo_connection():
     """Close MongoDB connection"""
