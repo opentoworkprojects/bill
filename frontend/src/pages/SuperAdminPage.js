@@ -1727,6 +1727,28 @@ const SuperAdminPage = () => {
                     <Filter className="w-4 h-4" />
                     Filters
                   </Button>
+
+                  {/* Refresh Bill Counts Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await axios.post(`${API}/super-admin/users/refresh-bill-counts`, {}, {
+                          params: credentials
+                        });
+                        toast.success(`✅ ${response.data.message}`);
+                        await fetchUsers(); // Refresh the user list
+                      } catch (error) {
+                        toast.error('Failed to refresh bill counts');
+                      }
+                    }}
+                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                    title="Recalculate bill counts from orders"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh Counts
+                  </Button>
                   
                   {/* Export Button */}
                   <div className="relative">
