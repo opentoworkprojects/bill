@@ -85,6 +85,25 @@ export const disconnectBluetoothPrinter = () => {
 export const isBluetoothPrinterConnected = () => connectedBluetoothPrinter?.gatt?.connected || false;
 export const getConnectedPrinterName = () => connectedBluetoothPrinter?.name || null;
 
+// Check if ANY printer is currently available/connected
+export const isPrinterAvailable = () => {
+  // Check Bluetooth
+  if (isBluetoothPrinterConnected()) return true;
+  
+  // Check Electron
+  if (isElectron()) {
+    try {
+      // If running in Electron, assume printer might be available
+      // Electron will handle printer detection
+      return !!window.electronAPI?.printReceipt;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  return false;
+};
+
 const textToEscPos = (text, bold = false) => {
   const cmds = [0x1B, 0x40];
   if (bold) cmds.push(0x1B, 0x45, 0x01);
@@ -557,7 +576,10 @@ const getProfessionalThemeStyles = (width, settings) => {
 export const printThermal = (htmlContent, paperWidth = '80mm', forceDialog = false) => {
   const settings = getPrintSettings();
   
-  // Implement proper fallback chain: Electron → Bluetooth → Web Serial → Instructions (NO DIALOGS)
+  // Implement proper fallback chain: Check for actual printer connection first
+  
+  // Only attempt silent printing if a printer is actually connected
+  const hasPrinterConnected = isElectron() || isBluetoothPrinterConnected();
   
   // Method 1: Electron native printing (highest priority)
   if (isElectron() && window.electronAPI?.printReceipt && !forceDialog) {
@@ -571,7 +593,6 @@ export const printThermal = (htmlContent, paperWidth = '80mm', forceDialog = fal
       return true; 
     } catch (e) {
       console.error('Electron print failed:', e);
-      toast.error('Desktop print failed: ' + e.message);
       // Fall through to next method
     }
   }
@@ -579,35 +600,27 @@ export const printThermal = (htmlContent, paperWidth = '80mm', forceDialog = fal
   // Method 2: Bluetooth thermal printer (mobile/web priority)
   if (isBluetoothPrinterConnected() && !forceDialog) {
     try {
+      toast.info('Sending to Bluetooth printer...');
       const plainText = htmlToPlainText(htmlContent);
-      return printViaBluetooth(plainText);
+      const btResult = printViaBluetooth(plainText);
+      if (btResult) {
+        toast.success('Sent to Bluetooth printer');
+      }
+      return btResult;
     } catch (e) {
       console.error('Bluetooth print failed:', e);
       // Fall through to next method
     }
   }
   
-  // Method 3: Web Serial API for direct USB thermal printer communication
-  // Check if navigator.serial actually exists and is not undefined
-  if (navigator?.serial && typeof navigator.serial.requestPort === 'function' && !forceDialog) {
-    try {
-      // Note: tryWebSerialPrint is async, but we can't await here in a sync function
-      // The function will handle the async operation internally
-      // For now, we'll skip this in sync context and fall through to silent print
-      // This is intentional - Web Serial requires user interaction anyway
-    } catch (e) {
-      console.error('Web Serial print failed:', e);
-      // Fall through to next method
-    }
-  }
-  
-  // Method 4: Browser print dialog (fallback) - only when explicitly requested
+  // Method 3: Browser print dialog (only when explicitly requested)
   if (forceDialog) {
     return printWithDialog(htmlContent, paperWidth);
   } else {
-    // CRITICAL FIX: Never show dialogs when forceDialog=false
-    // Instead, provide user instructions and prepare content for manual printing
-    return attemptSilentBrowserPrint(htmlContent, paperWidth);
+    // Silent mode: No printer detected and no dialog requested
+    // Show informative message to user instead of pretending to print
+    toast.info('📋 No printer connected - Please connect a printer and try again', { duration: 4000 });
+    return false;
   }
 };
 
