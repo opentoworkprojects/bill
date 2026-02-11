@@ -384,10 +384,7 @@ const CounterSalePage = ({ user }) => {
       const order = orderResponse.data;
       createdOrderId = order?.id;
 
-      const completionStatus = determineBillingCompletionStatus({
-        waiterName: user?.username || 'Counter',
-        isCredit: paymentStats.is_credit
-      });
+      const completionStatus = 'completed';
 
       const paymentData = {
         order_id: createdOrderId,
