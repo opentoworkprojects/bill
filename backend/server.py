@@ -722,6 +722,7 @@ class Order(BaseModel):
 
 
 class OrderCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     table_id: Optional[str] = "counter"  # Optional when KOT disabled
     table_number: Optional[int] = 0  # Optional when KOT disabled
     items: List[OrderItem]
@@ -729,6 +730,8 @@ class OrderCreate(BaseModel):
     customer_phone: Optional[str] = None  # For WhatsApp notifications
     frontend_origin: Optional[str] = None  # For generating tracking links
     order_type: Optional[str] = "dine_in"  # dine_in, takeaway, delivery
+    status: Optional[str] = None  # Optional status for quick billing (e.g., 'completed' for counter sales)
+    quick_billing: bool = False  # Flag for fast-track order creation
 
 
 class Payment(BaseModel):
@@ -4943,7 +4946,7 @@ async def create_order(
             order_type="takeaway",
             organization_id=user_org_id,
             invoice_number=invoice_number,
-            status=order_data.status or "ready"  # Use provided status (ready for quick bill)
+            status=order_data.status or "completed"  # Use provided status (completed for quick bill since payment is processed immediately)
         )
 
         doc = order_obj.model_dump()
@@ -5145,7 +5148,8 @@ async def create_order(
         tracking_token=tracking_token,
         order_type=order_data.order_type or "takeaway",
         organization_id=user_org_id,
-        invoice_number=invoice_number
+        invoice_number=invoice_number,
+        status=order_data.status or "pending"  # Use provided status or default to pending
     )
 
     doc = order_obj.model_dump()
