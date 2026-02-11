@@ -1214,8 +1214,8 @@ const CounterSalePage = ({ user }) => {
 
               <p className="text-xs text-gray-500 text-center">
                 {businessSettings?.print_customization?.auto_print 
-                  ? '🖨️ Receipt is being printed automatically to thermal printer'
-                  : '💡 Click Print Receipt to send to thermal printer'}
+                  ? '🖨️ Receipt will print automatically if printer is connected'
+                  : '💡 Click Print Receipt to print (printer must be connected)'}
               </p>
             </div>
           </Card>
