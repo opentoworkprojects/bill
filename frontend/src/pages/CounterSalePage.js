@@ -823,17 +823,23 @@ const CounterSalePage = ({ user }) => {
                     <p className="text-lg font-bold">{totalItems} items</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 sm:gap-3 w-full">
                   {selectedItems.length > 0 && (
                     <Button 
                       onClick={() => setShowViewItemsModal(true)}
-                      className="bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white font-bold h-9 px-4 shadow-lg hover:shadow-xl transition-all active:scale-95"
+                      className="bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white font-bold h-9 px-4 shadow-lg hover:shadow-xl transition-all active:scale-95 flex-1 min-w-[140px]"
                       title="View and edit all items in cart"
                     >
                       <span className="text-lg mr-2">📋</span> View Items
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={resetSale} disabled={selectedItems.length === 0}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetSale}
+                    disabled={selectedItems.length === 0}
+                    className="flex-1 min-w-[110px] justify-center"
+                  >
                     <RotateCcw className="w-3 h-3 mr-1" />
                     New Sale
                   </Button>
