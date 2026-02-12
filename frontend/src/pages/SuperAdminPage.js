@@ -710,6 +710,12 @@ const SuperAdminPage = () => {
     }
   };
 
+  const getPlatformKey = (platform) =>
+    (platform || '')
+      .toString()
+      .trim()
+      .toLowerCase();
+
   // Create new campaign (Requirements 9.2, 9.3)
   const createCampaign = async () => {
     try {
@@ -3773,10 +3779,10 @@ const SuperAdminPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-gray-900">
-                    {appVersions.filter(v => v.platform === 'android').length}
+                    {appVersions.filter(v => getPlatformKey(v.platform) === 'android').length}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Active: {appVersions.filter(v => v.platform === 'android' && v.is_active).length}
+                    Active: {appVersions.filter(v => getPlatformKey(v.platform) === 'android' && v.is_active).length}
                   </p>
                 </CardContent>
               </Card>
@@ -3791,10 +3797,10 @@ const SuperAdminPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-gray-900">
-                    {appVersions.filter(v => v.platform === 'windows').length}
+                    {appVersions.filter(v => getPlatformKey(v.platform) === 'windows').length}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Active: {appVersions.filter(v => v.platform === 'windows' && v.is_active).length}
+                    Active: {appVersions.filter(v => getPlatformKey(v.platform) === 'windows' && v.is_active).length}
                   </p>
                 </CardContent>
               </Card>
@@ -3827,12 +3833,12 @@ const SuperAdminPage = () => {
                         <tr key={version.id || index} className="border-b hover:bg-gray-50 transition-colors">
                           <td className="p-3">
                             <div className="flex items-center gap-2">
-                              {version.platform === 'android' ? (
+                              {getPlatformKey(version.platform) === 'android' ? (
                                 <Smartphone className="w-5 h-5 text-green-600" />
                               ) : (
                                 <Monitor className="w-5 h-5 text-blue-600" />
                               )}
-                              <span className="font-medium capitalize">{version.platform}</span>
+                              <span className="font-medium capitalize">{getPlatformKey(version.platform) || 'unknown'}</span>
                             </div>
                           </td>
                           <td className="p-3">
