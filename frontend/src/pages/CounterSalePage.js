@@ -671,9 +671,9 @@ const CounterSalePage = ({ user }) => {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] lg:grid-cols-[1fr_360px] gap-3 sm:gap-4 flex-1 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:grid-cols-[minmax(0,1fr)_360px] gap-3 sm:gap-4 flex-1 min-h-0">
           {/* Menu Section */}
-          <div className="space-y-3 flex flex-col min-h-0">
+          <div className="space-y-3 flex flex-col min-h-0 min-w-0">
             <Card className="p-2 sm:p-3">
               <div className="flex flex-col gap-2 sm:gap-3">
                 <div className="relative flex-1">
@@ -795,10 +795,10 @@ const CounterSalePage = ({ user }) => {
                               </div>
                             )}
 
-                            <p className="text-[9px] sm:text-[10px] font-medium text-gray-600 text-center mt-0.5 line-clamp-1 w-full leading-tight">
+                            <p className="text-xs sm:text-sm font-semibold text-gray-700 text-center mt-1 line-clamp-1 w-full leading-snug">
                               {item.name}
                             </p>
-                            <p className="text-[10px] sm:text-xs font-bold text-violet-600">{currency}{item.price}</p>
+                            <p className="text-xs sm:text-sm font-bold text-violet-600">{currency}{item.price}</p>
                           </div>
                         );
                       })}
@@ -810,7 +810,7 @@ const CounterSalePage = ({ user }) => {
           </div>
 
           {/* Checkout Panel */}
-          <div className="flex flex-col min-h-0 overflow-hidden">
+          <div className="flex flex-col min-h-0 min-w-0 overflow-hidden">
             <div className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-3">
