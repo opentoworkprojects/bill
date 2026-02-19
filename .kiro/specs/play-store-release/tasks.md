@@ -71,71 +71,71 @@
 ## 4. Testing and Verification
 
 ### 4.1 Create unit tests for manifest validator
-- [~] Test detection of deprecated attributes
-- [~] Test detection of resizability restrictions
-- [~] Test detection of orientation locks
-- [~] Test XML parsing edge cases
+- [ ] Test detection of deprecated attributes
+- [ ] Test detection of resizability restrictions
+- [ ] Test detection of orientation locks
+- [ ] Test XML parsing edge cases
 
 ### 4.2 Create property-based tests
-- [~] Property: Validator detects all deprecated attributes
-- [~] Property: Validator correctly identifies resizability issues
-- [~] Property: Validator correctly identifies orientation locks
-- [~] Property: Fixed manifest passes all validations
+- [ ] Property: Validator detects all deprecated attributes
+- [ ] Property: Validator correctly identifies resizability issues
+- [ ] Property: Validator correctly identifies orientation locks
+- [ ] Property: Fixed manifest passes all validations
 
 ### 4.3 Manual testing on devices
-- [~] Build APK with updated manifest
-- [~] Test on phone (portrait and landscape)
-- [~] Test on tablet (all orientations)
-- [~] Test on foldable device (if available)
-- [~] Verify edge-to-edge display on Android 15+
+- [ ] Build APK with updated manifest
+- [ ] Test on phone (portrait and landscape)
+- [ ] Test on tablet (all orientations)
+- [ ] Test on foldable device (if available)
+- [ ] Verify edge-to-edge display on Android 15+
 
 ### 4.4 Play Store validation
-- [~] Upload AAB to Play Console (internal testing track)
-- [~] Verify no warnings about edge-to-edge APIs
-- [~] Verify no warnings about resizability
-- [~] Verify no warnings about orientation restrictions
-- [~] Check release stability score
+- [ ] Upload AAB to Play Console (internal testing track)
+- [ ] Verify no warnings about edge-to-edge APIs
+- [ ] Verify no warnings about resizability
+- [ ] Verify no warnings about orientation restrictions
+- [ ] Check release stability score
 
 ## 5. Documentation and Release
 
 ### 5.1 Update release documentation
-- [~] Document manifest changes made
-- [~] Update BUILD_AND_UPLOAD_GUIDE.md
-- [~] Create migration guide for future updates
-- [~] Document validation script usage
+- [ ] Document manifest changes made
+- [ ] Update BUILD_AND_UPLOAD_GUIDE.md
+- [ ] Create migration guide for future updates
+- [ ] Document validation script usage
 
 ### 5.2 Update version and build
-- [~] Increment versionCode to 30
-- [~] Update versionName to match
-- [~] Build signed AAB
-- [~] Build signed APK
-- [~] Verify signatures
+- [ ] Increment versionCode to 30
+- [ ] Update versionName to match
+- [ ] Build signed AAB
+- [ ] Build signed APK
+- [ ] Verify signatures
 
 ### 5.3 Create release checklist
-- [~] Generate comprehensive release checklist
-- [~] Include all validation steps
-- [~] Include manual testing steps
-- [~] Include Play Store submission steps
+- [ ] Generate comprehensive release checklist
+- [ ] Include all validation steps
+- [ ] Include manual testing steps
+- [ ] Include Play Store submission steps
 
 ### 5.4 Final verification
-- [~] Run all automated validations
-- [~] Verify all tests pass
-- [~] Review all changes
-- [~] Prepare release notes
+- [ ] Run all automated validations
+- [ ] Verify all tests pass
+- [ ] Review all changes
+- [ ] Prepare release notes
 
 ## 6. Integration with Release Pipeline
 
 ### 6.1 Update release.py script
-- [~] Add manifest validation to pipeline
-- [~] Integrate with existing validation steps
-- [~] Add command-line option for manifest validation
-- [~] Update help documentation
+- [ ] Add manifest validation to pipeline
+- [ ] Integrate with existing validation steps
+- [ ] Add command-line option for manifest validation
+- [ ] Update help documentation
 
 ### 6.2 Add to CI/CD (if applicable)
-- [~] Add manifest validation to build pipeline
-- [~] Fail build if validation errors found
-- [~] Generate validation reports
-- [~] Archive validation results
+- [ ] Add manifest validation to build pipeline
+- [ ] Fail build if validation errors found
+- [ ] Generate validation reports
+- [ ] Archive validation results
 
 ## Notes
 
