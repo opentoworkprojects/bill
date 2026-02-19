@@ -323,7 +323,7 @@ const BlogPage = () => {
                     <div className="flex items-center justify-between text-sm text-gray-500">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" />
-                        <span>{post.author}</span>
+                        <span>{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -396,7 +396,7 @@ const BlogPage = () => {
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      <span>{post.author}</span>
+                      <span>{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
