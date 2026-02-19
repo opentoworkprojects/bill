@@ -120,7 +120,72 @@ const BlogPostPage = () => {
 
           {/* Content */}
           <div className="prose prose-lg max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: newBlogPost.content.replace(/\n/g, '<br/>').replace(/###/g, '<h3>').replace(/##/g, '<h2>').replace(/\*\*/g, '<strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>') }} />
+            {newBlogPost.content.split('\n\n').map((paragraph, index) => {
+              // Skip empty paragraphs
+              if (!paragraph.trim()) return null;
+              
+              // Headers
+              if (paragraph.startsWith('# ')) {
+                return <h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>;
+              } else if (paragraph.startsWith('## ')) {
+                return <h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>;
+              } else if (paragraph.startsWith('### ')) {
+                return <h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>;
+              }
+              
+              // Bold text
+              if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                return <p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>;
+              }
+              
+              // Lists
+              if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
+                const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
+                return (
+                  <ul key={index} className="list-disc ml-6 my-4 space-y-2">
+                    {items.map((item, i) => (
+                      <li key={i} className="text-gray-700">{item.substring(2)}</li>
+                    ))}
+                  </ul>
+                );
+              }
+              
+              // Links/Buttons
+              const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
+              if (linkMatch) {
+                return (
+                  <div key={index} className="my-6">
+                    <Link to={linkMatch[2]}>
+                      <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+                        {linkMatch[1]}
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              }
+              
+              // Horizontal rule
+              if (paragraph.trim() === '---') {
+                return <hr key={index} className="my-8 border-gray-300" />;
+              }
+              
+              // Regular paragraph with inline formatting
+              let formattedText = paragraph;
+              
+              // Handle bold text
+              formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+              
+              // Handle links
+              formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+              
+              return (
+                <p 
+                  key={index} 
+                  className="text-gray-700 leading-relaxed my-4 text-lg"
+                  dangerouslySetInnerHTML={{ __html: formattedText }}
+                />
+              );
+            })}
           </div>
 
           {/* Ad - Middle of Article */}
@@ -982,36 +1047,71 @@ BillByteKOT offers a complete KOT solution for just ₹999/year:
 
         {/* Content */}
         <div className="prose prose-lg max-w-none">
-          {post.content.split('\n').map((paragraph, index) => {
+          {post.content.split('\n\n').map((paragraph, index) => {
+            // Skip empty paragraphs
+            if (!paragraph.trim()) return null;
+            
+            // Headers
             if (paragraph.startsWith('# ')) {
-              return <h1 key={index} className="text-4xl font-bold mt-12 mb-6">{paragraph.substring(2)}</h1>;
+              return <h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>;
             } else if (paragraph.startsWith('## ')) {
-              return <h2 key={index} className="text-3xl font-bold mt-10 mb-4">{paragraph.substring(3)}</h2>;
+              return <h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>;
             } else if (paragraph.startsWith('### ')) {
-              return <h3 key={index} className="text-2xl font-bold mt-8 mb-3">{paragraph.substring(4)}</h3>;
-            } else if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
-              return <p key={index} className="font-bold text-lg my-4">{paragraph.slice(2, -2)}</p>;
-            } else if (paragraph.startsWith('- ')) {
-              return <li key={index} className="ml-6 my-2">{paragraph.substring(2)}</li>;
-            } else if (paragraph.startsWith('[') && paragraph.includes('](')) {
-              const match = paragraph.match(/\[(.*?)\]\((.*?)\)/);
-              if (match) {
-                return (
-                  <div key={index} className="my-6">
-                    <Link to={match[2]}>
-                      <Button className="bg-gradient-to-r from-violet-600 to-purple-600">
-                        {match[1]}
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              }
-            } else if (paragraph.trim() === '---') {
-              return <hr key={index} className="my-8 border-gray-300" />;
-            } else if (paragraph.trim()) {
-              return <p key={index} className="text-gray-700 leading-relaxed my-4">{paragraph}</p>;
+              return <h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>;
             }
-            return null;
+            
+            // Bold paragraphs
+            if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+              return <p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>;
+            }
+            
+            // Lists
+            if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
+              const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
+              return (
+                <ul key={index} className="list-disc ml-6 my-4 space-y-2">
+                  {items.map((item, i) => (
+                    <li key={i} className="text-gray-700">{item.substring(2)}</li>
+                  ))}
+                </ul>
+              );
+            }
+            
+            // Links/Buttons
+            const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
+            if (linkMatch) {
+              return (
+                <div key={index} className="my-6">
+                  <Link to={linkMatch[2]}>
+                    <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+                      {linkMatch[1]}
+                    </Button>
+                  </Link>
+                </div>
+              );
+            }
+            
+            // Horizontal rule
+            if (paragraph.trim() === '---') {
+              return <hr key={index} className="my-8 border-gray-300" />;
+            }
+            
+            // Regular paragraph with inline formatting
+            let formattedText = paragraph;
+            
+            // Handle bold text
+            formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+            
+            // Handle links
+            formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+            
+            return (
+              <p 
+                key={index} 
+                className="text-gray-700 leading-relaxed my-4 text-lg"
+                dangerouslySetInnerHTML={{ __html: formattedText }}
+              />
+            );
           })}
         </div>
 
