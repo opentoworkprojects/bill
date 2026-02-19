@@ -904,7 +904,7 @@ BillByteKOT offers a complete KOT solution for just ₹999/year:
         
         {/* Article specific */}
         <meta property="article:published_time" content={post.date} />
-        <meta property="article:author" content={post.author} />
+        <meta property="article:author" content={typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'} />
         <meta property="article:section" content={post.category} />
       </Helmet>
       
@@ -951,7 +951,7 @@ BillByteKOT offers a complete KOT solution for just ₹999/year:
         <div className="flex flex-wrap items-center gap-6 text-gray-600 mb-8">
           <div className="flex items-center gap-2">
             <User className="w-5 h-5" />
-            <span>{post.author}</span>
+            <span>{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
           </div>
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5" />
