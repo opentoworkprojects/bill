@@ -13,25 +13,19 @@ import {
   Activity, 
   Clock, 
   Database, 
-  AlertTriangle, 
-  CheckCircle, 
   TrendingUp, 
   TrendingDown, 
   RefreshCw,
   Eye,
   EyeOff,
-  Settings,
   Download
 } from 'lucide-react';
 import performanceMonitor from '../utils/performanceMonitor';
 import activeOrdersCache from '../utils/activeOrdersCache';
-import performanceAlertSystem from '../utils/performanceAlertSystem';
 
 const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
   const [performanceStats, setPerformanceStats] = useState(null);
   const [cacheStats, setCacheStats] = useState(null);
-  const [alertStats, setAlertStats] = useState(null);
-  const [recentAlerts, setRecentAlerts] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(5000); // 5 seconds
@@ -52,23 +46,6 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
     };
   }, [autoRefresh, refreshInterval]);
 
-  // Listen for real-time alerts
-  useEffect(() => {
-    const handleAlert = (event) => {
-      const alert = event.detail;
-      setRecentAlerts(prev => [alert, ...prev.slice(0, 9)]); // Keep last 10 alerts
-      
-      // Refresh stats when new alert comes in
-      loadPerformanceData();
-    };
-
-    window.addEventListener('performanceAlertSystemAlert', handleAlert);
-    
-    return () => {
-      window.removeEventListener('performanceAlertSystemAlert', handleAlert);
-    };
-  }, []);
-
   /**
    * Load performance data from all monitoring systems
    */
@@ -81,10 +58,6 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
       // Get cache stats
       const cachePerf = activeOrdersCache.getPerformanceStats();
       
-      // Get alert system status
-      const alertStatus = performanceAlertSystem.getStatus();
-      const alerts = performanceAlertSystem.getAlertHistory({ timeRange: 3600000 }); // Last hour
-      
       setPerformanceStats({
         ...perfStats,
         report: perfReport,
@@ -92,8 +65,6 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
       });
       
       setCacheStats(cachePerf);
-      setAlertStats(alertStatus);
-      setRecentAlerts(alerts.slice(0, 10)); // Keep last 10 alerts
       
     } catch (error) {
       console.error('Failed to load performance data:', error);
@@ -124,8 +95,8 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
       timestamp: new Date().toISOString(),
       performance: performanceStats.report,
       cache: cacheStats,
-      alerts: alertStats,
-      recentAlerts: recentAlerts
+      alerts: [],
+      recentAlerts: []
     };
     
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
@@ -191,19 +162,6 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
    */
   const formatPercentage = (value) => {
     return `${value.toFixed(1)}%`;
-  };
-
-  /**
-   * Get alert severity badge
-   */
-  const getAlertBadge = (severity) => {
-    const variants = {
-      critical: 'destructive',
-      warning: 'secondary',
-      info: 'outline'
-    };
-    
-    return <Badge variant={variants[severity] || 'outline'}>{severity}</Badge>;
   };
 
   if (!isVisible) {
@@ -298,26 +256,6 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
               </Badge>
             </div>
           </div>
-
-          {/* Alert Summary */}
-          {alertStats && (
-            <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                <span className="text-xs font-medium">Alerts (1h)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {alertStats.criticalAlerts > 0 && (
-                  <Badge variant="destructive" className="text-xs">
-                    {alertStats.criticalAlerts} Critical
-                  </Badge>
-                )}
-                <Badge variant="outline" className="text-xs">
-                  {alertStats.recentAlerts} Total
-                </Badge>
-              </div>
-            </div>
-          )}
 
           {/* Expanded Details */}
           {isExpanded && (
@@ -415,29 +353,6 @@ const PerformanceDashboard = ({ isVisible = true, onToggle }) => {
                         </span>
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
-
-              {/* Recent Alerts */}
-              {recentAlerts.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold mb-2 flex items-center">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Recent Alerts
-                  </h4>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                    {recentAlerts.slice(0, 5).map((alert) => (
-                      <div key={alert.id} className="flex items-center justify-between p-1 bg-gray-50 rounded text-xs">
-                        <div className="flex-1 truncate">
-                          <div className="font-medium truncate">{alert.type}</div>
-                          <div className="text-gray-600 truncate">{alert.message}</div>
-                        </div>
-                        <div className="ml-2">
-                          {getAlertBadge(alert.severity)}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}

@@ -28,7 +28,6 @@ import activeOrdersSync from '../utils/activeOrdersSync';
 import activeOrdersCache from '../utils/activeOrdersCache';
 // 📊 PERFORMANCE MONITORING: Import performance monitoring systems
 import performanceMonitor from '../utils/performanceMonitor';
-import performanceAlertSystem from '../utils/performanceAlertSystem';
 // import PerformanceDashboard from '../components/PerformanceDashboard'; // DISABLED FOR PRODUCTION
 
 // Enhanced sound effects for better UX
