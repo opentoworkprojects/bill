@@ -32,14 +32,14 @@ const BlogPostPage = () => {
           ]}
           url={`https://billbytekot.in/blog/${slug}`}
           image={newBlogPost.image}
-          author={newBlogPost.author}
+          author={typeof newBlogPost.author === 'string' ? newBlogPost.author : newBlogPost.author?.name || 'BillByteKOT Team'}
           publishedDate={newBlogPost.date}
           modifiedDate={newBlogPost.modifiedDate || newBlogPost.date}
           schemaData={{
             headline: newBlogPost.title,
             description: newBlogPost.excerpt || newBlogPost.title,
             image: newBlogPost.image,
-            author: newBlogPost.author,
+            author: typeof newBlogPost.author === 'string' ? newBlogPost.author : newBlogPost.author?.name || 'BillByteKOT Team',
             publishedDate: newBlogPost.date,
             modifiedDate: newBlogPost.modifiedDate || newBlogPost.date,
             url: `https://billbytekot.in/blog/${slug}`,
@@ -92,7 +92,7 @@ const BlogPostPage = () => {
             </span>
             <span className="flex items-center gap-1">
               <User className="w-4 h-4" />
-              {newBlogPost.author}
+              {typeof newBlogPost.author === 'string' ? newBlogPost.author : newBlogPost.author?.name || 'BillByteKOT Team'}
             </span>
             <span className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
