@@ -1,5 +1,10 @@
 // Centralized print utilities for thermal printer support
 import { toast } from 'sonner';
+import {
+  isPrinterConnected as isBluetoothPrinterConnectedV2,
+  printReceipt as printBluetoothReceipt,
+  printKOT as printBluetoothKOT
+} from './bluetoothPrint';
 
 // ============ PLATFORM DETECTION ============
 
@@ -2117,15 +2122,17 @@ const showMobilePrintOptions = (order, businessOverride) => new Promise((resolve
 
 export const printReceipt = async (order, businessOverride = null) => {
   try {
+    // On mobile, prefer Bluetooth if connected; otherwise show mobile print options
+    if (isMobile()) {
+      if (isBluetoothPrinterConnectedV2()) {
+        return await printBluetoothReceipt(order, businessOverride || getBusinessSettings());
+      }
+      return await showMobilePrintOptions(order, businessOverride);
+    }
+
     const settings = getPrintSettings();
-    
-    // Generate receipt HTML
     const receiptHTML = generateReceiptHTML(order, businessOverride);
-    
-    // Use the enhanced printThermal function with proper fallback chain
-    const success = printThermal(receiptHTML, settings.paper_width, false);
-    
-    return success;
+    return printThermal(receiptHTML, settings.paper_width, false);
   } catch (e) { 
     console.error('Receipt print error:', e);
     toast.error('Print failed: ' + e.message); 
@@ -2135,16 +2142,17 @@ export const printReceipt = async (order, businessOverride = null) => {
 
 export const printKOT = async (order, businessOverride = null) => {
   try {
+    // On mobile, prefer Bluetooth if connected; otherwise show mobile print options
+    if (isMobile()) {
+      if (isBluetoothPrinterConnectedV2()) {
+        return await printBluetoothKOT(order, businessOverride || getBusinessSettings());
+      }
+      return await showMobilePrintOptions(order, businessOverride);
+    }
+
     const settings = getPrintSettings();
-    
-    // Generate KOT HTML
     const kotHTML = generateKOTHTML(order, businessOverride);
-    
-    // Use the enhanced printThermal function with proper fallback chain
-    // For auto-KOT, use silent printing (forceDialog = false)
-    const success = printThermal(kotHTML, settings.paper_width, false);
-    
-    return success;
+    return printThermal(kotHTML, settings.paper_width, false);
   } catch (e) { 
     console.error('KOT print error:', e);
     toast.error('KOT print failed: ' + e.message); 
@@ -2182,10 +2190,14 @@ export const printWithDialogExport = (html, paperWidth = '80mm') => {
 // Manual print function for user-initiated printing (shows print dialog)
 export const manualPrintReceipt = async (order, businessOverride = null) => {
   try {
+    // On mobile, avoid system print dialogs; use smart print options instead.
+    if (isMobile()) {
+      return await smartPrint(order, businessOverride);
+    }
+
     const settings = getPrintSettings();
     const receiptHTML = generateReceiptHTML(order, businessOverride);
-    // FIXED: Use forceDialog = true for user-initiated prints so the print dialog actually shows
-    return printThermal(receiptHTML, settings.paper_width, true); // Show print dialog for manual printing
+    return printThermal(receiptHTML, settings.paper_width, true);
   } catch (e) { 
     console.error('Manual print failed:', e);
     toast.error('Print failed: ' + e.message); 
