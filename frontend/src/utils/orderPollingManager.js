@@ -75,6 +75,13 @@ class OrderPollingManager {
     
     console.log('🔄 OrderPollingManager initialized with priority system, event triggers, and smart polling');
   }
+
+  /**
+   * Check if an auth token exists (prevents unauthenticated polling)
+   */
+  hasAuthToken() {
+    return !!localStorage.getItem('token');
+  }
   
   /**
    * Initialize smart polling system
@@ -192,6 +199,9 @@ class OrderPollingManager {
     
     this.smartPolling.intervalId = setInterval(() => {
       // Only poll if no high-priority operations are in progress
+      if (!this.hasAuthToken()) {
+        return;
+      }
       if (!this.isRefreshing && this.priorityQueue.length === 0) {
         this.triggerEventRefresh('adaptive-polling', this.PRIORITY_LEVELS.LOW);
       }
@@ -404,6 +414,11 @@ class OrderPollingManager {
    */
   triggerEventRefresh(source, priority = this.PRIORITY_LEVELS.NORMAL, eventData = {}) {
     console.log(`🎯 Event-driven refresh triggered: ${source} (priority: ${priority})`);
+
+    if (!this.hasAuthToken()) {
+      console.log(`🔒 Skipping refresh "${source}" - no auth token`);
+      return;
+    }
     
     // Create event-specific refresh function
     const eventRefreshFunction = async (options = {}) => {
