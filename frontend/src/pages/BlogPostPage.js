@@ -7,10 +7,306 @@ import { toast } from 'sonner';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { BlogPostSEO } from '../seo';
 import AdSense from '../components/AdSense';
+import { useState, useEffect } from 'react';
 
 const BlogPostPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const [markdownContent, setMarkdownContent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // List of markdown blog files
+  const markdownBlogs = [
+    'customer-experience-revolution',
+    'how-to-increase-restaurant-sales-2026',
+    'profit-margin-secrets',
+    'restaurant-automation-revolution-2025',
+    'restaurant-billing-software-free-vs-paid-2026',
+    'restaurant-pos-system-complete-guide-2025',
+    'restaurant-technology-trends-2025'
+  ];
+
+  // Try to load markdown file if it exists
+  useEffect(() => {
+    if (markdownBlogs.includes(slug)) {
+      fetch(`/blog/${slug}.md`)
+        .then(response => {
+          if (response.ok) {
+            return response.text();
+          }
+          throw new Error('Markdown file not found');
+        })
+        .then(text => {
+          setMarkdownContent(text);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Error loading markdown:', error);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  // Check if markdown content was loaded
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If markdown content exists, render it
+  if (markdownContent) {
+    // Extract metadata from markdown
+    const lines = markdownContent.split('\n');
+    const titleLine = lines.find(line => line.startsWith('# '));
+    const title = titleLine ? titleLine.substring(2).trim() : 'Blog Post';
+    
+    // Extract published date and reading time from markdown
+    const metaLine = lines.find(line => line.includes('Published:') || line.includes('Reading Time:'));
+    let publishedDate = new Date().toISOString().split('T')[0];
+    let readTime = '10 min read';
+    
+    if (metaLine) {
+      const dateMatch = metaLine.match(/Published:\s*([^|]+)/);
+      const timeMatch = metaLine.match(/Reading Time:\s*([^|]+)/);
+      if (dateMatch) publishedDate = dateMatch[1].trim();
+      if (timeMatch) readTime = timeMatch[1].trim();
+    }
+
+    // Determine category from content
+    const categoryMatch = markdownContent.match(/Category:\s*([^\n]+)/);
+    const category = categoryMatch ? categoryMatch[1].trim() : 'Restaurant Tips';
+
+    const image = `https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=600&fit=crop`;
+
+    return (
+      <>
+        <Helmet>
+          <title>{title} | BillByteKOT Blog</title>
+          <meta name="description" content={title} />
+          <meta name="keywords" content={`${category}, restaurant billing, KOT system, restaurant software, BillByteKOT`} />
+          <link rel="canonical" href={`https://billbytekot.in/blog/${slug}`} />
+          
+          <meta property="og:title" content={`${title} | BillByteKOT`} />
+          <meta property="og:description" content={title} />
+          <meta property="og:image" content={image} />
+          <meta property="og:url" content={`https://billbytekot.in/blog/${slug}`} />
+          <meta property="og:type" content="article" />
+          
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={title} />
+          <meta name="twitter:description" content={title} />
+          <meta name="twitter:image" content={image} />
+          
+          <meta property="article:published_time" content={publishedDate} />
+          <meta property="article:author" content="BillByteKOT Team" />
+          <meta property="article:section" content={category} />
+        </Helmet>
+        
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        
+        {/* Header */}
+        <header className="bg-white border-b sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Link to="/" className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <ChefHat className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                  BillByteKOT
+                </span>
+              </Link>
+              <Button variant="outline" onClick={() => navigate('/blog')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Blog
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Article */}
+        <article className="container mx-auto px-4 py-12 max-w-4xl">
+          {/* Hero Image */}
+          <img 
+            src={image} 
+            alt={title}
+            className="w-full h-96 object-cover rounded-2xl shadow-2xl mb-8"
+          />
+
+          {/* Meta Info */}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              {new Date(publishedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+            <span className="flex items-center gap-1">
+              <User className="w-4 h-4" />
+              BillByteKOT Team
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              {readTime}
+            </span>
+            <span className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
+              {category}
+            </span>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+            {title}
+          </h1>
+
+          {/* Ad - Top of Article */}
+          <div className="my-8">
+            <AdSense 
+              slot="1635338536"
+              format="auto"
+              responsive="true"
+              className="mb-8"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="prose prose-lg max-w-none">
+            {markdownContent.split('\n\n').map((paragraph, index) => {
+              // Skip empty paragraphs and metadata lines
+              if (!paragraph.trim() || paragraph.startsWith('*Published:') || paragraph.startsWith('*Reading Time:')) return null;
+              
+              // Headers
+              if (paragraph.startsWith('# ')) {
+                return <h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>;
+              } else if (paragraph.startsWith('## ')) {
+                return <h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>;
+              } else if (paragraph.startsWith('### ')) {
+                return <h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>;
+              } else if (paragraph.startsWith('#### ')) {
+                return <h4 key={index} className="text-xl font-bold mt-6 mb-2 text-gray-900">{paragraph.substring(5)}</h4>;
+              }
+              
+              // Bold text
+              if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                return <p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>;
+              }
+              
+              // Lists
+              if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
+                const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
+                return (
+                  <ul key={index} className="list-disc ml-6 my-4 space-y-2">
+                    {items.map((item, i) => {
+                      let itemText = item.substring(2);
+                      // Handle inline formatting
+                      itemText = itemText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+                      itemText = itemText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+                      return (
+                        <li key={i} className="text-gray-700" dangerouslySetInnerHTML={{ __html: itemText }} />
+                      );
+                    })}
+                  </ul>
+                );
+              }
+              
+              // Links/Buttons
+              const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
+              if (linkMatch && paragraph.trim().startsWith('[')) {
+                return (
+                  <div key={index} className="my-6">
+                    <Link to={linkMatch[2]}>
+                      <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+                        {linkMatch[1]}
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              }
+              
+              // Horizontal rule
+              if (paragraph.trim() === '---') {
+                return <hr key={index} className="my-8 border-gray-300" />;
+              }
+              
+              // Blockquotes
+              if (paragraph.startsWith('> ')) {
+                return (
+                  <blockquote key={index} className="border-l-4 border-violet-600 pl-4 italic text-gray-700 my-4">
+                    {paragraph.substring(2)}
+                  </blockquote>
+                );
+              }
+              
+              // Regular paragraph with inline formatting
+              let formattedText = paragraph;
+              
+              // Handle bold text
+              formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+              
+              // Handle italic text
+              formattedText = formattedText.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+              
+              // Handle links
+              formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+              
+              // Handle inline code
+              formattedText = formattedText.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-2 py-1 rounded text-sm">$1</code>');
+              
+              return (
+                <p 
+                  key={index} 
+                  className="text-gray-700 leading-relaxed my-4 text-lg"
+                  dangerouslySetInnerHTML={{ __html: formattedText }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Ad - Middle of Article */}
+          <div className="my-8">
+            <AdSense 
+              slot="1635338536"
+              format="auto"
+              responsive="true"
+              className="my-8"
+            />
+          </div>
+
+          {/* CTA */}
+          <div className="mt-12 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
+            <h3 className="text-2xl font-bold mb-4">Ready to Get Started?</h3>
+            <p className="text-lg mb-6 opacity-90">
+              Start your 7-day free trial today. No credit card required.
+            </p>
+            <Button 
+              size="lg"
+              className="bg-white text-violet-600 hover:bg-gray-100 h-12 px-8"
+              onClick={() => navigate('/login')}
+            >
+              Start Free Trial
+            </Button>
+          </div>
+
+          {/* Ad - Bottom of Article */}
+          <div className="mt-8">
+            <AdSense 
+              slot="1635338536"
+              format="auto"
+              responsive="true"
+              className="mt-8"
+            />
+          </div>
+        </article>
+        </div>
+      </>
+    );
+  }
 
   // Check if post exists in new blog posts data
   const newBlogPost = blogPostsData.find(post => post.slug === slug);
