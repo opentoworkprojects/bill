@@ -593,13 +593,13 @@ const SettingsPage = ({ user }) => {
       {(!loading || initialDataLoaded) && (
         <div className="space-y-6" data-testid="settings-page">
         <TrialBanner user={user} />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Settings</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>Settings</h1>
             <p className="text-gray-600 mt-2">Configure your restaurant billing system</p>
           </div>
           {window.electronAPI?.getVersion && (
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <p className="text-sm text-gray-500">Desktop App</p>
               <p className="text-lg font-bold text-violet-600">v{window.electronAPI.getVersion()}</p>
             </div>
@@ -607,40 +607,41 @@ const SettingsPage = ({ user }) => {
         </div>
 
         {/* Settings Tabs */}
-        <div className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-          <button
-            onClick={() => setActiveTab('business')}
-            className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'business' ? 'bg-white shadow text-violet-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            Business Details
-          </button>
-          <button
-            onClick={() => setActiveTab('print')}
-            className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'print' ? 'bg-white shadow text-violet-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Printer className="w-4 h-4" />
-            Print Customization
-          </button>
-          <button
-            onClick={() => setActiveTab('whatsapp')}
-            className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'whatsapp' ? 'bg-white shadow text-green-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <MessageCircle className="w-4 h-4" />
-            WhatsApp
-          </button>
+        <div className="bg-gray-100 rounded-lg p-1 w-full overflow-x-auto">
+          <div className="flex gap-2 w-max min-w-full">
+            <button
+              onClick={() => setActiveTab('business')}
+              className={`px-3 sm:px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === 'business' ? 'bg-white shadow text-violet-600' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              Business Details
+            </button>
+            <button
+              onClick={() => setActiveTab('print')}
+              className={`px-3 sm:px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === 'print' ? 'bg-white shadow text-violet-600' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Printer className="w-4 h-4" />
+              Print Customization
+            </button>
+            <button
+              onClick={() => setActiveTab('whatsapp')}
+              className={`px-3 sm:px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 text-xs sm:text-sm whitespace-nowrap ${
+                activeTab === 'whatsapp' ? 'bg-white shadow text-green-600' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              WhatsApp
+            </button>
 
           {/* WhatsApp Pro tab - Only show in desktop app */}
           {(window.__ELECTRON__ || window.electronAPI) && (
             <button
               onClick={() => setActiveTab('whatsapp-desktop')}
-              className={`px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-md font-medium transition-all flex items-center gap-2 text-xs sm:text-sm whitespace-nowrap ${
                 activeTab === 'whatsapp-desktop' ? 'bg-white shadow text-green-600' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -648,6 +649,7 @@ const SettingsPage = ({ user }) => {
               WhatsApp Pro
             </button>
           )}
+          </div>
         </div>
 
         {/* Print Customization Tab */}
