@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { X, Phone, Mail, CheckCircle, Smartphone, Sparkles } from "lucide-react";
+import { X, Phone, Mail, CheckCircle, Smartphone, Sparkles, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import axios from "axios";
 import { toast } from "sonner";
 
+// Play Store link
+const PLAY_STORE_URL = "https://shorturl.at/CLDN3";
+
 const MobileAppLeadPopup = ({ isOpen, onClose }) => {
-  const [step, setStep] = useState(1); // 1: form, 2: success
+  const [step, setStep] = useState(1); // 1: form, 2: redirecting
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -18,9 +21,9 @@ const MobileAppLeadPopup = ({ isOpen, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Require at least phone or email
-    if (!formData.email && !formData.phone) {
-      toast.error("Please enter your phone number or email");
+    // Require phone number
+    if (!formData.phone) {
+      toast.error("Please enter your phone number");
       return;
     }
 
@@ -29,11 +32,19 @@ const MobileAppLeadPopup = ({ isOpen, onClose }) => {
     try {
       await axios.post(`${process.env.REACT_APP_BACKEND_URL || 'https://restro-ai.onrender.com'}/api/leads`, {
         ...formData,
-        source: "mobile_app_early_access",
+        source: "play_store_download",
         timestamp: new Date().toISOString(),
       });
-      toast.success("Thank you! We'll contact you soon.");
+      
+      // Show success and redirect to Play Store
       setStep(2);
+      toast.success("Redirecting to Play Store...");
+      
+      // Redirect to Play Store after 2 seconds
+      setTimeout(() => {
+        window.open(PLAY_STORE_URL, '_blank');
+        handleClose();
+      }, 2000);
     } catch (error) {
       console.error("Error submitting lead:", error);
       toast.error("Something went wrong. Please try again.");
@@ -80,22 +91,22 @@ const MobileAppLeadPopup = ({ isOpen, onClose }) => {
             </div>
             <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur px-3 py-1 rounded-full text-sm font-medium mb-3">
               <Sparkles className="w-4 h-4" />
-              Early Access
+              Now on Play Store
             </div>
             <h2 className="text-2xl font-black">
-              Mobile App Coming Soon!
+              Download BillByteKOT
             </h2>
             <p className="text-white/80 mt-2 text-sm">
-              Be the first to get our Android app
+              Get the app from Google Play Store
             </p>
           </div>
         </div>
 
         {step === 1 ? (
-          // Step 1: Lead Capture Form
+          // Step 1: Phone Number Collection
           <div className="p-6">
             <p className="text-gray-600 text-center mb-6">
-              Enter your details and our team will contact you when the app is ready for download.
+              Enter your phone number to download the app from Play Store
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,19 +137,14 @@ const MobileAppLeadPopup = ({ isOpen, onClose }) => {
                     onChange={handleChange}
                     placeholder="+91 98765 43210"
                     className="w-full pl-10 h-11"
+                    required
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-200"></div>
-                <span className="text-xs text-gray-400">OR</span>
-                <div className="flex-1 h-px bg-gray-200"></div>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address <span className="text-red-500">*</span>
+                  Email Address (Optional)
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -175,56 +181,68 @@ const MobileAppLeadPopup = ({ isOpen, onClose }) => {
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Submitting...
+                    Processing...
                   </span>
                 ) : (
-                  "Get Early Access"
+                  <>
+                    <ExternalLink className="w-5 h-5 mr-2" />
+                    Continue to Play Store
+                  </>
                 )}
               </Button>
 
               <p className="text-xs text-center text-gray-500">
-                We'll notify you as soon as the app is available
+                You'll be redirected to Google Play Store
               </p>
             </form>
           </div>
         ) : (
-          // Step 2: Success Message
+          // Step 2: Redirecting Message
           <div className="p-6 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4 animate-pulse">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              You're on the list! 🎉
+              Redirecting to Play Store... 🚀
             </h2>
             <p className="text-gray-600 mb-6">
-              Our team will contact you within 24 hours with early access to the mobile app.
+              Opening Google Play Store in a new tab
             </p>
 
             <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-4 mb-6 text-left">
               <p className="text-sm font-semibold text-gray-900 mb-3">
-                What to expect:
+                After installing:
               </p>
               <ul className="text-sm text-gray-600 space-y-2">
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span>Priority access to Android app download</span>
+                  <span>Open the app and sign up</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span>Personal onboarding call from our team</span>
+                  <span>Start your 7-day free trial</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span>Extended 14-day free trial</span>
+                  <span>No credit card required</span>
                 </li>
               </ul>
             </div>
 
             <Button
-              onClick={handleClose}
-              className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600"
+              onClick={() => window.open(PLAY_STORE_URL, '_blank')}
+              className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 mb-2"
             >
-              Got it, Thanks!
+              <ExternalLink className="w-5 h-5 mr-2" />
+              Open Play Store Now
+            </Button>
+            
+            <Button
+              onClick={handleClose}
+              variant="outline"
+              className="w-full h-10"
+            >
+              Close
             </Button>
           </div>
         )}
