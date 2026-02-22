@@ -765,7 +765,7 @@ const LandingPage = () => {
       icon: Smartphone,
       title: "Mobile & PWA Ready",
       description:
-        "Works on any device. Download Android app now via Early Access!",
+        "Works on any device. Download Android app now from Play Store!",
       color: "from-purple-500 to-pink-600",
     },
     {
@@ -1449,7 +1449,7 @@ const LandingPage = () => {
             <div className="text-center mb-10">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full mb-4">
                 <Smartphone className="w-4 h-4 text-green-400" />
-                <span className="text-sm font-medium text-green-400">Available on Early Access</span>
+                <span className="text-sm font-medium text-green-400">Now on Play Store</span>
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-3" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
                 Beautiful on Every Device
@@ -2686,7 +2686,7 @@ const LandingPage = () => {
               },
               {
                 q: "Can I use BillByteKOT AI on mobile?",
-                a: "Yes! It works on any device. Download our Android app now through Early Access - available for direct download!",
+                a: "Yes! It works on any device. Download our Android app now from Google Play Store!",
                 icon: "📱"
               },
               {
@@ -2744,7 +2744,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Early Access Android App Section */}
+      {/* Android App Section - Now Live on Play Store */}
       <section id="app" className="py-20 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
@@ -2753,7 +2753,7 @@ const LandingPage = () => {
               <div className="space-y-6">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 rounded-full">
                   <Rocket className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-600">Early Access Program</span>
+                  <span className="text-sm font-medium text-green-600">Now Live on Play Store</span>
                 </div>
                 
                 <h2 className="text-4xl md:text-5xl font-bold" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
@@ -2762,18 +2762,17 @@ const LandingPage = () => {
                 </h2>
                 
                 <p className="text-xl text-gray-600">
-                  Be among the first to experience BillByteKOT AI on your Android device. 
-                  Join our early access program and get exclusive benefits!
+                  Download BillByteKOT from Google Play Store and manage your restaurant on the go!
                 </p>
 
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Gift className="w-5 h-5 text-green-600" />
+                      <Zap className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Exclusive Early Bird Pricing</h4>
-                      <p className="text-gray-600 text-sm">Get 50% off on your first year subscription</p>
+                      <h4 className="font-semibold text-gray-900">Lightning Fast Performance</h4>
+                      <p className="text-gray-600 text-sm">Native Android app optimized for speed</p>
                     </div>
                   </div>
                   
@@ -2782,8 +2781,8 @@ const LandingPage = () => {
                       <Bell className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Priority Feature Requests</h4>
-                      <p className="text-gray-600 text-sm">Your feedback shapes the app's future</p>
+                      <h4 className="font-semibold text-gray-900">Real-time Notifications</h4>
+                      <p className="text-gray-600 text-sm">Get instant alerts for new orders</p>
                     </div>
                   </div>
                   
@@ -2792,30 +2791,30 @@ const LandingPage = () => {
                       <Shield className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Early Adopter Badge</h4>
-                      <p className="text-gray-600 text-sm">Special recognition in the app</p>
+                      <h4 className="font-semibold text-gray-900">Secure & Reliable</h4>
+                      <p className="text-gray-600 text-sm">Bank-grade security for your data</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Early Access Form */}
+                {/* Download Button */}
                 <div className="bg-white p-6 rounded-2xl shadow-xl border border-green-100">
                   <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
                     <Smartphone className="w-5 h-5 text-green-600" />
-                    Get Early Access Now
+                    Download from Play Store
                   </h4>
                   <p className="text-gray-600 text-sm mb-4">
-                    Enter your details and our team will contact you with the download link.
+                    Enter your phone number to get the download link
                   </p>
                   <Button 
                     onClick={() => setShowMobileAppPopup(true)}
                     className="w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 text-lg"
                   >
                     <Download className="w-5 h-5 mr-2" />
-                    Request Early Access
+                    Download Android App
                   </Button>
                   <p className="text-xs text-gray-500 mt-3 text-center">
-                    🔒 We'll contact you within 24 hours
+                    🔒 Free to download • 7-day trial included
                   </p>
                 </div>
               </div>
