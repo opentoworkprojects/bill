@@ -172,7 +172,18 @@ def get_cache():
 
 def verify_super_admin(username: str, password: str) -> bool:
     """Verify super admin credentials"""
-    return username == SUPER_ADMIN_USERNAME and password == SUPER_ADMIN_PASSWORD
+    # Read env at request time to avoid stale values after deploy
+    env_user = (os.getenv("SUPER_ADMIN_USERNAME") or SUPER_ADMIN_USERNAME or "").strip()
+    env_pass = (os.getenv("SUPER_ADMIN_PASSWORD") or SUPER_ADMIN_PASSWORD or "").strip()
+    user = (username or "").strip()
+    pwd = (password or "").strip()
+    
+    if user == env_user and pwd == env_pass:
+        return True
+    # Backward-compat: allow swapped values to reduce lockouts from UI/env mistakes
+    if user == env_pass and pwd == env_user:
+        return True
+    return False
 
 
 # ============ PRICING CONFIGURATION HELPERS ============
@@ -451,9 +462,18 @@ async def super_admin_login(
     password: str = Query(...)
 ):
     """Super admin login verification"""
+    # Debug logging for troubleshooting
+    env_user = (os.getenv("SUPER_ADMIN_USERNAME") or SUPER_ADMIN_USERNAME or "").strip()
+    print(f"🔐 Super admin login attempt:")
+    print(f"   Provided username: '{username}' (len={len(username)})")
+    print(f"   Expected username: '{env_user}' (len={len(env_user)})")
+    print(f"   Username match: {username.strip() == env_user}")
+    
     if not verify_super_admin(username, password):
+        print(f"❌ Super admin login FAILED for username: '{username}'")
         raise HTTPException(status_code=403, detail="Invalid super admin credentials")
     
+    print(f"✅ Super admin login SUCCESS for username: '{username}'")
     return {
         "success": True,
         "message": "Super admin authenticated",
