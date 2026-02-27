@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Label } from "../components/ui/label";
+import EditOrderModal from "../components/EditOrderModal";
 import {
   Tabs,
   TabsContent,
@@ -35,7 +36,11 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-  Layers
+  Layers,
+  Pencil,
+  Trash2,
+  Eye,
+  X
 } from "lucide-react";
 
 const ReportsPage = ({ user }) => {
@@ -49,6 +54,15 @@ const ReportsPage = ({ user }) => {
   const [forecast, setForecast] = useState(null);
   const [customerBalances, setCustomerBalances] = useState([]);
   const [customerBalanceLoading, setCustomerBalanceLoading] = useState(false);
+
+  const [menuItems, setMenuItems] = useState([]);
+  const [businessSettings, setBusinessSettings] = useState({});
+  const [reportOrders, setReportOrders] = useState([]);
+  const [reportOrdersLoading, setReportOrdersLoading] = useState(false);
+  const [editOrderModal, setEditOrderModal] = useState({ open: false, order: null });
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({ open: false, order: null });
+  const [viewOrderModal, setViewOrderModal] = useState({ open: false, order: null });
+  const [cancelConfirmModal, setCancelConfirmModal] = useState({ open: false, order: null });
   
   // Stock Report State
   const [stockReport, setStockReport] = useState(null);
@@ -120,6 +134,22 @@ const ReportsPage = ({ user }) => {
     setDateRange(datePresets[preset]());
   }, [datePresets]);
 
+  const fetchReportOrders = useCallback(async () => {
+    setReportOrdersLoading(true);
+    try {
+      const response = await axios.get(`${API}/reports/export`, {
+        params: dateRange,
+      });
+      setReportOrders(response.data.orders || []);
+    } catch (error) {
+      console.error("Failed to fetch report orders", error);
+      toast.error("Failed to load orders for selected date range");
+      setReportOrders([]);
+    } finally {
+      setReportOrdersLoading(false);
+    }
+  }, [dateRange]);
+
   useEffect(() => {
     // Prioritized loading: Load critical data first, then supporting data
     const loadReports = async () => {
@@ -139,7 +169,7 @@ const ReportsPage = ({ user }) => {
           fetchStaffPerformance(),
           fetchPeakHours(),
           fetchCategoryAnalysis(),
-          fetchCustomerBalances(),
+          fetchCustomerBalances({ showToast: false }),
           fetchStockReport(),
           fetchStockCategories(),
           fetchStockSuppliers()
@@ -159,6 +189,27 @@ const ReportsPage = ({ user }) => {
     };
     
     loadReports();
+  }, []);
+
+  useEffect(() => {
+    fetchReportOrders();
+  }, [fetchReportOrders]);
+
+  useEffect(() => {
+    const fetchMenuAndSettings = async () => {
+      try {
+        const [menuRes, settingsRes] = await Promise.all([
+          axios.get(`${API}/menu?fresh=true&_t=${Date.now()}`),
+          axios.get(`${API}/business/settings`)
+        ]);
+        const items = Array.isArray(menuRes.data) ? menuRes.data.filter((item) => item && item.available !== false) : [];
+        setMenuItems(items);
+        setBusinessSettings(settingsRes.data?.business_settings || {});
+      } catch (error) {
+        console.error("Failed to load menu/settings for reports", error);
+      }
+    };
+    fetchMenuAndSettings();
   }, []);
 
   const fetchDailyReport = async () => {
@@ -231,7 +282,59 @@ const ReportsPage = ({ user }) => {
     }
   }, []);
 
-  const fetchCustomerBalances = useCallback(async () => {
+  const handleUpdateOrder = async (payload) => {
+    if (!editOrderModal.order?.id) return;
+    try {
+      await axios.put(`${API}/orders/${editOrderModal.order.id}`, payload);
+      toast.success("Order updated successfully!");
+      setEditOrderModal({ open: false, order: null });
+      fetchReportOrders();
+    } catch (error) {
+      console.error("Update order failed", error);
+      toast.error("Failed to update order");
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteConfirmModal.order?.id) return;
+    try {
+      await axios.delete(`${API}/orders/${deleteConfirmModal.order.id}`);
+      toast.success("Order deleted");
+      setDeleteConfirmModal({ open: false, order: null });
+      fetchReportOrders();
+    } catch (error) {
+      console.error("Delete order failed", error);
+      toast.error("Failed to delete order");
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelConfirmModal.order?.id) return;
+    try {
+      await axios.put(`${API}/orders/${cancelConfirmModal.order.id}/cancel`);
+      toast.success("Order cancelled");
+      setCancelConfirmModal({ open: false, order: null });
+      fetchReportOrders();
+    } catch (error) {
+      console.error("Cancel order failed", error);
+      toast.error("Failed to cancel order");
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-700',
+      preparing: 'bg-blue-100 text-blue-700',
+      ready: 'bg-green-100 text-green-700',
+      completed: 'bg-gray-100 text-gray-700',
+      cancelled: 'bg-red-100 text-red-700',
+      credit: 'bg-orange-100 text-orange-700',
+      due: 'bg-orange-100 text-orange-700'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const fetchCustomerBalances = useCallback(async ({ showToast = false } = {}) => {
     setCustomerBalanceLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -250,25 +353,36 @@ const ReportsPage = ({ user }) => {
       setCustomerBalances(data);
       
       if (data.length > 0) {
-        toast.success(`Found ${data.length} customers with outstanding balances`);
+        if (showToast) {
+          toast.success(`Found ${data.length} customers with outstanding balances`);
+        }
       } else {
         console.log("No customers with outstanding balances found");
-        // Show info message instead of error when no data
-        toast.info("No customers with outstanding balances found");
+        if (showToast) {
+          toast.info("No customers with outstanding balances found");
+        }
       }
     } catch (error) {
       console.error("Failed to fetch customer balances", error);
       
       // More detailed error handling
       if (error.response?.status === 404) {
-        toast.error("Customer balance endpoint not found. Please check backend.");
+        if (showToast) {
+          toast.error("Customer balance endpoint not found. Please check backend.");
+        }
         console.log("💡 Backend endpoint /reports/customer-balances not found");
       } else if (error.response?.status === 401) {
-        toast.error("Authentication required for customer balances");
+        if (showToast) {
+          toast.error("Authentication required for customer balances");
+        }
       } else if (error.code === 'ECONNABORTED') {
-        toast.error("Request timeout - server took too long to respond");
+        if (showToast) {
+          toast.error("Request timeout - server took too long to respond");
+        }
       } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-        toast.error("Cannot connect to backend server");
+        if (showToast) {
+          toast.error("Cannot connect to backend server");
+        }
         console.log("💡 Backend server might not be running");
         
         // Optional: Load mock data for testing
@@ -297,12 +411,16 @@ const ReportsPage = ({ user }) => {
             }
           ];
           setCustomerBalances(mockData);
-          toast.info("Using mock data for testing (development mode)");
+          if (showToast) {
+            toast.info("Using mock data for testing (development mode)");
+          }
           setCustomerBalanceLoading(false);
           return;
         }
       } else {
-        toast.error("Failed to load customer balances");
+        if (showToast) {
+          toast.error("Failed to load customer balances");
+        }
       }
       
       setCustomerBalances([]);
@@ -1842,6 +1960,90 @@ const ReportsPage = ({ user }) => {
               </CardContent>
             </Card>
 
+            {reportOrdersLoading && (
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">Orders in Selected Range</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500">Loading orders...</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {!reportOrdersLoading && reportOrders.length > 0 && (
+              <Card className="border-0 shadow-lg" data-testid="range-orders-list">
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">Orders in Selected Range</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-72 sm:max-h-96 overflow-y-auto">
+                    {reportOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="p-2 sm:p-3 bg-gray-50 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm sm:text-base truncate">
+                            Order #{order.id.slice(0, 8)}
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-500">
+                            Table {order.table_number} • {(order.items || []).length} items • {new Date(order.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <p className="font-bold text-violet-600 text-sm sm:text-base flex-shrink-0">
+                            ₹{(order?.total || 0).toFixed(0)}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setViewOrderModal({ open: true, order })}
+                              className="p-2 rounded-lg bg-white border hover:bg-gray-100"
+                              title="View"
+                            >
+                              <Eye className="w-4 h-4 text-gray-700" />
+                            </button>
+                            <button
+                              onClick={() => setEditOrderModal({ open: true, order })}
+                              className="p-2 rounded-lg bg-white border hover:bg-gray-100"
+                              title="Edit"
+                            >
+                              <Pencil className="w-4 h-4 text-blue-600" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmModal({ open: true, order })}
+                              className="p-2 rounded-lg bg-white border hover:bg-gray-100"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </button>
+                            <button
+                              onClick={() => setCancelConfirmModal({ open: true, order })}
+                              className="p-2 rounded-lg bg-white border hover:bg-gray-100"
+                              title="Cancel"
+                            >
+                              <XCircle className="w-4 h-4 text-orange-600" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {!reportOrdersLoading && reportOrders.length === 0 && (
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">Orders in Selected Range</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500">No orders found for the selected date range.</p>
+                </CardContent>
+              </Card>
+            )}
+
             {dailyReport?.orders && dailyReport.orders.length > 0 && (
               <Card
                 className="border-0 shadow-lg"
@@ -2496,7 +2698,7 @@ const ReportsPage = ({ user }) => {
                     Customer Balance Management
                   </div>
                   <Button
-                    onClick={fetchCustomerBalances}
+                    onClick={() => fetchCustomerBalances({ showToast: true })}
                     disabled={customerBalanceLoading}
                     variant="outline"
                     size="sm"
@@ -2646,7 +2848,7 @@ const ReportsPage = ({ user }) => {
                     {/* Manual refresh button */}
                     <div className="mt-8 flex gap-3 justify-center">
                       <Button
-                        onClick={fetchCustomerBalances}
+                        onClick={() => fetchCustomerBalances({ showToast: true })}
                         disabled={customerBalanceLoading}
                         variant="outline"
                       >
@@ -2828,6 +3030,196 @@ const ReportsPage = ({ user }) => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {viewOrderModal.open && viewOrderModal.order && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4">
+            <Card className="w-full max-w-lg border-0 shadow-2xl max-h-[95vh] overflow-hidden flex flex-col bg-white">
+              <CardHeader className="relative bg-violet-600 text-white rounded-t-lg p-4 sm:p-6 flex-shrink-0">
+                <button
+                  onClick={() => setViewOrderModal({ open: false, order: null })}
+                  className="absolute right-3 sm:right-4 top-3 sm:top-4 text-white/80 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg pr-8">
+                  <FileText className="w-5 h-5" />
+                  Order #{(viewOrderModal.order?.id || '').slice(0, 8)}
+                </CardTitle>
+                <p className="text-violet-100 text-xs sm:text-sm mt-1">
+                  {viewOrderModal.order?.created_at ? new Date(viewOrderModal.order.created_at).toLocaleString() : ''}
+                </p>
+              </CardHeader>
+              <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4 text-sm">
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 text-xs">Table</p>
+                    <p className="font-bold text-base sm:text-lg">{viewOrderModal.order?.table_number || 'Counter'}</p>
+                  </div>
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 text-xs">Status</p>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(viewOrderModal.order?.status)}`}>
+                      {viewOrderModal.order?.status || 'unknown'}
+                    </span>
+                  </div>
+                  {viewOrderModal.order?.customer_name && (
+                    <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500 text-xs">Customer</p>
+                      <p className="font-bold text-sm truncate">{viewOrderModal.order.customer_name}</p>
+                    </div>
+                  )}
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 text-xs">Server</p>
+                    <p className="font-bold text-sm truncate">{viewOrderModal.order?.waiter_name || 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 sm:pt-4">
+                  <h4 className="font-bold mb-2 sm:mb-3 text-sm sm:text-base">Order Items</h4>
+                  <div className="space-y-1.5 sm:space-y-2 max-h-40 overflow-y-auto">
+                    {(viewOrderModal.order?.items || []).map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 rounded-lg">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{item.quantity}× {item.name}</p>
+                          {item.notes && <p className="text-xs text-orange-600 truncate">Note: {item.notes}</p>}
+                        </div>
+                        <p className="font-bold text-sm ml-2 flex-shrink-0">₹{((item.price || 0) * (item.quantity || 0)).toFixed(0)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 sm:pt-4 space-y-1 sm:space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span className="font-medium">₹{(viewOrderModal.order?.subtotal || 0).toFixed(0)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm text-gray-600">
+                    <span>Tax:</span>
+                    <span>₹{(viewOrderModal.order?.tax || 0).toFixed(0)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg sm:text-xl font-bold text-violet-600 pt-2 border-t">
+                    <span>Total:</span>
+                    <span>₹{(viewOrderModal.order?.total || 0).toFixed(0)}</span>
+                  </div>
+                  {viewOrderModal.order?.payment_method && (
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="text-gray-500">Payment:</span>
+                      <span className="font-medium capitalize">{viewOrderModal.order.payment_method === 'split' ? 'Split Payment' : viewOrderModal.order.payment_method}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="p-3 sm:p-4 border-t flex gap-2">
+                <Button
+                  onClick={() => { setEditOrderModal({ open: true, order: viewOrderModal.order }); setViewOrderModal({ open: false, order: null }); }}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-sm"
+                >
+                  Edit Order
+                </Button>
+                <Button
+                  onClick={() => { setCancelConfirmModal({ open: true, order: viewOrderModal.order }); setViewOrderModal({ open: false, order: null }); }}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-600 text-sm"
+                >
+                  Cancel Order
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setViewOrderModal({ open: false, order: null })}
+                  className="text-sm"
+                >
+                  Close
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        <EditOrderModal
+          open={editOrderModal.open}
+          order={editOrderModal.order}
+          onClose={() => setEditOrderModal({ open: false, order: null })}
+          onUpdate={handleUpdateOrder}
+          menuItems={menuItems}
+          businessSettings={businessSettings}
+        />
+
+        {deleteConfirmModal.open && deleteConfirmModal.order && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md border-0 shadow-2xl bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                  Delete Order
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to permanently delete order{" "}
+                  <strong>#{deleteConfirmModal.order.id.slice(0, 8)}</strong>?
+                </p>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Table:</strong> {deleteConfirmModal.order.table_number}</p>
+                  <p><strong>Total:</strong> ₹{deleteConfirmModal.order.total.toFixed(0)}</p>
+                  <p><strong>Status:</strong> {deleteConfirmModal.order.status}</p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    onClick={handleDeleteOrder}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-sm"
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteConfirmModal({ open: false, order: null })}
+                    className="flex-1 text-sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {cancelConfirmModal.open && cancelConfirmModal.order && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md border-0 shadow-2xl bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-orange-600" />
+                  Cancel Order
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to cancel order{" "}
+                  <strong>#{cancelConfirmModal.order.id.slice(0, 8)}</strong>?
+                </p>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Table:</strong> {cancelConfirmModal.order.table_number}</p>
+                  <p><strong>Total:</strong> ₹{cancelConfirmModal.order.total.toFixed(0)}</p>
+                  <p><strong>Status:</strong> {cancelConfirmModal.order.status}</p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    onClick={handleCancelOrder}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-sm"
+                  >
+                    Cancel Order
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCancelConfirmModal({ open: false, order: null })}
+                    className="flex-1 text-sm"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );
