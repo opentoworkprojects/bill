@@ -8954,6 +8954,16 @@ async def category_analysis_report(current_user: dict = Depends(get_current_user
 async def customer_balances_report(current_user: dict = Depends(get_current_user)):
     """Get customer balance report showing outstanding credit amounts"""
     user_org_id = get_secure_org_id(current_user)
+
+    def _normalize_dt(value):
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str) and value:
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except Exception:
+                return None
+        return None
     
     # Find all orders with outstanding balances (credit orders)
     credit_orders = await db.orders.find({
@@ -8984,7 +8994,8 @@ async def customer_balances_report(current_user: dict = Depends(get_current_user
     # Process all orders to get complete customer statistics
     for order in all_orders:
         # Use phone as key, or "unknown_<order_id>" if no phone
-        phone = order.get("customer_phone", "").strip()
+        phone_raw = order.get("customer_phone", "")
+        phone = str(phone_raw).strip() if phone_raw is not None else ""
         if not phone:
             # For orders without phone, use order ID as unique key
             phone = f"unknown_{order.get('id', 'no_id')}"
@@ -8992,30 +9003,32 @@ async def customer_balances_report(current_user: dict = Depends(get_current_user
         customer_stats[phone]["customer_name"] = order.get("customer_name") or "Unknown Customer"
         customer_stats[phone]["customer_phone"] = order.get("customer_phone") or "No Phone"
         customer_stats[phone]["total_orders"] += 1
-        customer_stats[phone]["total_amount_ordered"] += order.get("total", 0)
-        customer_stats[phone]["total_paid"] += order.get("payment_received", 0)
+        customer_stats[phone]["total_amount_ordered"] += float(order.get("total") or 0)
+        customer_stats[phone]["total_paid"] += float(order.get("payment_received") or 0)
         
         # Track last order date
-        order_date = order.get("created_at")
+        order_date = _normalize_dt(order.get("created_at"))
         if order_date:
-            if not customer_stats[phone]["last_order_date"] or order_date > customer_stats[phone]["last_order_date"]:
+            last_dt = customer_stats[phone]["last_order_date"]
+            if not last_dt or (isinstance(last_dt, datetime) and order_date > last_dt):
                 customer_stats[phone]["last_order_date"] = order_date
     
     # Process credit orders to get outstanding balances
     for order in credit_orders:
         # Use phone as key, or "unknown_<order_id>" if no phone
-        phone = order.get("customer_phone", "").strip()
+        phone_raw = order.get("customer_phone", "")
+        phone = str(phone_raw).strip() if phone_raw is not None else ""
         if not phone:
             phone = f"unknown_{order.get('id', 'no_id')}"
             
-        balance = order.get("balance_amount", 0)
+        balance = float(order.get("balance_amount") or 0)
         if balance > 0:
             customer_stats[phone]["balance_amount"] += balance
             customer_stats[phone]["credit_orders"].append({
                 "order_id": order.get("id"),
                 "date": order.get("created_at"),
-                "total": order.get("total", 0),
-                "paid": order.get("payment_received", 0),
+                "total": float(order.get("total") or 0),
+                "paid": float(order.get("payment_received") or 0),
                 "balance": balance,
                 "table_number": order.get("table_number", "N/A")
             })
@@ -9031,7 +9044,7 @@ async def customer_balances_report(current_user: dict = Depends(get_current_user
                 "total_orders": stats["total_orders"],
                 "total_amount_ordered": round(stats["total_amount_ordered"], 2),
                 "total_paid": round(stats["total_paid"], 2),
-                "last_order_date": stats["last_order_date"],
+                "last_order_date": stats["last_order_date"].isoformat() if isinstance(stats["last_order_date"], datetime) else stats["last_order_date"],
                 "credit_orders_count": len(stats["credit_orders"]),
                 "credit_orders": stats["credit_orders"][-5:]  # Last 5 credit orders
             })
