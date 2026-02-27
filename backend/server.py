@@ -12456,6 +12456,13 @@ def verify_super_admin(username: str, password: str) -> bool:
     """Verify super admin credentials"""
     return username == SUPER_ADMIN_USERNAME and password == SUPER_ADMIN_PASSWORD
 
+@api_router.get("/super-admin/login")
+async def super_admin_login(username: str, password: str):
+    """Validate super admin credentials"""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+    return {"success": True}
+
 @api_router.get("/super-admin/dashboard")
 async def get_super_admin_dashboard(username: str, password: str):
     """Get complete system overview - Site Owner Only"""
