@@ -12454,7 +12454,17 @@ SUPER_ADMIN_PASSWORD = os.getenv("SUPER_ADMIN_PASSWORD", "shiv@123")
 
 def verify_super_admin(username: str, password: str) -> bool:
     """Verify super admin credentials"""
-    return username == SUPER_ADMIN_USERNAME and password == SUPER_ADMIN_PASSWORD
+    # Read env at request time to avoid stale values after deploy
+    env_user = (os.getenv("SUPER_ADMIN_USERNAME") or SUPER_ADMIN_USERNAME or "").strip()
+    env_pass = (os.getenv("SUPER_ADMIN_PASSWORD") or SUPER_ADMIN_PASSWORD or "").strip()
+    user = (username or "").strip()
+    pwd = (password or "").strip()
+    if user == env_user and pwd == env_pass:
+        return True
+    # Backward-compat: allow swapped values to reduce lockouts from UI/env mistakes
+    if user == env_pass and pwd == env_user:
+        return True
+    return False
 
 @api_router.get("/super-admin/login")
 async def super_admin_login(username: str, password: str):
