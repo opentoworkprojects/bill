@@ -104,6 +104,18 @@ except Exception as e:
     _BILLING_AUTOMATION_AVAILABLE = False
     send_bill_via_whatsapp = None
 
+# Import WhatsApp Cloud API helpers (optional)
+try:
+    from whatsapp_cloud_api import whatsapp_api, send_whatsapp_status, send_whatsapp_receipt, send_whatsapp_otp
+    _WHATSAPP_CLOUD_AVAILABLE = True
+except Exception as e:
+    print(f"WhatsApp Cloud API not available: {e}")
+    _WHATSAPP_CLOUD_AVAILABLE = False
+    whatsapp_api = None
+    send_whatsapp_status = None
+    send_whatsapp_receipt = None
+    send_whatsapp_otp = None
+
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv(
     "MONGO_URL",
@@ -4890,6 +4902,44 @@ def generate_whatsapp_notification(phone: str, message: str) -> str:
     return f"https://wa.me/{phone_clean}?text={encoded_message}"
 
 
+async def send_whatsapp_status_or_link(
+    customer_phone: str,
+    status: str,
+    order: dict,
+    business: dict,
+    frontend_origin: str = ""
+) -> dict:
+    """
+    Prefer WhatsApp Cloud API for auto-send. Fall back to wa.me link if unavailable.
+    Returns a dict with whatsapp_link, whatsapp_sent, whatsapp_mode.
+    """
+    if not customer_phone:
+        return {"whatsapp_link": None, "whatsapp_sent": False, "whatsapp_mode": None}
+    
+    if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
+        try:
+            restaurant_name = (business or {}).get("restaurant_name", "Restaurant")
+            tracking_token = order.get("tracking_token", "")
+            base_url = frontend_origin or (business or {}).get("frontend_url", "")
+            tracking_url = f"{base_url}/track/{tracking_token}" if base_url and tracking_token else None
+            
+            await send_whatsapp_status(
+                customer_phone,
+                order.get("id", ""),
+                status,
+                restaurant_name,
+                tracking_url
+            )
+            
+            return {"whatsapp_link": None, "whatsapp_sent": True, "whatsapp_mode": "cloud"}
+        except Exception as e:
+            print(f"⚠️ WhatsApp Cloud send failed, falling back to link: {e}")
+    
+    message = get_status_message(status, order, business, frontend_origin or "")
+    whatsapp_link = generate_whatsapp_notification(customer_phone, message)
+    return {"whatsapp_link": whatsapp_link, "whatsapp_sent": False, "whatsapp_mode": "link"}
+
+
 def get_status_message(status: str, order: dict, business: dict, frontend_url: str = "") -> str:
     """Generate status-specific WhatsApp message"""
     # Handle None business case
@@ -5152,7 +5202,14 @@ async def create_order(
                 frontend_url = order_data.frontend_origin or ""
                 if order_data.customer_phone and business.get("whatsapp_auto_notify"):
                     message = get_status_message("pending", updated_order, business, frontend_url)
-                    whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
+                    result = await send_whatsapp_status_or_link(
+                        order_data.customer_phone,
+                        "pending",
+                        updated_order,
+                        business,
+                        frontend_url
+                    )
+                    whatsapp_link = result.get("whatsapp_link")
                 
                 print(f"✅ Order consolidated successfully: {existing_order['id']} (Table {table_number})")
                 return {
@@ -5245,8 +5302,14 @@ async def create_order(
     whatsapp_link = None
     frontend_url = order_data.frontend_origin or ""
     if order_data.customer_phone and business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
-        message = get_status_message("pending", doc, business, frontend_url)
-        whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
+        result = await send_whatsapp_status_or_link(
+            order_data.customer_phone,
+            "pending",
+            doc,
+            business,
+            frontend_url
+        )
+        whatsapp_link = result.get("whatsapp_link")
 
     print(f"✅ New order created successfully: {order_obj.id} (Table {table_number})")
     return {
@@ -5875,8 +5938,14 @@ async def update_order_status(
         if should_notify:
             # Update order with current status for message generation
             order["status"] = status
-            message = get_status_message(status, order, business, frontend_origin or "")
-            whatsapp_link = generate_whatsapp_notification(customer_phone, message)
+            result = await send_whatsapp_status_or_link(
+                customer_phone,
+                status,
+                order,
+                business,
+                frontend_origin or ""
+            )
+            whatsapp_link = result.get("whatsapp_link")
 
     return {
         "message": "Order status updated",
