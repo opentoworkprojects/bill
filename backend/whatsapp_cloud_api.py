@@ -7,8 +7,61 @@ No user login required - fully automated
 import os
 import httpx
 import json
-from typing import Optional, Dict, Any
-from datetime import datetime
+import asyncio
+from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
+from collections import deque
+
+
+class RateLimiter:
+    """Rate limiter for WhatsApp API to prevent hitting limits"""
+    
+    def __init__(self, max_requests: int = 100, window_seconds: int = 24*60*60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests = deque()
+        self._lock = asyncio.Lock()
+    
+    async def can_send(self) -> bool:
+        """Check if we can send a message without hitting rate limit"""
+        async with self._lock:
+            now = datetime.now()
+            cutoff = now - timedelta(seconds=self.window_seconds)
+            
+            # Remove old requests outside the window
+            while self.requests and self.requests[0] < cutoff:
+                self.requests.popleft()
+            
+            return len(self.requests) < self.max_requests
+    
+    async def record_send(self):
+        """Record a send attempt"""
+        async with self._lock:
+            self.requests.append(datetime.now())
+
+
+class MessageQueue:
+    """Queue for messages when rate limited"""
+    
+    def __init__(self):
+        self._queue: List[Dict[str, Any]] = []
+        self._lock = asyncio.Lock()
+    
+    async def enqueue_message(self, message_data: Dict[str, Any]):
+        """Add a message to the queue"""
+        async with self._lock:
+            self._queue.append(message_data)
+    
+    async def dequeue_message(self) -> Optional[Dict[str, Any]]:
+        """Get the next message from the queue"""
+        async with self._lock:
+            if self._queue:
+                return self._queue.pop(0)
+            return None
+    
+    def get_queue_depth(self) -> int:
+        """Get current queue size"""
+        return len(self._queue)
 
 
 class WhatsAppCloudAPI:
@@ -21,9 +74,79 @@ class WhatsAppCloudAPI:
         self.api_version = os.getenv("WHATSAPP_API_VERSION", "v18.0")
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
         
+        # Initialize rate limiter and message queue
+        self.rate_limiter = RateLimiter(max_requests=100, window_seconds=24*60*60)  # 100 messages per day
+        self.message_queue = MessageQueue()
+        
     def is_configured(self) -> bool:
         """Check if WhatsApp Cloud API is properly configured"""
         return bool(self.phone_number_id and self.access_token)
+    
+    def validate_phone_number(self, phone: str) -> tuple:
+        """
+        Validate and clean phone number for WhatsApp API
+        
+        Args:
+            phone: Raw phone number (may include +, spaces, dashes)
+            
+        Returns:
+            Tuple of (is_valid, cleaned_phone_or_error_message)
+        """
+        if not phone:
+            return (False, "Phone number is required")
+        
+        # Remove common formatting characters
+        cleaned = phone.replace("+", "").replace(" ", "").replace("-", "").replace("(", "").replace(")", "").replace(".", "")
+        
+        # Remove any non-digit characters
+        cleaned = ''.join(c for c in cleaned if c.isdigit())
+        
+        # Validate length
+        if len(cleaned) < 10:
+            return (False, f"Phone number too short: {cleaned}")
+        
+        # If it starts with 91 (India) and has 12 digits, keep as is
+        # If it doesn't have country code, assume India (+91)
+        if len(cleaned) == 10:
+            cleaned = "91" + cleaned
+        elif len(cleaned) == 11 and cleaned.startswith("0"):
+            cleaned = "91" + cleaned[1:]
+        elif len(cleaned) == 12 and cleaned.startswith("91"):
+            pass  # Already has country code
+        elif len(cleaned) == 13 and cleaned.startswith("+91"):
+            cleaned = cleaned[1:]
+        else:
+            # Try to use as-is if longer than 12
+            if len(cleaned) > 12:
+                pass  # Use as-is for other countries
+            else:
+                return (False, f"Invalid phone number format: {phone}")
+        
+        return (True, cleaned)  # Return without + prefix for direct API use
+    
+    async def enqueue_message(self, message_data: Dict[str, Any]):
+        """Add a message to the queue when rate limited"""
+        await self.message_queue.enqueue_message(message_data)
+    
+    def get_queue_depth(self) -> int:
+        """Get current queue depth"""
+        return self.message_queue.get_queue_depth()
+    
+    async def process_queue(self):
+        """Process queued messages (call periodically)"""
+        while True:
+            msg = await self.message_queue.dequeue_message()
+            if not msg:
+                break
+            try:
+                to_phone = msg.get('to_phone', '')
+                message = msg.get('message', '')
+                preview_url = msg.get('preview_url', True)
+                
+                if to_phone and message:
+                    await self.send_text_message(to_phone, message, preview_url)
+            except Exception as e:
+                print(f"Error processing queued message: {e}")
     
     async def send_text_message(
         self, 
@@ -331,8 +454,14 @@ async def test_whatsapp_connection() -> Dict[str, Any]:
         }
     
     try:
-        # Try to send a test message to the business number itself
-        test_phone = whatsapp_api.phone_number_id
+        # Send a test message to a real phone number
+        test_phone = os.getenv("WHATSAPP_TEST_PHONE", "").strip()
+        if not test_phone:
+            return {
+                "success": False,
+                "configured": True,
+                "error": "WHATSAPP_TEST_PHONE not set"
+            }
         result = await whatsapp_api.send_text_message(
             test_phone,
             "✅ WhatsApp Cloud API connection test successful!"

@@ -95,6 +95,15 @@ except Exception as e:
     print(f"AI Service initialization issue")
     ai_service = None
 
+# Import Billing Automation for WhatsApp Cloud API
+try:
+    from billing_automation import send_bill_via_whatsapp
+    _BILLING_AUTOMATION_AVAILABLE = True
+except Exception as e:
+    print(f"Billing automation not available: {e}")
+    _BILLING_AUTOMATION_AVAILABLE = False
+    send_bill_via_whatsapp = None
+
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv(
     "MONGO_URL",
@@ -309,6 +318,41 @@ app.add_middleware(
 
 # Add GZip compression for faster response times (compress responses > 500 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# =========================
+# WhatsApp Webhook Endpoints
+# =========================
+@app.get("/webhooks/whatsapp")
+async def whatsapp_webhook_verify(request: Request):
+    """
+    Webhook verification for Meta/WhatsApp.
+    Meta sends: hub.mode, hub.verify_token, hub.challenge
+    """
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    expected = os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+    
+    if mode == "subscribe" and token and token == expected and challenge:
+        return Response(content=challenge, media_type="text/plain")
+    
+    return Response(status_code=403, content="Verification failed")
+
+
+@app.post("/webhooks/whatsapp")
+async def whatsapp_webhook_receive(payload: dict = Body(...)):
+    """
+    Receive WhatsApp webhook events.
+    For now, just acknowledge. Extend to process message/status events.
+    """
+    try:
+        # Minimal safe log to confirm delivery without dumping PII
+        event_id = payload.get("entry", [{}])[0].get("id")
+        print(f"WhatsApp webhook received. entry_id={event_id}")
+    except Exception:
+        pass
+    
+    return {"success": True}
 
 # Rate limiting and monitoring middleware
 class MonitoringMiddleware(BaseHTTPMiddleware):
