@@ -9505,11 +9505,20 @@ async def get_cloud_api_status():
         }
     
     is_configured = whatsapp_api.is_configured()
+    # Do not expose secrets; only show presence flags for troubleshooting
+    env_flags = {
+        "has_phone_number_id": bool(os.getenv("WHATSAPP_PHONE_NUMBER_ID")),
+        "has_access_token": bool(os.getenv("WHATSAPP_ACCESS_TOKEN")),
+        "has_business_account_id": bool(os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID")),
+        "has_verify_token": bool(os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN")),
+        "api_version": os.getenv("WHATSAPP_API_VERSION", "v18.0")
+    }
     return {
         "available": True,
         "configured": is_configured,
         "message": "WhatsApp Cloud API is configured and ready" if is_configured else "WhatsApp Cloud API credentials not set",
-        "phone_number_id": whatsapp_api.phone_number_id if is_configured else None
+        "phone_number_id": whatsapp_api.phone_number_id if is_configured else None,
+        "env_flags": env_flags
     }
 
 
