@@ -105,6 +105,7 @@ except Exception as e:
     send_bill_via_whatsapp = None
 
 # Import WhatsApp Cloud API helpers (optional)
+_WHATSAPP_CLOUD_AVAILABLE = False
 try:
     from whatsapp_cloud_api import whatsapp_api, send_whatsapp_status, send_whatsapp_receipt, send_whatsapp_otp
     _WHATSAPP_CLOUD_AVAILABLE = True
