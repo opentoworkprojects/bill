@@ -1341,7 +1341,7 @@ const BillingPage = ({ user }) => {
     }
   };
 
-  const handleWhatsappShare = async () => {
+const handleWhatsappShare = async () => {
     if (!whatsappPhone.trim()) { toast.error('Enter phone number'); return; }
     try {
       const response = await apiWithRetry({
@@ -1350,14 +1350,14 @@ const BillingPage = ({ user }) => {
         data: { phone_number: whatsappPhone, customer_name: order?.customer_name },
         timeout: 10000
       });
-      if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message sent');
-      } else if (response.data?.whatsapp_link) {
-        window.open(response.data.whatsapp_link, '_blank');
+      if (response.data?.whatsapp_sent) {
+        toast.success('WhatsApp receipt sent via Cloud API');
+      } else {
+        toast.error(response.data?.whatsapp_error || 'WhatsApp Cloud API not configured');
       }
       setShowWhatsappModal(false);
     } catch (error) {
-      // Error handling is done by apiWithRetry
+      toast.error('Failed to send WhatsApp message');
     }
   };
 
