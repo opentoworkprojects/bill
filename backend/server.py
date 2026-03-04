@@ -4915,7 +4915,12 @@ async def send_whatsapp_status_or_link(
     Returns a dict with whatsapp_link, whatsapp_sent, whatsapp_mode.
     """
     if not customer_phone:
-        return {"whatsapp_link": None, "whatsapp_sent": False, "whatsapp_mode": None}
+        return {
+            "whatsapp_link": None,
+            "whatsapp_sent": False,
+            "whatsapp_mode": None,
+            "whatsapp_error": "missing_phone"
+        }
     
     if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
         try:
@@ -4932,13 +4937,24 @@ async def send_whatsapp_status_or_link(
                 tracking_url
             )
             
-            return {"whatsapp_link": None, "whatsapp_sent": True, "whatsapp_mode": "cloud"}
+            return {
+                "whatsapp_link": None,
+                "whatsapp_sent": True,
+                "whatsapp_mode": "cloud",
+                "whatsapp_error": None
+            }
         except Exception as e:
             print(f"⚠️ WhatsApp Cloud send failed, falling back to link: {e}")
+            cloud_error = str(e)
     
     message = get_status_message(status, order, business, frontend_origin or "")
     whatsapp_link = generate_whatsapp_notification(customer_phone, message)
-    return {"whatsapp_link": whatsapp_link, "whatsapp_sent": False, "whatsapp_mode": "link"}
+    return {
+        "whatsapp_link": whatsapp_link,
+        "whatsapp_sent": False,
+        "whatsapp_mode": "link",
+        "whatsapp_error": cloud_error if 'cloud_error' in locals() else None
+    }
 
 
 def get_status_message(status: str, order: dict, business: dict, frontend_url: str = "") -> str:
@@ -5201,8 +5217,10 @@ async def create_order(
                 # Generate WhatsApp notification if enabled
                 whatsapp_link = None
                 frontend_url = order_data.frontend_origin or ""
+                whatsapp_sent = False
+                whatsapp_mode = None
+                whatsapp_error = None
                 if order_data.customer_phone and business.get("whatsapp_auto_notify"):
-                    message = get_status_message("pending", updated_order, business, frontend_url)
                     result = await send_whatsapp_status_or_link(
                         order_data.customer_phone,
                         "pending",
@@ -5211,11 +5229,18 @@ async def create_order(
                         frontend_url
                     )
                     whatsapp_link = result.get("whatsapp_link")
+                    whatsapp_sent = result.get("whatsapp_sent", False)
+                    whatsapp_mode = result.get("whatsapp_mode")
+                    whatsapp_error = result.get("whatsapp_error")
+                    print(f"📲 WhatsApp notify (consolidated): sent={whatsapp_sent} mode={whatsapp_mode} error={whatsapp_error}")
                 
                 print(f"✅ Order consolidated successfully: {existing_order['id']} (Table {table_number})")
                 return {
                     **updated_order,
                     "whatsapp_link": whatsapp_link,
+                    "whatsapp_sent": whatsapp_sent,
+                    "whatsapp_mode": whatsapp_mode,
+                    "whatsapp_error": whatsapp_error,
                     "consolidated": True,
                     "message": f"Items added to existing order for Table {table_number}"
                 }
@@ -5301,6 +5326,9 @@ async def create_order(
     
     # Generate WhatsApp notification if enabled and phone provided
     whatsapp_link = None
+    whatsapp_sent = False
+    whatsapp_mode = None
+    whatsapp_error = None
     frontend_url = order_data.frontend_origin or ""
     if order_data.customer_phone and business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
         result = await send_whatsapp_status_or_link(
@@ -5311,11 +5339,18 @@ async def create_order(
             frontend_url
         )
         whatsapp_link = result.get("whatsapp_link")
+        whatsapp_sent = result.get("whatsapp_sent", False)
+        whatsapp_mode = result.get("whatsapp_mode")
+        whatsapp_error = result.get("whatsapp_error")
+        print(f"📲 WhatsApp notify (new order): sent={whatsapp_sent} mode={whatsapp_mode} error={whatsapp_error}")
 
     print(f"✅ New order created successfully: {order_obj.id} (Table {table_number})")
     return {
         **order_obj.model_dump(),
         "whatsapp_link": whatsapp_link,
+        "whatsapp_sent": whatsapp_sent,
+        "whatsapp_mode": whatsapp_mode,
+        "whatsapp_error": whatsapp_error,
         "tracking_token": tracking_token,
         "tracking_url": f"{frontend_url}/track/{tracking_token}" if frontend_url else ""
     }
@@ -5923,10 +5958,20 @@ async def update_order_status(
         print(f"⚠️ Verification error: {verify_error}")
     
     # Generate WhatsApp notification if enabled
-    business = current_user.get("business_settings", {})
+    # Refresh business settings from DB to avoid stale flags
+    business = current_user.get("business_settings", {}) or {}
+    try:
+        db_user = await db.users.find_one({"id": current_user.get("id")}, {"business_settings": 1, "_id": 0})
+        if db_user and db_user.get("business_settings"):
+            business = db_user["business_settings"]
+    except Exception as e:
+        print(f"⚠️ Failed to refresh business settings: {e}")
     whatsapp_link = None
     customer_phone = order.get("customer_phone")
     
+    whatsapp_sent = False
+    whatsapp_mode = None
+    whatsapp_error = None
     if customer_phone and business.get("whatsapp_auto_notify"):
         should_notify = False
         if status == "preparing" and business.get("whatsapp_notify_on_preparing"):
@@ -5947,6 +5992,10 @@ async def update_order_status(
                 frontend_origin or ""
             )
             whatsapp_link = result.get("whatsapp_link")
+            whatsapp_sent = result.get("whatsapp_sent", False)
+            whatsapp_mode = result.get("whatsapp_mode")
+            whatsapp_error = result.get("whatsapp_error")
+            print(f"📲 WhatsApp notify (status={status}): sent={whatsapp_sent} mode={whatsapp_mode} error={whatsapp_error}")
 
     return {
         "message": "Order status updated",
@@ -5956,6 +6005,9 @@ async def update_order_status(
         "cache_invalidated": True,
         "database_verified": True,
         "whatsapp_link": whatsapp_link,
+        "whatsapp_sent": whatsapp_sent,
+        "whatsapp_mode": whatsapp_mode,
+        "whatsapp_error": whatsapp_error,
         "customer_phone": customer_phone
     }
 
