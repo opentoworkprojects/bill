@@ -1350,7 +1350,11 @@ const BillingPage = ({ user }) => {
         data: { phone_number: whatsappPhone, customer_name: order?.customer_name },
         timeout: 10000
       });
-      window.open(response.data.whatsapp_link, '_blank');
+      if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
+        toast.success('WhatsApp message sent');
+      } else if (response.data?.whatsapp_link) {
+        window.open(response.data.whatsapp_link, '_blank');
+      }
       setShowWhatsappModal(false);
     } catch (error) {
       // Error handling is done by apiWithRetry
