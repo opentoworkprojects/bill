@@ -4930,14 +4930,46 @@ async def send_whatsapp_status_or_link(
         base_url = frontend_origin or (business or {}).get("frontend_url", "")
         tracking_url = f"{base_url}/track/{tracking_token}" if base_url and tracking_token else None
 
-        await send_whatsapp_status(
-            customer_phone,
-            order.get("id", ""),
-            status,
-            restaurant_name,
-            tracking_url
-        )
-        print(f"✅ WA status sent | to={customer_phone} | status={status}")
+        # For business-initiated messaging, use templates when configured.
+        status_template = whatsapp_api.get_status_template_name(status)
+        if status_template:
+            customer_name = (order.get("customer_name") or "Customer")
+            order_id = str(order.get("id", ""))[:8].upper()
+            total = order.get("total", 0)
+            currency = CURRENCY_SYMBOLS.get((business or {}).get("currency", "INR"), "₹")
+            amount = f"{currency}{total:.2f}"
+
+            await whatsapp_api.send_template_message(
+                customer_phone,
+                status_template,
+                [customer_name, order_id, amount],
+                whatsapp_api.template_lang
+            )
+            print(f"✅ WA template sent | to={customer_phone} | status={status} | template={status_template}")
+        elif status == "pending" and whatsapp_api.is_template_configured():
+            customer_name = (order.get("customer_name") or "Customer")
+            order_id = str(order.get("id", ""))[:8].upper()
+            total = order.get("total", 0)
+            currency = CURRENCY_SYMBOLS.get((business or {}).get("currency", "INR"), "₹")
+            amount = f"{currency}{total:.2f}"
+
+            await whatsapp_api.send_template_message(
+                customer_phone,
+                whatsapp_api.template_name,
+                [customer_name, order_id, amount],
+                whatsapp_api.template_lang
+            )
+            print(f"✅ WA template sent | to={customer_phone} | status={status} | template={whatsapp_api.template_name}")
+        else:
+            await send_whatsapp_status(
+                customer_phone,
+                order.get("id", ""),
+                status,
+                restaurant_name,
+                tracking_url
+            )
+            print(f"✅ WA status sent | to={customer_phone} | status={status}")
+
         return {"whatsapp_sent": True, "whatsapp_mode": "cloud", "whatsapp_error": None}
     except Exception as e:
         print(f"❌ WA status failed | to={customer_phone} | status={status} | error={e}")
@@ -5314,20 +5346,26 @@ async def create_order(
     # Auto-send WhatsApp notification on order creation (Cloud API only, no wa.me)
     whatsapp_sent = False
     whatsapp_error = None
+    whatsapp_mode = None
     frontend_url = order_data.frontend_origin or ""
-    if order_data.customer_phone:
-        asyncio.create_task(send_whatsapp_status_or_link(
+    if order_data.customer_phone and business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed", True):
+        result = await send_whatsapp_status_or_link(
             order_data.customer_phone,
             "pending",
             doc,
             business,
             frontend_url
-        ))
+        )
+        whatsapp_sent = result.get("whatsapp_sent", False)
+        whatsapp_mode = result.get("whatsapp_mode")
+        whatsapp_error = result.get("whatsapp_error")
+        print(f"📲 WhatsApp notify (new order): sent={whatsapp_sent} mode={whatsapp_mode} error={whatsapp_error}")
 
     print(f"✅ New order created successfully: {order_obj.id} (Table {table_number})")
     return {
         **order_obj.model_dump(),
         "whatsapp_sent": whatsapp_sent,
+        "whatsapp_mode": whatsapp_mode,
         "whatsapp_error": whatsapp_error,
         "tracking_token": tracking_token,
         "tracking_url": f"{frontend_url}/track/{tracking_token}" if frontend_url else ""

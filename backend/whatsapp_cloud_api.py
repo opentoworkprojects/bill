@@ -18,9 +18,30 @@ class WhatsAppCloudAPI:
         self.access_token = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
         self.api_version = os.getenv("WHATSAPP_API_VERSION", "v18.0")
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
+        self.template_name = os.getenv("WHATSAPP_TEMPLATE_NAME", "").strip()
+        self.template_lang = os.getenv("WHATSAPP_TEMPLATE_LANG", "en_US").strip()
+        self.template_status_pending = os.getenv("WHATSAPP_TEMPLATE_STATUS_PENDING", "").strip()
+        self.template_status_preparing = os.getenv("WHATSAPP_TEMPLATE_STATUS_PREPARING", "").strip()
+        self.template_status_ready = os.getenv("WHATSAPP_TEMPLATE_STATUS_READY", "").strip()
+        self.template_status_completed = os.getenv("WHATSAPP_TEMPLATE_STATUS_COMPLETED", "").strip()
+        self.template_status_cancelled = os.getenv("WHATSAPP_TEMPLATE_STATUS_CANCELLED", "").strip()
 
     def is_configured(self) -> bool:
         return bool(self.phone_number_id and self.access_token)
+
+    def is_template_configured(self) -> bool:
+        return bool(self.template_name and self.template_lang)
+
+    def get_status_template_name(self, status: str) -> str:
+        status = (status or "").lower()
+        mapping = {
+            "pending": self.template_status_pending,
+            "preparing": self.template_status_preparing,
+            "ready": self.template_status_ready,
+            "completed": self.template_status_completed,
+            "cancelled": self.template_status_cancelled,
+        }
+        return mapping.get(status, "")
 
     def clean_phone(self, phone: str) -> str:
         """Normalize phone to digits only with country code."""
@@ -63,6 +84,32 @@ class WhatsAppCloudAPI:
         result = await self._post(payload)
         msg_id = result.get("messages", [{}])[0].get("id", "")
         print(f"✅ WA sent | to={phone} | msg_id={msg_id}")
+        return result
+
+    async def send_template_message(self, to_phone: str, template_name: str, params: list, language: str = "en_US") -> Dict[str, Any]:
+        """Send a template message (required for business-initiated messaging)."""
+        if not self.is_configured():
+            raise ValueError("WhatsApp Cloud API not configured. Set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN.")
+
+        phone = self.clean_phone(to_phone)
+        components = [{
+            "type": "body",
+            "parameters": [{"type": "text", "text": str(p)} for p in params]
+        }]
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language},
+                "components": components
+            }
+        }
+        result = await self._post(payload)
+        msg_id = result.get("messages", [{}])[0].get("id", "")
+        print(f"✅ WA template sent | to={phone} | template={template_name} | msg_id={msg_id}")
         return result
 
     async def send_receipt(self, to_phone: str, order: Dict[str, Any], business: Dict[str, Any]) -> Dict[str, Any]:
