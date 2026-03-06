@@ -5049,17 +5049,19 @@ async def send_whatsapp_status_or_link(
         if not status_template:
             return {"whatsapp_sent": False, "whatsapp_error": f"template_missing:{status}"}
 
-        restaurant_name = (business or {}).get("restaurant_name", "Restaurant")
+        customer_name = (order.get("customer_name") or "Customer")
         order_id = str(order.get("id", ""))[:8].upper()
-        template_params = [restaurant_name, order_id]
+        total = order.get("total", 0)
+        currency = (business or {}).get("currency", "INR")
+        amount = f"{currency} {total:.2f}"
+        template_params = [customer_name, order_id, amount]
 
         cleaned_phone = normalize_phone_e164(customer_phone)
-        await send_whatsapp_status(
+        await whatsapp_api.send_template_message(
             cleaned_phone,
-            order_id,
-            status,
-            restaurant_name,
-            None
+            status_template,
+            template_params,
+            whatsapp_api.template_lang
         )
         print(f"✅ WA status sent | to={cleaned_phone} | status={status} | template={status_template} | params={template_params} | status=sent")
 
@@ -6130,17 +6132,19 @@ async def update_order_status(
                         try:
                             template_name = whatsapp_api.get_status_template_name(status)
                             if template_name:
-                                restaurant_name = business.get("restaurant_name", "Our Restaurant")
+                                customer_name = (order.get("customer_name") or "Customer")
                                 order_id_short = str(order_id)[:8].upper()
+                                total = order.get("total", 0)
+                                currency = business.get("currency", "INR")
+                                amount = f"{currency} {total:.2f}"
                                 cleaned_phone = normalize_phone_e164(customer_phone)
-                                template_params = [restaurant_name, order_id_short]
+                                template_params = [customer_name, order_id_short, amount]
 
-                                result = await send_whatsapp_status(
+                                result = await whatsapp_api.send_template_message(
                                     cleaned_phone,
-                                    order_id_short,
-                                    status,
-                                    restaurant_name,
-                                    None
+                                    template_name,
+                                    template_params,
+                                    whatsapp_api.template_lang
                                 )
 
                                 msg_id = result.get("messages", [{}])[0].get("id", "")
