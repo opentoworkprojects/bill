@@ -117,6 +117,17 @@ except Exception as e:
     send_whatsapp_receipt_cloud = None
     send_whatsapp_otp = None
 
+# Import WhatsApp Consent Manager
+_WHATSAPP_CONSENT_AVAILABLE = False
+try:
+    from whatsapp_consent import get_consent_manager, check_customer_consent
+    _WHATSAPP_CONSENT_AVAILABLE = True
+except Exception as e:
+    print(f"WhatsApp Consent Manager not available: {e}")
+    _WHATSAPP_CONSENT_AVAILABLE = False
+    get_consent_manager = None
+    check_customer_consent = None
+
 # MongoDB connection with SSL configuration
 mongo_url = os.getenv(
     "MONGO_URL",
@@ -5958,16 +5969,63 @@ async def update_order_status(
     whatsapp_sent = False
     whatsapp_error = None
 
-    # Auto-send WhatsApp on every status change (Cloud API only, no wa.me)
+    # 📱 AUTO-SEND WHATSAPP STATUS UPDATE (Cloud API with consent check)
+    # Sends: "Your order is being prepared" → "Your order is ready!" → etc.
     if customer_phone and status in ("pending", "preparing", "ready", "completed"):
-        order["status"] = status
-        asyncio.create_task(send_whatsapp_status_or_link(
-            customer_phone,
-            status,
-            order,
-            business,
-            frontend_origin or ""
-        ))
+        try:
+            # Check if customer has consented to receive messages
+            if _WHATSAPP_CONSENT_AVAILABLE:
+                consent_manager = get_consent_manager(db)
+                has_consent = await consent_manager.check_consent(user_org_id, customer_phone)
+                
+                if not has_consent:
+                    print(f"⚠️ No WhatsApp consent for {customer_phone} - skipping status update")
+                    whatsapp_error = "Customer has not opted in to WhatsApp messages"
+                else:
+                    # Customer has consent - send status update via WhatsApp Cloud API
+                    if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
+                        try:
+                            # Determine which template to use based on status
+                            template_name = whatsapp_api.get_status_template_name(status)
+                            if template_name:
+                                restaurant_name = business.get("restaurant_name", "Our Restaurant")
+                                order_id_short = str(order_id)[:8].upper()
+                                
+                                result = await whatsapp_api.send_template_message(
+                                    customer_phone,
+                                    template_name,
+                                    [restaurant_name, order_id_short],
+                                    whatsapp_api.template_lang
+                                )
+                                
+                                msg_id = result.get("messages", [{}])[0].get("id", "")
+                                if msg_id:
+                                    # Record message sent in consent tracker
+                                    await consent_manager.record_message_sent(user_org_id, customer_phone, msg_id)
+                                    whatsapp_sent = True
+                                    print(f"✅ STATUS UPDATE SENT via WhatsApp: {status} to {customer_phone} (msg_id: {msg_id})")
+                            else:
+                                print(f"⚠️ No WhatsApp template configured for status '{status}'")
+                                whatsapp_error = f"No template for status {status}"
+                        except Exception as cloud_err:
+                            print(f"⚠️ WhatsApp Cloud API error: {cloud_err}")
+                            whatsapp_error = str(cloud_err)
+                    else:
+                        print(f"⚠️ WhatsApp Cloud API not configured - skipping status update")
+                        whatsapp_error = "WhatsApp Cloud API not configured"
+            else:
+                # Fallback if consent manager not available - still send if enabled
+                if business.get("whatsapp_enabled", False):
+                    asyncio.create_task(send_whatsapp_status_or_link(
+                        customer_phone,
+                        status,
+                        order,
+                        business,
+                        ""
+                    ))
+        except Exception as e:
+            print(f"⚠️ WhatsApp status update failed: {e}")
+            whatsapp_error = str(e)
 
     return {
         "message": "Order status updated",
@@ -10860,6 +10918,16 @@ async def startup_validation():
     # Start background cache cleanup task
     asyncio.create_task(periodic_cache_cleanup())
     print("✅ Background cache cleanup task started")
+    
+    # Initialize WhatsApp Consent Manager (for billing message opt-in)
+    if _WHATSAPP_CONSENT_AVAILABLE:
+        try:
+            consent_manager = get_consent_manager(db)
+            await consent_manager.ensure_indexes()
+            print("✅ WhatsApp consent management system initialized")
+        except Exception as e:
+            print(f"⚠️ WhatsApp consent initialization failed: {e}")
+            print("📝 Continuing without WhatsApp consent tracking")
 
 
 async def periodic_cache_cleanup():
@@ -12409,6 +12477,196 @@ async def delete_customer(
         raise HTTPException(status_code=404, detail="Customer not found")
     
     return {"message": "Customer deleted"}
+
+
+# ============================================================================
+# WhatsApp Consent Management - Billing Message Opt-In/Opt-Out
+# ============================================================================
+
+@api_router.post("/whatsapp/consent/on-phone-entry")
+async def whatsapp_auto_opt_in_on_phone_entry(
+    phone_number: str,
+    customer_name: Optional[str] = None,
+    order_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    ✅ AUTO OPT-IN: Called when customer enters phone number during billing
+    
+    Usage:
+    - Called from billing page when customer enters/updates phone number
+    - BEFORE payment is processed
+    - Automatically grants consent for WhatsApp transactional messages
+    
+    Flow:
+    1. Customer enters phone number on billing page
+    2. This endpoint auto opts-in the customer
+    3. After payment verification, receipt is auto-sent immediately
+    4. Customer receives message without needing to message first
+    
+    Compliance:
+    ✅ Follows Meta WhatsApp Cloud API policy for business-initiated messaging
+    ✅ Explicit opt-in during billing process
+    ✅ Transactional messages sent immediately (no 24-hour window needed)
+    """
+    if not _WHATSAPP_CONSENT_AVAILABLE:
+        return {
+            "success": False,
+            "consented": False,
+            "message": "WhatsApp consent not available"
+        }
+    
+    user_org_id = get_secure_org_id(current_user)
+    
+    try:
+        consent_manager = get_consent_manager(db)
+        
+        # Auto opt-in customer when they enter phone number
+        result = await consent_manager.opt_in_customer(
+            organization_id=user_org_id,
+            phone_number=phone_number,
+            customer_name=customer_name,
+            channel="billing-phone-entry",  # Track that this was auto opt-in during phone entry
+            metadata={
+                "order_id": order_id,
+                "opted_in_at_phone_entry": datetime.utcnow().isoformat(),
+                "awaiting_payment_completion": True
+            }
+        )
+        
+        # Get current consent status
+        status = await consent_manager.get_consent_status(
+            organization_id=user_org_id,
+            phone_number=phone_number
+        )
+        
+        return {
+            "success": True,
+            "consented": True,
+            "message": "✅ Phone number saved. Consent granted for WhatsApp billing messages.",
+            "phone_number": status.get("phone_number"),
+            "expires_at": status.get("expires_at"),
+            "will_receive_receipt": True,
+            "receipt_timing": "Immediately after payment verification"
+        }
+    except Exception as e:
+        print(f"Auto opt-in on phone entry failed: {e}")
+        # Don't block billing flow if opt-in fails
+        return {
+            "success": False,
+            "consented": False,
+            "message": "Phone number saved. WhatsApp consent could not be processed.",
+            "error": str(e),
+            "note": "Billing can continue, but WhatsApp receipt won't be sent"
+        }
+
+
+@api_router.post("/whatsapp/consent/opt-in")
+async def whatsapp_opt_in_customer(
+    phone_number: str,
+    customer_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Opt-in customer to receive WhatsApp billing messages (manual)"""
+    if not _WHATSAPP_CONSENT_AVAILABLE:
+        raise HTTPException(status_code=503, detail="WhatsApp Consent Manager not available")
+    
+    user_org_id = get_secure_org_id(current_user)
+    
+    try:
+        consent_manager = get_consent_manager(db)
+        result = await consent_manager.opt_in_customer(
+            organization_id=user_org_id,
+            phone_number=phone_number,
+            customer_name=customer_name,
+            channel="manual-billing"
+        )
+        return {
+            "success": True,
+            "message": "Customer opted in to WhatsApp billing messages",
+            "phone_number": result.get("phone_number"),
+            "expires_at": result.get("expires_at")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Opt-in failed: {str(e)}")
+
+
+@api_router.post("/whatsapp/consent/opt-out")
+async def whatsapp_opt_out_customer(
+    phone_number: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Opt-out customer from WhatsApp billing messages"""
+    if not _WHATSAPP_CONSENT_AVAILABLE:
+        raise HTTPException(status_code=503, detail="WhatsApp Consent Manager not available")
+    
+    user_org_id = get_secure_org_id(current_user)
+    
+    try:
+        consent_manager = get_consent_manager(db)
+        result = await consent_manager.opt_out_customer(
+            organization_id=user_org_id,
+            phone_number=phone_number
+        )
+        return {
+            "success": True,
+            "message": "Customer opted out from WhatsApp billing messages",
+            "phone_number": result.get("phone_number")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Opt-out failed: {str(e)}")
+
+
+@api_router.get("/whatsapp/consent/status/{phone_number}")
+async def get_whatsapp_consent_status(
+    phone_number: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Check WhatsApp consent status for a customer phone number"""
+    if not _WHATSAPP_CONSENT_AVAILABLE:
+        raise HTTPException(status_code=503, detail="WhatsApp Consent Manager not available")
+    
+    user_org_id = get_secure_org_id(current_user)
+    
+    try:
+        consent_manager = get_consent_manager(db)
+        status = await consent_manager.get_consent_status(
+            organization_id=user_org_id,
+            phone_number=phone_number
+        )
+        return status
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+
+@api_router.post("/whatsapp/consent/bulk-opt-in")
+async def whatsapp_bulk_opt_in(
+    phone_numbers: list,
+    current_user: dict = Depends(get_current_user),
+):
+    """Bulk opt-in multiple customers to WhatsApp billing messages"""
+    if not _WHATSAPP_CONSENT_AVAILABLE:
+        raise HTTPException(status_code=503, detail="WhatsApp Consent Manager not available")
+    
+    if not current_user.get("role") == "admin":
+        raise HTTPException(status_code=403, detail="Only admin can perform bulk operations")
+    
+    user_org_id = get_secure_org_id(current_user)
+    
+    try:
+        consent_manager = get_consent_manager(db)
+        result = await consent_manager.bulk_opt_in(
+            organization_id=user_org_id,
+            phone_numbers=phone_numbers
+        )
+        return {
+            "success": result["success"],
+            "success_count": result["success_count"],
+            "error_count": result["error_count"],
+            "message": result["message"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk opt-in failed: {str(e)}")
 
 
 # ============================================================================
