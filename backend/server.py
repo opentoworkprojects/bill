@@ -4915,7 +4915,7 @@ async def send_whatsapp_status_or_link(
     frontend_origin: str = ""
 ) -> dict:
     """
-    Send WhatsApp status notification via Cloud API only. No wa.me redirects.
+    Send WhatsApp status notification via Cloud API templates only.
     Auto-sends at every order stage: pending, preparing, ready, completed.
     """
     if not customer_phone:
@@ -4925,56 +4925,28 @@ async def send_whatsapp_status_or_link(
         return {"whatsapp_sent": False, "whatsapp_error": "cloud_not_configured"}
 
     try:
-        restaurant_name = (business or {}).get("restaurant_name", "Restaurant")
-        tracking_token = order.get("tracking_token", "")
-        base_url = frontend_origin or (business or {}).get("frontend_url", "")
-        tracking_url = f"{base_url}/track/{tracking_token}" if base_url and tracking_token else None
-
-        # For business-initiated messaging, use templates when configured.
         status_template = whatsapp_api.get_status_template_name(status)
-        if status_template:
-            customer_name = (order.get("customer_name") or "Customer")
-            order_id = str(order.get("id", ""))[:8].upper()
-            total = order.get("total", 0)
-            currency = CURRENCY_SYMBOLS.get((business or {}).get("currency", "INR"), "₹")
-            amount = f"{currency}{total:.2f}"
+        if not status_template:
+            return {"whatsapp_sent": False, "whatsapp_error": f"template_missing:{status}"}
 
-            await whatsapp_api.send_template_message(
-                customer_phone,
-                status_template,
-                [customer_name, order_id, amount],
-                whatsapp_api.template_lang
-            )
-            print(f"✅ WA template sent | to={customer_phone} | status={status} | template={status_template}")
-        elif status == "pending" and whatsapp_api.is_template_configured():
-            customer_name = (order.get("customer_name") or "Customer")
-            order_id = str(order.get("id", ""))[:8].upper()
-            total = order.get("total", 0)
-            currency = CURRENCY_SYMBOLS.get((business or {}).get("currency", "INR"), "₹")
-            amount = f"{currency}{total:.2f}"
+        customer_name = (order.get("customer_name") or "Customer")
+        order_id = str(order.get("id", ""))[:8].upper()
+        total = order.get("total", 0)
+        currency = (business or {}).get("currency", "INR")
+        amount = f"{currency} {total:.2f}"
 
-            await whatsapp_api.send_template_message(
-                customer_phone,
-                whatsapp_api.template_name,
-                [customer_name, order_id, amount],
-                whatsapp_api.template_lang
-            )
-            print(f"✅ WA template sent | to={customer_phone} | status={status} | template={whatsapp_api.template_name}")
-        else:
-            await send_whatsapp_status(
-                customer_phone,
-                order.get("id", ""),
-                status,
-                restaurant_name,
-                tracking_url
-            )
-            print(f"✅ WA status sent | to={customer_phone} | status={status}")
+        await whatsapp_api.send_template_message(
+            customer_phone,
+            status_template,
+            [customer_name, order_id, amount],
+            whatsapp_api.template_lang
+        )
+        print(f"WA template sent | to={customer_phone} | status={status} | template={status_template}")
 
         return {"whatsapp_sent": True, "whatsapp_mode": "cloud", "whatsapp_error": None}
     except Exception as e:
-        print(f"❌ WA status failed | to={customer_phone} | status={status} | error={e}")
+        print(f"WA status failed | to={customer_phone} | status={status} | error={e}")
         return {"whatsapp_sent": False, "whatsapp_error": str(e)}
-
 
 def get_status_message(status: str, order: dict, business: dict, frontend_url: str = "") -> str:
     """Generate status-specific WhatsApp message"""
@@ -9399,25 +9371,28 @@ Tax: {currency_symbol}{order['tax']:.2f}
                 "whatsapp_enabled": whatsapp_enabled
             }
         except Exception as e:
-            print(f"⚠️ WhatsApp Cloud send-receipt failed, falling back to link: {e}")
-            cloud_error = str(e)
-    else:
-        cloud_error = "cloud_not_configured"
-    
-    # Fallback: Generate WhatsApp link
-    whatsapp_link = f"https://wa.me/{phone_clean}?text={encoded_message}"
+            print(f"WA Cloud send-receipt failed: {e}")
+            return {
+                "success": False,
+                "message": "WhatsApp Cloud send failed",
+                "whatsapp_sent": False,
+                "whatsapp_mode": "cloud",
+                "whatsapp_error": str(e),
+                "phone_number": phone,
+                "order_id": order_id,
+                "whatsapp_enabled": whatsapp_enabled
+            }
+
     return {
-        "success": True,
-        "message": "WhatsApp receipt link generated",
-        "whatsapp_link": whatsapp_link,
+        "success": False,
+        "message": "WhatsApp Cloud API not configured",
         "whatsapp_sent": False,
-        "whatsapp_mode": "link",
-        "whatsapp_error": cloud_error,
+        "whatsapp_mode": "cloud",
+        "whatsapp_error": "cloud_not_configured",
         "phone_number": phone,
         "order_id": order_id,
         "whatsapp_enabled": whatsapp_enabled
     }
-
 
 @api_router.get("/whatsapp/settings")
 async def get_whatsapp_settings(current_user: dict = Depends(get_current_user)):
@@ -9561,7 +9536,7 @@ async def send_status_via_cloud_api(
     user_org_id = get_secure_org_id(current_user)
     order = await db.orders.find_one(
         {"id": order_id, "organization_id": user_org_id},
-        {"_id": 0, "tracking_token": 1}
+        {"_id": 0, "tracking_token": 1, "total": 1, "customer_name": 1, "id": 1}
     )
     
     tracking_url = None
@@ -9569,18 +9544,18 @@ async def send_status_via_cloud_api(
         tracking_url = f"{frontend_url}/track/{order['tracking_token']}"
     
     try:
-        result = await send_whatsapp_status(
-            phone=phone_number,
-            order_id=order_id,
+        result = await send_whatsapp_status_or_link(
+            customer_phone=phone_number,
             status=status,
-            restaurant_name=restaurant_name,
-            tracking_url=tracking_url
+            order=order or {"id": order_id},
+            business=business,
+            frontend_origin=frontend_url
         )
         
         return {
             "success": True,
             "message": "Status update sent via WhatsApp",
-            "message_id": result.get("messages", [{}])[0].get("id"),
+            "message_id": result.get("messages", [{}])[0].get("id") if isinstance(result, dict) else None,
             "phone_number": phone_number,
             "status": status
         }
@@ -9965,9 +9940,6 @@ async def create_customer_order(order_data: CustomerOrderCreate):
     
     # Generate WhatsApp notification
     whatsapp_link = None
-    if business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed"):
-        message = get_status_message("pending", doc, business, frontend_url)
-        whatsapp_link = generate_whatsapp_notification(order_data.customer_phone, message)
     
     tracking_url = f"{frontend_url}/track/{tracking_token}" if frontend_url else ""
     

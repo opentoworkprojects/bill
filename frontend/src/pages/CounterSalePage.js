@@ -1122,7 +1122,7 @@ const CounterSalePage = ({ user }) => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">Phone Number</label>
+              <label className="text-sm font-medium text-gray-700 block mb-2">Phone number (to receive bill and order updates on WhatsApp).</label>
               <Input
                 ref={customerPhoneRef}
                 value={customerPhone}

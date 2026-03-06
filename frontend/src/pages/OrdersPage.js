@@ -2463,8 +2463,7 @@ const OrdersPage = ({ user }) => {
                       <div>
                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                           <span className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs">📱</span>
-                          Phone Number
-                          <span className="text-xs text-gray-400 font-normal">(for WhatsApp)</span>
+                          Phone number (to receive bill and order updates on WhatsApp).
                         </label>
                         <Input
                           value={formData.customer_phone}
