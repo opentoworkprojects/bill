@@ -3050,7 +3050,7 @@ const handleWhatsappShare = async () => {
                   />
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Phone number (to receive bill and order updates on WhatsApp).</Label>
+                  <Label className="text-sm font-medium">Mobile number (to receive your bill and order updates on WhatsApp).</Label>
                   <Input 
                     placeholder="+91 9876543210" 
                     value={customerPhone} 

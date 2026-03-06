@@ -4918,6 +4918,115 @@ def generate_whatsapp_notification(phone: str, message: str) -> str:
     return f"https://wa.me/{phone_clean}?text={encoded_message}"
 
 
+def normalize_phone_e164(phone: str) -> str:
+    """Normalize phone number to E.164 digits (no leading +). Defaults to India if 10 digits."""
+    if not phone:
+        return ""
+    cleaned = "".join(c for c in str(phone) if c.isdigit())
+    if len(cleaned) == 10:
+        cleaned = "91" + cleaned
+    elif len(cleaned) == 11 and cleaned.startswith("0"):
+        cleaned = "91" + cleaned[1:]
+    return cleaned
+
+
+async def ensure_customer_implicit_opt_in(
+    user_org_id: str,
+    customer_phone: str,
+    customer_name: Optional[str] = None
+) -> None:
+    """Upsert customer and mark WhatsApp implicit consent for billing-triggered messages."""
+    if not customer_phone:
+        return
+    try:
+        existing = await db.customers.find_one(
+            {"phone": customer_phone, "organization_id": user_org_id},
+            {"_id": 0, "whatsapp_opt_in": 1}
+        )
+        if existing and existing.get("whatsapp_opt_in") == "explicit":
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        update = {
+            "$set": {
+                "phone": customer_phone,
+                "organization_id": user_org_id,
+                "whatsapp_opt_in": "implicit",
+                "whatsapp_opt_in_at": now_iso,
+                "whatsapp_opt_in_source": "billing"
+            },
+            "$setOnInsert": {
+                "id": str(uuid.uuid4()),
+                "created_at": now_iso,
+                "total_orders": 0,
+                "total_spent": 0.0
+            }
+        }
+        if customer_name:
+            update["$set"]["name"] = customer_name
+        await db.customers.update_one(
+            {"phone": customer_phone, "organization_id": user_org_id},
+            update,
+            upsert=True
+        )
+        if _WHATSAPP_CONSENT_AVAILABLE:
+            try:
+                consent_manager = get_consent_manager(db)
+                await consent_manager.opt_in_customer(
+                    organization_id=user_org_id,
+                    phone_number=customer_phone,
+                    channel="billing-implicit",
+                    metadata={
+                        "opted_in_at_billing": now_iso,
+                        "source": "billing"
+                    }
+                )
+            except Exception as consent_err:
+                print(f"⚠️ Consent manager opt-in failed for {customer_phone}: {consent_err}")
+    except Exception as e:
+        print(f"⚠️ Failed to set implicit WhatsApp opt-in for {customer_phone}: {e}")
+
+
+async def send_whatsapp_receipt_auto(
+    customer_phone: str,
+    order: dict,
+    business: dict,
+    user_org_id: str
+) -> dict:
+    """Send receipt via approved WhatsApp template with logging and consent checks."""
+    if not customer_phone:
+        return {"whatsapp_sent": False, "whatsapp_error": "missing_phone"}
+
+    if not (_WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured()):
+        return {"whatsapp_sent": False, "whatsapp_error": "cloud_not_configured"}
+
+    try:
+        if _WHATSAPP_CONSENT_AVAILABLE:
+            try:
+                consent_manager = get_consent_manager(db)
+                has_consent = await consent_manager.check_consent(user_org_id, customer_phone)
+                if not has_consent:
+                    return {"whatsapp_sent": False, "whatsapp_error": "no_consent"}
+            except Exception as consent_err:
+                print(f"⚠️ Consent check failed, continuing cautiously: {consent_err}")
+
+        cleaned_phone = normalize_phone_e164(customer_phone)
+        template_name = whatsapp_api.get_bill_template_name()
+        customer_name = (order.get("customer_name") or "Customer")
+        order_id_short = str(order.get("id", ""))[:8].upper()
+        currency = (business or {}).get("currency", "INR")
+        amount = f"{currency} {order.get('total', 0):.2f}"
+        template_params = [customer_name, order_id_short, amount]
+
+        result = await send_whatsapp_receipt_cloud(cleaned_phone, order, business)
+        msg_id = result.get("messages", [{}])[0].get("id", "")
+        print(f"✅ WA receipt sent | to={cleaned_phone} | template={template_name} | params={template_params} | status=sent | msg_id={msg_id}")
+        return {"whatsapp_sent": True, "whatsapp_mode": "cloud", "whatsapp_error": None, "message_id": msg_id}
+    except Exception as e:
+        print(f"❌ WA receipt failed | to={customer_phone} | status=failed | error={e}")
+        return {"whatsapp_sent": False, "whatsapp_error": str(e)}
+
+
 async def send_whatsapp_status_or_link(
     customer_phone: str,
     status: str,
@@ -4940,23 +5049,23 @@ async def send_whatsapp_status_or_link(
         if not status_template:
             return {"whatsapp_sent": False, "whatsapp_error": f"template_missing:{status}"}
 
-        customer_name = (order.get("customer_name") or "Customer")
+        restaurant_name = (business or {}).get("restaurant_name", "Restaurant")
         order_id = str(order.get("id", ""))[:8].upper()
-        total = order.get("total", 0)
-        currency = (business or {}).get("currency", "INR")
-        amount = f"{currency} {total:.2f}"
+        template_params = [restaurant_name, order_id]
 
-        await whatsapp_api.send_template_message(
-            customer_phone,
-            status_template,
-            [customer_name, order_id, amount],
-            whatsapp_api.template_lang
+        cleaned_phone = normalize_phone_e164(customer_phone)
+        await send_whatsapp_status(
+            cleaned_phone,
+            order_id,
+            status,
+            restaurant_name,
+            None
         )
-        print(f"WA template sent | to={customer_phone} | status={status} | template={status_template}")
+        print(f"✅ WA status sent | to={cleaned_phone} | status={status} | template={status_template} | params={template_params} | status=sent")
 
         return {"whatsapp_sent": True, "whatsapp_mode": "cloud", "whatsapp_error": None}
     except Exception as e:
-        print(f"WA status failed | to={customer_phone} | status={status} | error={e}")
+        print(f"❌ WA status failed | to={customer_phone} | status={status} | status=failed | error={e}")
         return {"whatsapp_sent": False, "whatsapp_error": str(e)}
 
 def get_status_message(status: str, order: dict, business: dict, frontend_url: str = "") -> str:
@@ -5031,6 +5140,7 @@ async def create_order(
     if getattr(order_data, 'quick_billing', False):
         user_org_id = get_secure_org_id(current_user)
         business = current_user.get("business_settings") or {}
+        business = current_user.get("business_settings") or {}
         tax_rate_setting = business.get("tax_rate")
         tax_rate = (tax_rate_setting if tax_rate_setting is not None else 5.0) / 100
         
@@ -5067,6 +5177,14 @@ async def create_order(
         doc["updated_at"] = doc["updated_at"].isoformat()
 
         await db.orders.insert_one(doc)
+
+        # Store implicit WhatsApp consent on customer record (billing flow)
+        if order_data.customer_phone:
+            await ensure_customer_implicit_opt_in(
+                user_org_id,
+                order_data.customer_phone,
+                order_data.customer_name or "Quick Sale"
+            )
         
         # Async cache invalidation (don't wait)
         try:
@@ -5075,6 +5193,15 @@ async def create_order(
         except:
             pass
         
+        # Auto-send receipt for quick billing (completed immediately)
+        if order_data.customer_phone and business.get("whatsapp_enabled", False):
+            await send_whatsapp_receipt_auto(
+                order_data.customer_phone,
+                doc,
+                business,
+                user_org_id
+            )
+
         return order_obj
     
     # NORMAL PATH - Full validation and logic
@@ -5216,6 +5343,14 @@ async def create_order(
                 # Return the updated order
                 updated_order = await db.orders.find_one({"id": existing_order["id"]}, {"_id": 0})
                 
+                # Store implicit WhatsApp consent on customer record (billing flow)
+                if order_data.customer_phone:
+                    await ensure_customer_implicit_opt_in(
+                        user_org_id,
+                        order_data.customer_phone,
+                        order_data.customer_name
+                    )
+
                 # Generate WhatsApp notification if enabled
                 whatsapp_link = None
                 frontend_url = order_data.frontend_origin or ""
@@ -5286,6 +5421,14 @@ async def create_order(
     doc["updated_at"] = doc["updated_at"].isoformat()
 
     await db.orders.insert_one(doc)
+
+    # Store implicit WhatsApp consent on customer record (billing flow)
+    if order_data.customer_phone:
+        await ensure_customer_implicit_opt_in(
+            user_org_id,
+            order_data.customer_phone,
+            order_data.customer_name
+        )
     
     # Invalidate Redis cache for active orders
     try:
@@ -5985,25 +6128,27 @@ async def update_order_status(
                     # Customer has consent - send status update via WhatsApp Cloud API
                     if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
                         try:
-                            # Determine which template to use based on status
                             template_name = whatsapp_api.get_status_template_name(status)
                             if template_name:
                                 restaurant_name = business.get("restaurant_name", "Our Restaurant")
                                 order_id_short = str(order_id)[:8].upper()
-                                
-                                result = await whatsapp_api.send_template_message(
-                                    customer_phone,
-                                    template_name,
-                                    [restaurant_name, order_id_short],
-                                    whatsapp_api.template_lang
+                                cleaned_phone = normalize_phone_e164(customer_phone)
+                                template_params = [restaurant_name, order_id_short]
+
+                                result = await send_whatsapp_status(
+                                    cleaned_phone,
+                                    order_id_short,
+                                    status,
+                                    restaurant_name,
+                                    None
                                 )
-                                
+
                                 msg_id = result.get("messages", [{}])[0].get("id", "")
                                 if msg_id:
                                     # Record message sent in consent tracker
                                     await consent_manager.record_message_sent(user_org_id, customer_phone, msg_id)
                                     whatsapp_sent = True
-                                    print(f"✅ STATUS UPDATE SENT via WhatsApp: {status} to {customer_phone} (msg_id: {msg_id})")
+                                    print(f"✅ WA status sent | to={cleaned_phone} | status={status} | template={template_name} | params={template_params} | status=sent | msg_id={msg_id}")
                             else:
                                 print(f"⚠️ No WhatsApp template configured for status '{status}'")
                                 whatsapp_error = f"No template for status {status}"
@@ -6167,6 +6312,33 @@ async def update_order(
                     print(f"🗑️ Cache invalidated for completed order update {order_id}")
                 except Exception as e:
                     print(f"⚠️ Cache invalidation error: {e}")
+
+                # Store implicit WhatsApp consent on customer record (billing flow)
+                completed_phone = update_data.get("customer_phone") or existing_order.get("customer_phone")
+                completed_name = update_data.get("customer_name") or existing_order.get("customer_name")
+                if completed_phone:
+                    await ensure_customer_implicit_opt_in(
+                        user_org_id,
+                        completed_phone,
+                        completed_name
+                    )
+
+                # Auto-send WhatsApp receipt after billing completion
+                try:
+                    if completed_phone and business.get("whatsapp_enabled", False):
+                        updated_order = await db.orders.find_one(
+                            {"id": order_id, "organization_id": user_org_id},
+                            {"_id": 0}
+                        )
+                        if updated_order:
+                            await send_whatsapp_receipt_auto(
+                                completed_phone,
+                                updated_order,
+                                business,
+                                user_org_id
+                            )
+                except Exception as wa_err:
+                    print(f"⚠️ WhatsApp receipt auto-send failed for order {order_id}: {wa_err}")
                 
                 return {"message": "Order completed and table cleared successfully"}
                 
@@ -6456,6 +6628,35 @@ async def update_order(
                             print(f"🍽️ Table freed via fallback for completed payment: {table_id}")
                         except Exception as fallback_error:
                             print(f"⚠️ Table clearing fallback error: {fallback_error}")
+
+            # Store implicit WhatsApp consent on customer record (billing flow)
+            updated_phone = update_data.get("customer_phone") or existing_order.get("customer_phone")
+            updated_name = update_data.get("customer_name") or existing_order.get("customer_name")
+            if updated_phone:
+                await ensure_customer_implicit_opt_in(
+                    user_org_id,
+                    updated_phone,
+                    updated_name
+                )
+
+            # Auto-send WhatsApp receipt after billing completion
+            try:
+                new_status = update_data.get("status", existing_order.get("status"))
+                is_fully_paid = (update_data.get("balance_amount", calculated_balance) == 0 and not is_credit)
+                if updated_phone and business.get("whatsapp_enabled", False) and (new_status in ["completed", "paid", "settled"] or is_fully_paid):
+                    updated_order = await db.orders.find_one(
+                        {"id": order_id, "organization_id": user_org_id},
+                        {"_id": 0}
+                    )
+                    if updated_order:
+                        await send_whatsapp_receipt_auto(
+                            updated_phone,
+                            updated_order,
+                            business,
+                            user_org_id
+                        )
+            except Exception as wa_err:
+                print(f"⚠️ WhatsApp receipt auto-send failed for order {order_id}: {wa_err}")
             
             return {"message": "Order updated successfully"}
 
