@@ -151,18 +151,16 @@ class WhatsAppCloudAPI:
             "type": "body",
             "parameters": [{"type": "text", "text": str(p)} for p in params]
         }]
-        
+
         # Build template object
+        # NOTE: Category is set when creating the template in Meta Business Manager,
+        # NOT when sending the message. The API does not accept "category" parameter.
         template_obj = {
             "name": template_name,
             "language": {"code": language},
             "components": components
         }
-        
-        # Add category parameter for utility templates to bypass 24-hour window
-        if self._is_utility_template(template_name):
-            template_obj["category"] = "UTILITY"
-        
+
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -170,24 +168,25 @@ class WhatsAppCloudAPI:
             "type": "template",
             "template": template_obj
         }
-        
+
         # Implement retry logic with exponential backoff
         last_error = None
         for attempt in range(self.MAX_RETRY_ATTEMPTS):
             try:
                 result = await self._post(payload)
                 msg_id = result.get("messages", [{}])[0].get("id", "")
-                
+
                 # Enhanced logging
-                category = template_obj.get("category", "STANDARD")
-                print(f"✅ WA template sent | to={phone} | template={template_name} | category={category} | msg_id={msg_id}")
-                
+                is_utility = self._is_utility_template(template_name)
+                category_label = "UTILITY" if is_utility else "STANDARD"
+                print(f"✅ WA template sent | to={phone} | template={template_name} | category={category_label} | msg_id={msg_id}")
+
                 return result
-                
+
             except Exception as e:
                 error_msg = str(e)
                 last_error = e
-                
+
                 # Try to parse error response for classification
                 error_response = {}
                 try:
@@ -197,24 +196,25 @@ class WhatsAppCloudAPI:
                         error_response = json.loads(json_str)
                 except:
                     pass
-                
+
                 # Classify error
                 classification = self._classify_error(error_response)
                 error_code = classification.get("code")
                 is_retryable = classification.get("is_retryable")
-                
+
                 # Enhanced error logging
-                category = template_obj.get("category", "STANDARD")
-                print(f"❌ WA template failed | to={phone} | template={template_name} | category={category} | "
+                is_utility = self._is_utility_template(template_name)
+                category_label = "UTILITY" if is_utility else "STANDARD"
+                print(f"❌ WA template failed | to={phone} | template={template_name} | category={category_label} | "
                       f"error_code={error_code} | attempt={attempt + 1}/{self.MAX_RETRY_ATTEMPTS} | "
                       f"retryable={is_retryable} | error={error_msg}")
-                
+
                 # Check if error is retryable
                 if not is_retryable:
                     # Permanent failure - don't retry
                     print(f"⚠️ Permanent failure detected (error_code={error_code}), not retrying")
                     raise
-                
+
                 # Check if we have more attempts
                 if attempt < self.MAX_RETRY_ATTEMPTS - 1:
                     # Wait before retry with exponential backoff
@@ -225,11 +225,12 @@ class WhatsAppCloudAPI:
                     # Max retries reached
                     print(f"❌ Max retries ({self.MAX_RETRY_ATTEMPTS}) reached, giving up")
                     raise
-        
+
         # Should not reach here, but just in case
         if last_error:
             raise last_error
         raise Exception("Unknown error in send_template_message")
+
 
     async def send_receipt(self, to_phone: str, order: Dict[str, Any], business: Dict[str, Any]) -> Dict[str, Any]:
         """Send receipt using approved template only."""
