@@ -6,11 +6,31 @@ No wa.me redirects. Cloud API only.
 
 import os
 import httpx
+import asyncio
+import json
 from typing import Optional, Dict, Any
 
 
 class WhatsAppCloudAPI:
     """Lightweight async WhatsApp Cloud API client using httpx."""
+
+    # Template category mapping for WhatsApp Cloud API
+    # UTILITY templates bypass the 24-hour messaging window restriction
+    UTILITY_TEMPLATES = {
+        "bill_confirmation",
+        "payment_receipt",
+        "order_preparing",
+        "order_ready"
+    }
+    
+    # Error codes for classification
+    ERROR_CODE_WINDOW_RESTRICTION = {131047, 131026}  # 24-hour window restriction
+    ERROR_CODE_INVALID_TEMPLATE = {131031}  # Invalid template
+    ERROR_CODE_RATE_LIMIT = {131051}  # Rate limit exceeded
+    
+    # Retry configuration
+    MAX_RETRY_ATTEMPTS = 3
+    RETRY_DELAYS = [1.0, 2.0, 4.0]  # Exponential backoff: 1s, 2s, 4s
 
     def __init__(self):
         self.phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
@@ -57,6 +77,36 @@ class WhatsAppCloudAPI:
             cleaned = "91" + cleaned[1:]
         return cleaned
 
+    def _is_utility_template(self, template_name: str) -> bool:
+        """Check if template is a utility template that bypasses 24-hour window."""
+        return template_name in self.UTILITY_TEMPLATES
+
+    def _classify_error(self, error_response: dict) -> Dict[str, Any]:
+        """Classify WhatsApp API error and determine if it's retryable."""
+        error_data = error_response.get("error", {})
+        error_code = error_data.get("code")
+        error_message = error_data.get("message", "")
+        
+        classification = {
+            "code": error_code,
+            "message": error_message,
+            "is_window_restriction": error_code in self.ERROR_CODE_WINDOW_RESTRICTION,
+            "is_invalid_template": error_code in self.ERROR_CODE_INVALID_TEMPLATE,
+            "is_rate_limit": error_code in self.ERROR_CODE_RATE_LIMIT,
+            "is_retryable": False
+        }
+        
+        # Determine if error is retryable
+        # Retry on rate limits and transient failures, but NOT on permanent failures
+        if error_code in self.ERROR_CODE_RATE_LIMIT:
+            classification["is_retryable"] = True
+        elif error_code in self.ERROR_CODE_WINDOW_RESTRICTION:
+            classification["is_retryable"] = False  # Permanent failure
+        elif error_code in self.ERROR_CODE_INVALID_TEMPLATE:
+            classification["is_retryable"] = False  # Permanent failure
+        
+        return classification
+
     async def _post(self, payload: dict) -> dict:
         """Execute POST to WhatsApp Cloud API."""
         url = f"{self.base_url}/{self.phone_number_id}/messages"
@@ -101,21 +151,85 @@ class WhatsAppCloudAPI:
             "type": "body",
             "parameters": [{"type": "text", "text": str(p)} for p in params]
         }]
+        
+        # Build template object
+        template_obj = {
+            "name": template_name,
+            "language": {"code": language},
+            "components": components
+        }
+        
+        # Add category parameter for utility templates to bypass 24-hour window
+        if self._is_utility_template(template_name):
+            template_obj["category"] = "UTILITY"
+        
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": phone,
             "type": "template",
-            "template": {
-                "name": template_name,
-                "language": {"code": language},
-                "components": components
-            }
+            "template": template_obj
         }
-        result = await self._post(payload)
-        msg_id = result.get("messages", [{}])[0].get("id", "")
-        print(f"✅ WA template sent | to={phone} | template={template_name} | msg_id={msg_id}")
-        return result
+        
+        # Implement retry logic with exponential backoff
+        last_error = None
+        for attempt in range(self.MAX_RETRY_ATTEMPTS):
+            try:
+                result = await self._post(payload)
+                msg_id = result.get("messages", [{}])[0].get("id", "")
+                
+                # Enhanced logging
+                category = template_obj.get("category", "STANDARD")
+                print(f"✅ WA template sent | to={phone} | template={template_name} | category={category} | msg_id={msg_id}")
+                
+                return result
+                
+            except Exception as e:
+                error_msg = str(e)
+                last_error = e
+                
+                # Try to parse error response for classification
+                error_response = {}
+                try:
+                    # Extract JSON from error message if present
+                    if "WhatsApp API error:" in error_msg:
+                        json_str = error_msg.replace("WhatsApp API error:", "").strip()
+                        error_response = json.loads(json_str)
+                except:
+                    pass
+                
+                # Classify error
+                classification = self._classify_error(error_response)
+                error_code = classification.get("code")
+                is_retryable = classification.get("is_retryable")
+                
+                # Enhanced error logging
+                category = template_obj.get("category", "STANDARD")
+                print(f"❌ WA template failed | to={phone} | template={template_name} | category={category} | "
+                      f"error_code={error_code} | attempt={attempt + 1}/{self.MAX_RETRY_ATTEMPTS} | "
+                      f"retryable={is_retryable} | error={error_msg}")
+                
+                # Check if error is retryable
+                if not is_retryable:
+                    # Permanent failure - don't retry
+                    print(f"⚠️ Permanent failure detected (error_code={error_code}), not retrying")
+                    raise
+                
+                # Check if we have more attempts
+                if attempt < self.MAX_RETRY_ATTEMPTS - 1:
+                    # Wait before retry with exponential backoff
+                    delay = self.RETRY_DELAYS[attempt]
+                    print(f"⏳ Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                else:
+                    # Max retries reached
+                    print(f"❌ Max retries ({self.MAX_RETRY_ATTEMPTS}) reached, giving up")
+                    raise
+        
+        # Should not reach here, but just in case
+        if last_error:
+            raise last_error
+        raise Exception("Unknown error in send_template_message")
 
     async def send_receipt(self, to_phone: str, order: Dict[str, Any], business: Dict[str, Any]) -> Dict[str, Any]:
         """Send receipt using approved template only."""
