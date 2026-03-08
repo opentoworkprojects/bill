@@ -1687,15 +1687,27 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 
+async def get_trial_days_config() -> int:
+    """Get trial_days from pricing_config, with fallback to default"""
+    try:
+        config = await db.pricing_config.find_one({"id": "default_pricing"})
+        if config:
+            return config.get("trial_days", 7)
+    except Exception as e:
+        print(f"⚠️ Failed to fetch trial_days config: {e}")
+    return 7  # Fallback to default
+
+
 async def check_subscription(user: dict):
     """
-    Strict trial enforcement with extension support
-    - Trial: 7 days from account creation + any extension days
-    - After trial: Must have active paid subscription
-    - No bill count limit during trial
+    Strict trial enforcement with extension support and bill count limit
+    - Trial: configurable trial_days from pricing_config + any extension days
+    - Bill limit: 50 bills maximum during trial period
+    - After trial OR bill limit: Must have active paid subscription
     - Staff users: Check their own subscription first, then fall back to admin's
+    - Returns: dict with allowed, reason, bill_count, trial_days_remaining
     """
-    
+
     # For staff users, check their own subscription first
     if user.get("role") in ["waiter", "cashier", "kitchen", "staff"]:
         # First check if staff has their own active subscription
@@ -1707,26 +1719,26 @@ async def check_subscription(user: dict):
                         expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
                     except:
                         expires_at = None
-                
+
                 if expires_at and expires_at >= datetime.now(timezone.utc):
                     # Staff has their own active subscription
-                    return True
-        
+                    return {"allowed": True, "reason": "active_subscription", "bill_count": user.get("bill_count", 0), "trial_days_remaining": 0}
+
         # Staff doesn't have own subscription, check organization admin's subscription
         org_id = user.get("organization_id")
         if org_id:
             # Find the admin of this organization
             admin_user = await db.users.find_one(
-                {"id": org_id, "role": "admin"}, 
-                {"_id": 0, "subscription_active": 1, "subscription_expires_at": 1, "created_at": 1, "trial_extension_days": 1}
+                {"id": org_id, "role": "admin"},
+                {"_id": 0, "subscription_active": 1, "subscription_expires_at": 1, "created_at": 1, "trial_extension_days": 1, "bill_count": 1}
             )
             if admin_user:
                 # Use admin's subscription status for trial/subscription check
                 user = admin_user
             else:
                 # If no admin found, block access
-                return False
-    
+                return {"allowed": False, "reason": "no_admin_found", "bill_count": 0, "trial_days_remaining": 0}
+
     # Check if user has active paid subscription
     if user.get("subscription_active"):
         # Check if subscription has expired
@@ -1737,42 +1749,58 @@ async def check_subscription(user: dict):
                     expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
                 except:
                     expires_at = None
-            
+
             if expires_at and expires_at < datetime.now(timezone.utc):
                 # Subscription expired - deactivate it
                 await db.users.update_one(
-                    {"id": user["id"]}, 
+                    {"id": user["id"]},
                     {"$set": {"subscription_active": False}}
                 )
                 # Fall through to check trial
             else:
                 # Active subscription - allow access
-                return True
-    
-    # No active subscription - check trial period
+                return {"allowed": True, "reason": "active_subscription", "bill_count": user.get("bill_count", 0), "trial_days_remaining": 0}
+
+    # No active subscription - check trial period AND bill count limit
+    bill_count = user.get("bill_count", 0)
     created_at = user.get("created_at")
     if isinstance(created_at, str):
         try:
             created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
         except:
             created_at = None
-    
+
     if created_at:
-        # Base trial is 7 days + any extension days granted by admin
+        # Get configurable trial days + any extension days granted by admin
+        trial_days = await get_trial_days_config()
         trial_extension_days = user.get("trial_extension_days", 0)
-        total_trial_days = 7 + trial_extension_days
+        total_trial_days = trial_days + trial_extension_days
         trial_end = created_at + timedelta(days=total_trial_days)
         now = datetime.now(timezone.utc)
-        
-        if now < trial_end:
-            # Still in trial period - allow access
-            return True
+
+        trial_days_remaining = (trial_end - now).days
+        trial_expired = now >= trial_end
+        bill_limit_reached = bill_count >= 50
+
+        # Check both conditions: trial period AND bill count
+        if trial_expired and bill_limit_reached:
+            # Both limits exceeded
+            return {"allowed": False, "reason": "both_limits_exceeded", "bill_count": bill_count, "trial_days_remaining": trial_days_remaining}
+        elif trial_expired:
+            # Trial period expired
+            return {"allowed": False, "reason": "trial_expired", "bill_count": bill_count, "trial_days_remaining": trial_days_remaining}
+        elif bill_limit_reached:
+            # Bill count limit reached
+            return {"allowed": False, "reason": "bill_limit_reached", "bill_count": bill_count, "trial_days_remaining": trial_days_remaining}
         else:
-            # Trial expired and no active subscription - block access
-            return False
-    
+            # Still in trial period AND under bill limit - allow access
+            return {"allowed": True, "reason": "trial_active", "bill_count": bill_count, "trial_days_remaining": trial_days_remaining}
+
     # No created_at date (shouldn't happen) - block access for safety
-    return False
+    return {"allowed": False, "reason": "no_created_at", "bill_count": bill_count, "trial_days_remaining": 0}
+
+
+
 
 
 def get_paper_width_chars(paper_width: str, custom_width: Optional[int] = None) -> int:
@@ -3692,25 +3720,33 @@ async def get_current_subscription_price():
 
 @api_router.get("/subscription/status")
 async def get_subscription_status(current_user: dict = Depends(get_current_user)):
-    is_active = await check_subscription(current_user)
+    subscription_status = await check_subscription(current_user)
+    
+    # Extract values from new dict return type
+    is_active = subscription_status["allowed"]
+    bill_count = subscription_status["bill_count"]
+    trial_days_left = max(0, subscription_status["trial_days_remaining"])
     
     # Check trial status
     created_at = current_user.get("created_at")
     if isinstance(created_at, str):
         created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
     
-    trial_end = created_at + timedelta(days=TRIAL_DAYS) if created_at else None
-    is_trial = trial_end and datetime.now(timezone.utc) < trial_end if trial_end else False
-    trial_days_left = max(0, (trial_end - datetime.now(timezone.utc)).days) if trial_end else 0
+    # Get configurable trial days
+    trial_days = await get_trial_days_config()
+    trial_extension_days = current_user.get("trial_extension_days", 0)
+    total_trial_days = trial_days + trial_extension_days
+    
+    trial_end = created_at + timedelta(days=total_trial_days) if created_at else None
+    is_trial = subscription_status["reason"] in ["trial_active", "trial_expired"]
     
     # Get current pricing (with campaign if active)
     pricing = await get_current_subscription_price()
     
     return {
         "subscription_active": current_user.get("subscription_active", False),
-        "bill_count": current_user.get("bill_count", 0),
-        "needs_subscription": not is_trial and current_user.get("bill_count", 0) >= 50
-        and not current_user.get("subscription_active", False),
+        "bill_count": bill_count,
+        "needs_subscription": not is_active,
         "subscription_expires_at": current_user.get("subscription_expires_at"),
         "is_trial": is_trial,
         "trial_days_left": trial_days_left,
@@ -5138,7 +5174,25 @@ We hope to see you again soon! 🙏
 async def create_order(
     order_data: OrderCreate, current_user: dict = Depends(get_current_user)
 ):
-    # 🚀 ULTRA-FAST PATH FOR QUICK BILLING - Skip all checks
+    # 🔒 SUBSCRIPTION VALIDATION - Check before processing any order
+    subscription_status = await check_subscription(current_user)
+    if not subscription_status["allowed"]:
+        # Get trial days for error message
+        trial_days = await get_trial_days_config()
+        
+        # Generate appropriate error message based on failure reason
+        if subscription_status["reason"] == "trial_expired":
+            detail = f"Your {trial_days}-day free trial has expired. Please subscribe to continue."
+        elif subscription_status["reason"] == "bill_limit_reached":
+            detail = "You have reached the 50 bill limit for your free trial. Please subscribe to continue."
+        elif subscription_status["reason"] == "both_limits_exceeded":
+            detail = "Your free trial has expired and you've reached the bill limit. Please subscribe to continue."
+        else:
+            detail = "Subscription required. Please subscribe to continue using BillByteKOT."
+        
+        raise HTTPException(status_code=402, detail=detail)
+    
+    # 🚀 ULTRA-FAST PATH FOR QUICK BILLING - Skip duplicate/consolidation checks (but NOT subscription)
     if getattr(order_data, 'quick_billing', False):
         user_org_id = get_secure_org_id(current_user)
         business = current_user.get("business_settings") or {}
@@ -5206,26 +5260,8 @@ async def create_order(
 
         return order_obj
     
-    # NORMAL PATH - Full validation and logic
-    if not await check_subscription(current_user):
-        # Check if trial expired or subscription expired
-        created_at = current_user.get("created_at")
-        if isinstance(created_at, str):
-            try:
-                created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                trial_end = created_at + timedelta(days=7)
-                if datetime.now(timezone.utc) > trial_end:
-                    raise HTTPException(
-                        status_code=402,
-                        detail="Your 7-day free trial has expired. Please subscribe to continue using BillByteKOT. Only ₹999/year for unlimited bills!",
-                    )
-            except:
-                pass
-        
-        raise HTTPException(
-            status_code=402,
-            detail="Subscription required. Please subscribe to continue using BillByteKOT.",
-        )
+    # NORMAL PATH - Full validation and logic (already validated above, this is redundant now)
+    # The subscription check at the beginning of the function handles all paths
 
     # Get user's organization_id
     user_org_id = get_secure_org_id(current_user)
@@ -10147,6 +10183,15 @@ async def create_customer_order(order_data: CustomerOrderCreate):
     admin = await db.users.find_one({"id": order_data.org_id}, {"_id": 0})
     if not admin:
         raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    # 🔒 SUBSCRIPTION VALIDATION - Check restaurant owner's subscription
+    subscription_status = await check_subscription(admin)
+    if not subscription_status["allowed"]:
+        # Restaurant owner's subscription is invalid - reject customer order
+        raise HTTPException(
+            status_code=402, 
+            detail="This restaurant's subscription has expired. Please contact the restaurant directly."
+        )
     
     business = admin.get("business_settings", {})
     if not business.get("customer_self_order_enabled"):
