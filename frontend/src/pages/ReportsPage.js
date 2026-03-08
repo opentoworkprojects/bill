@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+﻿import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { API } from "../App";
 import Layout from "../components/Layout";
@@ -101,6 +101,15 @@ const ReportsPage = ({ user }) => {
         end_date: end.toISOString().split("T")[0] 
       };
     },
+    fifteenDays: () => {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 15);
+      return {
+        start_date: start.toISOString().split("T")[0],
+        end_date: end.toISOString().split("T")[0]
+      };
+    },
     month: () => {
       const end = new Date();
       const start = new Date();
@@ -133,6 +142,11 @@ const ReportsPage = ({ user }) => {
     setActivePreset(preset);
     setDateRange(datePresets[preset]());
   }, [datePresets]);
+
+  const reportOrdersTotal = useMemo(
+    () => reportOrders.reduce((sum, order) => sum + (Number(order?.total) || 0), 0),
+    [reportOrders]
+  );
 
   const fetchReportOrders = useCallback(async () => {
     setReportOrdersLoading(true);
@@ -370,7 +384,7 @@ const ReportsPage = ({ user }) => {
         if (showToast) {
           toast.error("Customer balance endpoint not found. Please check backend.");
         }
-        console.log("💡 Backend endpoint /reports/customer-balances not found");
+        console.log("?? Backend endpoint /reports/customer-balances not found");
       } else if (error.response?.status === 401) {
         if (showToast) {
           toast.error("Authentication required for customer balances");
@@ -383,11 +397,11 @@ const ReportsPage = ({ user }) => {
         if (showToast) {
           toast.error("Cannot connect to backend server");
         }
-        console.log("💡 Backend server might not be running");
+        console.log("?? Backend server might not be running");
         
         // Optional: Load mock data for testing
         if (process.env.NODE_ENV === 'development') {
-          console.log("🎭 Loading mock data for development testing...");
+          console.log("?? Loading mock data for development testing...");
           const mockData = [
             {
               customer_name: "John Doe",
@@ -636,16 +650,16 @@ const ReportsPage = ({ user }) => {
           </head>
           <body>
             <div class="header">
-              <h1>📦 Stock Report</h1>
+              <h1>?? Stock Report</h1>
               <p>Generated: ${new Date().toLocaleString()}</p>
-              <p>Total Items: ${stockReport.totalItems} | Total Value: ₹${stockReport.totalValue.toFixed(2)}</p>
+              <p>Total Items: ${stockReport.totalItems} | Total Value: &#8377;${stockReport.totalValue.toFixed(2)}</p>
             </div>
 
             <div class="summary-grid">
               <div class="summary-card total">
                 <h4>Total Items</h4>
                 <p>${stockReport.totalItems}</p>
-                <small>₹${stockReport.totalValue.toFixed(0)} value</small>
+                <small>&#8377;${stockReport.totalValue.toFixed(0)} value</small>
               </div>
               <div class="summary-card healthy">
                 <h4>Healthy Stock</h4>
@@ -692,8 +706,8 @@ const ReportsPage = ({ user }) => {
                       <td>${item.category_name || 'N/A'}</td>
                       <td>${item.quantity || 0} ${item.unit || 'pcs'}</td>
                       <td>${item.min_quantity || 0}</td>
-                      <td>₹${(item.price_per_unit || 0).toFixed(2)}</td>
-                      <td>₹${((item.quantity || 0) * (item.price_per_unit || 0)).toFixed(2)}</td>
+                      <td>&#8377;${(item.price_per_unit || 0).toFixed(2)}</td>
+                      <td>&#8377;${((item.quantity || 0) * (item.price_per_unit || 0)).toFixed(2)}</td>
                       <td class="${statusClass}">${status}</td>
                       <td>${item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}</td>
                     </tr>
@@ -907,18 +921,18 @@ const ReportsPage = ({ user }) => {
                   <td>${order.waiter_name}</td>
                   <td>${order.customer_name || 'N/A'}</td>
                   <td>${order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</td>
-                  <td>₹${order.subtotal.toFixed(2)}</td>
-                  <td>₹${order.tax.toFixed(2)}</td>
-                  <td>₹${order.total.toFixed(2)}</td>
+                  <td>&#8377;${order.subtotal.toFixed(2)}</td>
+                  <td>&#8377;${order.tax.toFixed(2)}</td>
+                  <td>&#8377;${order.total.toFixed(2)}</td>
                   <td>${order.status}</td>
                   <td>${new Date(order.created_at).toLocaleString()}</td>
                 </tr>
               `).join('')}
               <tr class="total-row">
                 <td colspan="5">TOTALS</td>
-                <td>₹${totalSubtotal.toFixed(2)}</td>
-                <td>₹${totalTax.toFixed(2)}</td>
-                <td>₹${totalSales.toFixed(2)}</td>
+                <td>&#8377;${totalSubtotal.toFixed(2)}</td>
+                <td>&#8377;${totalTax.toFixed(2)}</td>
+                <td>&#8377;${totalSales.toFixed(2)}</td>
                 <td colspan="2"></td>
               </tr>
             </tbody>
@@ -1069,15 +1083,15 @@ const ReportsPage = ({ user }) => {
             </div>
             <div class="summary-item">
               <h3>Total Sales</h3>
-              <p>₹${totalSales.toFixed(2)}</p>
+              <p>&#8377;${totalSales.toFixed(2)}</p>
             </div>
             <div class="summary-item">
               <h3>Total Tax</h3>
-              <p>₹${totalTax.toFixed(2)}</p>
+              <p>&#8377;${totalTax.toFixed(2)}</p>
             </div>
             <div class="summary-item">
               <h3>Avg Order</h3>
-              <p>₹${(totalSales / totalOrders).toFixed(2)}</p>
+              <p>&#8377;${(totalSales / totalOrders).toFixed(2)}</p>
             </div>
           </div>
 
@@ -1104,16 +1118,16 @@ const ReportsPage = ({ user }) => {
                   <td>${order.waiter_name}</td>
                   <td>${order.customer_name || 'N/A'}</td>
                   <td>${order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</td>
-                  <td>₹${order.subtotal.toFixed(2)}</td>
-                  <td>₹${order.tax.toFixed(2)}</td>
-                  <td>₹${order.total.toFixed(2)}</td>
+                  <td>&#8377;${order.subtotal.toFixed(2)}</td>
+                  <td>&#8377;${order.tax.toFixed(2)}</td>
+                  <td>&#8377;${order.total.toFixed(2)}</td>
                 </tr>
               `).join('')}
               <tr class="total-row">
                 <td colspan="6">TOTALS</td>
-                <td>₹${totalSubtotal.toFixed(2)}</td>
-                <td>₹${totalTax.toFixed(2)}</td>
-                <td>₹${totalSales.toFixed(2)}</td>
+                <td>&#8377;${totalSubtotal.toFixed(2)}</td>
+                <td>&#8377;${totalTax.toFixed(2)}</td>
+                <td>&#8377;${totalSales.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
@@ -1267,15 +1281,15 @@ const ReportsPage = ({ user }) => {
             </div>
             <div class="summary-card">
               <h3>Total Sales</h3>
-              <p>₹${totalSales.toFixed(2)}</p>
+              <p>&#8377;${totalSales.toFixed(2)}</p>
             </div>
             <div class="summary-card">
               <h3>Total Tax</h3>
-              <p>₹${totalTax.toFixed(2)}</p>
+              <p>&#8377;${totalTax.toFixed(2)}</p>
             </div>
             <div class="summary-card">
               <h3>Avg Order</h3>
-              <p>₹${(totalSales / totalOrders).toFixed(2)}</p>
+              <p>&#8377;${(totalSales / totalOrders).toFixed(2)}</p>
             </div>
           </div>
 
@@ -1303,9 +1317,9 @@ const ReportsPage = ({ user }) => {
                   <td>${order.waiter_name}</td>
                   <td>${order.customer_name || 'N/A'}</td>
                   <td>${order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</td>
-                  <td>₹${order.subtotal.toFixed(2)}</td>
-                  <td>₹${order.tax.toFixed(2)}</td>
-                  <td><strong>₹${order.total.toFixed(2)}</strong></td>
+                  <td>&#8377;${order.subtotal.toFixed(2)}</td>
+                  <td>&#8377;${order.tax.toFixed(2)}</td>
+                  <td><strong>&#8377;${order.total.toFixed(2)}</strong></td>
                   <td>${order.status}</td>
                 </tr>
               `).join('')}
@@ -1313,9 +1327,9 @@ const ReportsPage = ({ user }) => {
             <tfoot>
               <tr style="background-color: #f3f4f6; font-weight: bold;">
                 <td colspan="6" style="text-align: right;">TOTALS:</td>
-                <td>₹${totalSubtotal.toFixed(2)}</td>
-                <td>₹${totalTax.toFixed(2)}</td>
-                <td>₹${totalSales.toFixed(2)}</td>
+                <td>&#8377;${totalSubtotal.toFixed(2)}</td>
+                <td>&#8377;${totalTax.toFixed(2)}</td>
+                <td>&#8377;${totalSales.toFixed(2)}</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -1470,7 +1484,7 @@ const ReportsPage = ({ user }) => {
         </head>
         <body>
           <div class="header">
-            <h1>📊 ${user?.business_settings?.restaurant_name || 'Restaurant'}</h1>
+            <h1>?? ${user?.business_settings?.restaurant_name || 'Restaurant'}</h1>
             <p><strong>Detailed Business Report</strong></p>
             <p>${new Date(dateRange.start_date).toLocaleDateString()} - ${new Date(dateRange.end_date).toLocaleDateString()}</p>
             <p>Generated: ${new Date().toLocaleString()}</p>
@@ -1478,11 +1492,11 @@ const ReportsPage = ({ user }) => {
 
           <!-- Summary Stats -->
           <div class="section">
-            <div class="section-title">📈 Summary Overview</div>
+            <div class="section-title">?? Summary Overview</div>
             <div class="stats-grid">
               <div class="stat-card highlight">
                 <h4>Total Revenue</h4>
-                <p>₹${totalSales.toFixed(0)}</p>
+                <p>&#8377;${totalSales.toFixed(0)}</p>
               </div>
               <div class="stat-card">
                 <h4>Total Orders</h4>
@@ -1490,11 +1504,11 @@ const ReportsPage = ({ user }) => {
               </div>
               <div class="stat-card">
                 <h4>Avg Order Value</h4>
-                <p>₹${totalOrders > 0 ? (totalSales / totalOrders).toFixed(0) : 0}</p>
+                <p>&#8377;${totalOrders > 0 ? (totalSales / totalOrders).toFixed(0) : 0}</p>
               </div>
               <div class="stat-card">
                 <h4>Tax Collected</h4>
-                <p>₹${totalTax.toFixed(0)}</p>
+                <p>&#8377;${totalTax.toFixed(0)}</p>
               </div>
             </div>
             <div class="stats-grid">
@@ -1520,7 +1534,7 @@ const ReportsPage = ({ user }) => {
           <div class="two-col">
             <!-- Best Selling Items -->
             <div class="section">
-              <div class="section-title">🏆 Top Selling Items</div>
+              <div class="section-title">?? Top Selling Items</div>
               ${bestSelling && bestSelling.length > 0 ? `
                 <table>
                   <thead>
@@ -1532,7 +1546,7 @@ const ReportsPage = ({ user }) => {
                         <td><span class="rank">${i + 1}</span></td>
                         <td><strong>${item.name || 'Unknown'}</strong><br><small style="color:#6b7280">${item.category || ''}</small></td>
                         <td>${item.total_quantity || 0}</td>
-                        <td>₹${(item.total_revenue || 0).toFixed(0)}</td>
+                        <td>&#8377;${(item.total_revenue || 0).toFixed(0)}</td>
                       </tr>
                     `).join('')}
                   </tbody>
@@ -1542,7 +1556,7 @@ const ReportsPage = ({ user }) => {
 
             <!-- Staff Performance -->
             <div class="section">
-              <div class="section-title">👥 Staff Performance</div>
+              <div class="section-title">?? Staff Performance</div>
               ${staffPerformance && staffPerformance.length > 0 ? `
                 <table>
                   <thead>
@@ -1553,8 +1567,8 @@ const ReportsPage = ({ user }) => {
                       <tr>
                         <td><strong>${staff.waiter_name}</strong></td>
                         <td>${staff.total_orders}</td>
-                        <td>₹${(staff.total_sales || 0).toFixed(0)}</td>
-                        <td>₹${(staff.avg_order_value || 0).toFixed(0)}</td>
+                        <td>&#8377;${(staff.total_sales || 0).toFixed(0)}</td>
+                        <td>&#8377;${(staff.avg_order_value || 0).toFixed(0)}</td>
                       </tr>
                     `).join('')}
                   </tbody>
@@ -1566,7 +1580,7 @@ const ReportsPage = ({ user }) => {
           <div class="two-col">
             <!-- Peak Hours -->
             <div class="section">
-              <div class="section-title">⏰ Peak Hours Analysis</div>
+              <div class="section-title">? Peak Hours Analysis</div>
               ${peakHours && peakHours.length > 0 ? `
                 <table>
                   <thead>
@@ -1580,7 +1594,7 @@ const ReportsPage = ({ user }) => {
                         <tr>
                           <td>${hour.hour}:00</td>
                           <td>${hour.order_count || 0}</td>
-                          <td>₹${(hour.total_sales || 0).toFixed(0)}</td>
+                          <td>&#8377;${(hour.total_sales || 0).toFixed(0)}</td>
                           <td>
                             <div class="progress-bar">
                               <div class="progress-fill" style="width:${pct}%"></div>
@@ -1596,7 +1610,7 @@ const ReportsPage = ({ user }) => {
 
             <!-- Category Analysis -->
             <div class="section">
-              <div class="section-title">📦 Sales by Category</div>
+              <div class="section-title">?? Sales by Category</div>
               ${categoryAnalysis && categoryAnalysis.length > 0 ? `
                 <table>
                   <thead>
@@ -1610,7 +1624,7 @@ const ReportsPage = ({ user }) => {
                         <tr>
                           <td><strong>${cat.category}</strong></td>
                           <td>${cat.total_quantity || 0}</td>
-                          <td>₹${(cat.total_revenue || 0).toFixed(0)}</td>
+                          <td>&#8377;${(cat.total_revenue || 0).toFixed(0)}</td>
                           <td>
                             <div class="progress-bar">
                               <div class="progress-fill" style="width:${pct}%"></div>
@@ -1628,7 +1642,7 @@ const ReportsPage = ({ user }) => {
           <!-- Orders Table -->
           ${orders.length > 0 ? `
             <div class="section">
-              <div class="section-title">📋 Order Details (${orders.length} orders)</div>
+              <div class="section-title">?? Order Details (${orders.length} orders)</div>
               <table>
                 <thead>
                   <tr>
@@ -1649,7 +1663,7 @@ const ReportsPage = ({ user }) => {
                       <td>${order.table_number}</td>
                       <td>${order.waiter_name}</td>
                       <td>${order.items.map(i => i.quantity + 'x ' + i.name).join(', ').slice(0, 40)}${order.items.length > 2 ? '...' : ''}</td>
-                      <td><strong>₹${order.total.toFixed(0)}</strong></td>
+                      <td><strong>&#8377;${order.total.toFixed(0)}</strong></td>
                       <td style="color: ${order.status === 'completed' ? '#16a34a' : order.status === 'cancelled' ? '#dc2626' : '#d97706'}">${order.status}</td>
                     </tr>
                   `).join('')}
@@ -1666,8 +1680,8 @@ const ReportsPage = ({ user }) => {
           </div>
 
           <div class="no-print">
-            <button class="btn btn-primary" onclick="window.print()">📄 Save as PDF / Print</button>
-            <button class="btn btn-secondary" onclick="window.close()">✕ Close</button>
+            <button class="btn btn-primary" onclick="window.print()">?? Save as PDF / Print</button>
+            <button class="btn btn-secondary" onclick="window.close()">? Close</button>
             <p style="margin-top:10px;font-size:12px;color:#6b7280;">
               Click "Save as PDF" in print dialog to download PDF
             </p>
@@ -1751,39 +1765,39 @@ const ReportsPage = ({ user }) => {
             <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-9 gap-1 min-w-max sm:min-w-0 bg-gray-100/80 p-1 rounded-xl">
               <TabsTrigger value="overview" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Overview</span>
-                <span className="sm:hidden">📊 Overview</span>
+                <span className="sm:hidden">Overview</span>
               </TabsTrigger>
               <TabsTrigger value="sales" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Sales Trends</span>
-                <span className="sm:hidden">📈 Sales</span>
+                <span className="sm:hidden">Sales</span>
               </TabsTrigger>
               <TabsTrigger value="items" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Best Sellers</span>
-                <span className="sm:hidden">🏆 Top Items</span>
+                <span className="sm:hidden">Top Items</span>
               </TabsTrigger>
               <TabsTrigger value="stock" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Stock Report</span>
-                <span className="sm:hidden">📦 Stock</span>
+                <span className="sm:hidden">Stock</span>
               </TabsTrigger>
               <TabsTrigger value="staff" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Staff Performance</span>
-                <span className="sm:hidden">👥 Staff</span>
+                <span className="sm:hidden">Staff</span>
               </TabsTrigger>
               <TabsTrigger value="hours" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Peak Hours</span>
-                <span className="sm:hidden">⏰ Hours</span>
+                <span className="sm:hidden">Hours</span>
               </TabsTrigger>
               <TabsTrigger value="customers" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Customer Balance</span>
-                <span className="sm:hidden">💳 Customers</span>
+                <span className="sm:hidden">Customers</span>
               </TabsTrigger>
               <TabsTrigger value="daybook" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Day Book</span>
-                <span className="sm:hidden">📒 Day Book</span>
+                <span className="sm:hidden">Day Book</span>
               </TabsTrigger>
               <TabsTrigger value="export" className="whitespace-nowrap px-3 py-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <span className="hidden sm:inline">Export</span>
-                <span className="sm:hidden">📥 Export</span>
+                <span className="sm:hidden">Export</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1819,7 +1833,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="text-2xl sm:text-4xl font-bold text-green-600 truncate">
-                      ₹{(dailyReport?.total_sales || 0).toFixed(2)}
+                      {"\u20B9"}{(dailyReport?.total_sales || 0).toFixed(2)}
                     </p>
                   </CardContent>
                 </Card>
@@ -1835,7 +1849,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="text-2xl sm:text-4xl font-bold text-blue-600 truncate">
-                      ₹
+                      {"\u20B9"}
                       {(dailyReport?.total_orders || 0) > 0
                         ? (
                             (dailyReport?.total_sales || 0) / (dailyReport?.total_orders || 1)
@@ -1867,13 +1881,13 @@ const ReportsPage = ({ user }) => {
                       <div className="text-center sm:text-left">
                         <p className="text-xs sm:text-sm text-gray-600">Sales</p>
                         <p className="text-lg sm:text-2xl font-bold text-green-600 truncate">
-                          ₹{(forecast?.current_stats?.total_sales || 0).toFixed(0)}
+                          {"\u20B9"}{(forecast?.current_stats?.total_sales || 0).toFixed(0)}
                         </p>
                       </div>
                       <div className="text-center sm:text-left">
                         <p className="text-xs sm:text-sm text-gray-600">Avg</p>
                         <p className="text-lg sm:text-2xl font-bold text-blue-600 truncate">
-                          ₹{(forecast?.current_stats?.avg_order || 0).toFixed(0)}
+                          {"\u20B9"}{(forecast?.current_stats?.avg_order || 0).toFixed(0)}
                         </p>
                       </div>
                     </div>
@@ -1900,7 +1914,9 @@ const ReportsPage = ({ user }) => {
                   <div className="flex flex-wrap gap-2">
                     {[
                       { key: 'today', label: 'Today' },
+                      { key: 'yesterday', label: 'Yesterday' },
                       { key: 'week', label: '7 Days' },
+                      { key: 'fifteenDays', label: '15 Days' },
                       { key: 'month', label: '30 Days' },
                     ].map(preset => (
                       <button
@@ -1917,8 +1933,8 @@ const ReportsPage = ({ user }) => {
                     ))}
                   </div>
                   
-                  {/* Date Range Display - Mobile optimized */}
-                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                  {/* Date Range + Total */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
                     <div>
                       <Label className="text-xs text-gray-500">From</Label>
                       <input
@@ -1944,6 +1960,22 @@ const ReportsPage = ({ user }) => {
                         className="w-full px-2 sm:px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:border-violet-500 outline-none transition-all"
                         data-testid="end-date-input"
                       />
+                    </div>
+                    <div className="flex items-end">
+                      <div className="w-full p-3 rounded-lg border border-violet-200 bg-violet-50">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[11px] text-gray-600">Selected Total</p>
+                            <p className="text-lg font-bold text-violet-700 truncate">
+                              {"\u20B9"}{reportOrdersTotal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[11px] text-gray-600">Orders</p>
+                            <p className="text-sm font-semibold text-gray-700">{reportOrders.length}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
@@ -1993,7 +2025,7 @@ const ReportsPage = ({ user }) => {
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3">
                           <p className="font-bold text-violet-600 text-sm sm:text-base flex-shrink-0">
-                            ₹{(order?.total || 0).toFixed(0)}
+                            {"\u20B9"}{(order?.total || 0).toFixed(0)}
                           </p>
                           <div className="flex items-center gap-1">
                             <button
@@ -2068,7 +2100,7 @@ const ReportsPage = ({ user }) => {
                           </p>
                         </div>
                         <p className="font-bold text-violet-600 text-sm sm:text-base ml-2 flex-shrink-0">
-                          ₹{(order?.total || 0).toFixed(0)}
+                          {"\u20B9"}{(order?.total || 0).toFixed(0)}
                         </p>
                       </div>
                     ))}
@@ -2091,7 +2123,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="text-xl sm:text-3xl font-bold text-violet-600 truncate">
-                      ₹{(dailyReport?.total_sales || 0).toFixed(2)}
+                      {"\u20B9"}{(dailyReport?.total_sales || 0).toFixed(2)}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {dailyReport.total_orders} orders
@@ -2110,7 +2142,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="text-xl sm:text-3xl font-bold text-green-600 truncate">
-                      ₹{(weeklyReport?.total_sales || 0).toFixed(2)}
+                      {"\u20B9"}{(weeklyReport?.total_sales || 0).toFixed(2)}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {weeklyReport.total_orders} orders
@@ -2129,7 +2161,7 @@ const ReportsPage = ({ user }) => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <p className="text-xl sm:text-3xl font-bold text-blue-600 truncate">
-                      ₹{(monthlyReport?.total_sales || 0).toFixed(2)}
+                      {"\u20B9"}{(monthlyReport?.total_sales || 0).toFixed(2)}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {monthlyReport.total_orders} orders
@@ -2154,13 +2186,13 @@ const ReportsPage = ({ user }) => {
                       <div className="text-center sm:text-left">
                         <p className="text-xs sm:text-sm text-gray-600">Weekly Average</p>
                         <p className="text-lg sm:text-2xl font-bold text-violet-600">
-                          ₹{((weeklyReport?.total_sales || 0) / 7).toFixed(2)}/day
+                          {"\u20B9"}{((weeklyReport?.total_sales || 0) / 7).toFixed(2)}/day
                         </p>
                       </div>
                       <div className="text-center sm:text-right">
                         <p className="text-xs sm:text-sm text-gray-600">Monthly Average</p>
                         <p className="text-lg sm:text-2xl font-bold text-blue-600">
-                          ₹{((monthlyReport?.total_sales || 0) / 30).toFixed(2)}/day
+                          {"\u20B9"}{((monthlyReport?.total_sales || 0) / 30).toFixed(2)}/day
                         </p>
                       </div>
                     </div>
@@ -2194,7 +2226,7 @@ const ReportsPage = ({ user }) => {
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">{item.name || 'Unknown'}</p>
                             <p className="text-xs sm:text-sm text-gray-500 truncate">
-                              {item.category || 'N/A'} • ₹{(item.price || 0).toFixed(2)}
+                              {item.category || 'N/A'} • {"\u20B9"}{(item.price || 0).toFixed(2)}
                             </p>
                           </div>
                         </div>
@@ -2203,7 +2235,7 @@ const ReportsPage = ({ user }) => {
                             {item.total_quantity || 0}
                           </p>
                           <p className="text-[10px] sm:text-sm text-gray-500 truncate">
-                            ₹{(item.total_revenue || 0).toFixed(0)}
+                            {"\u20B9"}{(item.total_revenue || 0).toFixed(0)}
                           </p>
                         </div>
                       </div>
@@ -2233,7 +2265,7 @@ const ReportsPage = ({ user }) => {
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium text-gray-900 truncate flex-1">{cat.category}</span>
                           <span className="text-xs sm:text-sm text-gray-600 ml-2 flex-shrink-0">
-                            {cat.total_quantity || 0} • ₹{(cat.total_revenue || 0).toFixed(0)}
+                            {cat.total_quantity || 0} • {"\u20B9"}{(cat.total_revenue || 0).toFixed(0)}
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -2266,7 +2298,7 @@ const ReportsPage = ({ user }) => {
                     {stockReport?.totalItems || 0}
                   </p>
                   <p className="text-xs text-blue-600 mt-1">
-                    ₹{(stockReport?.totalValue || 0).toFixed(0)} value
+                    {"\u20B9"}{(stockReport?.totalValue || 0).toFixed(0)} value
                   </p>
                 </CardContent>
               </Card>
@@ -2412,7 +2444,7 @@ const ReportsPage = ({ user }) => {
                             {item.quantity} {item.unit}
                           </p>
                           <p className="text-[10px] sm:text-sm text-gray-500">
-                            ₹{(item.quantity * item.price_per_unit).toFixed(0)}
+                            {"\u20B9"}{(item.quantity * item.price_per_unit).toFixed(0)}
                           </p>
                         </div>
                       </div>
@@ -2452,7 +2484,7 @@ const ReportsPage = ({ user }) => {
                               <span className="font-medium text-gray-900 truncate flex-1">{category.name}</span>
                             </div>
                             <span className="text-xs sm:text-sm text-gray-600 ml-2 flex-shrink-0">
-                              {categoryItems.length} items • ₹{categoryValue.toFixed(0)}
+                              {categoryItems.length} items • {"\u20B9"}{categoryValue.toFixed(0)}
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -2576,10 +2608,10 @@ const ReportsPage = ({ user }) => {
                         </div>
                         <div className="text-right flex-shrink-0 ml-2">
                           <p className="text-lg sm:text-2xl font-bold text-green-600 truncate">
-                            ₹{(staff.total_sales || 0).toFixed(0)}
+                            {"\u20B9"}{(staff.total_sales || 0).toFixed(0)}
                           </p>
                           <p className="text-[10px] sm:text-sm text-gray-500">
-                            Avg: ₹{(staff.avg_order_value || 0).toFixed(0)}
+                            Avg: {"\u20B9"}{(staff.avg_order_value || 0).toFixed(0)}
                           </p>
                         </div>
                       </div>
@@ -2617,7 +2649,7 @@ const ReportsPage = ({ user }) => {
                               {hour.hour}:00 - {hour.hour}:59
                             </span>
                             <span className="text-[10px] sm:text-sm text-gray-600">
-                              {hour.order_count || 0} • ₹{(hour.total_sales || 0).toFixed(0)}
+                              {hour.order_count || 0} • {"\u20B9"}{(hour.total_sales || 0).toFixed(0)}
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
@@ -2737,7 +2769,7 @@ const ReportsPage = ({ user }) => {
                       <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
                         <p className="text-xs text-gray-600">Total Credit</p>
                         <p className="text-lg font-bold text-green-600">
-                          ₹{customerBalances.reduce((sum, customer) => sum + (customer.balance_amount > 0 ? customer.balance_amount : 0), 0).toFixed(0)}
+                          {"\u20B9"}{customerBalances.reduce((sum, customer) => sum + (customer.balance_amount > 0 ? customer.balance_amount : 0), 0).toFixed(0)}
                         </p>
                       </div>
                       <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg">
@@ -2749,7 +2781,7 @@ const ReportsPage = ({ user }) => {
                       <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg">
                         <p className="text-xs text-gray-600">Avg Balance</p>
                         <p className="text-lg font-bold text-orange-600">
-                          ₹{customerBalances.length > 0 ? (customerBalances.reduce((sum, c) => sum + (c.balance_amount > 0 ? c.balance_amount : 0), 0) / customerBalances.filter(c => c.balance_amount > 0).length || 0).toFixed(0) : 0}
+                          {"\u20B9"}{customerBalances.length > 0 ? (customerBalances.reduce((sum, c) => sum + (c.balance_amount > 0 ? c.balance_amount : 0), 0) / customerBalances.filter(c => c.balance_amount > 0).length || 0).toFixed(0) : 0}
                         </p>
                       </div>
                       <div className="p-3 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg">
@@ -2784,15 +2816,15 @@ const ReportsPage = ({ user }) => {
                                 {customer.customer_name || 'Unknown Customer'}
                               </p>
                               <p className="text-xs sm:text-sm text-gray-500 truncate">
-                                📞 {customer.customer_phone || 'No phone'} • 
-                                🛒 {customer.total_orders} orders • 
-                                📅 {customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}
+                                ?? {customer.customer_phone || 'No phone'} • 
+                                ?? {customer.total_orders} orders • 
+                                ?? {customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}
                               </p>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0 ml-2">
                             <p className="text-lg sm:text-2xl font-bold text-red-600 truncate">
-                              ₹{customer.balance_amount.toFixed(0)}
+                              {"\u20B9"}{customer.balance_amount.toFixed(0)}
                             </p>
                             <p className="text-[10px] sm:text-sm text-gray-500">
                               Outstanding
@@ -2831,7 +2863,7 @@ const ReportsPage = ({ user }) => {
                       <p className="text-base">Great news! All your customers have paid in full.</p>
                       
                       <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="font-medium text-blue-900 mb-2">💡 How Customer Balances Work:</p>
+                        <p className="font-medium text-blue-900 mb-2">?? How Customer Balances Work:</p>
                         <ul className="text-left space-y-2 text-blue-800">
                           <li>• Create orders with <strong>Credit</strong> payment method</li>
                           <li>• Accept <strong>partial payments</strong> on orders</li>
@@ -2841,7 +2873,7 @@ const ReportsPage = ({ user }) => {
                       </div>
                       
                       <p className="mt-4 text-xs text-gray-500 italic">
-                        Tip: Go to Billing → Select items → Choose "Credit" payment → Enter partial amount
+                        Tip: Go to Billing ? Select items ? Choose "Credit" payment ? Enter partial amount
                       </p>
                     </div>
                     
@@ -2883,12 +2915,13 @@ const ReportsPage = ({ user }) => {
                     <Label className="text-sm sm:text-base font-semibold mb-2 sm:mb-3 block">Quick Select</Label>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                       {[
-                        { key: 'today', label: 'Today', icon: '📅' },
-                        { key: 'yesterday', label: 'Yesterday', icon: '⏪' },
-                        { key: 'week', label: '7 Days', icon: '📆' },
-                        { key: 'month', label: '30 Days', icon: '🗓️' },
-                        { key: 'thisMonth', label: 'This Month', icon: '📊' },
-                        { key: 'lastMonth', label: 'Last Month', icon: '📈' },
+                        { key: 'today', label: 'Today', icon: 'T' },
+                        { key: 'yesterday', label: 'Yesterday', icon: 'Y' },
+                        { key: 'week', label: '7 Days', icon: '7d' },
+                        { key: 'fifteenDays', label: '15 Days', icon: '15d' },
+                        { key: 'month', label: '30 Days', icon: '30d' },
+                        { key: 'thisMonth', label: 'This Month', icon: 'TM' },
+                        { key: 'lastMonth', label: 'Last Month', icon: 'LM' },
                       ].map(preset => (
                         <button
                           key={preset.key}
@@ -2942,7 +2975,7 @@ const ReportsPage = ({ user }) => {
                     </div>
                     <div className="mt-2 sm:mt-3 p-1.5 sm:p-2 bg-violet-100 rounded-lg text-center">
                       <span className="text-[10px] sm:text-sm text-violet-700 font-medium">
-                        📅 {new Date(dateRange.start_date).toLocaleDateString()} → {new Date(dateRange.end_date).toLocaleDateString()}
+                        ?? {new Date(dateRange.start_date).toLocaleDateString()} ? {new Date(dateRange.end_date).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -3020,7 +3053,7 @@ const ReportsPage = ({ user }) => {
                         <p className="text-[9px] sm:text-xs text-gray-600">Sales report</p>
                       </div>
                       <div className="p-1.5 sm:p-2 bg-white rounded-lg border border-violet-300 bg-violet-50 col-span-2">
-                        <p className="font-semibold text-violet-700 text-[10px] sm:text-sm">⭐ Detailed Report</p>
+                        <p className="font-semibold text-violet-700 text-[10px] sm:text-sm">? Detailed Report</p>
                         <p className="text-[9px] sm:text-xs text-gray-600">Full analytics with charts</p>
                       </div>
                     </div>
@@ -3082,7 +3115,7 @@ const ReportsPage = ({ user }) => {
                           <p className="font-medium text-sm truncate">{item.quantity}× {item.name}</p>
                           {item.notes && <p className="text-xs text-orange-600 truncate">Note: {item.notes}</p>}
                         </div>
-                        <p className="font-bold text-sm ml-2 flex-shrink-0">₹{((item.price || 0) * (item.quantity || 0)).toFixed(0)}</p>
+                        <p className="font-bold text-sm ml-2 flex-shrink-0">{"\u20B9"}{((item.price || 0) * (item.quantity || 0)).toFixed(0)}</p>
                       </div>
                     ))}
                   </div>
@@ -3091,15 +3124,15 @@ const ReportsPage = ({ user }) => {
                 <div className="border-t pt-3 sm:pt-4 space-y-1 sm:space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
-                    <span className="font-medium">₹{(viewOrderModal.order?.subtotal || 0).toFixed(0)}</span>
+                    <span className="font-medium">{"\u20B9"}{(viewOrderModal.order?.subtotal || 0).toFixed(0)}</span>
                   </div>
                   <div className="flex justify-between text-xs sm:text-sm text-gray-600">
                     <span>Tax:</span>
-                    <span>₹{(viewOrderModal.order?.tax || 0).toFixed(0)}</span>
+                    <span>{"\u20B9"}{(viewOrderModal.order?.tax || 0).toFixed(0)}</span>
                   </div>
                   <div className="flex justify-between text-lg sm:text-xl font-bold text-violet-600 pt-2 border-t">
                     <span>Total:</span>
-                    <span>₹{(viewOrderModal.order?.total || 0).toFixed(0)}</span>
+                    <span>{"\u20B9"}{(viewOrderModal.order?.total || 0).toFixed(0)}</span>
                   </div>
                   {viewOrderModal.order?.payment_method && (
                     <div className="flex justify-between text-xs sm:text-sm">
@@ -3155,11 +3188,11 @@ const ReportsPage = ({ user }) => {
               <CardContent className="space-y-3">
                 <p className="text-sm text-gray-600">
                   Are you sure you want to permanently delete order{" "}
-                  <strong>#{deleteConfirmModal.order.id.slice(0, 8)}</strong>?
+                  <strong>#{deleteConfirmModal.order.id.slice(0, 8)}</strong>
                 </p>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p><strong>Table:</strong> {deleteConfirmModal.order.table_number}</p>
-                  <p><strong>Total:</strong> ₹{deleteConfirmModal.order.total.toFixed(0)}</p>
+                  <p><strong>Total:</strong> {"\u20B9"}{deleteConfirmModal.order.total.toFixed(0)}</p>
                   <p><strong>Status:</strong> {deleteConfirmModal.order.status}</p>
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -3194,11 +3227,11 @@ const ReportsPage = ({ user }) => {
               <CardContent className="space-y-3">
                 <p className="text-sm text-gray-600">
                   Are you sure you want to cancel order{" "}
-                  <strong>#{cancelConfirmModal.order.id.slice(0, 8)}</strong>?
+                  <strong>#{cancelConfirmModal.order.id.slice(0, 8)}</strong>
                 </p>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p><strong>Table:</strong> {cancelConfirmModal.order.table_number}</p>
-                  <p><strong>Total:</strong> ₹{cancelConfirmModal.order.total.toFixed(0)}</p>
+                  <p><strong>Total:</strong> {"\u20B9"}{cancelConfirmModal.order.total.toFixed(0)}</p>
                   <p><strong>Status:</strong> {cancelConfirmModal.order.status}</p>
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -3352,7 +3385,7 @@ const DayBookTab = ({ dateRange }) => {
         </head>
         <body>
           <div class="header">
-            <h1>📒 Day Book Report</h1>
+            <h1>?? Day Book Report</h1>
             <p>Date: ${new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
             <p>Generated: ${new Date().toLocaleString()}</p>
           </div>
@@ -3360,47 +3393,47 @@ const DayBookTab = ({ dateRange }) => {
           <div class="summary-grid">
             <div class="summary-card inflow">
               <h4>Total Inflows</h4>
-              <p>₹${daybook.total_inflows.toFixed(2)}</p>
+              <p>&#8377;${daybook.total_inflows.toFixed(2)}</p>
               <small>${daybook.order_count} orders</small>
             </div>
             <div class="summary-card outflow">
               <h4>Total Outflows</h4>
-              <p>₹${daybook.total_outflows.toFixed(2)}</p>
+              <p>&#8377;${daybook.total_outflows.toFixed(2)}</p>
               <small>${daybook.expense_count} expenses</small>
             </div>
             <div class="summary-card net">
               <h4>Net Cash Flow</h4>
-              <p>${daybook.net_cash_flow >= 0 ? '+' : ''}₹${daybook.net_cash_flow.toFixed(2)}</p>
+              <p>${daybook.net_cash_flow >= 0 ? '+' : ''}&#8377;${daybook.net_cash_flow.toFixed(2)}</p>
             </div>
             <div class="summary-card closing">
               <h4>Closing Balance</h4>
-              <p>₹${daybook.closing_balance.toFixed(2)}</p>
+              <p>&#8377;${daybook.closing_balance.toFixed(2)}</p>
             </div>
           </div>
 
           <div class="breakdown-grid">
             <div class="section">
-              <div class="section-title">💰 Inflow Breakdown</div>
+              <div class="section-title">?? Inflow Breakdown</div>
               ${Object.entries(daybook.inflow_breakdown).filter(([_, amount]) => amount > 0).map(([method, amount]) => `
                 <div class="breakdown-item inflow">
                   <span style="text-transform: capitalize;">${method}</span>
-                  <span class="amount-inflow">₹${amount.toFixed(2)}</span>
+                  <span class="amount-inflow">&#8377;${amount.toFixed(2)}</span>
                 </div>
               `).join('') || '<p style="color: #666; text-align: center;">No inflows recorded</p>'}
             </div>
             <div class="section">
-              <div class="section-title">📤 Outflow Breakdown</div>
+              <div class="section-title">?? Outflow Breakdown</div>
               ${Object.entries(daybook.outflow_breakdown).filter(([_, amount]) => amount > 0).map(([category, amount]) => `
                 <div class="breakdown-item outflow">
                   <span>${category}</span>
-                  <span class="amount-outflow">₹${amount.toFixed(2)}</span>
+                  <span class="amount-outflow">&#8377;${amount.toFixed(2)}</span>
                 </div>
               `).join('') || '<p style="color: #666; text-align: center;">No outflows recorded</p>'}
             </div>
           </div>
 
           <div class="section">
-            <div class="section-title">📋 Transaction Details (${daybook.entries.length} transactions)</div>
+            <div class="section-title">?? Transaction Details (${daybook.entries.length} transactions)</div>
             ${daybook.entries.length > 0 ? `
               <table>
                 <thead>
@@ -3417,13 +3450,13 @@ const DayBookTab = ({ dateRange }) => {
                   ${daybook.entries.map(entry => `
                     <tr class="${entry.type === 'inflow' ? 'inflow-row' : 'outflow-row'}">
                       <td>${entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                      <td>${entry.type === 'inflow' ? '↑ Inflow' : '↓ Outflow'}</td>
+                      <td>${entry.type === 'inflow' ? '? Inflow' : '? Outflow'}</td>
                       <td>${entry.category}</td>
                       <td>${entry.description}</td>
                       <td class="${entry.type === 'inflow' ? 'amount-inflow' : 'amount-outflow'}">
-                        ${entry.type === 'inflow' ? '+' : '-'}₹${entry.amount.toFixed(2)}
+                        ${entry.type === 'inflow' ? '+' : '-'}&#8377;${entry.amount.toFixed(2)}
                       </td>
-                      <td>₹${entry.running_balance.toFixed(2)}</td>
+                      <td>&#8377;${entry.running_balance.toFixed(2)}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -3523,10 +3556,10 @@ const DayBookTab = ({ dateRange }) => {
               <td>Closing Balance</td>
             </tr>
             <tr>
-              <td style="color: green;">₹${daybook.total_inflows.toFixed(2)}</td>
-              <td style="color: red;">₹${daybook.total_outflows.toFixed(2)}</td>
-              <td style="color: ${daybook.net_cash_flow >= 0 ? 'green' : 'red'};">${daybook.net_cash_flow >= 0 ? '+' : ''}₹${daybook.net_cash_flow.toFixed(2)}</td>
-              <td style="color: purple;">₹${daybook.closing_balance.toFixed(2)}</td>
+              <td style="color: green;">&#8377;${daybook.total_inflows.toFixed(2)}</td>
+              <td style="color: red;">&#8377;${daybook.total_outflows.toFixed(2)}</td>
+              <td style="color: ${daybook.net_cash_flow >= 0 ? 'green' : 'red'};">${daybook.net_cash_flow >= 0 ? '+' : ''}&#8377;${daybook.net_cash_flow.toFixed(2)}</td>
+              <td style="color: purple;">&#8377;${daybook.closing_balance.toFixed(2)}</td>
             </tr>
           </table>
           
@@ -3539,12 +3572,12 @@ const DayBookTab = ({ dateRange }) => {
             ${Object.entries(daybook.inflow_breakdown).map(([method, amount]) => `
               <tr class="inflow-row">
                 <td style="text-transform: capitalize;">${method}</td>
-                <td>₹${amount.toFixed(2)}</td>
+                <td>&#8377;${amount.toFixed(2)}</td>
               </tr>
             `).join('')}
             <tr class="summary-row">
               <td>Total Inflows</td>
-              <td>₹${daybook.total_inflows.toFixed(2)}</td>
+              <td>&#8377;${daybook.total_inflows.toFixed(2)}</td>
             </tr>
           </table>
           
@@ -3557,12 +3590,12 @@ const DayBookTab = ({ dateRange }) => {
             ${Object.entries(daybook.outflow_breakdown).map(([category, amount]) => `
               <tr class="outflow-row">
                 <td>${category}</td>
-                <td>₹${amount.toFixed(2)}</td>
+                <td>&#8377;${amount.toFixed(2)}</td>
               </tr>
             `).join('')}
             <tr class="summary-row">
               <td>Total Outflows</td>
-              <td>₹${daybook.total_outflows.toFixed(2)}</td>
+              <td>&#8377;${daybook.total_outflows.toFixed(2)}</td>
             </tr>
           </table>
           
@@ -3582,8 +3615,8 @@ const DayBookTab = ({ dateRange }) => {
                 <td>${entry.type === 'inflow' ? 'Inflow' : 'Outflow'}</td>
                 <td>${entry.category}</td>
                 <td>${entry.description}</td>
-                <td>${entry.type === 'inflow' ? '+' : '-'}₹${entry.amount.toFixed(2)}</td>
-                <td>₹${entry.running_balance.toFixed(2)}</td>
+                <td>${entry.type === 'inflow' ? '+' : '-'}&#8377;${entry.amount.toFixed(2)}</td>
+                <td>&#8377;${entry.running_balance.toFixed(2)}</td>
               </tr>
             `).join('')}
           </table>
@@ -3672,7 +3705,7 @@ const DayBookTab = ({ dateRange }) => {
                   <TrendingUp className="w-5 h-5" />
                   <span className="text-sm font-medium">Total Inflows</span>
                 </div>
-                <p className="text-2xl font-bold text-green-700">₹{daybook.total_inflows.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-700">{"\u20B9"}{daybook.total_inflows.toFixed(2)}</p>
                 <p className="text-xs text-green-600 mt-1">{daybook.order_count} orders</p>
               </CardContent>
             </Card>
@@ -3683,7 +3716,7 @@ const DayBookTab = ({ dateRange }) => {
                   <Package className="w-5 h-5" />
                   <span className="text-sm font-medium">Total Outflows</span>
                 </div>
-                <p className="text-2xl font-bold text-red-700">₹{daybook.total_outflows.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-red-700">{"\u20B9"}{daybook.total_outflows.toFixed(2)}</p>
                 <p className="text-xs text-red-600 mt-1">{daybook.expense_count} expenses</p>
               </CardContent>
             </Card>
@@ -3695,7 +3728,7 @@ const DayBookTab = ({ dateRange }) => {
                   <span className="text-sm font-medium">Net Cash Flow</span>
                 </div>
                 <p className={`text-2xl font-bold ${daybook.net_cash_flow >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  {daybook.net_cash_flow >= 0 ? '+' : ''}₹{daybook.net_cash_flow.toFixed(2)}
+                  {daybook.net_cash_flow >= 0 ? '+' : ''}{"\u20B9"}{daybook.net_cash_flow.toFixed(2)}
                 </p>
               </CardContent>
             </Card>
@@ -3706,7 +3739,7 @@ const DayBookTab = ({ dateRange }) => {
                   <FileText className="w-5 h-5" />
                   <span className="text-sm font-medium">Closing Balance</span>
                 </div>
-                <p className="text-2xl font-bold text-violet-700">₹{daybook.closing_balance.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-violet-700">{"\u20B9"}{daybook.closing_balance.toFixed(2)}</p>
               </CardContent>
             </Card>
           </div>
@@ -3726,7 +3759,7 @@ const DayBookTab = ({ dateRange }) => {
                     amount > 0 && (
                       <div key={method} className="flex justify-between items-center p-2 bg-green-50 rounded-lg">
                         <span className="capitalize font-medium">{method}</span>
-                        <span className="text-green-700 font-bold">₹{amount.toFixed(2)}</span>
+                        <span className="text-green-700 font-bold">{"\u20B9"}{amount.toFixed(2)}</span>
                       </div>
                     )
                   ))}
@@ -3750,7 +3783,7 @@ const DayBookTab = ({ dateRange }) => {
                     amount > 0 && (
                       <div key={category} className="flex justify-between items-center p-2 bg-red-50 rounded-lg">
                         <span className="font-medium">{category}</span>
-                        <span className="text-red-700 font-bold">₹{amount.toFixed(2)}</span>
+                        <span className="text-red-700 font-bold">{"\u20B9"}{amount.toFixed(2)}</span>
                       </div>
                     )
                   ))}
@@ -3785,9 +3818,9 @@ const DayBookTab = ({ dateRange }) => {
                       </div>
                       <div className="text-right">
                         <p className={`font-bold ${entry.type === 'inflow' ? 'text-green-700' : 'text-red-700'}`}>
-                          {entry.type === 'inflow' ? '+' : '-'}₹{entry.amount.toFixed(2)}
+                          {entry.type === 'inflow' ? '+' : '-'}{"\u20B9"}{entry.amount.toFixed(2)}
                         </p>
-                        <p className="text-xs text-gray-500">Balance: ₹{entry.running_balance.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Balance: {"\u20B9"}{entry.running_balance.toFixed(2)}</p>
                       </div>
                     </div>
                   ))
@@ -3802,3 +3835,5 @@ const DayBookTab = ({ dateRange }) => {
 };
 
 export default ReportsPage;
+
+
