@@ -69,16 +69,35 @@ const SuperAdminPage = () => {
       name: 'Trial Ending Soon',
       subject: 'Your BillByteKOT trial is ending soon',
       html: `
-        <div style="font-family: Arial, sans-serif; color: #111;">
-          <h2 style="margin: 0 0 8px;">Your trial ends soon</h2>
-          <p>Hi {{name}},</p>
-          <p>Your BillByteKOT free trial is about to end. Upgrade now to keep unlimited billing, KOT, reports, and WhatsApp sharing active.</p>
-          <p style="margin: 16px 0;">
-            <a href="https://billbytekot.in/subscription" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Upgrade Now</a>
-          </p>
-          <p>Need help? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> or <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">call +91 83108 32669</a>.</p>
+        <div style="margin:0;padding:0;background:#f3f6ff;">
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e5edff;">
+            <div style="background:linear-gradient(135deg,#2563eb,#60a5fa);padding:28px 28px 22px;color:#fff;">
+              <div style="font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;">BillByteKOT</div>
+              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">Your trial ends soon</div>
+              <div style="font-size:14px;opacity:.9;">Keep billing active without interruption</div>
+            </div>
+            <div style="padding:24px 28px 6px;">
+              <div style="font-size:16px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:15px;color:#334155;line-height:1.7;margin-top:8px;">
+                Your BillByteKOT free trial is about to end. Upgrade now to keep unlimited bills, KOT workflow, reports, and WhatsApp sharing running smoothly.
+              </div>
+              <div style="font-size:14px;color:#475569;line-height:1.7;margin-top:10px;">
+                Most restaurants upgrade before the trial ends to avoid billing interruptions during rush hours.
+              </div>
+            </div>
+            <div style="padding:14px 28px 24px;">
+              <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#1d4ed8;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin-right:8px;">Upgrade Now</a>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Get App</a>
+            </div>
+            <div style="padding:14px 28px 26px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="font-size:12px;color:#64748b;">?? <a href="https://shorturl.at/CLDN3" style="color:#2563eb;text-decoration:none;">Play Store</a> &nbsp;?&nbsp; ?? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp</a> &nbsp;?&nbsp; ?? <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call +91 83108 32669</a></div>
+                <div style="font-size:12px;color:#94a3b8;">Reply to this email for help.</div>
+              </div>
+            </div>
+          </div>
         </div>
-      `.trim(),
+`.trim(),
       text: 'Hi {{name}}, your BillByteKOT trial is about to end. Upgrade now to keep unlimited billing. https://billbytekot.in/subscription'
     },
     {
@@ -87,23 +106,30 @@ const SuperAdminPage = () => {
       subject: 'Last day to keep your billing active',
       html: `
         <div style="margin:0;padding:0;background:#fff7ed;">
-          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #fde68a;">
-            <div style="background:#f97316;padding:22px;color:#fff;text-align:center;">
-              <div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;opacity:.9;">Final Reminder</div>
-              <div style="font-size:26px;font-weight:800;margin-top:4px;">Your trial ends today</div>
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #fed7aa;">
+            <div style="background:linear-gradient(135deg,#f97316,#fb923c);padding:28px;color:#fff;">
+              <div style="font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.9;">Final Reminder</div>
+              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">Your trial ends today</div>
+              <div style="font-size:14px;opacity:.9;">Keep billing live without delay</div>
             </div>
-            <div style="padding:22px 24px;text-align:center;">
-              <div style="font-size:16px;color:#111;">Hi {{name}},</div>
-              <div style="font-size:18px;font-weight:700;margin:8px 0;">Continue unlimited bills + reports + WhatsApp sharing</div>
-              <div style="font-size:14px;color:#475569;line-height:1.6;">Upgrade now to avoid interruption in billing.</div>
-              <div style="margin-top:16px;">
-                <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#ea580c;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Upgrade Today</a>
+            <div style="padding:24px 28px 6px;">
+              <div style="font-size:16px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:16px;font-weight:700;margin:8px 0;color:#0f172a;">Continue unlimited bills, reports, and WhatsApp sharing</div>
+              <div style="font-size:14px;color:#475569;line-height:1.7;">Upgrade now to avoid interruptions during peak hours. Most users upgrade on the final day to keep the flow smooth.</div>
+            </div>
+            <div style="padding:14px 28px 24px;">
+              <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#ea580c;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin-right:8px;">Upgrade Today</a>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Get App</a>
+            </div>
+            <div style="padding:14px 28px 26px;background:#fff7ed;border-top:1px solid #fde68a;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="font-size:12px;color:#7c2d12;">?? <a href="https://shorturl.at/CLDN3" style="color:#ea580c;text-decoration:none;">Play Store</a> &nbsp;?&nbsp; ?? <a href="https://wa.me/918310832669" style="color:#ea580c;text-decoration:none;">WhatsApp</a> &nbsp;?&nbsp; ?? <a href="tel:+918310832669" style="color:#ea580c;text-decoration:none;">Call +91 83108 32669</a></div>
+                <div style="font-size:12px;color:#9a3412;">Reply to this email for help.</div>
               </div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Need help? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> or <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">call</a>.</div>
             </div>
           </div>
         </div>
-      `.trim(),
+`.trim(),
       text: 'Hi {{name}}, your trial ends today. Upgrade now: https://billbytekot.in/subscription'
     },
     {
@@ -112,39 +138,30 @@ const SuperAdminPage = () => {
       subject: 'Limited-time offer on BillByteKOT',
       html: `
         <div style="margin:0;padding:0;background:#f2f6ff;">
-          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e6eefc;">
-            <div style="background:linear-gradient(135deg,#3b82f6,#60a5fa);padding:24px 24px 18px;color:#fff;text-align:center;">
-              <div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;opacity:.9;">BillByteKOT</div>
-              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">Upgrade & Save</div>
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e6eefc;">
+            <div style="background:linear-gradient(135deg,#2563eb,#60a5fa);padding:28px;color:#fff;text-align:left;">
+              <div style="font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.9;">BillByteKOT</div>
+              <div style="font-size:30px;font-weight:800;margin:6px 0 2px;">Upgrade & Save</div>
               <div style="font-size:14px;opacity:.9;">Limited-time promotional offer</div>
             </div>
-            <div style="padding:22px 24px 8px;text-align:center;">
-              <div style="font-size:16px;color:#111;">Hi {{name}},</div>
-              <div style="font-size:20px;font-weight:700;margin:6px 0;color:#0f172a;">Unlock Unlimited Bills & Premium Features</div>
-              <div style="font-size:14px;color:#475569;line-height:1.6;">
-                Keep your billing, KOT, reports and WhatsApp bill sharing running without limits.
+            <div style="padding:24px 28px 6px;">
+              <div style="font-size:16px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:20px;font-weight:700;margin:8px 0;color:#0f172a;">Unlock Unlimited Bills & Premium Features</div>
+              <div style="font-size:14px;color:#475569;line-height:1.7;">Keep your billing, KOT, reports and WhatsApp bill sharing running without limits. Upgrade now and get priority support.</div>
+            </div>
+            <div style="padding:14px 28px 18px;">
+              <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin-right:8px;">Get Offer</a>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Download App</a>
+            </div>
+            <div style="padding:14px 28px 26px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="font-size:12px;color:#64748b;">?? <a href="https://shorturl.at/CLDN3" style="color:#2563eb;text-decoration:none;">Play Store</a> &nbsp;?&nbsp; ?? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp</a> &nbsp;?&nbsp; ?? <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call +91 83108 32669</a></div>
+                <div style="font-size:12px;color:#94a3b8;">Reply to this email for help.</div>
               </div>
-            </div>
-            <div style="padding:12px 24px 20px;text-align:center;">
-              <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin:6px 6px;">Get Offer</a>
-              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#111827;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin:6px 6px;">Download App</a>
-            </div>
-            <div style="padding:0 24px 24px;text-align:center;">
-              <a href="https://shorturl.at/CLDN3" style="display:inline-block;text-decoration:none;">
-                <div style="display:inline-flex;align-items:center;gap:10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;">
-                  <div style="width:26px;height:26px;background:#22c55e;border-radius:6px;display:inline-block;"></div>
-                  <div style="text-align:left;">
-                    <div style="font-size:11px;color:#64748b;line-height:1;">Get it on</div>
-                    <div style="font-size:14px;font-weight:700;color:#0f172a;line-height:1.2;">Google Play</div>
-                  </div>
-                </div>
-              </a>
-              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Reply to this email for help: support@billbytekot.in</div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:6px;">Or <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> • <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call +91 83108 32669</a></div>
             </div>
           </div>
         </div>
-      `.trim(),
+`.trim(),
       text: 'Hi {{name}}, limited-time offer on BillByteKOT. Upgrade: https://billbytekot.in/subscription Download app: https://shorturl.at/CLDN3'
     },
     {
@@ -153,24 +170,29 @@ const SuperAdminPage = () => {
       subject: 'Join 10,000+ restaurants on BillByteKOT',
       html: `
         <div style="margin:0;padding:0;background:#f8fafc;">
-          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-            <div style="padding:22px 24px;border-bottom:1px solid #e2e8f0;">
-              <div style="font-size:20px;font-weight:800;color:#0f172a;">10,000+ restaurants trust BillByteKOT</div>
-              <div style="font-size:14px;color:#64748b;margin-top:6px;">Faster billing • Fewer errors • Higher sales</div>
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;">
+            <div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:26px;color:#fff;">
+              <div style="font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.8;">Trusted by 10,000+</div>
+              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">Restaurants choose BillByteKOT</div>
+              <div style="font-size:14px;opacity:.9;">Faster billing ? Fewer errors ? Higher sales</div>
             </div>
-            <div style="padding:22px 24px;">
-              <div style="font-size:15px;color:#0f172a;">Hi {{name}},</div>
-              <div style="font-size:14px;color:#475569;line-height:1.6;margin-top:8px;">
-                Restaurants report faster billing and better customer experience after switching to BillByteKOT.
+            <div style="padding:24px 28px 6px;">
+              <div style="font-size:16px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:14px;color:#475569;line-height:1.7;margin-top:8px;">Teams report faster billing and better customer experience after switching to BillByteKOT. Try premium features now and scale your operations.</div>
+            </div>
+            <div style="padding:14px 28px 24px;">
+              <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin-right:8px;">Upgrade Now</a>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Get App</a>
+            </div>
+            <div style="padding:14px 28px 26px;background:#f1f5f9;border-top:1px solid #e2e8f0;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="font-size:12px;color:#64748b;">?? <a href="https://shorturl.at/CLDN3" style="color:#2563eb;text-decoration:none;">Play Store</a> &nbsp;?&nbsp; ?? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp</a> &nbsp;?&nbsp; ?? <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call +91 83108 32669</a></div>
+                <div style="font-size:12px;color:#94a3b8;">Reply to this email for help.</div>
               </div>
-              <div style="margin:16px 0;">
-                <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Upgrade Now</a>
-              </div>
-              <div style="font-size:12px;color:#94a3b8;">Reply for a quick demo or help. <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> • <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call</a></div>
             </div>
           </div>
         </div>
-      `.trim(),
+`.trim(),
       text: 'Hi {{name}}, join 10,000+ restaurants on BillByteKOT. Upgrade: https://billbytekot.in/subscription'
     },
     {
@@ -178,16 +200,30 @@ const SuperAdminPage = () => {
       name: 'New Feature Update',
       subject: 'New features are live in BillByteKOT',
       html: `
-        <div style="font-family: Arial, sans-serif; color: #111;">
-          <h2 style="margin: 0 0 8px;">New features are live</h2>
-          <p>Hi {{name}},</p>
-          <p>We just shipped new improvements across billing, reports, and performance. Log in to explore the latest updates.</p>
-          <p style="margin: 16px 0;">
-            <a href="https://billbytekot.in/login" style="background:#16a34a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Open Dashboard</a>
-          </p>
-          <p>As always, reply if you need anything.</p>
+        <div style="margin:0;padding:0;background:#f0fdf4;">
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #bbf7d0;">
+            <div style="background:linear-gradient(135deg,#16a34a,#22c55e);padding:26px;color:#fff;">
+              <div style="font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;">Product Update</div>
+              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">New features are live</div>
+              <div style="font-size:14px;opacity:.9;">Faster workflows for your team</div>
+            </div>
+            <div style="padding:24px 28px 6px;">
+              <div style="font-size:16px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:14px;color:#475569;line-height:1.7;margin-top:8px;">We just shipped improvements across billing, reports, and performance. Log in to explore the latest updates and get more done in less time.</div>
+            </div>
+            <div style="padding:14px 28px 24px;">
+              <a href="https://billbytekot.in/login" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin-right:8px;">Open Dashboard</a>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Get App</a>
+            </div>
+            <div style="padding:14px 28px 26px;background:#f0fdf4;border-top:1px solid #bbf7d0;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="font-size:12px;color:#15803d;">?? <a href="https://shorturl.at/CLDN3" style="color:#16a34a;text-decoration:none;">Play Store</a> &nbsp;?&nbsp; ?? <a href="https://wa.me/918310832669" style="color:#16a34a;text-decoration:none;">WhatsApp</a> &nbsp;?&nbsp; ?? <a href="tel:+918310832669" style="color:#16a34a;text-decoration:none;">Call +91 83108 32669</a></div>
+                <div style="font-size:12px;color:#86efac;">Reply to this email for help.</div>
+              </div>
+            </div>
+          </div>
         </div>
-      `.trim(),
+`.trim(),
       text: 'Hi {{name}}, new features are live in BillByteKOT. Log in: https://billbytekot.in/login'
     },
     {
@@ -196,22 +232,29 @@ const SuperAdminPage = () => {
       subject: 'Get BillByteKOT on your phone',
       html: `
         <div style="margin:0;padding:0;background:#ecfeff;">
-          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #bae6fd;">
-            <div style="background:#06b6d4;padding:22px;color:#fff;text-align:center;">
-              <div style="font-size:24px;font-weight:800;">Install the BillByteKOT app</div>
-              <div style="font-size:14px;opacity:.9;">Fast billing • Quick KOT • Live reports</div>
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #bae6fd;">
+            <div style="background:linear-gradient(135deg,#06b6d4,#22d3ee);padding:26px;color:#fff;">
+              <div style="font-size:14px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;">Get the App</div>
+              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">Install BillByteKOT</div>
+              <div style="font-size:14px;opacity:.9;">Fast billing ? Quick KOT ? Live reports</div>
             </div>
-            <div style="padding:22px 24px;text-align:center;">
-              <div style="font-size:16px;color:#111;">Hi {{name}},</div>
-              <div style="font-size:14px;color:#475569;line-height:1.6;margin:8px 0 14px;">
-                Keep billing smooth even during rush hours. Download the app now.
+            <div style="padding:24px 28px 6px;">
+              <div style="font-size:16px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:14px;color:#475569;line-height:1.7;margin-top:8px;">Keep billing smooth even during rush hours. Use the app for faster order entry and billing on the go.</div>
+            </div>
+            <div style="padding:14px 28px 24px;">
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin-right:8px;">Download on Play Store</a>
+              <a href="https://billbytekot.in/login" style="display:inline-block;background:#06b6d4;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Open Web</a>
+            </div>
+            <div style="padding:14px 28px 26px;background:#ecfeff;border-top:1px solid #bae6fd;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="font-size:12px;color:#0e7490;">?? <a href="https://shorturl.at/CLDN3" style="color:#0ea5e9;text-decoration:none;">Play Store</a> &nbsp;?&nbsp; ?? <a href="https://wa.me/918310832669" style="color:#0ea5e9;text-decoration:none;">WhatsApp</a> &nbsp;?&nbsp; ?? <a href="tel:+918310832669" style="color:#0ea5e9;text-decoration:none;">Call +91 83108 32669</a></div>
+                <div style="font-size:12px;color:#7dd3fc;">Reply to this email for help.</div>
               </div>
-              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#111827;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Download on Play Store</a>
-              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Questions? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> or <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">call +91 83108 32669</a>.</div>
             </div>
           </div>
         </div>
-      `.trim(),
+`.trim(),
       text: 'Hi {{name}}, download BillByteKOT app: https://shorturl.at/CLDN3'
     }
   ];
