@@ -40,11 +40,181 @@ const SuperAdminPage = () => {
   const [showCreateLead, setShowCreateLead] = useState(false);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
   const [invoiceData, setInvoiceData] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [subscriptionMonths, setSubscriptionMonths] = useState(12);
   const [subscriptionAmount, setSubscriptionAmount] = useState(999);
+  const [promoTarget, setPromoTarget] = useState(null);
+  const [promoForm, setPromoForm] = useState({
+    subject: '',
+    html_body: '',
+    text_body: '',
+    cc_support: true
+  });
+  const [sendingPromo, setSendingPromo] = useState(false);
+  const [selectedPromoTemplate, setSelectedPromoTemplate] = useState('custom');
+
+  const promoTemplates = [
+    {
+      id: 'custom',
+      name: 'Custom',
+      subject: '',
+      html: '',
+      text: ''
+    },
+    {
+      id: 'trial-ends',
+      name: 'Trial Ending Soon',
+      subject: 'Your BillByteKOT trial is ending soon',
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #111;">
+          <h2 style="margin: 0 0 8px;">Your trial ends soon</h2>
+          <p>Hi {{name}},</p>
+          <p>Your BillByteKOT free trial is about to end. Upgrade now to keep unlimited billing, KOT, reports, and WhatsApp sharing active.</p>
+          <p style="margin: 16px 0;">
+            <a href="https://billbytekot.in/subscription" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Upgrade Now</a>
+          </p>
+          <p>Need help? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> or <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">call +91 83108 32669</a>.</p>
+        </div>
+      `.trim(),
+      text: 'Hi {{name}}, your BillByteKOT trial is about to end. Upgrade now to keep unlimited billing. https://billbytekot.in/subscription'
+    },
+    {
+      id: 'last-day',
+      name: 'Last Day Urgency',
+      subject: 'Last day to keep your billing active',
+      html: `
+        <div style="margin:0;padding:0;background:#fff7ed;">
+          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #fde68a;">
+            <div style="background:#f97316;padding:22px;color:#fff;text-align:center;">
+              <div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;opacity:.9;">Final Reminder</div>
+              <div style="font-size:26px;font-weight:800;margin-top:4px;">Your trial ends today</div>
+            </div>
+            <div style="padding:22px 24px;text-align:center;">
+              <div style="font-size:16px;color:#111;">Hi {{name}},</div>
+              <div style="font-size:18px;font-weight:700;margin:8px 0;">Continue unlimited bills + reports + WhatsApp sharing</div>
+              <div style="font-size:14px;color:#475569;line-height:1.6;">Upgrade now to avoid interruption in billing.</div>
+              <div style="margin-top:16px;">
+                <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#ea580c;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Upgrade Today</a>
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Need help? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> or <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">call</a>.</div>
+            </div>
+          </div>
+        </div>
+      `.trim(),
+      text: 'Hi {{name}}, your trial ends today. Upgrade now: https://billbytekot.in/subscription'
+    },
+    {
+      id: 'offer',
+      name: 'Poster Offer + Play Store',
+      subject: 'Limited-time offer on BillByteKOT',
+      html: `
+        <div style="margin:0;padding:0;background:#f2f6ff;">
+          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e6eefc;">
+            <div style="background:linear-gradient(135deg,#3b82f6,#60a5fa);padding:24px 24px 18px;color:#fff;text-align:center;">
+              <div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;opacity:.9;">BillByteKOT</div>
+              <div style="font-size:28px;font-weight:800;margin:6px 0 2px;">Upgrade & Save</div>
+              <div style="font-size:14px;opacity:.9;">Limited-time promotional offer</div>
+            </div>
+            <div style="padding:22px 24px 8px;text-align:center;">
+              <div style="font-size:16px;color:#111;">Hi {{name}},</div>
+              <div style="font-size:20px;font-weight:700;margin:6px 0;color:#0f172a;">Unlock Unlimited Bills & Premium Features</div>
+              <div style="font-size:14px;color:#475569;line-height:1.6;">
+                Keep your billing, KOT, reports and WhatsApp bill sharing running without limits.
+              </div>
+            </div>
+            <div style="padding:12px 24px 20px;text-align:center;">
+              <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin:6px 6px;">Get Offer</a>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#111827;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;margin:6px 6px;">Download App</a>
+            </div>
+            <div style="padding:0 24px 24px;text-align:center;">
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;text-decoration:none;">
+                <div style="display:inline-flex;align-items:center;gap:10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;">
+                  <div style="width:26px;height:26px;background:#22c55e;border-radius:6px;display:inline-block;"></div>
+                  <div style="text-align:left;">
+                    <div style="font-size:11px;color:#64748b;line-height:1;">Get it on</div>
+                    <div style="font-size:14px;font-weight:700;color:#0f172a;line-height:1.2;">Google Play</div>
+                  </div>
+                </div>
+              </a>
+              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Reply to this email for help: support@billbytekot.in</div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:6px;">Or <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> • <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call +91 83108 32669</a></div>
+            </div>
+          </div>
+        </div>
+      `.trim(),
+      text: 'Hi {{name}}, limited-time offer on BillByteKOT. Upgrade: https://billbytekot.in/subscription Download app: https://shorturl.at/CLDN3'
+    },
+    {
+      id: 'social-proof',
+      name: 'Social Proof',
+      subject: 'Join 10,000+ restaurants on BillByteKOT',
+      html: `
+        <div style="margin:0;padding:0;background:#f8fafc;">
+          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+            <div style="padding:22px 24px;border-bottom:1px solid #e2e8f0;">
+              <div style="font-size:20px;font-weight:800;color:#0f172a;">10,000+ restaurants trust BillByteKOT</div>
+              <div style="font-size:14px;color:#64748b;margin-top:6px;">Faster billing • Fewer errors • Higher sales</div>
+            </div>
+            <div style="padding:22px 24px;">
+              <div style="font-size:15px;color:#0f172a;">Hi {{name}},</div>
+              <div style="font-size:14px;color:#475569;line-height:1.6;margin-top:8px;">
+                Restaurants report faster billing and better customer experience after switching to BillByteKOT.
+              </div>
+              <div style="margin:16px 0;">
+                <a href="https://billbytekot.in/subscription" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Upgrade Now</a>
+              </div>
+              <div style="font-size:12px;color:#94a3b8;">Reply for a quick demo or help. <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> • <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">Call</a></div>
+            </div>
+          </div>
+        </div>
+      `.trim(),
+      text: 'Hi {{name}}, join 10,000+ restaurants on BillByteKOT. Upgrade: https://billbytekot.in/subscription'
+    },
+    {
+      id: 'feature',
+      name: 'New Feature Update',
+      subject: 'New features are live in BillByteKOT',
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #111;">
+          <h2 style="margin: 0 0 8px;">New features are live</h2>
+          <p>Hi {{name}},</p>
+          <p>We just shipped new improvements across billing, reports, and performance. Log in to explore the latest updates.</p>
+          <p style="margin: 16px 0;">
+            <a href="https://billbytekot.in/login" style="background:#16a34a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Open Dashboard</a>
+          </p>
+          <p>As always, reply if you need anything.</p>
+        </div>
+      `.trim(),
+      text: 'Hi {{name}}, new features are live in BillByteKOT. Log in: https://billbytekot.in/login'
+    },
+    {
+      id: 'app-install',
+      name: 'App Install Focus',
+      subject: 'Get BillByteKOT on your phone',
+      html: `
+        <div style="margin:0;padding:0;background:#ecfeff;">
+          <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #bae6fd;">
+            <div style="background:#06b6d4;padding:22px;color:#fff;text-align:center;">
+              <div style="font-size:24px;font-weight:800;">Install the BillByteKOT app</div>
+              <div style="font-size:14px;opacity:.9;">Fast billing • Quick KOT • Live reports</div>
+            </div>
+            <div style="padding:22px 24px;text-align:center;">
+              <div style="font-size:16px;color:#111;">Hi {{name}},</div>
+              <div style="font-size:14px;color:#475569;line-height:1.6;margin:8px 0 14px;">
+                Keep billing smooth even during rush hours. Download the app now.
+              </div>
+              <a href="https://shorturl.at/CLDN3" style="display:inline-block;background:#111827;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700;">Download on Play Store</a>
+              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Questions? <a href="https://wa.me/918310832669" style="color:#2563eb;text-decoration:none;">WhatsApp us</a> or <a href="tel:+918310832669" style="color:#2563eb;text-decoration:none;">call +91 83108 32669</a>.</div>
+            </div>
+          </div>
+        </div>
+      `.trim(),
+      text: 'Hi {{name}}, download BillByteKOT app: https://shorturl.at/CLDN3'
+    }
+  ];
 
   // Auto-calculate subscription amount based on months
   useEffect(() => {
@@ -1068,6 +1238,73 @@ const SuperAdminPage = () => {
     setShowSubscriptionModal(true);
   };
 
+  const resetPromoModal = () => {
+    setShowPromoModal(false);
+    setPromoTarget(null);
+    setPromoForm({
+      subject: '',
+      html_body: '',
+      text_body: '',
+      cc_support: true
+    });
+    setSendingPromo(false);
+  };
+
+  const openPromoModal = (user) => {
+    setPromoTarget(user);
+    setPromoForm({
+      subject: '',
+      html_body: '',
+      text_body: '',
+      cc_support: true
+    });
+    setSelectedPromoTemplate('custom');
+    setShowPromoModal(true);
+  };
+
+  const sendPromoEmail = async () => {
+    if (!promoTarget?.email) {
+      toast.error('User email not found');
+      return;
+    }
+    if (!promoForm.subject.trim() || !promoForm.html_body.trim()) {
+      toast.error('Subject and HTML content are required');
+      return;
+    }
+    setSendingPromo(true);
+    try {
+      const response = await axios.post(
+        `${API}/super-admin/users/${promoTarget.id}/send-promo-email`,
+        promoForm,
+        { params: credentials }
+      );
+      if (response.data?.success) {
+        toast.success('Promotional email sent');
+        resetPromoModal();
+      } else {
+        toast.error(response.data?.message || 'Failed to send email');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send promotional email');
+    } finally {
+      setSendingPromo(false);
+    }
+  };
+
+  const applyPromoTemplate = (templateId) => {
+    const template = promoTemplates.find((t) => t.id === templateId);
+    if (!template) return;
+    const name = promoTarget?.username || promoTarget?.email || 'there';
+    const html = (template.html || '').replaceAll('{{name}}', name);
+    const text = (template.text || '').replaceAll('{{name}}', name);
+    setPromoForm((prev) => ({
+      ...prev,
+      subject: template.subject || prev.subject,
+      html_body: html || prev.html_body,
+      text_body: text || prev.text_body
+    }));
+  };
+
   const updateTicketStatus = async (ticketId, status) => {
     try {
       await axios.put(`${API}/super-admin/tickets/${ticketId}`, 
@@ -2004,6 +2241,18 @@ const SuperAdminPage = () => {
                                   title="View Details"
                                 >
                                   <Eye className="w-3 h-3" />
+                                </Button>
+                              )}
+
+                              {hasPermission('users') && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openPromoModal(user)}
+                                  className="text-xs h-7 px-2 text-blue-600 border-blue-200"
+                                  title="Send Promotional Email"
+                                >
+                                  <Send className="w-3 h-3" />
                                 </Button>
                               )}
                               
@@ -2959,6 +3208,119 @@ const SuperAdminPage = () => {
                     <Button 
                       onClick={resetSubscriptionModal}
                       variant="outline" 
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Promotional Email Modal */}
+        {showPromoModal && promoTarget && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+            <Card className="w-full max-w-2xl my-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="w-5 h-5 text-blue-600" />
+                  Send Promotional Email
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">To</p>
+                    <p className="font-medium">{promoTarget.username || 'User'}</p>
+                    <p className="text-sm text-gray-500">{promoTarget.email}</p>
+                    <p className="text-xs text-gray-500 mt-1">From: hello@billbytekot.in • Reply-To: support@billbytekot.in</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 items-end">
+                    <div className="col-span-2">
+                      <Label>Template</Label>
+                      <select
+                        value={selectedPromoTemplate}
+                        onChange={(e) => setSelectedPromoTemplate(e.target.value)}
+                        className="w-full px-3 py-2 border rounded mt-1"
+                      >
+                        {promoTemplates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => applyPromoTemplate(selectedPromoTemplate)}
+                      className="h-10"
+                    >
+                      Apply Template
+                    </Button>
+                  </div>
+
+                  <div>
+                    <Label>Subject *</Label>
+                    <Input
+                      value={promoForm.subject}
+                      onChange={(e) => setPromoForm({ ...promoForm, subject: e.target.value })}
+                      placeholder="Enter subject"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>HTML Content *</Label>
+                    <textarea
+                      value={promoForm.html_body}
+                      onChange={(e) => setPromoForm({ ...promoForm, html_body: e.target.value })}
+                      placeholder="Paste HTML email content"
+                      rows={8}
+                      className="w-full px-3 py-2 border rounded mt-1 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Text Content (optional)</Label>
+                    <textarea
+                      value={promoForm.text_body}
+                      onChange={(e) => setPromoForm({ ...promoForm, text_body: e.target.value })}
+                      placeholder="Plain text fallback"
+                      rows={4}
+                      className="w-full px-3 py-2 border rounded mt-1 text-sm"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="ccSupport"
+                      checked={promoForm.cc_support}
+                      onChange={(e) => setPromoForm({ ...promoForm, cc_support: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="ccSupport" className="flex items-center gap-2 cursor-pointer">
+                      <Mail className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm">CC support@billbytekot.in</span>
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={sendPromoEmail}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      disabled={sendingPromo}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {sendingPromo ? 'Sending...' : 'Send Email'}
+                    </Button>
+                    <Button
+                      onClick={resetPromoModal}
+                      variant="outline"
                       className="flex-1"
                     >
                       Cancel

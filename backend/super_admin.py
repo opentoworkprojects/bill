@@ -12,6 +12,9 @@ import os
 import io
 import csv
 import uuid
+import re
+
+from email_service import send_email
 
 
 # ============ PRICING CONFIGURATION MODEL (Requirements 8.2) ============
@@ -74,6 +77,13 @@ class Campaign(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat() if v else None
         }
+
+
+class PromoEmailRequest(BaseModel):
+    subject: str
+    html_body: str
+    text_body: Optional[str] = None
+    cc_support: bool = True
 
 
 class CampaignCreateRequest(BaseModel):
@@ -779,6 +789,61 @@ async def get_user_details(
     except Exception as e:
         print(f"❌ User details error: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# ============ PROMOTIONAL EMAILS ============
+
+@super_admin_router.post("/users/{user_id}/send-promo-email")
+async def send_promotional_email(
+    user_id: str,
+    payload: PromoEmailRequest,
+    username: str = Query(...),
+    password: str = Query(...)
+):
+    """Send a promotional email to a specific user via Resend (cc support)."""
+    if not verify_super_admin(username, password):
+        raise HTTPException(status_code=403, detail="Invalid super admin credentials")
+
+    db = get_db()
+
+    try:
+        user = await db.users.find_one(
+            {"$or": [{"id": user_id}, {"email": user_id}]},
+            {"_id": 0, "id": 1, "email": 1, "username": 1}
+        )
+        if not user or not user.get("email"):
+            raise HTTPException(status_code=404, detail="User email not found")
+
+        text_body = payload.text_body
+        if not text_body:
+            text_body = re.sub(r"<[^>]+>", " ", payload.html_body or "").strip()
+            if not text_body:
+                text_body = payload.subject
+
+        cc_list = ["support@billbytekot.in"] if payload.cc_support else None
+
+        result = await send_email(
+            user.get("email"),
+            payload.subject,
+            payload.html_body,
+            text_body,
+            from_email="BillByteKOT <hello@billbytekot.in>",
+            reply_to="support@billbytekot.in",
+            cc=cc_list
+        )
+
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", "Email sent"),
+            "provider": result.get("provider"),
+            "email": user.get("email"),
+            "user_id": user.get("id")
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Promo email error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send promotional email: {str(e)}")
 
 # ============ RECENT ORDERS (LIMITED) ============
 

@@ -24,7 +24,15 @@ def get_config():
     }
 
 
-async def send_via_resend(email: str, subject: str, html_body: str, text_body: str, from_email: str = None, reply_to: str = None) -> dict:
+async def send_via_resend(
+    email: str,
+    subject: str,
+    html_body: str,
+    text_body: str,
+    from_email: str = None,
+    reply_to: str = None,
+    cc: list = None
+) -> dict:
     """Send email via Resend API (Free - 100 emails/day)
     
     Args:
@@ -56,6 +64,9 @@ async def send_via_resend(email: str, subject: str, html_body: str, text_body: s
             "html": html_body,
             "text": text_body
         }
+        
+        if cc:
+            payload["cc"] = cc
         
         # Add reply_to if specified (enables receiving replies at support@billbytekot.in)
         if reply_to:
@@ -96,7 +107,7 @@ async def send_via_resend(email: str, subject: str, html_body: str, text_body: s
             raise
 
 
-async def send_via_smtp(email: str, subject: str, html_body: str, text_body: str) -> dict:
+async def send_via_smtp(email: str, subject: str, html_body: str, text_body: str, cc: list = None) -> dict:
     """Send email via SMTP"""
     config = get_config()
     
@@ -107,6 +118,8 @@ async def send_via_smtp(email: str, subject: str, html_body: str, text_body: str
     msg['Subject'] = subject
     msg['From'] = f"{config['smtp_from_name']} <{config['smtp_from_email']}>"
     msg['To'] = email
+    if cc:
+        msg['Cc'] = ", ".join(cc)
     msg.attach(MIMEText(text_body, 'plain'))
     msg.attach(MIMEText(html_body, 'html'))
     
@@ -133,7 +146,15 @@ async def send_via_smtp(email: str, subject: str, html_body: str, text_body: str
     raise Exception("All SMTP ports failed")
 
 
-async def send_email(email: str, subject: str, html_body: str, text_body: str, from_email: str = None, reply_to: str = None) -> dict:
+async def send_email(
+    email: str,
+    subject: str,
+    html_body: str,
+    text_body: str,
+    from_email: str = None,
+    reply_to: str = None,
+    cc: list = None
+) -> dict:
     """Send email using configured provider with fallback
     
     Args:
@@ -152,11 +173,11 @@ async def send_email(email: str, subject: str, html_body: str, text_body: str, f
     # Try primary provider first
     try:
         if provider == "resend":
-            return await send_via_resend(email, subject, html_body, text_body, from_email, reply_to)
+            return await send_via_resend(email, subject, html_body, text_body, from_email, reply_to, cc)
         elif provider == "smtp":
-            return await send_via_smtp(email, subject, html_body, text_body)
+            return await send_via_smtp(email, subject, html_body, text_body, cc)
         else:
-            return await send_via_resend(email, subject, html_body, text_body, from_email, reply_to)
+            return await send_via_resend(email, subject, html_body, text_body, from_email, reply_to, cc)
     except Exception as e:
         print(f"❌ Primary email failed ({provider}): {e}")
         
@@ -164,7 +185,7 @@ async def send_email(email: str, subject: str, html_body: str, text_body: str, f
         if provider == "resend" and config["smtp_user"] and config["smtp_password"]:
             print("📧 Trying SMTP fallback...")
             try:
-                return await send_via_smtp(email, subject, html_body, text_body)
+                return await send_via_smtp(email, subject, html_body, text_body, cc)
             except Exception as smtp_error:
                 print(f"❌ SMTP fallback also failed: {smtp_error}")
         
