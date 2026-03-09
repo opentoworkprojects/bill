@@ -24,7 +24,7 @@ import {
   Download
 } from 'lucide-react';
 import { API } from '../App';
-import { apiWithRetry } from '../utils/apiClient';
+import { apiWithRetry, apiSilent } from '../utils/apiClient';
 import { processPaymentFast } from '../utils/optimizedPayment';
 import { computePaymentState, determineBillingCompletionStatus } from '../utils/orderWorkflowRules';
 import { validatePayment } from '../utils/paymentValidator';
@@ -85,6 +85,7 @@ const CounterSalePage = ({ user }) => {
   const [upiAmount, setUpiAmount] = useState('');
   const [processing, setProcessing] = useState(false);
   const [businessSettings, setBusinessSettings] = useState({});
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [pendingComplete, setPendingComplete] = useState(false);
@@ -116,6 +117,20 @@ const CounterSalePage = ({ user }) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const fetchSubscriptionStatus = async () => {
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/subscription/status`,
+        timeout: 8000
+      });
+      if (response?.data) {
+        setSubscriptionStatus(response.data);
+      }
+    };
+    fetchSubscriptionStatus();
+  }, []);
 
   const categories = useMemo(() => {
     const unique = new Set(menuItems.map((item) => item.category).filter(Boolean));
@@ -271,6 +286,15 @@ const CounterSalePage = ({ user }) => {
 
     if (processing) return;
 
+    const billCount = subscriptionStatus?.bill_count ?? user?.bill_count ?? 0;
+    const subscriptionActive = subscriptionStatus?.subscription_active ?? user?.subscription_active ?? false;
+    const needsSubscription = subscriptionStatus?.needs_subscription ?? (!subscriptionActive && billCount >= 50);
+    if (needsSubscription) {
+      toast.error('Free plan limit reached (50 bills). Please subscribe to continue.');
+      navigate('/subscription');
+      return;
+    }
+
     if (!skipCustomerCheck && paymentMethod === 'credit' && businessSettings?.credit_requires_customer_info) {
       if (!customerName.trim() || !customerPhone.trim()) {
         setPendingComplete(true);
@@ -384,6 +408,17 @@ const CounterSalePage = ({ user }) => {
       const order = orderResponse.data;
       createdOrderId = order?.id;
 
+      setSubscriptionStatus((prev) => {
+        if (!prev) return prev;
+        const nextCount = (prev.bill_count || 0) + 1;
+        const shouldRequire = !prev.subscription_active && nextCount >= 50;
+        return {
+          ...prev,
+          bill_count: nextCount,
+          needs_subscription: shouldRequire ? true : prev.needs_subscription
+        };
+      });
+
       const completionStatus = 'completed';
 
       const paymentData = {
@@ -456,9 +491,16 @@ const CounterSalePage = ({ user }) => {
       console.log('✅ Order completed in background:', createdOrderId);
     } catch (error) {
       console.error('Background error processing order:', error);
+      if (error.response?.status === 402) {
+        setSubscriptionStatus((prev) => (prev ? { ...prev, needs_subscription: true } : prev));
+        const errorMsg = error.response?.data?.detail || 'Subscription required to continue.';
+        toast.error(errorMsg);
+        navigate('/subscription');
+        return;
+      }
       // User already saw success - order will retry via sync mechanism
     }
-  }, [selectedItems, processing, paymentMethod, businessSettings, total, effectiveReceived, customerName, customerPhone, subtotal, tax, taxRate, discountAmount, discountValue, discountType, splitPaid, splitCredit, cashValue, cardValue, upiValue, user, setProcessing, setShowPrintReceipt, setCompletedSaleOrder, resetSale, setMenuSearch, searchRef, openCustomerModal, setPendingComplete]);
+  }, [selectedItems, processing, paymentMethod, businessSettings, total, effectiveReceived, customerName, customerPhone, subtotal, tax, taxRate, discountAmount, discountValue, discountType, splitPaid, splitCredit, cashValue, cardValue, upiValue, user, subscriptionStatus, navigate, setProcessing, setShowPrintReceipt, setCompletedSaleOrder, resetSale, setMenuSearch, searchRef, openCustomerModal, setPendingComplete]);
 
   const handleCompleteSale = async () => {
     if (pendingComplete) {

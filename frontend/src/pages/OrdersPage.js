@@ -115,6 +115,7 @@ const OrdersPage = ({ user }) => {
   const [menuSearch, setMenuSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [tableSearch, setTableSearch] = useState(''); // Search for tables
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   
   // Simplified edit order state for new EditOrderModal component
   const [editOrderModal, setEditOrderModal] = useState({ open: false, order: null });
@@ -235,6 +236,20 @@ const OrdersPage = ({ user }) => {
       dataLoadedRef.current = true;
       loadInitialData();
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchSubscriptionStatus = async () => {
+      const response = await apiSilent({
+        method: 'get',
+        url: `${API}/subscription/status`,
+        timeout: 8000
+      });
+      if (response?.data) {
+        setSubscriptionStatus(response.data);
+      }
+    };
+    fetchSubscriptionStatus();
   }, []);
 
   // Listen for payment completion events from BillingPage
@@ -1009,6 +1024,15 @@ const OrdersPage = ({ user }) => {
       return;
     }
 
+    const quickBillCount = subscriptionStatus?.bill_count ?? user?.bill_count ?? 0;
+    const quickSubActive = subscriptionStatus?.subscription_active ?? user?.subscription_active ?? false;
+    const quickNeedsSub = subscriptionStatus?.needs_subscription ?? (!quickSubActive && quickBillCount >= 50);
+    if (quickNeedsSub) {
+      toast.error('Free plan limit reached (50 bills). Please subscribe to continue.');
+      navigate('/subscription');
+      return;
+    }
+
     setIsCreatingOrder(true);
 
     try {
@@ -1042,13 +1066,32 @@ const OrdersPage = ({ user }) => {
       
       // Reset form
       resetForm();
+
+      // Update local subscription status count
+      setSubscriptionStatus((prev) => {
+        if (!prev) return prev;
+        const nextCount = (prev.bill_count || 0) + 1;
+        const shouldRequire = !prev.subscription_active && nextCount >= 50;
+        return {
+          ...prev,
+          bill_count: nextCount,
+          needs_subscription: shouldRequire ? true : prev.needs_subscription
+        };
+      });
       
       // Navigate instantly
       navigate(`/billing/${newOrder.id}`, { replace: true });
 
     } catch (error) {
       console.error('Quick bill failed:', error);
-      toast.error('Quick bill failed');
+      if (error.response?.status === 402) {
+        setSubscriptionStatus((prev) => (prev ? { ...prev, needs_subscription: true } : prev));
+        const errorMsg = error.response?.data?.detail || 'Subscription required to continue.';
+        toast.error(errorMsg);
+        navigate('/subscription');
+      } else {
+        toast.error('Quick bill failed');
+      }
       
       // Reopen menu on error
       setShowMenuPage(true);
@@ -1073,6 +1116,15 @@ const OrdersPage = ({ user }) => {
     // Prevent duplicate order creation
     if (isCreatingOrder) {
       toast.warning('Order is being created, please wait...');
+      return;
+    }
+
+    const effectiveBillCount = subscriptionStatus?.bill_count ?? user?.bill_count ?? 0;
+    const subscriptionActive = subscriptionStatus?.subscription_active ?? user?.subscription_active ?? false;
+    const needsSubscription = subscriptionStatus?.needs_subscription ?? (!subscriptionActive && effectiveBillCount >= 50);
+    if (needsSubscription) {
+      toast.error('Free plan limit reached (50 bills). Please subscribe to continue.');
+      navigate('/subscription');
       return;
     }
 
@@ -1174,6 +1226,18 @@ const OrdersPage = ({ user }) => {
         timestamp: now
       });
 
+      // Update local subscription status count
+      setSubscriptionStatus((prev) => {
+        if (!prev) return prev;
+        const nextCount = (prev.bill_count || 0) + 1;
+        const shouldRequire = !prev.subscription_active && nextCount >= 50;
+        return {
+          ...prev,
+          bill_count: nextCount,
+          needs_subscription: shouldRequire ? true : prev.needs_subscription
+        };
+      });
+
       // Update table status if needed
       if (selectedTable && selectedTable.status === 'available') {
         setTables(prevTables => 
@@ -1214,7 +1278,13 @@ const OrdersPage = ({ user }) => {
       setOrders(prevOrders => prevOrders.filter(order => order.id !== `temp_${now}`));
       
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to create order';
-      toast.error(`Order creation failed: ${errorMsg}`);
+      if (error.response?.status === 402) {
+        setSubscriptionStatus((prev) => (prev ? { ...prev, needs_subscription: true } : prev));
+        toast.error(errorMsg);
+        navigate('/subscription');
+      } else {
+        toast.error(`Order creation failed: ${errorMsg}`);
+      }
     } finally {
       setIsCreatingOrder(false);
     }

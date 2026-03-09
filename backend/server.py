@@ -13,6 +13,7 @@ import io
 import time
 import random
 import math
+import builtins
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -29,6 +30,24 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+
+# Global log suppression for cleaner output (set DEBUG_LOGS=true to enable verbose logs)
+_LOG_DEBUG = os.getenv("DEBUG_LOGS", "").lower() in ("1", "true", "yes", "on")
+_original_print = builtins.print
+
+def _quiet_print(*args, **kwargs):
+    message = " ".join(str(arg) for arg in args)
+    if _LOG_DEBUG:
+        return _original_print(*args, **kwargs)
+    if any(token in message for token in ("❌", "🚨", "⚠️", "ERROR", "Error", "warning", "Warning", "CRITICAL", "Critical")):
+        return _original_print(*args, **kwargs)
+    return
+
+builtins.print = _quiet_print
+logging.basicConfig(
+    level=logging.INFO if _LOG_DEBUG else logging.WARNING,
+    format="%(levelname)s:%(name)s:%(message)s"
+)
 
 # Import Redis cache service
 from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service, get_table_status_manager
@@ -5233,6 +5252,8 @@ async def create_order(
         doc["updated_at"] = doc["updated_at"].isoformat()
 
         await db.orders.insert_one(doc)
+        # Increment bill count for org owner on order creation (free trial limit uses total orders)
+        await db.users.update_one({"id": user_org_id}, {"$inc": {"bill_count": 1}})
 
         # Store implicit WhatsApp consent on customer record (billing flow)
         if order_data.customer_phone:
@@ -5459,6 +5480,10 @@ async def create_order(
     doc["updated_at"] = doc["updated_at"].isoformat()
 
     await db.orders.insert_one(doc)
+    # Increment bill count for org owner on order creation (free trial limit uses total orders)
+    await db.users.update_one({"id": order_data.org_id}, {"$inc": {"bill_count": 1}})
+    # Increment bill count for org owner on order creation (free trial limit uses total orders)
+    await db.users.update_one({"id": user_org_id}, {"$inc": {"bill_count": 1}})
 
     # Store implicit WhatsApp consent on customer record (billing flow)
     if order_data.customer_phone:
@@ -6918,9 +6943,7 @@ async def create_payment_order(
             {"id": payment_data.order_id, "organization_id": user_org_id},
             {"$set": {"status": "completed"}},
         )
-        await db.users.update_one(
-            {"id": current_user["id"]}, {"$inc": {"bill_count": 1}}
-        )
+        # Bill count is incremented on order creation to reflect total orders
 
         # Use TableStatusManager to set table to available when payment is completed
         # This ensures immediate table status sync (Requirements 1.2, 1.3)
@@ -6993,7 +7016,7 @@ async def verify_payment(
         {"id": order_id, "organization_id": user_org_id},
         {"$set": {"status": "completed"}},
     )
-    await db.users.update_one({"id": current_user["id"]}, {"$inc": {"bill_count": 1}})
+    # Bill count is incremented on order creation to reflect total orders
 
     # Use TableStatusManager to set table to available when payment is completed
     # This ensures immediate table status sync (Requirements 1.2, 1.3)

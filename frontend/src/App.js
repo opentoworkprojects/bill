@@ -59,6 +59,17 @@ import { Toaster } from './components/ui/sonner';
 import { setupAutoSync } from './utils/offlineSync';
 import { startNotificationPolling, requestNotificationPermission } from './utils/pushNotifications';
 
+// Reduce noisy logs in production by default.
+// Set localStorage.DEBUG_LOGS = 'true' to re-enable console logs.
+if (typeof window !== 'undefined') {
+  const debugLogs = localStorage.getItem('DEBUG_LOGS') === 'true';
+  if (!debugLogs) {
+    console.log = () => {};
+    console.info = () => {};
+    console.debug = () => {};
+  }
+}
+
 // Electron navigation handler component
 const ElectronNavigator = () => {
   const navigate = useNavigate();
