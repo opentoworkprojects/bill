@@ -1256,7 +1256,7 @@ const OrdersPage = ({ user }) => {
       
       // Offer WhatsApp notification
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message sent');
+        toast.success('WhatsApp message delivered');
       } else if (response.data?.whatsapp_link && formData.customer_phone) {
         setTimeout(() => {
           if (window.confirm('Send order confirmation via WhatsApp?')) {
@@ -1471,7 +1471,7 @@ const OrdersPage = ({ user }) => {
       
       // WhatsApp notification
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message sent');
+        toast.success('WhatsApp message delivered');
       } else if (response.data?.whatsapp_link && response.data?.customer_phone) {
         setTimeout(() => {
           if (window.confirm(`Send "${status}" update via WhatsApp?`)) {
@@ -1574,7 +1574,7 @@ const OrdersPage = ({ user }) => {
       });
       
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message sent');
+        toast.success('WhatsApp message delivered');
       } else if (response.data?.whatsapp_link) {
         window.open(response.data.whatsapp_link, '_blank');
         toast.success('Opening WhatsApp...');
