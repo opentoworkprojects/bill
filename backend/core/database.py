@@ -18,17 +18,18 @@ async def get_database() -> AsyncIOMotorDatabase:
 
 async def connect_to_mongo():
     """Initialize MongoDB connection"""
-    # Configure connection pooling for stability
+    # Configure connection pooling for high-performance under load
     client_options = {
-        "maxPoolSize": 10,           # Max connections in pool (reduced for stability)
-        "minPoolSize": 2,            # Min connections kept alive
-        "maxIdleTimeMS": 45000,      # 45 seconds idle before closing
+        "maxPoolSize": 100,           # Increased for high concurrent requests (was 10)
+        "minPoolSize": 10,            # Keep more connections alive
+        "maxIdleTimeMS": 30000,       # 30 seconds idle before closing
         "serverSelectionTimeoutMS": 10000,   # 10s server selection timeout
         "connectTimeoutMS": 15000,    # 15s connection timeout
         "socketTimeoutMS": 30000,     # 30s socket timeout
-        "waitQueueTimeoutMS": 10000,  # 10s wait for connection from pool
+        "waitQueueTimeoutMS": 5000,   # 5s wait for connection from pool (reduced)
         "retryWrites": True,          # Automatic write retries
         "w": "majority",              # Write concern
+        "readPreference": "primaryPreferred"  # Prefer primary for reads
     }
     
     db.client = AsyncIOMotorClient(settings.MONGODB_URI, **client_options)
@@ -53,9 +54,13 @@ async def close_mongo_connection():
 
 async def create_indexes():
     """Create necessary database indexes"""
-    # Orders collection
+    # Orders collection - Performance optimized indexes
     await db.db.orders.create_index([("organization_id", 1), ("created_at", -1)])
     await db.db.orders.create_index([("table_number", 1), ("status", 1)])
+    await db.db.orders.create_index([("status", 1), ("organization_id", 1)])  # Critical for kitchen filtering
+    await db.db.orders.create_index([("waiter_id", 1), ("created_at", -1)])  # For staff reports
+    await db.db.orders.create_index([("customer_phone", 1)])  # For customer lookups
+    await db.db.orders.create_index([("date", 1), ("organization_id", 1)])  # For date-range queries
     await db.db.orders.create_index("invoice_number", unique=True, sparse=True)
     
     # Users collection
@@ -68,10 +73,11 @@ async def create_indexes():
         unique=True
     )
     
-    # Menu items collection
+    # Menu items collection - Performance optimized
     await db.db.menu_items.create_index(
         [("organization_id", 1), ("name", 1)],
         unique=True
     )
+    await db.db.menu_items.create_index([("organization_id", 1), ("active", 1)])  # For active menu filtering
     
-    print("✅ Created database indexes")
+    print("✅ Created optimized database indexes for high performance")

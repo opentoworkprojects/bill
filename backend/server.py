@@ -5269,16 +5269,35 @@ async def create_order(
         order_data.customer_name
     )
 
-    # GLOBAL DUPLICATE PREVENTION - idempotent submission guard (all order paths)
+    # OPTIMIZED DUPLICATE PREVENTION - Single efficient query
     try:
-        recent_cutoff = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
-        recent_orders = await db.orders.find({
+        # Single query to check for duplicates and existing orders in one go
+        now = datetime.now(timezone.utc)
+        recent_cutoff = (now - timedelta(seconds=10)).isoformat()
+        consolidation_cutoff = (now - timedelta(hours=2)).isoformat()
+        
+        # Build compound query for both duplicate check and consolidation
+        duplicate_query = {
             "organization_id": user_org_id,
             "table_id": table_id,
             "waiter_id": current_user.get("id"),
             "created_at": {"$gte": recent_cutoff}
-        }, {"_id": 0}).to_list(5)
-
+        }
+        
+        consolidation_query = {
+            "organization_id": user_org_id,
+            "table_id": table_id,
+            "status": {"$in": ["pending", "preparing"]},
+            "created_at": {"$gte": consolidation_cutoff}
+        }
+        
+        # Execute both queries in parallel for better performance
+        recent_orders_task = db.orders.find(duplicate_query, {"_id": 0}).to_list(5)
+        existing_order_task = db.orders.find_one(consolidation_query)
+        
+        recent_orders, existing_order = await asyncio.gather(recent_orders_task, existing_order_task)
+        
+        # Check for duplicates
         for recent_order in recent_orders:
             recent_signature = build_order_signature(
                 recent_order.get("items", []),
@@ -5296,7 +5315,7 @@ async def create_order(
                     "message": "Duplicate submission detected. Returning existing order."
                 }
     except Exception as e:
-        print(f"⚠️ Duplicate submission guard failed: {e}")
+        print(f"⚠️ Optimized duplicate/consolidation check failed: {e}")
     
     # 🚀 ULTRA-FAST PATH FOR QUICK BILLING - Skip duplicate/consolidation checks (but NOT subscription)
     if getattr(order_data, 'quick_billing', False):
@@ -5413,62 +5432,57 @@ async def create_order(
                         detail=f"Duplicate order detected for Table {table_number}. Please wait 30 seconds before placing the same order again."
                     )
             
-            # ORDER CONSOLIDATION LOGIC - Check for existing pending orders on the same table
-            existing_order = await db.orders.find_one({
-                "organization_id": user_org_id,
-                "table_id": table_id,
-                "status": {"$in": ["pending", "preparing"]},
-                "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}  # Only check last 2 hours
-            })
+        except Exception as e:
+            print(f"⚠️ Enhanced duplicate prevention failed: {e}")
+            # Continue with order creation even if duplicate check fails
+        
+        # ORDER CONSOLIDATION LOGIC - Use the existing_order we already fetched
+        if existing_order:
+            print(f"🔄 Found existing order {existing_order['id']} for table {table_number}, consolidating items...")
             
-            if existing_order:
-                print(f"🔄 Found existing order {existing_order['id']} for table {table_number}, consolidating items...")
-                
-                # Consolidate items - merge with existing order
-                existing_items = existing_order.get("items", [])
-                new_items = [item.model_dump() for item in order_data.items]
-                
-                # Merge items by menu_item_id
-                consolidated_items = {}
-                
-                # Add existing items
-                for item in existing_items:
-                    key = item.get("menu_item_id", item.get("name", "unknown"))
-                    if key in consolidated_items:
-                        consolidated_items[key]["quantity"] += item["quantity"]
-                    else:
-                        consolidated_items[key] = item.copy()
-                
-                # Add new items
-                for item in new_items:
-                    key = item.get("menu_item_id", item.get("name", "unknown"))
-                    if key in consolidated_items:
-                        consolidated_items[key]["quantity"] += item["quantity"]
-                    else:
-                        consolidated_items[key] = item.copy()
-                
-                # Convert back to list
-                final_items = list(consolidated_items.values())
-                
-                # Recalculate totals
-                subtotal = sum(item["price"] * item["quantity"] for item in final_items)
-                tax = subtotal * tax_rate
-                total = subtotal + tax
-                
-                # Update existing order with consolidated items
-                await db.orders.update_one(
-                    {"id": existing_order["id"]},
-                    {
-                        "$set": {
-                            "items": final_items,
-                            "subtotal": subtotal,
-                            "tax": tax,
-                            "total": total,
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                            # Update customer info if provided
-                            "customer_name": order_data.customer_name or existing_order.get("customer_name", ""),
-                            "customer_phone": order_data.customer_phone or existing_order.get("customer_phone", "")
-                        }
+            # Consolidate items - merge with existing order
+            
+            # Merge items by menu_item_id
+            consolidated_items = {}
+            
+            # Add existing items
+            for item in existing_items:
+                key = item.get("menu_item_id", item.get("name", "unknown"))
+                if key in consolidated_items:
+                    consolidated_items[key]["quantity"] += item["quantity"]
+                else:
+                    consolidated_items[key] = item.copy()
+            
+            # Add new items
+            for item in new_items:
+                key = item.get("menu_item_id", item.get("name", "unknown"))
+                if key in consolidated_items:
+                    consolidated_items[key]["quantity"] += item["quantity"]
+                else:
+                    consolidated_items[key] = item.copy()
+            
+            # Convert back to list
+            final_items = list(consolidated_items.values())
+            
+            # Recalculate totals
+            subtotal = sum(item["price"] * item["quantity"] for item in final_items)
+            tax = subtotal * tax_rate
+            total = subtotal + tax
+            
+            # Update existing order with consolidated items
+            await db.orders.update_one(
+                {"id": existing_order["id"]},
+                {
+                    "$set": {
+                        "items": final_items,
+                        "subtotal": subtotal,
+                        "tax": tax,
+                        "total": total,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        # Update customer info if provided
+                        "customer_name": order_data.customer_name or existing_order.get("customer_name", ""),
+                        "customer_phone": order_data.customer_phone or existing_order.get("customer_phone", "")
+                    }
                     }
                 )
                 
@@ -5521,22 +5535,7 @@ async def create_order(
                     "consolidated": True,
                     "message": f"Items added to existing order for Table {table_number}"
                 }
-                
-        except HTTPException:
-            raise
-        except Exception as e:
-            print(f"⚠️ Order consolidation check failed: {e}, creating new order...")
-            # If consolidation fails, continue with creating new order
 
-    # CREATE NEW ORDER (original logic)
-    subtotal = sum(item.price * item.quantity for item in order_data.items)
-    tax = subtotal * tax_rate
-    total = subtotal + tax
-    
-    # Generate tracking token for customer live tracking
-    tracking_token = str(uuid.uuid4())[:12]
-
-    # Get next invoice number for the organization
     invoice_number = await get_next_invoice_number(user_org_id)
     
     order_obj = Order(
@@ -5833,8 +5832,12 @@ async def get_orders(
             # NO DATE FILTER: Yesterday's uncompleted orders should still show as active
 
         try:
+            # PERFORMANCE OPTIMIZATION: Use pagination instead of loading all orders
+            # Default page_size=20 for better performance, max 100 to prevent abuse
+            skip_count = (page - 1) * page_size
+            
             # ALWAYS fetch from database for most current status
-            orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
+            orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).skip(skip_count).limit(page_size).to_list(page_size)
             
             # IMPROVED BUSINESS LOGIC: Filter based on status, not payment amount
             if not status or status not in ["completed", "paid", "cancelled", "billed", "settled"]:
@@ -5913,14 +5916,14 @@ async def get_orders(
             else:
                 print(f"📊 Returned {len(orders)} {status} orders from database")
             
-            # SMART CACHING: Cache fresh results for very short time (30 seconds only)
+            # SMART CACHING: Cache fresh results for longer time (2 minutes for better performance)
             if not fresh:
                 try:
                     cached_service = get_cached_order_service()
                     if cached_service and not status:
-                        # Only cache active orders for 30 seconds
-                        await cached_service.cache.set_active_orders(user_org_id, orders, ttl=30)
-                        print(f"💾 Cached {len(orders)} orders for 30 seconds")
+                        # Cache active orders for 2 minutes (increased from 30s for better performance)
+                        await cached_service.cache.set_active_orders(user_org_id, orders, ttl=120)
+                        print(f"💾 Cached {len(orders)} orders for 2 minutes")
                 except Exception as cache_error:
                     print(f"⚠️ Cache write error: {cache_error}")
             
@@ -5996,6 +5999,91 @@ async def get_orders(
     except Exception as e:
         print(f"❌ Critical error in get_orders: {e}")
         # Last resort: return empty list to prevent API crash
+        return []
+
+
+@api_router.get("/orders/kitchen", response_model=List[Order])
+async def get_kitchen_orders(
+    current_user: dict = Depends(get_current_user),
+    fresh: Optional[bool] = Query(False, description="Force fresh data from database")
+):
+    """🚀 HIGH-PERFORMANCE Kitchen Orders Endpoint - Server-side filtering for optimal speed"""
+    # Get user's organization_id - CRITICAL for data isolation
+    user_org_id = current_user.get("organization_id")
+
+    # SECURITY: Ensure organization_id is valid
+    if not user_org_id:
+        print(f"🚨 SECURITY ALERT: User {current_user.get('email')} attempted to fetch kitchen orders without organization_id!")
+        raise HTTPException(status_code=403, detail="Organization not configured. Contact support.")
+
+    print(f"👨‍🍳 Kitchen fetching orders for org {user_org_id}")
+
+    try:
+        # Check cache first (unless fresh data requested)
+        if not fresh:
+            try:
+                cached_service = get_cached_order_service()
+                if cached_service:
+                    cached_orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
+                    if cached_orders:
+                        print(f"💾 Served {len(cached_orders)} kitchen orders from cache")
+                        return cached_orders
+            except Exception as cache_error:
+                print(f"⚠️ Cache read error: {cache_error}")
+
+        # Optimized database query: Filter server-side for kitchen needs
+        # Include pending, preparing, ready orders + recently completed (30 seconds)
+        now = datetime.now(timezone.utc)
+        thirty_seconds_ago = now - timedelta(seconds=30)
+
+        # Build efficient query with proper indexing
+        query = {
+            "organization_id": user_org_id,
+            "$or": [
+                {"status": {"$in": ["pending", "preparing", "ready"]}},
+                {
+                    "status": "completed",
+                    "updated_at": {"$gte": thirty_seconds_ago}
+                }
+            ]
+        }
+
+        # Use optimized projection - only fetch fields needed by kitchen
+        projection = {
+            "_id": 0,
+            "id": 1,
+            "table_number": 1,
+            "status": 1,
+            "items": 1,
+            "total": 1,
+            "created_at": 1,
+            "updated_at": 1,
+            "waiter_id": 1,
+            "customer_name": 1,
+            "customer_phone": 1,
+            "notes": 1
+        }
+
+        # Sort by creation time and limit to reasonable number
+        orders = await db.orders.find(query, projection).sort("created_at", 1).limit(200).to_list(200)
+
+        print(f"🍳 Fetched {len(orders)} kitchen orders from database")
+
+        # Cache the results for 2 minutes
+        if not fresh:
+            try:
+                cached_service = get_cached_order_service()
+                if cached_service:
+                    await cached_service.cache.set_active_orders(user_org_id, orders, ttl=120)
+                    print(f"💾 Cached kitchen orders for 2 minutes")
+            except Exception as cache_error:
+                print(f"⚠️ Kitchen cache write error: {cache_error}")
+
+        return orders
+
+    except Exception as e:
+        print(f"❌ Error in get_kitchen_orders: {e}")
+        # Return empty list rather than crash
         return []
 
 

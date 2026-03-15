@@ -161,23 +161,11 @@ const KitchenPage = ({ user }) => {
 
   const fetchOrders = async () => {
     try {
-      const response = await axios.get(`${API}/orders`);
-      const activeOrders = response.data.filter(o => {
-        // Include pending, preparing, ready orders
-        if (['pending', 'preparing', 'ready'].includes(o.status)) {
-          return true;
-        }
-        
-        // Also include recently completed orders (within last 30 seconds) for smooth transition
-        if (o.status === 'completed') {
-          const completedTime = new Date(o.updated_at || o.created_at);
-          const now = new Date();
-          const timeDiff = (now - completedTime) / 1000; // seconds
-          return timeDiff <= 30; // Show completed orders for 30 seconds
-        }
-        
-        return false;
-      });
+      // 🚀 PERFORMANCE OPTIMIZATION: Use dedicated kitchen endpoint for server-side filtering
+      const response = await axios.get(`${API}/orders/kitchen`);
+      
+      // Server already filtered for kitchen needs - no client-side filtering needed
+      const activeOrders = response.data;
       
       const sorted = activeOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       
