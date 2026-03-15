@@ -49,6 +49,9 @@ logging.basicConfig(
     level=logging.INFO if _LOG_DEBUG else logging.WARNING,
     format="%(levelname)s:%(name)s:%(message)s"
 )
+if not _LOG_DEBUG:
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 
 # Import Redis cache service
 from redis_cache import init_redis_cache, cleanup_redis_cache, get_cached_order_service, get_table_status_manager
@@ -15387,9 +15390,10 @@ async def get_assetlinks():
     )
 
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+if _LOG_DEBUG:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 logger = logging.getLogger(__name__)
 
 
@@ -16331,4 +16335,4 @@ async def shutdown_db_client():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=10000)
+    uvicorn.run(app, host="0.0.0.0", port=10000, access_log=_LOG_DEBUG)
