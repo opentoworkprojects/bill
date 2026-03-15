@@ -6255,6 +6255,7 @@ async def update_order_status(
     customer_phone = order.get("customer_phone")
     whatsapp_sent = False
     whatsapp_error = None
+    whatsapp_mode = None
 
     # 📱 AUTO-SEND WHATSAPP STATUS UPDATE (Cloud API with consent check)
     # Sends: "Your order is being prepared" → "Your order is ready!" → etc.
@@ -6267,7 +6268,7 @@ async def update_order_status(
                 
                 if not has_consent:
                     print(f"⚠️ No WhatsApp consent for {customer_phone} - skipping status update")
-                    whatsapp_error = "Customer has not opted in to WhatsApp messages"
+                    whatsapp_error = "no_consent"
                 else:
                     # Customer has consent - send status update via WhatsApp Cloud API
                     if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
@@ -6294,26 +6295,30 @@ async def update_order_status(
                                     # Record message sent in consent tracker
                                     await consent_manager.record_message_sent(user_org_id, customer_phone, msg_id)
                                     whatsapp_sent = True
+                                    whatsapp_mode = "cloud"
                                     print(f"✅ WA status sent | to={cleaned_phone} | status={status} | template={template_name} | params={template_params} | status=sent | msg_id={msg_id}")
                             else:
                                 print(f"⚠️ No WhatsApp template configured for status '{status}'")
-                                whatsapp_error = f"No template for status {status}"
+                                whatsapp_error = f"template_missing:{status}"
                         except Exception as cloud_err:
                             print(f"⚠️ WhatsApp Cloud API error: {cloud_err}")
                             whatsapp_error = str(cloud_err)
                     else:
                         print(f"⚠️ WhatsApp Cloud API not configured - skipping status update")
-                        whatsapp_error = "WhatsApp Cloud API not configured"
+                        whatsapp_error = "cloud_not_configured"
             else:
                 # Fallback if consent manager not available - still send if enabled
                 if business.get("whatsapp_enabled", False):
-                    asyncio.create_task(send_whatsapp_status_or_link(
+                    result = await send_whatsapp_status_or_link(
                         customer_phone,
                         status,
                         order,
                         business,
                         ""
-                    ))
+                    )
+                    whatsapp_sent = result.get("whatsapp_sent", False)
+                    whatsapp_mode = result.get("whatsapp_mode")
+                    whatsapp_error = result.get("whatsapp_error")
         except Exception as e:
             print(f"⚠️ WhatsApp status update failed: {e}")
             whatsapp_error = str(e)
@@ -6326,6 +6331,7 @@ async def update_order_status(
         "cache_invalidated": True,
         "database_verified": True,
         "whatsapp_sent": whatsapp_sent,
+        "whatsapp_mode": whatsapp_mode,
         "whatsapp_error": whatsapp_error,
         "customer_phone": customer_phone
     }
