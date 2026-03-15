@@ -1,6 +1,7 @@
 
 import base64
 import json
+import hashlib
 import logging
 import os
 import ssl
@@ -1745,6 +1746,8 @@ async def check_subscription(user: dict):
 
         # Staff doesn't have own subscription, check organization admin's subscription
         org_id = user.get("organization_id")
+        if not org_id:
+            return {"allowed": False, "reason": "no_organization", "bill_count": 0, "trial_days_remaining": 0}
         if org_id:
             # Find the admin of this organization
             admin_user = await db.users.find_one(
@@ -1860,6 +1863,41 @@ def get_separator(style: str, width: int) -> str:
         "none": ""
     }
     return separators.get(style, "-" * width)
+
+
+def build_order_signature(
+    items,
+    table_id: Optional[str],
+    table_number: Optional[int],
+    order_type: Optional[str],
+    customer_phone: Optional[str],
+    customer_name: Optional[str]
+) -> str:
+    """Build a deterministic signature to deduplicate identical order submissions."""
+    normalized_items = []
+    for item in items or []:
+        try:
+            item_data = item.model_dump()
+        except Exception:
+            item_data = item or {}
+        key = item_data.get("menu_item_id") or item_data.get("id") or item_data.get("name") or "unknown"
+        normalized_items.append({
+            "k": str(key),
+            "q": float(item_data.get("quantity", 0)),
+            "p": float(item_data.get("price", 0))
+        })
+
+    normalized_items.sort(key=lambda x: (x["k"], x["p"]))
+    payload = {
+        "table_id": table_id or "counter",
+        "table_number": table_number or 0,
+        "order_type": order_type or "dine_in",
+        "customer_phone": customer_phone or "",
+        "customer_name": customer_name or "",
+        "items": normalized_items
+    }
+    signature = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(signature.encode("utf-8")).hexdigest()
 
 
 def get_receipt_template(
@@ -2647,6 +2685,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     subscription_active = current_user.get("subscription_active", False)
     organization_id = current_user.get("organization_id")
     admin_created_at = None
+    admin_user = None
     
     if current_user.get("role") in ["waiter", "cashier", "kitchen", "staff"] and organization_id:
         admin_user = await db.users.find_one(
@@ -2674,10 +2713,13 @@ async def get_me(current_user: dict = Depends(get_current_user)):
             created_at = None
     
     if created_at:
-        trial_end = created_at + timedelta(days=7)
+        trial_days = await get_trial_days_config()
+        trial_extension_days = admin_user.get("trial_extension_days", 0) if admin_user else current_user.get("trial_extension_days", 0)
+        total_trial_days = trial_days + trial_extension_days
+        trial_end = created_at + timedelta(days=total_trial_days)
         now = datetime.now(timezone.utc)
         days_left = (trial_end - now).days
-        
+
         trial_info = {
             "is_trial": not subscription_active,
             "trial_days_left": max(0, days_left),
@@ -5210,10 +5252,51 @@ async def create_order(
             detail = "Subscription required. Please subscribe to continue using BillByteKOT."
         
         raise HTTPException(status_code=402, detail=detail)
+
+    user_org_id = get_secure_org_id(current_user)
+    table_id = order_data.table_id or "counter"
+    table_number = order_data.table_number or 0
+    order_type_for_signature = order_data.order_type or ("takeaway" if getattr(order_data, "quick_billing", False) else "dine_in")
+    order_signature = build_order_signature(
+        order_data.items,
+        table_id,
+        table_number,
+        order_type_for_signature,
+        order_data.customer_phone,
+        order_data.customer_name
+    )
+
+    # GLOBAL DUPLICATE PREVENTION - idempotent submission guard (all order paths)
+    try:
+        recent_cutoff = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+        recent_orders = await db.orders.find({
+            "organization_id": user_org_id,
+            "table_id": table_id,
+            "waiter_id": current_user.get("id"),
+            "created_at": {"$gte": recent_cutoff}
+        }, {"_id": 0}).to_list(5)
+
+        for recent_order in recent_orders:
+            recent_signature = build_order_signature(
+                recent_order.get("items", []),
+                recent_order.get("table_id"),
+                recent_order.get("table_number"),
+                recent_order.get("order_type"),
+                recent_order.get("customer_phone"),
+                recent_order.get("customer_name")
+            )
+            if recent_signature == order_signature:
+                print(f"🛡️ Duplicate submission blocked for table {table_number} (order {recent_order.get('id')})")
+                return {
+                    **recent_order,
+                    "duplicate_prevented": True,
+                    "message": "Duplicate submission detected. Returning existing order."
+                }
+    except Exception as e:
+        print(f"⚠️ Duplicate submission guard failed: {e}")
     
     # 🚀 ULTRA-FAST PATH FOR QUICK BILLING - Skip duplicate/consolidation checks (but NOT subscription)
     if getattr(order_data, 'quick_billing', False):
-        user_org_id = get_secure_org_id(current_user)
         business = current_user.get("business_settings") or {}
         business = current_user.get("business_settings") or {}
         tax_rate_setting = business.get("tax_rate")
@@ -5285,8 +5368,6 @@ async def create_order(
     # The subscription check at the beginning of the function handles all paths
 
     # Get user's organization_id
-    user_org_id = get_secure_org_id(current_user)
-
     # Get business settings - handle None case
     business = current_user.get("business_settings") or {}
     # Handle tax_rate properly - allow 0 as valid value
@@ -5295,9 +5376,6 @@ async def create_order(
     kot_mode_enabled = business.get("kot_mode_enabled", True)
     
     # Use default values for table when KOT is disabled
-    table_id = order_data.table_id or "counter"
-    table_number = order_data.table_number or 0
-
     # ENHANCED DUPLICATE PREVENTION - Check for exact duplicate orders
     if kot_mode_enabled and table_id != "counter":
         try:
@@ -5441,6 +5519,8 @@ async def create_order(
                     "message": f"Items added to existing order for Table {table_number}"
                 }
                 
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"⚠️ Order consolidation check failed: {e}, creating new order...")
             # If consolidation fails, continue with creating new order
@@ -5480,8 +5560,6 @@ async def create_order(
     doc["updated_at"] = doc["updated_at"].isoformat()
 
     await db.orders.insert_one(doc)
-    # Increment bill count for org owner on order creation (free trial limit uses total orders)
-    await db.users.update_one({"id": order_data.org_id}, {"$inc": {"bill_count": 1}})
     # Increment bill count for org owner on order creation (free trial limit uses total orders)
     await db.users.update_one({"id": user_org_id}, {"$inc": {"bill_count": 1}})
 
