@@ -509,7 +509,7 @@ class AlertManager:
             logger.warning(f"ALERT [{alert['severity'].upper()}]: {alert['message']}")
             
             # Store in Redis for dashboard
-            if self.redis_cache and self.redis_cache.is_connected():
+            if self.redis_cache and self.redis_cache.is_connected() and self.redis_cache.redis:
                 alert_data = {
                     **alert,
                     "timestamp": datetime.now(timezone.utc).isoformat()

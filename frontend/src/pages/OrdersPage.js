@@ -137,6 +137,8 @@ const OrdersPage = ({ user }) => {
   
   // Add state for preventing duplicate orders
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [showCreatingOverlay, setShowCreatingOverlay] = useState(false);
+  const creatingOverlayTimerRef = useRef(null);
   const [lastOrderCreated, setLastOrderCreated] = useState(null);
   // Add state for preventing double-clicks on status change buttons
   const [processingStatusChanges, setProcessingStatusChanges] = useState(new Set());
@@ -1038,6 +1040,13 @@ const OrdersPage = ({ user }) => {
     }
 
     setIsCreatingOrder(true);
+    setShowCreatingOverlay(true);
+    if (creatingOverlayTimerRef.current) {
+      clearTimeout(creatingOverlayTimerRef.current);
+    }
+    creatingOverlayTimerRef.current = setTimeout(() => {
+      setShowCreatingOverlay(false);
+    }, 2000);
 
     try {
       const customerName = formData.customer_name?.trim() || 'Quick Sale';
@@ -1101,6 +1110,11 @@ const OrdersPage = ({ user }) => {
       setShowMenuPage(true);
     } finally {
       setIsCreatingOrder(false);
+      setShowCreatingOverlay(false);
+      if (creatingOverlayTimerRef.current) {
+        clearTimeout(creatingOverlayTimerRef.current);
+        creatingOverlayTimerRef.current = null;
+      }
     }
   };
 
@@ -1148,6 +1162,13 @@ const OrdersPage = ({ user }) => {
     });
 
     setIsCreatingOrder(true);
+    setShowCreatingOverlay(true);
+    if (creatingOverlayTimerRef.current) {
+      clearTimeout(creatingOverlayTimerRef.current);
+    }
+    creatingOverlayTimerRef.current = setTimeout(() => {
+      setShowCreatingOverlay(false);
+    }, 2000);
 
     try {
       const selectedTable = formData.table_id ? tables.find(t => t.id === formData.table_id) : null;
@@ -1261,14 +1282,14 @@ const OrdersPage = ({ user }) => {
       // Offer WhatsApp notification
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
         toast.success('WhatsApp message sent');
-      } else if (response.data?.whatsapp_error) {
-        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link && formData.customer_phone) {
         setTimeout(() => {
           if (window.confirm('Send order confirmation via WhatsApp?')) {
             window.open(response.data.whatsapp_link, '_blank');
           }
         }, 500);
+      } else {
+        toast.error(whatsappFailedMessage());
       }
 
     } catch (error) {
@@ -1293,6 +1314,11 @@ const OrdersPage = ({ user }) => {
       }
     } finally {
       setIsCreatingOrder(false);
+      setShowCreatingOverlay(false);
+      if (creatingOverlayTimerRef.current) {
+        clearTimeout(creatingOverlayTimerRef.current);
+        creatingOverlayTimerRef.current = null;
+      }
     }
   };
 
@@ -1478,14 +1504,14 @@ const OrdersPage = ({ user }) => {
       // WhatsApp notification
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
         toast.success('WhatsApp message sent');
-      } else if (response.data?.whatsapp_error) {
-        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link && response.data?.customer_phone) {
         setTimeout(() => {
           if (window.confirm(`Send "${status}" update via WhatsApp?`)) {
             window.open(response.data.whatsapp_link, '_blank');
           }
         }, 300);
+      } else {
+        toast.error(whatsappFailedMessage());
       }
       
     } catch (error) {
@@ -1564,20 +1590,7 @@ const OrdersPage = ({ user }) => {
     }
   };
 
-  const formatWhatsappError = (errorCode) => {
-    if (!errorCode) return 'WhatsApp failed';
-    if (errorCode.startsWith('template_missing:')) return 'WhatsApp template missing';
-    switch (errorCode) {
-      case 'cloud_not_configured':
-        return 'WhatsApp not configured';
-      case 'no_consent':
-        return 'WhatsApp consent not available';
-      case 'missing_phone':
-        return 'Phone number missing';
-      default:
-        return 'WhatsApp failed';
-    }
-  };
+  const whatsappFailedMessage = () => 'WhatsApp message failed';
 
   const handleWhatsappShare = async () => {
     if (!whatsappPhone.trim()) {
@@ -1598,11 +1611,11 @@ const OrdersPage = ({ user }) => {
       
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
         toast.success('WhatsApp message sent');
-      } else if (response.data?.whatsapp_error) {
-        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link) {
         window.open(response.data.whatsapp_link, '_blank');
         toast.success('Opening WhatsApp...');
+      } else {
+        toast.error(whatsappFailedMessage());
       }
       setWhatsappModal({ open: false, orderId: null, customerName: '' });
       setWhatsappPhone('');
@@ -1819,7 +1832,7 @@ const OrdersPage = ({ user }) => {
   return (
     <Layout user={user}>
       {/* 🚀 ENHANCED QUICK BILL LOADING */}
-      {isCreatingOrder && (
+      {showCreatingOverlay && (
         <div className="fixed inset-0 bg-gradient-to-br from-violet-600/95 to-purple-700/95 backdrop-blur-md z-[9999] flex items-center justify-center">
           <div className="relative">
             {/* Animated background circles */}

@@ -1371,20 +1371,7 @@ const BillingPage = ({ user }) => {
   };
 
 const handleWhatsappShare = async () => {
-    const formatWhatsappError = (errorCode) => {
-      if (!errorCode) return 'WhatsApp failed';
-      if (errorCode.startsWith('template_missing:')) return 'WhatsApp template missing';
-      switch (errorCode) {
-        case 'cloud_not_configured':
-          return 'WhatsApp not configured';
-        case 'no_consent':
-          return 'WhatsApp consent not available';
-        case 'missing_phone':
-          return 'Phone number missing';
-        default:
-          return 'WhatsApp failed';
-      }
-    };
+    const whatsappFailedMessage = () => 'WhatsApp message failed';
     if (!whatsappPhone.trim()) { toast.error('Enter phone number'); return; }
     try {
       const response = await apiWithRetry({
@@ -1395,11 +1382,11 @@ const handleWhatsappShare = async () => {
       });
       if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
         toast.success('WhatsApp message sent');
-      } else if (response.data?.whatsapp_error) {
-        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link) {
         window.open(response.data.whatsapp_link, '_blank');
         toast.success('Opening WhatsApp...');
+      } else {
+        toast.error(whatsappFailedMessage());
       }
       setShowWhatsappModal(false);
     } catch (error) {

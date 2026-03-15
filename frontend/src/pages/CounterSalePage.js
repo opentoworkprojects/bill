@@ -408,7 +408,9 @@ const CounterSalePage = ({ user }) => {
       const order = orderResponse.data;
       createdOrderId = order?.id;
       if (order?.whatsapp_mode === 'cloud' || order?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
+        toast.success('WhatsApp message sent');
+      } else {
+        toast.error('WhatsApp message failed');
       }
 
       setSubscriptionStatus((prev) => {

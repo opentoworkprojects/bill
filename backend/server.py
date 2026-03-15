@@ -6351,6 +6351,13 @@ async def update_order(
         print(f"👤 User: {current_user.get('username', 'unknown')} (org: {current_user.get('organization_id', 'none')})")
         
         user_org_id = get_secure_org_id(current_user)
+        business = current_user.get("business_settings") or {}
+        try:
+            db_user = await db.users.find_one({"id": current_user.get("id")}, {"business_settings": 1, "_id": 0})
+            if db_user and db_user.get("business_settings"):
+                business = db_user["business_settings"]
+        except Exception as e:
+            print(f"⚠️ Failed to refresh business settings for order update: {e}")
         
         # Validate order_id format
         if not order_id or not isinstance(order_id, str):

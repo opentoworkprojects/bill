@@ -402,7 +402,11 @@ axios.interceptors.response.use(
       config.retry = 0;
     }
     
+    const method = (config.method || 'get').toLowerCase();
+    const isIdempotent = ['get', 'head', 'options'].includes(method);
+    const allowRetry = config.allowRetry === true || isIdempotent;
     const shouldRetry = 
+      allowRetry &&
       config.retry < 2 && // Max 2 retries
       (!error.response || error.response.status >= 500 || error.code === 'ECONNABORTED');
     

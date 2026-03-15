@@ -230,6 +230,9 @@ apiClient.interceptors.response.use(
 export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
   let lastError;
   const isSilent = requestConfig?.silent;
+  const method = (requestConfig?.method || 'get').toLowerCase();
+  const isIdempotent = ['get', 'head', 'options'].includes(method);
+  const allowRetry = requestConfig?.allowRetry === true || isIdempotent;
   
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
@@ -253,6 +256,11 @@ export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
       
       // Don't retry on client errors (4xx) except 408 (timeout)
       if (error.response?.status >= 400 && error.response?.status < 500 && error.response?.status !== 408) {
+        break;
+      }
+
+      // Don't retry non-idempotent requests unless explicitly allowed
+      if (!allowRetry) {
         break;
       }
       
