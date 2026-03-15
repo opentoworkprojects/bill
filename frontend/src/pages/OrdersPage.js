@@ -685,13 +685,33 @@ const OrdersPage = ({ user }) => {
 
   const loadInitialData = async () => {
     try {
-      // CLEAR ALL CACHES for fresh data
-      console.log('🧹 Clearing all caches for fresh data');
-      sessionStorage.removeItem(`orders_${user?.id}`);
-      localStorage.removeItem('billbyte_menu_cache');
-      
-      // NO CACHE LOADING - Always fetch fresh data from database
-      console.log('🚀 Loading all data fresh from database');
+      // Cache-first for instant UI, refresh in background
+      console.log('⚡ Loading cached data for instant UI');
+
+      // Use cached menu items if available
+      try {
+        const cachedMenu = localStorage.getItem('billbyte_menu_cache');
+        if (cachedMenu) {
+          const parsedMenu = JSON.parse(cachedMenu);
+          if (Array.isArray(parsedMenu) && parsedMenu.length > 0) {
+            setMenuItems(parsedMenu);
+            setMenuLoading(false);
+          }
+        }
+      } catch (e) {}
+
+      // Use cached active orders for instant render
+      try {
+        const cachedActive = activeOrdersCache.getActiveOrders();
+        if (cachedActive.length > 0) {
+          setOrders(cachedActive.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+        }
+      } catch (e) {}
+
+      // Allow UI to render immediately
+      setLoading(false);
+
+      console.log('🚀 Fetching fresh data in background');
 
       // Load critical data first (orders, today's bills, tables, and menu items) - ALL FRESH
       const [ordersRes, todaysBillsRes, tablesRes, menuRes] = await Promise.all([
@@ -745,8 +765,8 @@ const OrdersPage = ({ user }) => {
       
       // Cache menu items for next time
       try {
-        // NO CACHING - Use fresh menu data directly
-        console.log('📋 Fresh menu items loaded:', validMenuItems.length);
+        localStorage.setItem('billbyte_menu_cache', JSON.stringify(validMenuItems));
+        console.log('📋 Fresh menu items cached:', validMenuItems.length);
       } catch (e) {
         console.warn('Failed to set menu items:', e);
       }
