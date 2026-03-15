@@ -787,7 +787,7 @@ const OrdersPage = ({ user }) => {
     }
   };
 
-  const fetchOrders = async (forceRefresh = false) => {
+  const fetchOrders = async (forceRefresh = false, showErrors = forceRefresh) => {
     // NUCLEAR PROTECTION: Skip if payment protection is active
     if (paymentProtectionActive && !forceRefresh) {
       console.log('🛡️ Skipping fetchOrders - payment protection active');
@@ -802,7 +802,8 @@ const OrdersPage = ({ user }) => {
       const response = await apiWithRetry({
         method: 'get',
         url: `${API}/orders${params}`,
-        timeout: 10000 // 10 second timeout
+        timeout: 10000, // 10 second timeout
+        silent: !forceRefresh
       });
       
       const ordersData = Array.isArray(response.data) ? response.data : [];
@@ -892,15 +893,16 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Failed to fetch orders', error);
       setOrders([]);
-      // Show user-friendly error
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-      } else if (error.response?.status >= 500) {
-        toast.error('Server error. Please try again later.');
-      } else if (error.code === 'ECONNABORTED') {
-        toast.error('Request timeout - please try again');
-      } else {
-        toast.error('Failed to load orders');
+      if (showErrors) {
+        if (error.response?.status === 401) {
+          toast.error('Session expired. Please login again.');
+        } else if (error.response?.status >= 500) {
+          toast.error('Server error. Please try again later.');
+        } else if (error.code === 'ECONNABORTED') {
+          toast.error('Request timeout - please try again');
+        } else {
+          toast.error('Failed to load orders');
+        }
       }
     }
   };
@@ -910,7 +912,8 @@ const OrdersPage = ({ user }) => {
       const response = await apiWithRetry({
         method: 'get',
         url: `${API}/orders/today-bills`,
-        timeout: 10000
+        timeout: 10000,
+        silent: true
       });
       
       const billsData = Array.isArray(response.data) ? response.data : [];
@@ -959,7 +962,8 @@ const OrdersPage = ({ user }) => {
       const response = await apiWithRetry({
         method: 'get',
         url: url,
-        timeout: 8000
+        timeout: 8000,
+        silent: !forceRefresh
       });
       
       const tablesData = Array.isArray(response.data) ? response.data : [];
@@ -1256,7 +1260,9 @@ const OrdersPage = ({ user }) => {
       
       // Offer WhatsApp notification
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
+        toast.success('WhatsApp message sent');
+      } else if (response.data?.whatsapp_error) {
+        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link && formData.customer_phone) {
         setTimeout(() => {
           if (window.confirm('Send order confirmation via WhatsApp?')) {
@@ -1471,7 +1477,9 @@ const OrdersPage = ({ user }) => {
       
       // WhatsApp notification
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
+        toast.success('WhatsApp message sent');
+      } else if (response.data?.whatsapp_error) {
+        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link && response.data?.customer_phone) {
         setTimeout(() => {
           if (window.confirm(`Send "${status}" update via WhatsApp?`)) {
@@ -1556,6 +1564,21 @@ const OrdersPage = ({ user }) => {
     }
   };
 
+  const formatWhatsappError = (errorCode) => {
+    if (!errorCode) return 'WhatsApp failed';
+    if (errorCode.startsWith('template_missing:')) return 'WhatsApp template missing';
+    switch (errorCode) {
+      case 'cloud_not_configured':
+        return 'WhatsApp not configured';
+      case 'no_consent':
+        return 'WhatsApp consent not available';
+      case 'missing_phone':
+        return 'Phone number missing';
+      default:
+        return 'WhatsApp failed';
+    }
+  };
+
   const handleWhatsappShare = async () => {
     if (!whatsappPhone.trim()) {
       toast.error('Please enter a phone number');
@@ -1574,7 +1597,9 @@ const OrdersPage = ({ user }) => {
       });
       
       if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
+        toast.success('WhatsApp message sent');
+      } else if (response.data?.whatsapp_error) {
+        toast.error(formatWhatsappError(response.data.whatsapp_error));
       } else if (response.data?.whatsapp_link) {
         window.open(response.data.whatsapp_link, '_blank');
         toast.success('Opening WhatsApp...');

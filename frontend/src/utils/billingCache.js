@@ -161,6 +161,52 @@ class BillingCache {
   }
 
   /**
+   * Fetch billing data fast: return order ASAP, fill menu/settings in background.
+   */
+  async getBillingDataFast(orderId) {
+    const cached = this.getCachedBillingData(orderId);
+    if (cached) {
+      return cached;
+    }
+
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    // Fetch order first for fast UI render
+    const orderRes = await axios.get(`${API}/orders/${orderId}`, { headers, timeout: 5000 });
+    const order = orderRes.data;
+
+    // Kick background fetch for settings/menu
+    Promise.allSettled([
+      axios.get(`${API}/business/settings`, { headers, timeout: 8000 }),
+      axios.get(`${API}/menu`, { headers, timeout: 8000 })
+    ]).then(([businessRes, menuRes]) => {
+      const businessSettings = businessRes.status === 'fulfilled' ? businessRes.value.data.business_settings : {};
+      const menuItems = menuRes.status === 'fulfilled'
+        ? (Array.isArray(menuRes.value.data) ? menuRes.value.data.filter(item => item.available) : [])
+        : [];
+      this._cacheData(orderId, {
+        order,
+        businessSettings,
+        menuItems,
+        timestamp: Date.now()
+      });
+    }).catch(() => {});
+
+    const fastData = {
+      order,
+      businessSettings: {},
+      menuItems: [],
+      timestamp: Date.now()
+    };
+    this._cacheData(orderId, fastData);
+    return fastData;
+  }
+
+  /**
    * Fetch all billing-related data in parallel
    */
   async _fetchBillingData(orderId) {

@@ -5286,7 +5286,7 @@ async def create_order(
                 recent_order.get("customer_name")
             )
             if recent_signature == order_signature:
-                print(f"🛡️ Duplicate submission blocked for table {table_number} (order {recent_order.get('id')})")
+                print(f"🛡️ Duplicate submission blocked: org={user_org_id} table={table_number} order={recent_order.get('id')}")
                 return {
                     **recent_order,
                     "duplicate_prevented": True,

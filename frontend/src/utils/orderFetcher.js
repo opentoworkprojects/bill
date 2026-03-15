@@ -86,8 +86,9 @@ export async function fetchOrdersAtomic(apiUrl, options = {}, recentPaymentCompl
     const response = await apiWithRetry({
       method: 'get',
       url: `${fetchUrl}${params}`,
-      timeout: immediateActiveOrders ? 5000 : 10000, // Shorter timeout for immediate mode
-      signal
+      timeout: immediateActiveOrders ? 8000 : 15000, // Increased timeouts for slow backends
+      signal,
+      silent: true
     });
     
     const ordersData = Array.isArray(response.data) ? response.data : [];
@@ -241,7 +242,7 @@ export async function bypassPollingDelays(apiUrl, options = {}) {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => {
       abortController.abort();
-    }, 3000); // 3 second timeout for immediate mode
+    }, 8000); // Increased timeout for immediate mode
     
     // Use immediate active orders mode with bypass
     const result = await fetchOrdersAtomic(apiUrl, {

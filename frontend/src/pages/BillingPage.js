@@ -39,6 +39,7 @@ const BillingPage = ({ user }) => {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [completedPaymentData, setCompletedPaymentData] = useState(null);
+  const orderSnapshotRef = useRef('');
   const [discountType, setDiscountType] = useState('amount');
   const [discountValue, setDiscountValue] = useState('');
   const [customTaxRate, setCustomTaxRate] = useState(null);
@@ -177,7 +178,7 @@ const BillingPage = ({ user }) => {
       
       // 🚀 CACHE-FIRST APPROACH: Use preloaded data for instant billing experience
       console.log('⚡ Loading billing data for order:', orderId);
-      const billingData = await billingCache.getBillingData(orderId, false); // Use cache first
+      const billingData = await billingCache.getBillingDataFast(orderId); // Fast path: order first
       
       setOrder(billingData.order);
       setOrderItems(billingData.order.items || []);
@@ -205,6 +206,13 @@ const BillingPage = ({ user }) => {
         setDiscountType(billingData.order.discount_type || 'amount');
         setDiscountValue(billingData.order.discount_value || billingData.order.discount || '');
       }
+
+      orderSnapshotRef.current = buildOrderSnapshot(
+        billingData.order.items || [],
+        billingData.order.discount_type || (billingData.order.discount || billingData.order.discount_amount ? 'amount' : discountType),
+        billingData.order.discount_value || billingData.order.discount || billingData.order.discount_amount || 0,
+        billingData.order.tax_rate || 5
+      );
       
       // End timing with cache hit/miss metadata
       endBillingTimer(orderId, { cacheHit: true, dataSource: 'cache' });
@@ -701,8 +709,28 @@ const BillingPage = ({ user }) => {
 
   const handleRemoveItem = (index) => setOrderItems(orderItems.filter((_, i) => i !== index));
 
+  const buildOrderSnapshot = (items, discountTypeValue, discountValueValue, taxRateValue) => {
+    const normalizedItems = (items || []).map((item) => ({
+      id: item.menu_item_id || item.id || item.name || 'unknown',
+      qty: Number(item.quantity || 0),
+      price: Number(item.price || 0),
+      notes: item.notes || ''
+    })).sort((a, b) => a.id.localeCompare(b.id));
+
+    return JSON.stringify({
+      items: normalizedItems,
+      discountType: discountTypeValue || 'amount',
+      discountValue: Number(discountValueValue || 0),
+      taxRate: Number(taxRateValue || 0)
+    });
+  };
+
   const updateOrderItems = async () => {
     if (orderItems.length === 0) { toast.error('Order must have at least one item'); return false; }
+    const currentSnapshot = buildOrderSnapshot(orderItems, discountType, discountValue, getEffectiveTaxRate());
+    if (currentSnapshot === orderSnapshotRef.current) {
+      return true; // No changes to persist
+    }
     try {
       const subtotal = calculateSubtotal();
       const discountAmt = calculateDiscountAmount();
@@ -718,6 +746,7 @@ const BillingPage = ({ user }) => {
         timeout: 12000
       });
       setOrder(prev => ({ ...prev, items: orderItems, subtotal: subtotal - discountAmt, tax, total }));
+      orderSnapshotRef.current = currentSnapshot;
       return true;
     } catch (error) {
       toast.error('Failed to update order');
@@ -1342,6 +1371,20 @@ const BillingPage = ({ user }) => {
   };
 
 const handleWhatsappShare = async () => {
+    const formatWhatsappError = (errorCode) => {
+      if (!errorCode) return 'WhatsApp failed';
+      if (errorCode.startsWith('template_missing:')) return 'WhatsApp template missing';
+      switch (errorCode) {
+        case 'cloud_not_configured':
+          return 'WhatsApp not configured';
+        case 'no_consent':
+          return 'WhatsApp consent not available';
+        case 'missing_phone':
+          return 'Phone number missing';
+        default:
+          return 'WhatsApp failed';
+      }
+    };
     if (!whatsappPhone.trim()) { toast.error('Enter phone number'); return; }
     try {
       const response = await apiWithRetry({
@@ -1350,10 +1393,13 @@ const handleWhatsappShare = async () => {
         data: { phone_number: whatsappPhone, customer_name: order?.customer_name },
         timeout: 10000
       });
-      if (response.data?.whatsapp_sent) {
-        toast.success('WhatsApp receipt sent via Cloud API');
-      } else {
-        toast.error(response.data?.whatsapp_error || 'WhatsApp Cloud API not configured');
+      if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
+        toast.success('WhatsApp message sent');
+      } else if (response.data?.whatsapp_error) {
+        toast.error(formatWhatsappError(response.data.whatsapp_error));
+      } else if (response.data?.whatsapp_link) {
+        window.open(response.data.whatsapp_link, '_blank');
+        toast.success('Opening WhatsApp...');
       }
       setShowWhatsappModal(false);
     } catch (error) {

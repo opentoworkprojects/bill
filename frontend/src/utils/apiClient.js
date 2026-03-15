@@ -50,6 +50,7 @@ apiClient.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    const isSilent = originalRequest?.silent;
     
     console.error(`❌ API Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`, {
       status: error.response?.status,
@@ -72,7 +73,7 @@ apiClient.interceptors.response.use(
       console.warn(`⏰ Timeout (attempt ${retryCount + 1}/${maxRetries}) - waiting ${delay}ms before retry...`);
       
       // Only show toast on first timeout
-      if (retryCount === 0) {
+      if (retryCount === 0 && !isSilent) {
         toast.error('Request taking longer than expected. Retrying...', {
           duration: 2000,
           style: {
@@ -95,7 +96,7 @@ apiClient.interceptors.response.use(
         console.error(`❌ Retry attempt ${retryCount + 1} failed:`, retryError);
         
         // If this was the last retry, show error
-        if (retryCount >= maxRetries - 1) {
+        if (retryCount >= maxRetries - 1 && !isSilent) {
           toast.error('Request timeout - please check your connection and try again', {
             duration: 5000,
             style: {
@@ -116,7 +117,7 @@ apiClient.interceptors.response.use(
       
       console.warn(`🌐 Network error (attempt ${retryCount + 1}/${maxRetries}) - waiting ${delay}ms...`);
       
-      if (retryCount === 0) {
+      if (retryCount === 0 && !isSilent) {
         toast.error('Network unstable - retrying...', {
           duration: 2000,
           style: {
@@ -134,7 +135,7 @@ apiClient.interceptors.response.use(
       } catch (retryError) {
         console.error(`❌ Network retry attempt ${retryCount + 1} failed`);
         
-        if (retryCount >= maxRetries - 1) {
+        if (retryCount >= maxRetries - 1 && !isSilent) {
           toast.error('Network error - please check your internet connection', {
             duration: 5000,
             style: {
@@ -153,14 +154,15 @@ apiClient.interceptors.response.use(
       const errorMsg = error.code === 'ERR_NETWORK' 
         ? 'Network connection failed - please check your internet'
         : 'Request timeout - server not responding';
-      
-      toast.error(errorMsg, {
-        duration: 5000,
-        style: {
-          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-          color: 'white'
-        }
-      });
+      if (!isSilent) {
+        toast.error(errorMsg, {
+          duration: 5000,
+          style: {
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+            color: 'white'
+          }
+        });
+      }
       return Promise.reject(error);
     }
     
@@ -172,13 +174,15 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
-      toast.error('Session expired. Please login again.', {
-        duration: 5000,
-        style: {
-          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-          color: 'white'
-        }
-      });
+      if (!isSilent) {
+        toast.error('Session expired. Please login again.', {
+          duration: 5000,
+          style: {
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+            color: 'white'
+          }
+        });
+      }
       
       // Redirect to login after a short delay
       setTimeout(() => {
@@ -190,13 +194,15 @@ apiClient.interceptors.response.use(
     
     // Handle server errors
     if (error.response?.status >= 500) {
-      toast.error('Server error - please try again later', {
-        duration: 5000,
-        style: {
-          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-          color: 'white'
-        }
-      });
+      if (!isSilent) {
+        toast.error('Server error - please try again later', {
+          duration: 5000,
+          style: {
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+            color: 'white'
+          }
+        });
+      }
       return Promise.reject(error);
     }
     
@@ -205,14 +211,15 @@ apiClient.interceptors.response.use(
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message || 
                           `Request failed (${error.response.status})`;
-      
-      toast.error(errorMessage, {
-        duration: 4000,
-        style: {
-          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-          color: 'white'
-        }
-      });
+      if (!isSilent) {
+        toast.error(errorMessage, {
+          duration: 4000,
+          style: {
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+            color: 'white'
+          }
+        });
+      }
     }
     
     return Promise.reject(error);
@@ -222,6 +229,7 @@ apiClient.interceptors.response.use(
 // Helper function for critical operations with custom retry logic
 export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
   let lastError;
+  const isSilent = requestConfig?.silent;
   
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
@@ -229,7 +237,7 @@ export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
       
       const response = await apiClient(requestConfig);
       
-      if (attempt > 1) {
+      if (attempt > 1 && !isSilent) {
         toast.success('Request succeeded after retry!', {
           duration: 2000,
           style: {
@@ -266,7 +274,7 @@ export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
 // Helper function for non-critical operations (fail silently)
 export const apiSilent = async (requestConfig) => {
   try {
-    return await apiClient(requestConfig);
+    return await apiClient({ ...requestConfig, silent: true });
   } catch (error) {
     console.warn('🔇 Silent API call failed:', error.message);
     return { data: null, error };
