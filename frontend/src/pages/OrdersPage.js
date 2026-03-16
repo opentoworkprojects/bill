@@ -165,69 +165,24 @@ const OrdersPage = ({ user }) => {
 
   // 🔧 DUPLICATE FIX: Order deduplication function
   const updateOrdersWithDeduplication = (newOrders, source = 'unknown') => {
-    const now = Date.now();
-    
-    // Prevent rapid successive updates (debounce)
-    if (now - lastOrdersUpdate < 500) {
-      console.log(`⏸️ Skipping order update from ${source} - too soon after last update (${now - lastOrdersUpdate}ms)`);
-      return;
-    }
-    
-    // Prevent concurrent updates
-    if (isUpdatingOrders) {
-      console.log(`⏸️ Skipping order update from ${source} - update already in progress`);
-      return;
-    }
-    
-    setIsUpdatingOrders(true);
-    setLastOrdersUpdate(now);
-    
     setOrders(prevOrders => {
-      // Create a map of existing orders for fast lookup
-      const existingOrdersMap = new Map();
-      prevOrders.forEach(order => {
-        if (order && order.id) {
-          existingOrdersMap.set(order.id, order);
-        }
+      // Keep any optimistic (temp) orders that haven't been confirmed yet
+      const optimisticOrders = prevOrders.filter(o => o._optimistic);
+      
+      // Deduplicate new orders by ID
+      const seen = new Set();
+      const deduped = newOrders.filter(o => {
+        if (!o || !o.id || seen.has(o.id)) return false;
+        seen.add(o.id);
+        return true;
       });
-      
-      // Create a map of new orders
-      const newOrdersMap = new Map();
-      newOrders.forEach(order => {
-        if (order && order.id) {
-          newOrdersMap.set(order.id, order);
-        }
-      });
-      
-      // If the orders are identical, don't update
-      if (existingOrdersMap.size === newOrdersMap.size && existingOrdersMap.size > 0) {
-        let identical = true;
-        for (const [id, existingOrder] of existingOrdersMap) {
-          const newOrder = newOrdersMap.get(id);
-          if (!newOrder || 
-              existingOrder.status !== newOrder.status ||
-              existingOrder.updated_at !== newOrder.updated_at ||
-              existingOrder.payment_received !== newOrder.payment_received) {
-            identical = false;
-            break;
-          }
-        }
-        
-        if (identical) {
-          console.log(`📋 Orders unchanged from ${source} - skipping update`);
-          setIsUpdatingOrders(false);
-          return prevOrders;
-        }
-      }
-      
-      console.log(`📋 Updating orders from ${source}:`, {
-        previous: prevOrders.length,
-        new: newOrders.length,
-        source
-      });
-      
-      setIsUpdatingOrders(false);
-      return newOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Merge: server orders + any optimistic orders not yet in server response
+      const serverIds = new Set(deduped.map(o => o.id));
+      const pendingOptimistic = optimisticOrders.filter(o => !serverIds.has(o.id));
+
+      return [...pendingOptimistic, ...deduped]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     });
   };
 
@@ -394,8 +349,8 @@ const OrdersPage = ({ user }) => {
           // Fetch active orders atomically
           const result = await fetchOrdersAtomic(API, options, recentPaymentCompletions);
           
-          // Update state atomically to prevent duplicates
-          setOrders(result.activeOrders);
+          // Update state atomically to prevent duplicates, preserving optimistic orders
+          updateOrdersWithDeduplication(result.activeOrders, 'coordinated-polling');
           
           // Move completed orders to today's bills
           if (result.completedOrders.length > 0) {
@@ -538,16 +493,10 @@ const OrdersPage = ({ user }) => {
     // Listen for new active orders
     const handleActiveOrderAdded = (event) => {
       const { order, source } = event.detail;
-      console.log('🎯 Active order added event received:', order.id, 'from', source);
-      
-      // Order should already be in state from handleSubmitOrder, but ensure it's there
+      // Only add if not already present (dedup)
       setOrders(prevOrders => {
-        const exists = prevOrders.some(o => o.id === order.id);
-        if (!exists) {
-          console.log('🚀 Adding missing order to active orders:', order.id);
-          return [order, ...prevOrders];
-        }
-        return prevOrders;
+        if (prevOrders.some(o => o.id === order.id)) return prevOrders;
+        return [order, ...prevOrders];
       });
     };
     
@@ -558,7 +507,7 @@ const OrdersPage = ({ user }) => {
       
       // Update orders if source is reliable
       if (source === 'server-sync' || source === 'cache-sync') {
-        setOrders(orders);
+        updateOrdersWithDeduplication(orders, source);
       }
     };
     
@@ -583,14 +532,9 @@ const OrdersPage = ({ user }) => {
       console.log('🔔 ActiveOrdersSync event:', event.type, event);
       
       if (event.type === 'new-order') {
-        // Ensure order is in active orders list
         setOrders(prevOrders => {
-          const exists = prevOrders.some(o => o.id === event.order.id);
-          if (!exists) {
-            console.log('🚀 Adding order from sync event:', event.order.id);
-            return [event.order, ...prevOrders];
-          }
-          return prevOrders;
+          if (prevOrders.some(o => o.id === event.order.id)) return prevOrders;
+          return [event.order, ...prevOrders];
         });
       }
     });
@@ -600,8 +544,8 @@ const OrdersPage = ({ user }) => {
       console.log('💾 ActiveOrdersCache event:', eventType, cachedOrders.length, 'orders');
       
       if (eventType === 'cache-synced' && cachedOrders.length > 0) {
-        // Update orders from cache if we have fresh data
-        setOrders(cachedOrders);
+        // Merge cache with current orders, don't overwrite
+        updateOrdersWithDeduplication(cachedOrders, 'cache-sync');
       }
     });
     
@@ -1154,12 +1098,42 @@ const OrdersPage = ({ user }) => {
       
       // Instant feedback
       playSound('success');
-      
+
+      // Build optimistic order to show instantly in UI
+      const tempId = `temp_${now}`;
+      const optimisticOrder = {
+        id: tempId,
+        table_id: formData.table_id || null,
+        table_number: selectedTable?.table_number || 0,
+        items: selectedItems,
+        customer_name: customerName,
+        customer_phone: formData.customer_phone || '',
+        status: 'pending',
+        subtotal: selectedItems.reduce((s, i) => s + i.price * i.quantity, 0),
+        tax: 0,
+        total: selectedItems.reduce((s, i) => s + i.price * i.quantity, 0),
+        payment_method: 'cash',
+        payment_received: 0,
+        balance_amount: 0,
+        is_credit: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        _optimistic: true
+      };
+
+      // 🚀 INSTANT: Show order in list immediately before server responds
+      setOrders(prevOrders => {
+        const deduped = prevOrders.filter(o => o.id !== tempId);
+        return [optimisticOrder, ...deduped];
+      });
+
       // Close menu and reset form immediately — hide loading overlay right away
       setShowMenuPage(false);
       setCartExpanded(false);
       resetForm();
       setIsCreatingOrder(false); // Hide "Creating Bill" overlay instantly
+      // Pause polling briefly so it doesn't race with the optimistic order
+      localStorage.setItem('lastUserInteraction', Date.now().toString());
 
       // Create order on server
       const response = await apiWithRetry({
@@ -1173,46 +1147,23 @@ const OrdersPage = ({ user }) => {
           customer_phone: formData.customer_phone || '',
           frontend_origin: window.location.origin
         },
-        timeout: 12000 // Longer timeout for order creation
+        timeout: 12000
       });
 
-      // INSTANT ACTIVE ORDERS: Add to active orders immediately
+      // Replace optimistic order with real server order
       const newOrder = { 
         ...response.data, 
         created_at: response.data.created_at || new Date().toISOString() 
       };
-      
-      console.log('✅ Order created successfully:', newOrder.id);
-      
-      // 1. Add to active orders state immediately
+
+      // 1. Swap temp order with real order (deduplicated)
       setOrders(prevOrders => {
-        console.log('🚀 INSTANT: Adding new order to active orders list');
-        
-        // 📊 PERFORMANCE MONITORING: Complete timing when order appears in UI
-        const displayTime = completeOrderDisplayTiming({
-          orderId: newOrder.id,
-          fromCache: false,
-          serverResponseTime: Date.now() - now
-        });
-        
-        console.log(`📊 Order creation to display time: ${displayTime.toFixed(2)}ms`);
-        
-        return [newOrder, ...prevOrders];
+        const without = prevOrders.filter(o => o.id !== tempId && o.id !== newOrder.id);
+        return [newOrder, ...without];
       });
       
-      // 2. Notify ActiveOrdersSync for immediate propagation
-      activeOrdersSync.notifyNewOrder(newOrder);
-      
-      // 3. Add to ActiveOrdersCache for fast future access
-      activeOrdersCache.addActiveOrder(newOrder);
-      
-      // 4. Broadcast window event for cross-component communication
-      window.dispatchEvent(new CustomEvent('activeOrderAdded', {
-        detail: { order: newOrder, source: 'order-creation' }
-      }));
-      
       // Success feedback
-      toast.success('✅ Order created successfully!');
+      toast.success('✅ Order created!');
       
       // 💾 PRELOAD BILLING DATA: Prepare billing cache for new order
       billingCache.preloadBillingData(response.data.id).catch(error => {
@@ -1275,7 +1226,7 @@ const OrdersPage = ({ user }) => {
       });
       
       // Remove optimistic order on failure
-      setOrders(prevOrders => prevOrders.filter(order => order.id !== `temp_${now}`));
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
       
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to create order';
       if (error.response?.status === 402) {
