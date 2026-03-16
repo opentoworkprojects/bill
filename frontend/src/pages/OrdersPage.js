@@ -1154,12 +1154,12 @@ const OrdersPage = ({ user }) => {
       
       // Instant feedback
       playSound('success');
-      toast.success('🎉 Creating order...');
       
-      // Close menu and reset form immediately
+      // Close menu and reset form immediately — hide loading overlay right away
       setShowMenuPage(false);
       setCartExpanded(false);
       resetForm();
+      setIsCreatingOrder(false); // Hide "Creating Bill" overlay instantly
 
       // Create order on server
       const response = await apiWithRetry({
