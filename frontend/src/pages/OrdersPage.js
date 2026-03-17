@@ -1194,14 +1194,10 @@ const OrdersPage = ({ user }) => {
       }, 3000);
       
       // Offer WhatsApp notification
-      if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
+      if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
+        toast.success('✅ WhatsApp message sent!');
       } else if (response.data?.whatsapp_link && formData.customer_phone) {
-        setTimeout(() => {
-          if (window.confirm('Send order confirmation via WhatsApp?')) {
-            window.open(response.data.whatsapp_link, '_blank');
-          }
-        }, 500);
+        window.open(response.data.whatsapp_link, '_blank');
       }
 
     } catch (error) {
@@ -1409,14 +1405,10 @@ const OrdersPage = ({ user }) => {
       }
       
       // WhatsApp notification
-      if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
+      if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
+        toast.success('✅ WhatsApp message sent!');
       } else if (response.data?.whatsapp_link && response.data?.customer_phone) {
-        setTimeout(() => {
-          if (window.confirm(`Send "${status}" update via WhatsApp?`)) {
-            window.open(response.data.whatsapp_link, '_blank');
-          }
-        }, 300);
+        window.open(response.data.whatsapp_link, '_blank');
       }
       
     } catch (error) {
@@ -1504,12 +1496,10 @@ const OrdersPage = ({ user }) => {
         timeout: 10000
       });
       
-      if (response.data?.whatsapp_mode === 'cloud' || response.data?.whatsapp_sent) {
-        toast.success('WhatsApp message delivered');
-      } else if (response.data?.whatsapp_link) {
+      if (response.data?.whatsapp_link && !response.data?.whatsapp_sent) {
         window.open(response.data.whatsapp_link, '_blank');
-        toast.success('Opening WhatsApp...');
       }
+      toast.success('✅ WhatsApp message sent!');
       setWhatsappModal({ open: false, orderId: null, customerName: '' });
       setWhatsappPhone('');
     } catch (error) {
