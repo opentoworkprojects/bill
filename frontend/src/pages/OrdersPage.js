@@ -657,11 +657,11 @@ const OrdersPage = ({ user }) => {
     // Fetch all in parallel — allSettled so one failure never blocks others
     try {
       const [ordersRes, todaysBillsRes, tablesRes, menuRes, settingsRes] = await Promise.allSettled([
-        apiSilent({ method: 'get', url: ${API}/orders, timeout: 10000 }),
-        apiSilent({ method: 'get', url: ${API}/orders/today-bills, timeout: 8000 }),
-        apiSilent({ method: 'get', url: ${API}/tables, timeout: 8000 }),
-        apiSilent({ method: 'get', url: ${API}/menu, timeout: 8000 }),
-        apiSilent({ method: 'get', url: ${API}/business/settings, timeout: 8000 }),
+        apiSilent({ method: 'get', url: `${API}/orders`, timeout: 10000 }),
+        apiSilent({ method: 'get', url: `${API}/orders/today-bills`, timeout: 8000 }),
+        apiSilent({ method: 'get', url: `${API}/tables`, timeout: 8000 }),
+        apiSilent({ method: 'get', url: `${API}/menu`, timeout: 8000 }),
+        apiSilent({ method: 'get', url: `${API}/business/settings`, timeout: 8000 }),
       ]);
 
       if (ordersRes.status === 'fulfilled') {
