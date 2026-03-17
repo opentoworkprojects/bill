@@ -141,6 +141,7 @@ const OrdersPage = ({ user }) => {
   // Tab state for Active Orders vs Today's Bills
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   
   // Add state for preventing duplicate orders
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
@@ -576,52 +577,45 @@ const OrdersPage = ({ user }) => {
 
   // Manual refresh function for real-time updates
   const handleManualRefresh = async () => {
-    // NUCLEAR PROTECTION: Skip if payment protection is active
+    // Clear stale cache so we always get fresh data
+    _pageCache.loadedAt = 0;
+    _pageCache.orders = null;
+
+    // If payment protection is active, just clear it and refresh anyway
     if (paymentProtectionActive) {
-      console.log('🛡️ Skipping manual refresh - payment protection active');
-      toast.info('⏳ Please wait - processing recent payment...');
-      return;
+      setPaymentProtectionActive(false);
     }
-    
+
     try {
-      // NO CACHES TO CLEAR - Always fetch fresh data
-      console.log('🔄 Manual refresh - fetching fresh data from database');
-      
-      // Play feedback sound and vibration
-      if ('vibrate' in navigator) {
-        navigator.vibrate([50]);
+      if ('vibrate' in navigator) navigator.vibrate([50]);
+
+      // Fetch orders directly — bypass fetchOrders guards
+      const [ordersRes, tablesRes] = await Promise.allSettled([
+        apiWithRetry({ method: 'get', url: `${API}/orders?fresh=true&_t=${Date.now()}`, timeout: 10000 }),
+        apiWithRetry({ method: 'get', url: `${API}/tables?fresh=true&_t=${Date.now()}`, timeout: 8000 }),
+      ]);
+
+      if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value?.data)) {
+        const valid = ordersRes.value.data
+          .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
+          .map(o => ({ ...o, customer_name: o.customer_name || '', table_number: o.table_number || 0, payment_method: o.payment_method || 'cash', created_at: o.created_at || new Date().toISOString() }))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        setOrders(valid);
+        _pageCache.orders = valid;
+        _pageCache.loadedAt = Date.now();
       }
-      
-      if (activeTab === 'active') {
-        await fetchOrders(true); // Force refresh
-      } else if (activeTab === 'history') {
+
+      if (tablesRes.status === 'fulfilled' && Array.isArray(tablesRes.value?.data)) {
+        const valid = tablesRes.value.data.filter(t => t && t.id && typeof t.table_number === 'number');
+        setTables(valid);
+        _pageCache.tables = valid;
+      }
+
+      if (activeTab === 'history') {
         await fetchTodaysBills();
       }
-      
-      // Also refresh tables for real-time table status
-      await fetchTables(true); // Force refresh
-      
-      // Reload menu with fresh data
-      try {
-        const menuRes = await apiSilent({ 
-          method: 'get', 
-          url: `${API}/menu?_t=${Date.now()}`, 
-          timeout: 8000 
-        });
-        
-        if (menuRes?.data) {
-          const menuData = Array.isArray(menuRes.data) ? menuRes.data : [];
-          const validMenuItems = menuData.filter(item => item && item.id && item.name);
-          
-          // NO CACHING - Use fresh menu data directly
-          setMenuItems(validMenuItems);
-        }
-      } catch (menuError) {
-        console.error('Menu refresh failed:', menuError);
-      }
-      
-      toast.success('Data refreshed successfully!', { duration: 2000 });
-      
+
+      toast.success('Refreshed!', { duration: 1500 });
     } catch (error) {
       console.error('Manual refresh failed:', error);
     } finally {
@@ -664,19 +658,22 @@ const OrdersPage = ({ user }) => {
         apiSilent({ method: 'get', url: `${API}/business/settings`, timeout: 8000 }),
       ]);
 
-      if (ordersRes.status === 'fulfilled') {
-        const data = Array.isArray(ordersRes.value?.data) ? ordersRes.value.data : [];
-        const valid = data
+      // Only update state when response actually has data — never overwrite with null/empty from a failed call
+      if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value?.data)) {
+        const valid = ordersRes.value.data
           .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
           .map(o => ({ ...o, customer_name: o.customer_name || '', table_number: o.table_number || 0, payment_method: o.payment_method || 'cash', created_at: o.created_at || new Date().toISOString() }))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         setOrders(valid);
         _pageCache.orders = valid;
+        setLoadFailed(false);
+      } else if (!_pageCache.orders) {
+        // No cache and no data — mark as failed so UI shows retry
+        setLoadFailed(true);
       }
 
-      if (todaysBillsRes.status === 'fulfilled') {
-        const data = Array.isArray(todaysBillsRes.value?.data) ? todaysBillsRes.value.data : [];
-        const valid = data
+      if (todaysBillsRes.status === 'fulfilled' && Array.isArray(todaysBillsRes.value?.data)) {
+        const valid = todaysBillsRes.value.data
           .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
           .map(o => ({ ...o, customer_name: o.customer_name || '', table_number: o.table_number || 0, payment_method: o.payment_method || 'cash', created_at: o.created_at || new Date().toISOString() }))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -684,16 +681,14 @@ const OrdersPage = ({ user }) => {
         _pageCache.todaysBills = valid;
       }
 
-      if (tablesRes.status === 'fulfilled') {
-        const data = Array.isArray(tablesRes.value?.data) ? tablesRes.value.data : [];
-        const valid = data.filter(t => t && t.id && typeof t.table_number === 'number');
+      if (tablesRes.status === 'fulfilled' && Array.isArray(tablesRes.value?.data)) {
+        const valid = tablesRes.value.data.filter(t => t && t.id && typeof t.table_number === 'number');
         setTables(valid);
         _pageCache.tables = valid;
       }
 
-      if (menuRes.status === 'fulfilled') {
-        const data = Array.isArray(menuRes.value?.data) ? menuRes.value.data : [];
-        const valid = data.filter(item => item && item.id && item.name && item.available);
+      if (menuRes.status === 'fulfilled' && Array.isArray(menuRes.value?.data)) {
+        const valid = menuRes.value.data.filter(item => item && item.id && item.name && item.available);
         setMenuItems(valid);
         setMenuLoading(false);
         _pageCache.menuItems = valid;
@@ -716,6 +711,13 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Failed to load initial data', error);
       setMenuLoading(false);
+      // Retry once after 3s if we have no data at all
+      if (!_pageCache.orders) {
+        setTimeout(() => {
+          _pageCache.loadedAt = 0;
+          loadInitialData();
+        }, 3000);
+      }
     } finally {
       setLoading(false);
     }
@@ -2596,10 +2598,25 @@ const OrdersPage = ({ user }) => {
             {filterActiveOrders(orders).length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
                 <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">🍽️</span>
+                  <span className="text-3xl">{loadFailed ? '⚠️' : '🍽️'}</span>
                 </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-1">No Active Orders</h3>
-                <p className="text-gray-500 text-sm">All clear! Tap "New Order" to get started</p>
+                {loadFailed ? (
+                  <>
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">Failed to load orders</h3>
+                    <p className="text-gray-500 text-sm mb-4">Check your connection and try again</p>
+                    <button
+                      onClick={handleManualRefresh}
+                      className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700"
+                    >
+                      Retry
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">No Active Orders</h3>
+                    <p className="text-gray-500 text-sm">All clear! Tap "New Order" to get started</p>
+                  </>
+                )}
               </div>
             )}
             {filterActiveOrders(orders).map((order) => {
