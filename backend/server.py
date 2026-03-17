@@ -184,16 +184,17 @@ try:
             tls=True,
             tlsInsecure=True,
             # Performance optimizations
-            maxPoolSize=50,  # Increased connection pool
-            minPoolSize=10,  # Keep connections warm
-            maxIdleTimeMS=45000,  # Keep connections alive
+            maxPoolSize=100,  # High-traffic: support 1000s of concurrent restaurants
+            minPoolSize=20,   # Keep connections warm
+            maxIdleTimeMS=60000,  # Keep connections alive longer
             serverSelectionTimeoutMS=3000,  # Faster timeout
             connectTimeoutMS=5000,  # Faster connection
-            socketTimeoutMS=20000,  # Socket timeout
+            socketTimeoutMS=30000,  # Socket timeout
             retryWrites=True,  # Auto-retry failed writes
-            retryReads=True,  # Auto-retry failed reads
+            retryReads=True,   # Auto-retry failed reads
             # Compression for faster data transfer
             compressors="snappy,zlib",
+            waitQueueTimeoutMS=5000,  # Don't wait forever for a connection slot
         )
     else:
         # For local or non-SSL connections
@@ -241,14 +242,19 @@ api_router = APIRouter(prefix="/api")
 from functools import lru_cache
 import threading
 
-# Simple cache with thread-safe operations
+# Simple cache with asyncio-safe operations
 _cache = {}
 _cache_ttl = {}
-_cache_lock = threading.Lock()
+_cache_lock = asyncio.Lock()
+
+# In-process idempotency map: prevents two simultaneous identical requests
+# from both passing the DB duplicate check before either has written
+_inflight_orders: dict = {}  # signature -> asyncio.Event
+_inflight_lock = asyncio.Lock()
 
 # Request deduplication to prevent duplicate concurrent requests
 _pending_requests = {}
-_pending_lock = threading.Lock()
+_pending_lock = asyncio.Lock()
 
 def cache_response(ttl_seconds=60):
     """Cache decorator for API responses"""
@@ -258,16 +264,15 @@ def cache_response(ttl_seconds=60):
             cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
             current_time = time.time()
             
-            # Check if cached and not expired
-            with _cache_lock:
-                if cache_key in _cache and cache_key in _cache_ttl:
-                    if current_time < _cache_ttl[cache_key]:
-                        return _cache[cache_key]
+            # Check if cached and not expired (no lock needed for read — dict reads are atomic in CPython)
+            if cache_key in _cache and cache_key in _cache_ttl:
+                if current_time < _cache_ttl[cache_key]:
+                    return _cache[cache_key]
             
             # Execute function and cache result
             result = await func(*args, **kwargs)
             
-            with _cache_lock:
+            async with _cache_lock:
                 _cache[cache_key] = result
                 _cache_ttl[cache_key] = current_time + ttl_seconds
             
@@ -278,14 +283,13 @@ def cache_response(ttl_seconds=60):
 def clear_expired_cache():
     """Clear expired cache entries to free memory"""
     current_time = time.time()
-    with _cache_lock:
-        expired_keys = [k for k, v in _cache_ttl.items() if current_time >= v]
-        for key in expired_keys:
-            _cache.pop(key, None)
-            _cache_ttl.pop(key, None)
+    expired_keys = [k for k, v in list(_cache_ttl.items()) if current_time >= v]
+    for key in expired_keys:
+        _cache.pop(key, None)
+        _cache_ttl.pop(key, None)
 
-# Semaphore to limit concurrent database operations (free tier optimization)
-DB_SEMAPHORE = asyncio.Semaphore(20)  # Max 20 concurrent DB operations
+# Semaphore to limit concurrent database operations
+DB_SEMAPHORE = asyncio.Semaphore(50)  # Allow up to 50 concurrent DB ops under high traffic
 
 async def rate_limited_db_operation(operation):
     """Execute database operation with rate limiting for free tier"""
@@ -293,7 +297,22 @@ async def rate_limited_db_operation(operation):
         return await operation
 
 
-# Dynamic CORS origin checker
+# In-memory fallback rate limiter (used when Redis is unavailable)
+_rate_limit_store: dict = {}  # ip -> [timestamps]
+_rate_limit_lock = asyncio.Lock()
+
+async def _check_memory_rate_limit(key: str, max_requests: int, window_seconds: int) -> bool:
+    """Token-bucket rate limiter backed by in-memory dict. Returns True if allowed."""
+    now = time.time()
+    async with _rate_limit_lock:
+        timestamps = _rate_limit_store.get(key, [])
+        # Drop timestamps outside the window
+        timestamps = [t for t in timestamps if now - t < window_seconds]
+        if len(timestamps) >= max_requests:
+            return False
+        timestamps.append(now)
+        _rate_limit_store[key] = timestamps
+        return True
 def is_allowed_origin(origin: str) -> bool:
     """Check if the origin is allowed for CORS"""
     allowed_patterns = [
@@ -412,25 +431,38 @@ class MonitoringMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             return response
         
-        # Check rate limits using Redis if available
+        # Check rate limits using Redis if available, fallback to in-memory
         try:
             from redis_cache import redis_cache
-            if redis_cache and redis_cache.is_connected():
-                # Different rate limits for different endpoints
+            redis_available = redis_cache and redis_cache.is_connected()
+        except Exception:
+            redis_available = False
+
+        try:
+            if redis_available:
                 if request.url.path.startswith("/api/auth/"):
                     rate_limit_key = f"rate_limit:auth:{client_ip}"
-                    if not await redis_cache.check_rate_limit(rate_limit_key, 10, 60):  # 10 requests per minute
+                    if not await redis_cache.check_rate_limit(rate_limit_key, 10, 60):
                         raise HTTPException(status_code=429, detail="Too many authentication requests")
                 elif request.url.path.startswith("/api/orders/"):
                     rate_limit_key = f"rate_limit:orders:{client_ip}"
-                    if not await redis_cache.check_rate_limit(rate_limit_key, 200, 60):  # 200 requests per minute
+                    if not await redis_cache.check_rate_limit(rate_limit_key, 200, 60):
                         raise HTTPException(status_code=429, detail="Too many order requests")
                 else:
                     rate_limit_key = f"rate_limit:general:{client_ip}"
-                    if not await redis_cache.check_rate_limit(rate_limit_key, 100, 60):  # 100 requests per minute
+                    if not await redis_cache.check_rate_limit(rate_limit_key, 100, 60):
                         raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            else:
+                # Fallback in-memory rate limiting
+                if request.url.path.startswith("/api/auth/"):
+                    if not await _check_memory_rate_limit(f"auth:{client_ip}", 10, 60):
+                        raise HTTPException(status_code=429, detail="Too many authentication requests")
+                elif request.url.path.startswith("/api/orders"):
+                    if not await _check_memory_rate_limit(f"orders:{client_ip}", 300, 60):
+                        raise HTTPException(status_code=429, detail="Too many order requests")
+        except HTTPException:
+            raise
         except Exception as e:
-            # Continue without rate limiting if Redis is unavailable
             print(f"Rate limiting error: {e}")
         
         # Process request
@@ -5267,6 +5299,25 @@ async def create_order(
     )
 
     # GLOBAL DUPLICATE PREVENTION - idempotent submission guard (all order paths)
+    # In-process lock: prevents two simultaneous requests with same signature from
+    # both passing the DB check before either has written (race condition under high traffic)
+    async with _inflight_lock:
+        if order_signature in _inflight_orders:
+            # Another coroutine is already processing this exact order — wait for it
+            event = _inflight_orders[order_signature]
+        else:
+            event = asyncio.Event()
+            _inflight_orders[order_signature] = event
+            event = None  # We are the owner, proceed
+
+    if event is not None:
+        # Wait for the owner to finish (max 5s), then check DB for the result
+        try:
+            await asyncio.wait_for(event.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pass
+        # Fall through to DB duplicate check below
+
     try:
         recent_cutoff = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
         recent_orders = await db.orders.find({
@@ -5560,6 +5611,11 @@ async def create_order(
     doc["updated_at"] = doc["updated_at"].isoformat()
 
     await db.orders.insert_one(doc)
+    # Signal any waiting duplicate requests that this order is now in DB
+    async with _inflight_lock:
+        ev = _inflight_orders.pop(order_signature, None)
+        if ev:
+            ev.set()
     # Increment bill count for org owner on order creation (free trial limit uses total orders)
     await db.users.update_one({"id": user_org_id}, {"$inc": {"bill_count": 1}})
 
@@ -11102,6 +11158,11 @@ async def startup_validation():
             await db.orders.create_index([("organization_id", 1), ("waiter_name", 1)])
             await db.orders.create_index([("organization_id", 1), ("created_at", -1), ("status", 1)])
             await db.orders.create_index("table_id")
+            # High-traffic: duplicate check + table status queries
+            await db.orders.create_index([("organization_id", 1), ("table_id", 1), ("status", 1), ("created_at", -1)])
+            await db.orders.create_index([("organization_id", 1), ("table_id", 1), ("waiter_id", 1), ("created_at", -1)])
+            # Idempotency key index for dedup
+            await db.orders.create_index("idempotency_key", sparse=True)
             
             # Compound indexes for reports queries
             await db.orders.create_index([("organization_id", 1), ("created_at", -1), ("total", 1)])
