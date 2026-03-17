@@ -6,7 +6,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye, FileText } from 'lucide-react';
 import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
 import { processPaymentFast, preloadPaymentData } from '../utils/optimizedPayment';
@@ -22,7 +22,10 @@ import PrintPreviewModal from '../components/PrintPreviewModal';
 const BillingPage = ({ user }) => {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const [order, setOrder] = useState(null);
+  const location = useLocation();
+  // Use order passed via navigation state for instant render, then refresh in background
+  const navOrder = location.state?.order || null;
+  const [order, setOrder] = useState(navOrder);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [receivedAmount, setReceivedAmount] = useState('');
   const [showReceivedAmount, setShowReceivedAmount] = useState(false);
@@ -170,21 +173,22 @@ const BillingPage = ({ user }) => {
   const loadBillingDataOptimized = async () => {
     if (!orderId) return;
 
-    // Start performance timing
     startBillingTimer(orderId);
 
+    // If we already have order from nav state, set items immediately so page is usable
+    if (navOrder) {
+      setOrderItems(navOrder.items || []);
+      if (navOrder.customer_phone) setWhatsappPhone(navOrder.customer_phone);
+    }
+
     try {
-      
-      // 🚀 CACHE-FIRST APPROACH: Use preloaded data for instant billing experience
-      console.log('⚡ Loading billing data for order:', orderId);
-      const billingData = await billingCache.getBillingData(orderId, false); // Use cache first
+      const billingData = await billingCache.getBillingData(orderId, false);
       
       setOrder(billingData.order);
       setOrderItems(billingData.order.items || []);
       setBusinessSettings(billingData.businessSettings);
       setMenuItems(billingData.menuItems);
       
-      // 🚀 CHECK PAYMENT STATUS: Set payment completed based on order status
       const isOrderPaid = billingData.order.status === 'completed' || 
                          billingData.order.status === 'paid' || 
                          (billingData.order.payment_received > 0 && billingData.order.balance_amount === 0);
@@ -199,26 +203,23 @@ const BillingPage = ({ user }) => {
         });
       }
       
-      // Set customer data
       if (billingData.order.customer_phone) setWhatsappPhone(billingData.order.customer_phone);
       if (billingData.order.discount || billingData.order.discount_amount) {
         setDiscountType(billingData.order.discount_type || 'amount');
         setDiscountValue(billingData.order.discount_value || billingData.order.discount || '');
       }
       
-      // End timing with cache hit/miss metadata
       endBillingTimer(orderId, { cacheHit: true, dataSource: 'cache' });
-      
-      // Pre-load payment data for faster processing
-      preloadPaymentData(orderId).catch(error => {
-        // Failed to preload payment data - continue without preloading
-      });
+      preloadPaymentData(orderId).catch(() => {});
       
     } catch (error) {
       console.error('❌ Failed to load billing data:', error);
       endBillingTimer(orderId, { cacheHit: false, dataSource: 'error', error: error.message });
-      toast.error('Failed to load billing data');
-      navigate('/orders');
+      // Only navigate away if we have no order at all
+      if (!order) {
+        toast.error('Failed to load billing data');
+        navigate('/orders');
+      }
     }
   };
 

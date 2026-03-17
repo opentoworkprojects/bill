@@ -46,9 +46,8 @@ const OptimizedBillingButton = ({ order, user, className = "" }) => {
   const handleBillAndPay = async () => {
     if (!order?.id) return;
 
-    // Instant feedback - always navigate immediately
-    console.log('⚡ Navigating to billing page instantly');
-    navigate(`/billing/${order.id}`);
+    // Navigate instantly — pass order data so BillingPage renders immediately
+    navigate(`/billing/${order.id}`, { state: { order } });
     
     // Play success sound for instant feedback
     try {
@@ -57,33 +56,23 @@ const OptimizedBillingButton = ({ order, user, className = "" }) => {
         const audioContext = new AudioContext();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
-        // Quick success beep
         oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
         gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.1);
       }
-    } catch (e) {
-      // Silently fail if audio not supported
-    }
+    } catch (e) {}
 
-    // Background data preparation (if not already cached)
+    // Preload in background if not already cached
     try {
       const cached = billingCache.getCachedBillingData(order.id);
       if (!cached) {
-        // Pre-load data in background for smooth billing page experience
-        billingCache.preloadBillingData(order.id).catch(error => {
-          console.warn('Background preload failed:', error);
-        });
+        billingCache.preloadBillingData(order.id).catch(() => {});
       }
-    } catch (error) {
-      console.error('Background billing preparation error:', error);
-    }
+    } catch (e) {}
   };
 
   if (!canShowButton) {
