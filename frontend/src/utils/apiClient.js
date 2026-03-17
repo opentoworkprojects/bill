@@ -117,7 +117,10 @@ export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
     } catch (error) {
       lastError = error;
       
-      if (error.response?.status >= 400 && error.response?.status < 500 && error.response?.status !== 408) {
+      const status = error.response?.status;
+      
+      // Don't retry on definitive client errors (except 408 timeout and 429 rate limit)
+      if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
         break;
       }
       
@@ -125,7 +128,10 @@ export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
         break;
       }
       
-      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      // Retry on 503 (server overloaded/cold start) with longer delay
+      const delay = status === 503
+        ? Math.min(2000 * attempt, 8000)
+        : Math.min(1000 * Math.pow(2, attempt - 1), 5000);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

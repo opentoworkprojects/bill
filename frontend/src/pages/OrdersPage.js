@@ -1292,7 +1292,7 @@ const OrdersPage = ({ user }) => {
     // Store original status for potential rollback
     const originalStatus = existingOrder?.status;
     
-    // 🚀 INSTANT VISUAL FEEDBACK - Update UI immediately with stronger persistence
+    // 🚀 INSTANT VISUAL FEEDBACK - Update UI immediately
     const instantUpdateTimestamp = Date.now();
     setOrders(prevOrders => 
       prevOrders.map(order => 
@@ -1303,8 +1303,8 @@ const OrdersPage = ({ user }) => {
               updated_at: new Date().toISOString(),
               instant_update: true,
               instant_update_timestamp: instantUpdateTimestamp,
-              processing_status: true,
-              original_status: originalStatus // Store for rollback
+              processing_status: false, // Never lock the button — API runs in background
+              original_status: originalStatus
             }
           : order
       )

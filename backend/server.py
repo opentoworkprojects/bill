@@ -383,6 +383,26 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # =========================
+# Global OPTIONS preflight handler
+# Must be registered BEFORE all routes so CORS headers are always returned,
+# even when the server is under load or returning 503 from the proxy.
+# =========================
+@app.options("/{rest_of_path:path}")
+async def global_options_handler(request: Request, rest_of_path: str):
+    """Handle all CORS preflight requests explicitly so they always get CORS headers."""
+    origin = request.headers.get("origin", "*")
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400",
+        },
+    )
+
+# =========================
 # WhatsApp Webhook Endpoints
 # =========================
 @app.get("/webhooks/whatsapp")
