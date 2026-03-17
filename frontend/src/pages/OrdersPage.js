@@ -619,7 +619,6 @@ const OrdersPage = ({ user }) => {
       
     } catch (error) {
       console.error('Manual refresh failed:', error);
-      toast.error('Refresh failed - please try again');
     } finally {
       setLoading(false);
     }
@@ -835,17 +834,6 @@ const OrdersPage = ({ user }) => {
       
     } catch (error) {
       console.error('Failed to fetch orders', error);
-      setOrders([]);
-      // Show user-friendly error
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-      } else if (error.response?.status >= 500) {
-        toast.error('Server error. Please try again later.');
-      } else if (error.code === 'ECONNABORTED') {
-        toast.error('Request timeout - please try again');
-      } else {
-        toast.error('Failed to load orders');
-      }
     }
   };
 
@@ -1456,15 +1444,7 @@ const OrdersPage = ({ user }) => {
         }
       } catch (e) {}
       
-      const errorMessage = error.response?.data?.detail || error.message || 'Network error';
-      toast.error(`❌ Failed to update status: ${errorMessage}`, {
-        duration: 4000,
-        style: {
-          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-          color: 'white',
-          fontWeight: 'bold'
-        }
-      });
+      console.error('Failed to update status:', error.response?.data?.detail || error.message);
     } finally {
       // Clean up processing state with shorter delay for faster responsiveness
       setTimeout(() => {
