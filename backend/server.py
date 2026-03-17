@@ -4561,10 +4561,17 @@ async def get_tables(
         
     except Exception as e:
         print(f"❌ Error fetching tables: {e}")
-        # Fallback to direct MongoDB query
-        tables = await db.tables.find({"organization_id": user_org_id}, {"_id": 0}).to_list(1000)
-        print(f"📊 Fallback: Returned {len(tables)} tables from MongoDB")
-        return tables
+        # Fallback to direct MongoDB query — always returns data even if cache/manager fails
+        try:
+            tables = await db.tables.find(
+                {"organization_id": user_org_id},
+                {"_id": 0}
+            ).sort("table_number", 1).to_list(1000)
+            print(f"📊 Fallback: Returned {len(tables)} tables from MongoDB")
+            return tables
+        except Exception as db_e:
+            print(f"❌ MongoDB fallback also failed: {db_e}")
+            return []
 
 
 @api_router.put("/tables/{table_id}", response_model=Table)
@@ -5659,7 +5666,7 @@ async def create_order(
                 {"id": table_id, "organization_id": user_org_id},
                 {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
             )
-            # Invalidate tables cache
+            # Always invalidate tables cache after any update
             try:
                 cached_service = get_cached_order_service()
                 await cached_service.invalidate_table_caches(user_org_id)

@@ -863,8 +863,7 @@ const OrdersPage = ({ user }) => {
       setTodaysBills(validBills.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
     } catch (error) {
       console.error('Failed to fetch today\'s bills', error);
-      setTodaysBills([]);
-      // Error handling is done by apiWithRetry
+      // DO NOT wipe bills on error — keep existing state
     }
   };
 
@@ -900,8 +899,8 @@ const OrdersPage = ({ user }) => {
       setTables(validTables);
     } catch (error) {
       console.error('Failed to fetch tables', error);
-      setTables([]);
-      // Error handling is done by apiWithRetry
+      // DO NOT wipe tables on error — keep existing state so UI stays usable
+      // setTables([]) was causing "tables disappeared" bug on network hiccups
     }
   };
 
@@ -1179,10 +1178,10 @@ const OrdersPage = ({ user }) => {
         );
       }
 
-      // Simple background refresh for tables only
+      // Background refresh for tables — short delay to let server finish table status update
       setTimeout(() => {
         fetchTables(true);
-      }, 3000);
+      }, 1000);
       
       // Offer WhatsApp notification
       if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
@@ -1200,16 +1199,28 @@ const OrdersPage = ({ user }) => {
         errorType: 'order-creation-failed'
       });
       
-      // Remove optimistic order on failure
-      setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
-      
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to create order';
       if (error.response?.status === 402) {
+        // Definite server rejection — remove optimistic order
+        setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
         setSubscriptionStatus((prev) => (prev ? { ...prev, needs_subscription: true } : prev));
         toast.error(errorMsg);
         navigate('/subscription');
-      } else {
+      } else if (error.response) {
+        // Server responded with an error (4xx/5xx) — order was NOT created
+        setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
         toast.error(`Order creation failed: ${errorMsg}`);
+      } else {
+        // Network timeout / no response — order MAY have been created on server
+        // Keep optimistic order visible and do a background fetch to confirm
+        console.warn('⚠️ Network error during order creation — keeping optimistic order, verifying with server...');
+        setTimeout(async () => {
+          try {
+            await fetchOrders(true);
+          } catch (e) {
+            setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
+          }
+        }, 3000);
       }
     } finally {
       setIsCreatingOrder(false);
