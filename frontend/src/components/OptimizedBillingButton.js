@@ -86,9 +86,6 @@ const OptimizedBillingButton = ({ order, user, className = "" }) => {
     >
       <CreditCard className="w-4 h-4" />
       Bill & Pay
-      {isPreloaded && (
-        <span className="ml-1 w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Ready for instant billing!" />
-      )}
     </button>
   );
 };

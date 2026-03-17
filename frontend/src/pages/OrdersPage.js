@@ -30,6 +30,13 @@ import activeOrdersCache from '../utils/activeOrdersCache';
 import performanceMonitor from '../utils/performanceMonitor';
 // import PerformanceDashboard from '../components/PerformanceDashboard'; // DISABLED FOR PRODUCTION
 
+// Module-level cache — survives React navigation (unmount/remount)
+const _pageCache = {
+  orders: null, tables: null, todaysBills: null,
+  menuItems: null, businessSettings: null, loadedAt: 0,
+};
+const CACHE_TTL = 30000; // 30s fresh window
+
 // Enhanced sound effects for better UX
 const playSound = (type) => {
   try {
@@ -133,7 +140,7 @@ const OrdersPage = ({ user }) => {
   });
   // Tab state for Active Orders vs Today's Bills
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   
   // Add state for preventing duplicate orders
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
@@ -576,8 +583,6 @@ const OrdersPage = ({ user }) => {
       return;
     }
     
-    setLoading(true);
-    
     try {
       // NO CACHES TO CLEAR - Always fetch fresh data
       console.log('🔄 Manual refresh - fetching fresh data from database');
@@ -625,105 +630,91 @@ const OrdersPage = ({ user }) => {
   };
 
   const loadInitialData = async () => {
-    try {
-      // CLEAR ALL CACHES for fresh data
-      console.log('🧹 Clearing all caches for fresh data');
-      sessionStorage.removeItem(`orders_${user?.id}`);
-      localStorage.removeItem('billbyte_menu_cache');
-      
-      // NO CACHE LOADING - Always fetch fresh data from database
-      console.log('🚀 Loading all data fresh from database');
+    const now = Date.now();
+    const cacheAge = now - _pageCache.loadedAt;
 
-      // Load critical data first (orders, today's bills, tables, and menu items) - ALL FRESH
-      const [ordersRes, todaysBillsRes, tablesRes, menuRes] = await Promise.all([
-        apiSilent({ method: 'get', url: `${API}/orders?fresh=true&_t=${Date.now()}` }),
-        apiSilent({ method: 'get', url: `${API}/orders/today-bills?fresh=true&_t=${Date.now()}` }),
-        // Use fresh=true and cache-busting for tables to get real-time status
-        apiSilent({ method: 'get', url: `${API}/tables?fresh=true&_t=${Date.now()}` }),
-        // Load menu items fresh
-        apiSilent({ method: 'get', url: `${API}/menu?fresh=true&_t=${Date.now()}`, timeout: 8000 })
+    // Fresh cache (<30s): show instantly, skip network entirely
+    if (_pageCache.orders && cacheAge < CACHE_TTL) {
+      setOrders(_pageCache.orders);
+      if (_pageCache.tables) setTables(_pageCache.tables);
+      if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
+      if (_pageCache.menuItems) { setMenuItems(_pageCache.menuItems); setMenuLoading(false); }
+      if (_pageCache.businessSettings) setBusinessSettings(_pageCache.businessSettings);
+      setLoading(false);
+      return;
+    }
+
+    // Stale cache: show immediately then refresh in background
+    if (_pageCache.orders) {
+      setOrders(_pageCache.orders);
+      if (_pageCache.tables) setTables(_pageCache.tables);
+      if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
+      if (_pageCache.menuItems) { setMenuItems(_pageCache.menuItems); setMenuLoading(false); }
+      if (_pageCache.businessSettings) setBusinessSettings(_pageCache.businessSettings);
+      setLoading(false);
+    }
+
+    // Fetch all in parallel — allSettled so one failure never blocks others
+    try {
+      const [ordersRes, todaysBillsRes, tablesRes, menuRes, settingsRes] = await Promise.allSettled([
+        apiSilent({ method: 'get', url: ${API}/orders, timeout: 10000 }),
+        apiSilent({ method: 'get', url: ${API}/orders/today-bills, timeout: 8000 }),
+        apiSilent({ method: 'get', url: ${API}/tables, timeout: 8000 }),
+        apiSilent({ method: 'get', url: ${API}/menu, timeout: 8000 }),
+        apiSilent({ method: 'get', url: ${API}/business/settings, timeout: 8000 }),
       ]);
-      
-      // Process orders data
-      const ordersData = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
-      const validOrders = ordersData.filter(order => {
-        return order && order.id && order.created_at && order.status && typeof order.total === 'number';
-      }).map(order => ({
-        ...order,
-        customer_name: order.customer_name || '',
-        table_number: order.table_number || 0,
-        payment_method: order.payment_method || 'cash',
-        created_at: order.created_at || new Date().toISOString()
-      }));
-      
-      // Process today's bills data
-      const billsData = Array.isArray(todaysBillsRes?.data) ? todaysBillsRes.data : [];
-      const validBills = billsData.filter(order => {
-        return order && order.id && order.created_at && order.status && typeof order.total === 'number';
-      }).map(order => ({
-        ...order,
-        customer_name: order.customer_name || '',
-        table_number: order.table_number || 0,
-        payment_method: order.payment_method || 'cash',
-        created_at: order.created_at || new Date().toISOString()
-      }));
-      
-      // Process tables data
-      const tablesData = Array.isArray(tablesRes?.data) ? tablesRes.data : [];
-      const validTables = tablesData.filter(table => {
-        return table && table.id && typeof table.table_number === 'number';
-      });
-      
-      // Process menu items data - now loaded as priority
-      const menuData = Array.isArray(menuRes?.data) ? menuRes.data : [];
-      const validMenuItems = menuData.filter(item => item && item.id && item.name && item.available);
-      
-      setOrders(validOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
-      setTodaysBills(validBills.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
-      setTables(validTables);
-      setMenuItems(validMenuItems); // Set menu items immediately
-      setMenuLoading(false);
-      
-      // Cache menu items for next time
-      try {
-        // NO CACHING - Use fresh menu data directly
-        console.log('📋 Fresh menu items loaded:', validMenuItems.length);
-      } catch (e) {
-        console.warn('Failed to set menu items:', e);
+
+      if (ordersRes.status === 'fulfilled') {
+        const data = Array.isArray(ordersRes.value?.data) ? ordersRes.value.data : [];
+        const valid = data
+          .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
+          .map(o => ({ ...o, customer_name: o.customer_name || '', table_number: o.table_number || 0, payment_method: o.payment_method || 'cash', created_at: o.created_at || new Date().toISOString() }))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        setOrders(valid);
+        _pageCache.orders = valid;
       }
-      
-      // 🚀 PERFORMANCE OPTIMIZATION: Smart pre-loading with persistent cache
-      const activeOrderIds = validOrders
-        .filter(order => ['ready', 'preparing', 'pending'].includes(order.status))
-        .map(order => order.id)
-        .slice(0, 15); // Increased from 10 to 15 for better coverage
-      
-      if (activeOrderIds.length > 0) {
-        // Smart preloading - only preload uncached orders
-        billingCache.preloadMultipleOrders(activeOrderIds).catch(error => {
-          console.warn('Smart preload failed:', error);
-        });
-        
-        // Background sync for potentially stale cached orders
-        billingCache.backgroundSync(activeOrderIds);
+
+      if (todaysBillsRes.status === 'fulfilled') {
+        const data = Array.isArray(todaysBillsRes.value?.data) ? todaysBillsRes.value.data : [];
+        const valid = data
+          .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
+          .map(o => ({ ...o, customer_name: o.customer_name || '', table_number: o.table_number || 0, payment_method: o.payment_method || 'cash', created_at: o.created_at || new Date().toISOString() }))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        setTodaysBills(valid);
+        _pageCache.todaysBills = valid;
       }
-      
-      // Load business settings in background (less critical)
-      apiSilent({ method: 'get', url: `${API}/business/settings` })
-        .then((settingsRes) => {
-          if (settingsRes?.data) {
-            setBusinessSettings(settingsRes.data.business_settings || {});
-          }
-        });
-      
+
+      if (tablesRes.status === 'fulfilled') {
+        const data = Array.isArray(tablesRes.value?.data) ? tablesRes.value.data : [];
+        const valid = data.filter(t => t && t.id && typeof t.table_number === 'number');
+        setTables(valid);
+        _pageCache.tables = valid;
+      }
+
+      if (menuRes.status === 'fulfilled') {
+        const data = Array.isArray(menuRes.value?.data) ? menuRes.value.data : [];
+        const valid = data.filter(item => item && item.id && item.name && item.available);
+        setMenuItems(valid);
+        setMenuLoading(false);
+        _pageCache.menuItems = valid;
+      }
+
+      if (settingsRes.status === 'fulfilled' && settingsRes.value?.data) {
+        const s = settingsRes.value.data.business_settings || {};
+        setBusinessSettings(s);
+        _pageCache.businessSettings = s;
+      }
+
+      _pageCache.loadedAt = Date.now();
+
+      // Preload billing data in background
+      const activeIds = (_pageCache.orders || [])
+        .filter(o => ['ready', 'preparing', 'pending'].includes(o.status))
+        .map(o => o.id).slice(0, 10);
+      if (activeIds.length > 0) billingCache.preloadMultipleOrders(activeIds).catch(() => {});
+
     } catch (error) {
       console.error('Failed to load initial data', error);
-      // Set empty defaults to prevent crashes
-      setOrders([]);
-      setTodaysBills([]);
-      setTables([]);
-      setMenuItems([]);
-      setBusinessSettings({});
       setMenuLoading(false);
     } finally {
       setLoading(false);
@@ -1285,9 +1276,6 @@ const OrdersPage = ({ user }) => {
 
     console.log('✅ Status change proceeding:', orderId, existingOrder?.status, '->', status);
 
-    // Add to processing set immediately with longer duration
-    setProcessingStatusChanges(prev => new Set([...prev, orderId]));
-
     // Store original status for potential rollback
     const originalStatus = existingOrder?.status;
     
@@ -1308,6 +1296,9 @@ const OrdersPage = ({ user }) => {
           : order
       )
     );
+
+    // Unlock button immediately — API runs in background
+    setProcessingStatusChanges(prev => { const s = new Set(prev); s.delete(orderId); return s; });
 
     // 🎵 IMMEDIATE SOUND FEEDBACK
     const statusSounds = {
