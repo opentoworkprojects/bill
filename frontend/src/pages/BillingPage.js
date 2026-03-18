@@ -1131,215 +1131,91 @@ const BillingPage = ({ user }) => {
   };
 
   const handlePayment = async () => {
-    const startTime = performance.now();
-    const paymentMonitor = startPaymentMonitoring(`payment-${orderId}-${Date.now()}`);
-    
-    // 🚀 ENHANCED INSTANT FEEDBACK: Multiple feedback mechanisms
-    setLoading(true);
-    
-    try {
-      // ✅ PAYMENT VALIDATION: Validate payment data before processing
-      const total = calculateTotal();
-      const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
-      const balance = Math.max(0, total - received);
-      const isCredit = balance > 0;
-      
-      // Prepare validation data
-      const validationData = {
-        orderData: {
-          id: orderId,
-          total: total,
-          items: orderItems
-        },
-        paymentMethod: splitPayment ? 'split' : paymentMethod,
-        paymentAmount: received,
-        customerInfo: {
-          name: customerName,
-          phone: customerPhone
-        },
-        splitAmounts: splitPayment ? {
-          cash_amount: parseFloat(cashAmount) || 0,
-          card_amount: parseFloat(cardAmount) || 0,
-          upi_amount: parseFloat(upiAmount) || 0,
-          credit_amount: balance
-        } : null
-      };
-      
-      // Validate payment data
-      const validation = validatePayment(validationData);
-      if (!validation.isValid) {
-        logValidationError(validation, validationData);
-        paymentMonitor.markFailure(new Error(`Validation failed: ${validation.error}`));
-        toast.error(`Validation Error: ${validation.error}`);
-        setLoading(false);
-        return;
-      }
-      
-      console.log('✅ Payment validation passed');
-      
-      // 🔊 ENHANCED SOUND EFFECTS: Multiple sound types for better feedback
-      try {
-        // Payment processing sound (cash register)
-        const paymentSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-        paymentSound.volume = 0.4;
-        paymentSound.play().catch(() => {});
-        
-        // Success chime (delayed)
-        setTimeout(() => {
-          try {
-            const successSound = new Audio('data:audio/wav;base64,UklGRvIBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-            successSound.volume = 0.5;
-            successSound.play().catch(() => {});
-          } catch (e) {}
-        }, 300);
-        
-      } catch (e) {}
-      
-      // 📳 VIBRATION FEEDBACK: Enhanced haptic feedback
-      try {
-        if (navigator.vibrate) {
-          // Payment processing vibration pattern
-          navigator.vibrate([100, 50, 100, 50, 200]);
-        }
-      } catch (e) {}
-      
-      if (!order) {
-        const error = new Error('Order not found');
-        logPaymentError(error, { orderId, amount: total, paymentMethod });
-        paymentMonitor.markFailure(error);
-        toast.error('Order not found');
-        setLoading(false);
-        return;
-      }
-      
-      const updated = await updateOrderItems();
-      if (!updated) {
-        const error = new Error('Failed to update order items');
-        paymentMonitor.markFailure(error);
-        setLoading(false);
-        return;
-      }
-      
-      // Allow ₹0 for credit payment method, but require positive amount for other methods
-      if ((showReceivedAmount || splitPayment) && received <= 0 && paymentMethod !== 'credit') {
-        const error = new Error('Invalid received amount');
-        logValidationError({ isValid: false, error: 'Invalid received amount' }, { received, total });
-        paymentMonitor.markFailure(error);
-        toast.error('Please enter a valid received amount');
-        setLoading(false);
-        return;
-      }
+    if (!order) { toast.error('Order not found'); return; }
+    if (orderItems.length === 0) { toast.error('Order must have at least one item'); return; }
 
-      // Customer info is optional for credit orders
-      // If provided, it will be saved; if not, order will show as "Unknown Customer"
-      // No need to block payment processing
-      
-      // 🎯 OPTIMISTIC UI UPDATE: Show success immediately for better UX
-      setPaymentCompleted(true);
-      setCompletedPaymentData({
-        received: received,
-        balance: balance,
-        total: total,
-        isCredit: isCredit,
-        paymentMethod: splitPayment ? 'split' : paymentMethod
-      });
-      
-      // 🎉 ENHANCED SUCCESS FEEDBACK: Multiple feedback types
-      toast.success(isCredit ? '💰 Partial payment recorded!' : '🎉 Payment completed!', {
-        duration: 3000,
-        style: {
-          background: 'linear-gradient(135deg, #10b981, #059669)',
-          color: 'white',
-          fontWeight: 'bold',
-          fontSize: '16px'
-        }
-      });
-      
-      // 📳 SUCCESS VIBRATION: Different pattern for success
-      try {
-        if (navigator.vibrate) {
-          navigator.vibrate([200, 100, 200]);
-        }
-      } catch (e) {}
-      
-      // Process payment in background with enhanced error handling
-      processPayment().then(() => {
-        // Payment succeeded
-        const result = paymentMonitor.markSuccess();
-        console.log('✅ Payment monitoring completed:', result);
-      }).catch(error => {
-        // Log payment error with context
-        logPaymentError(error, {
-          orderId,
-          amount: total,
-          paymentMethod: splitPayment ? 'split' : paymentMethod,
-          isCredit,
-          tableNumber: order?.table_number
-        });
-        
-        // Mark payment as failed in monitor
-        paymentMonitor.markFailure(error);
-        
-        // Background payment processing failed
-        // Revert optimistic update on error
-        setPaymentCompleted(false);
-        setCompletedPaymentData(null);
-        
-        // Enhanced error message based on error type
-        let errorMessage = '❌ Payment processing failed. Please try again.';
-        
-        if (error.code === 'ERR_NETWORK' || !error.response) {
-          errorMessage = '🌐 Network error. Please check your connection and try again.';
-        } else if (error.response?.status === 500) {
-          errorMessage = '⚠️ Server error. Payment may have been processed. Please verify before retrying.';
-        } else if (error.response?.status === 400) {
-          errorMessage = '❌ Invalid payment data. Please check your entries and try again.';
-        } else if (error.response?.data?.detail) {
-          errorMessage = `❌ ${error.response.data.detail}`;
-        }
-        
-        toast.error(errorMessage);
-        
-        // Error vibration
-        try {
-          if (navigator.vibrate) {
-            navigator.vibrate([300, 100, 300, 100, 300]);
-          }
-        } catch (e) {}
-      }).finally(() => {
-        setLoading(false);
-        
-        // Log performance metrics
-        const endTime = performance.now();
-        const duration = endTime - startTime;
-        logPerformanceIssue('payment_processing', duration, 3000);
-      });
-      
-    } catch (error) {
-      // Log unexpected errors
-      logPaymentError(error, {
-        orderId,
-        amount: calculateTotal(),
-        paymentMethod: splitPayment ? 'split' : paymentMethod,
-        tableNumber: order?.table_number
-      });
-      
-      // Mark payment as failed in monitor
-      paymentMonitor.markFailure(error);
-      
-      toast.error('❌ Payment processing failed. Please try again.');
-      setLoading(false);
-      // Revert optimistic update
-      setPaymentCompleted(false);
-      setCompletedPaymentData(null);
-      
-      // Error vibration
-      try {
-        if (navigator.vibrate) {
-          navigator.vibrate([300, 100, 300, 100, 300]);
-        }
-      } catch (e) {}
+    const total = calculateTotal();
+    const received = (showReceivedAmount || splitPayment) ? calculateReceivedAmount() : total;
+    const balance = Math.max(0, total - received);
+    const isCredit = balance > 0;
+
+    if ((showReceivedAmount || splitPayment) && received <= 0 && paymentMethod !== 'credit') {
+      toast.error('Please enter a valid received amount');
+      return;
     }
+
+    // ✅ INSTANT UI — mark payment done immediately, no waiting for server
+    const completionStatus = determineBillingCompletionStatus({ waiterName: order?.waiter_name, isCredit });
+    const paymentResult = {
+      received, balance, total, isCredit,
+      paymentMethod: splitPayment ? 'split' : paymentMethod
+    };
+
+    setPaymentCompleted(true);
+    setCompletedPaymentData(paymentResult);
+    setLoading(false);
+
+    // Dispatch event immediately so OrdersPage removes it from active list right now
+    const completedOrderData = {
+      ...order,
+      status: completionStatus,
+      payment_method: splitPayment ? 'split' : paymentMethod,
+      payment_received: received,
+      balance_amount: balance,
+      is_credit: isCredit,
+      total
+    };
+    window.dispatchEvent(new CustomEvent('paymentCompleted', {
+      detail: { orderId, orderData: completedOrderData, removeFromActiveOrders: true }
+    }));
+    localStorage.setItem('paymentCompleted', JSON.stringify({ orderId, orderData: completedOrderData }));
+    setTimeout(() => localStorage.removeItem('paymentCompleted'), 5000);
+
+    toast.success(isCredit ? '💰 Partial payment recorded!' : '🎉 Payment completed!', { duration: 2000 });
+
+    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+
+    // 🔄 BACKGROUND: Update server (non-blocking — UI already shows success)
+    const paymentData = {
+      order_id: orderId,
+      status: completionStatus,
+      payment_method: splitPayment ? 'split' : paymentMethod,
+      payment_received: received,
+      balance_amount: balance,
+      is_credit: isCredit,
+      discount: calculateDiscountAmount(),
+      discount_type: discountType,
+      discount_value: parseFloat(discountValue) || 0,
+      discount_amount: calculateDiscountAmount(),
+      total,
+      updated_at: new Date().toISOString(),
+      items: orderItems,
+      subtotal: calculateSubtotal() - calculateDiscountAmount(),
+      tax: calculateTax(),
+      tax_rate: getEffectiveTaxRate(),
+      table_id: order?.table_id,
+      ...(splitPayment && {
+        cash_amount: parseFloat(cashAmount) || 0,
+        card_amount: parseFloat(cardAmount) || 0,
+        upi_amount: parseFloat(upiAmount) || 0,
+        credit_amount: balance
+      })
+    };
+
+    // Fire and forget — don't await, don't block UI
+    (async () => {
+      try {
+        await apiWithRetry({
+          method: 'put',
+          url: `${API}/orders/${orderId}`,
+          data: paymentData,
+          timeout: 15000
+        });
+        billingCache.invalidateOrder(orderId);
+      } catch (err) {
+        console.error('Background payment save failed:', err);
+      }
+    })();
   };
 
 const handleWhatsappShare = async () => {
