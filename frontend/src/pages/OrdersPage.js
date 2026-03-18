@@ -279,10 +279,24 @@ const OrdersPage = ({ user }) => {
     };
     
     window.addEventListener('storage', handleStorageChange);
+
+    // If server save failed after all retries, re-add the order to active list
+    const handlePaymentFailed = (event) => {
+      const { orderId: failedOrderId, order: failedOrder } = event.detail;
+      if (!failedOrderId || !failedOrder) return;
+      setOrders(prev => {
+        if (prev.some(o => o.id === failedOrderId)) return prev;
+        return [failedOrder, ...prev];
+      });
+      setRecentPaymentCompletions(prev => { const s = new Set(prev); s.delete(failedOrderId); return s; });
+      setPaymentProtectionActive(false);
+    };
+    window.addEventListener('paymentFailed', handlePaymentFailed);
     
     return () => {
       window.removeEventListener('paymentCompleted', handlePaymentCompleted);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('paymentFailed', handlePaymentFailed);
     };
   }, []); // No deps — payment handler uses setters only, no stale closure risk
 
@@ -393,6 +407,31 @@ const OrdersPage = ({ user }) => {
       document.removeEventListener('keydown', trackInteraction);
     };
   }, []);
+
+  // Keyboard shortcuts for faster order creation
+  useEffect(() => {
+    const handleKeyboard = (e) => {
+      // Ctrl+N or Cmd+N — open new order menu
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n' && !showMenuPage) {
+        e.preventDefault();
+        setShowMenuPage(true);
+      }
+      // Ctrl+Enter or Cmd+Enter — submit order when menu is open
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && showMenuPage && selectedItems.length > 0) {
+        e.preventDefault();
+        handleSubmitOrder();
+      }
+      // Escape — close menu
+      if (e.key === 'Escape' && showMenuPage) {
+        e.preventDefault();
+        setShowMenuPage(false);
+        setCartExpanded(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyboard);
+    return () => document.removeEventListener('keydown', handleKeyboard);
+  }, [showMenuPage, selectedItems]);
 
   // Aggressive real-time refresh on window focus (when user returns to tab)
   useEffect(() => {

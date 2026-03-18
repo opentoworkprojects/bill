@@ -1144,78 +1144,64 @@ const BillingPage = ({ user }) => {
       return;
     }
 
-    // ✅ INSTANT UI — mark payment done immediately, no waiting for server
-    const completionStatus = determineBillingCompletionStatus({ waiterName: order?.waiter_name, isCredit });
-    const paymentResult = {
-      received, balance, total, isCredit,
-      paymentMethod: splitPayment ? 'split' : paymentMethod
-    };
+    setLoading(true);
 
-    setPaymentCompleted(true);
-    setCompletedPaymentData(paymentResult);
-    setLoading(false);
+    try {
+      const completionStatus = determineBillingCompletionStatus({ waiterName: order?.waiter_name, isCredit });
+      
+      // Single fast server call — wait for confirmation before showing success
+      const response = await apiWithRetry({
+        method: 'put',
+        url: `${API}/orders/${orderId}`,
+        data: {
+          order_id: orderId,
+          status: completionStatus,
+          payment_method: splitPayment ? 'split' : paymentMethod,
+          payment_received: received,
+          balance_amount: balance,
+          is_credit: isCredit,
+          discount: calculateDiscountAmount(),
+          discount_type: discountType,
+          discount_value: parseFloat(discountValue) || 0,
+          discount_amount: calculateDiscountAmount(),
+          total,
+          items: orderItems,
+          subtotal: calculateSubtotal() - calculateDiscountAmount(),
+          tax: calculateTax(),
+          tax_rate: getEffectiveTaxRate(),
+          table_id: order?.table_id,
+          ...(splitPayment && {
+            cash_amount: parseFloat(cashAmount) || 0,
+            card_amount: parseFloat(cardAmount) || 0,
+            upi_amount: parseFloat(upiAmount) || 0,
+            credit_amount: balance
+          })
+        },
+        timeout: 8000
+      });
 
-    // Dispatch event immediately so OrdersPage removes it from active list right now
-    const completedOrderData = {
-      ...order,
-      status: completionStatus,
-      payment_method: splitPayment ? 'split' : paymentMethod,
-      payment_received: received,
-      balance_amount: balance,
-      is_credit: isCredit,
-      total
-    };
-    window.dispatchEvent(new CustomEvent('paymentCompleted', {
-      detail: { orderId, orderData: completedOrderData, removeFromActiveOrders: true }
-    }));
-    localStorage.setItem('paymentCompleted', JSON.stringify({ orderId, orderData: completedOrderData }));
-    setTimeout(() => localStorage.removeItem('paymentCompleted'), 5000);
+      // Server confirmed — now update UI
+      setPaymentCompleted(true);
+      setCompletedPaymentData({ received, balance, total, isCredit, paymentMethod: splitPayment ? 'split' : paymentMethod });
 
-    toast.success(isCredit ? '💰 Partial payment recorded!' : '🎉 Payment completed!', { duration: 2000 });
+      // Dispatch event so OrdersPage removes it immediately
+      const completedOrderData = { ...order, ...response.data, status: completionStatus, payment_received: received, balance_amount: balance, is_credit: isCredit, total };
+      window.dispatchEvent(new CustomEvent('paymentCompleted', { detail: { orderId, orderData: completedOrderData } }));
+      localStorage.setItem('paymentCompleted', JSON.stringify({ orderId, orderData: completedOrderData }));
+      setTimeout(() => localStorage.removeItem('paymentCompleted'), 5000);
 
-    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+      toast.success(isCredit ? '💰 Partial payment!' : '✅ Payment done!');
+      try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
 
-    // 🔄 BACKGROUND: Update server (non-blocking — UI already shows success)
-    const paymentData = {
-      order_id: orderId,
-      status: completionStatus,
-      payment_method: splitPayment ? 'split' : paymentMethod,
-      payment_received: received,
-      balance_amount: balance,
-      is_credit: isCredit,
-      discount: calculateDiscountAmount(),
-      discount_type: discountType,
-      discount_value: parseFloat(discountValue) || 0,
-      discount_amount: calculateDiscountAmount(),
-      total,
-      updated_at: new Date().toISOString(),
-      items: orderItems,
-      subtotal: calculateSubtotal() - calculateDiscountAmount(),
-      tax: calculateTax(),
-      tax_rate: getEffectiveTaxRate(),
-      table_id: order?.table_id,
-      ...(splitPayment && {
-        cash_amount: parseFloat(cashAmount) || 0,
-        card_amount: parseFloat(cardAmount) || 0,
-        upi_amount: parseFloat(upiAmount) || 0,
-        credit_amount: balance
-      })
-    };
+      billingCache.invalidateOrder(orderId);
 
-    // Fire and forget — don't await, don't block UI
-    (async () => {
-      try {
-        await apiWithRetry({
-          method: 'put',
-          url: `${API}/orders/${orderId}`,
-          data: paymentData,
-          timeout: 15000
-        });
-        billingCache.invalidateOrder(orderId);
-      } catch (err) {
-        console.error('Background payment save failed:', err);
-      }
-    })();
+    } catch (error) {
+      console.error('Payment failed:', error);
+      toast.error('Payment failed. Please try again.');
+      try { if (navigator.vibrate) navigator.vibrate([300, 100, 300]); } catch (e) {}
+    } finally {
+      setLoading(false);
+    }
   };
 
 const handleWhatsappShare = async () => {
