@@ -607,6 +607,7 @@ const OrdersPage = ({ user }) => {
   const loadInitialData = async () => {
     const now = Date.now();
     const cacheAge = now - _pageCache.loadedAt;
+    const STALE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes for stale cache fallback
 
     // Fresh cache (<30s): show instantly, skip network entirely
     if (_pageCache.orders && cacheAge < CACHE_TTL) {
@@ -627,6 +628,12 @@ const OrdersPage = ({ user }) => {
       if (_pageCache.menuItems) { setMenuItems(_pageCache.menuItems); setMenuLoading(false); }
       if (_pageCache.businessSettings) setBusinessSettings(_pageCache.businessSettings);
       setLoading(false);
+      
+      // CRITICAL FIX: Show staleness indicator if cache is old
+      if (cacheAge > CACHE_TTL && cacheAge < STALE_CACHE_TTL) {
+        const ageMinutes = Math.floor(cacheAge / 60000);
+        toast.warning(`Showing cached data from ${ageMinutes} minute${ageMinutes !== 1 ? 's' : ''} ago - Refresh to update`);
+      }
     }
 
     // Fetch all in parallel — allSettled so one failure never blocks others
@@ -639,7 +646,7 @@ const OrdersPage = ({ user }) => {
         apiSilent({ method: 'get', url: `${API}/business/settings`, timeout: 8000 }),
       ]);
 
-      // Only update state when response actually has data — never overwrite with null/empty from a failed call
+      // CRITICAL FIX: Only update state when response actually has data — never overwrite with null/empty from a failed call
       if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value?.data)) {
         const valid = ordersRes.value.data
           .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
@@ -651,6 +658,10 @@ const OrdersPage = ({ user }) => {
       } else if (!_pageCache.orders) {
         // No cache and no data — mark as failed so UI shows retry
         setLoadFailed(true);
+      } else {
+        // CRITICAL FIX: Have cache but fetch failed - keep using cache, show warning
+        console.warn('⚠️ Failed to fetch fresh orders, using cached data');
+        toast.warning('Using cached orders - refresh to update');
       }
 
       if (todaysBillsRes.status === 'fulfilled' && Array.isArray(todaysBillsRes.value?.data)) {
@@ -666,6 +677,9 @@ const OrdersPage = ({ user }) => {
         const valid = tablesRes.value.data.filter(t => t && t.id && typeof t.table_number === 'number');
         setTables(valid);
         _pageCache.tables = valid;
+      } else if (_pageCache.tables) {
+        // CRITICAL FIX: Keep cached tables if fetch failed
+        console.warn('⚠️ Failed to fetch fresh tables, using cached data');
       }
 
       if (menuRes.status === 'fulfilled' && Array.isArray(menuRes.value?.data)) {
@@ -692,12 +706,21 @@ const OrdersPage = ({ user }) => {
     } catch (error) {
       console.error('Failed to load initial data', error);
       setMenuLoading(false);
-      // Retry once after 3s if we have no data at all
-      if (!_pageCache.orders) {
-        setTimeout(() => {
-          _pageCache.loadedAt = 0;
-          loadInitialData();
-        }, 3000);
+      
+      // CRITICAL FIX: If we have cache (even stale), use it instead of showing error
+      if (_pageCache.orders && cacheAge < STALE_CACHE_TTL) {
+        console.log('💾 Using stale cache as fallback after fetch failure');
+        const ageMinutes = Math.floor(cacheAge / 60000);
+        toast.warning(`Using cached data from ${ageMinutes} minute${ageMinutes !== 1 ? 's' : ''} ago - Server unavailable`);
+        setLoadFailed(false);
+      } else {
+        // Retry once after 3s if we have no usable data at all
+        if (!_pageCache.orders) {
+          setTimeout(() => {
+            _pageCache.loadedAt = 0;
+            loadInitialData();
+          }, 3000);
+        }
       }
     } finally {
       setLoading(false);

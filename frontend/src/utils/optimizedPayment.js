@@ -79,19 +79,12 @@ export class OptimizedPaymentProcessor {
         console.log('📋 Using cached business settings');
       }
 
-      // 5. Parallel API calls with timeout and retry logic
+      // 5. CRITICAL FIX: Skip redundant /payments/create-order call entirely
+      // The /orders/{id} PUT endpoint already handles payment completion, table release, and cache invalidation
+      console.log('💰 Payment processing - using single /orders/{id} PUT endpoint for maximum speed');
+      
       const promises = [
-        // Make payment record creation completely optional and non-blocking
-        this.createPaymentRecordWithRetry(optimizedPayload).catch(error => {
-          console.warn('💳 Payment record creation failed (non-critical):', error.message);
-          return { 
-            data: { 
-              id: null, 
-              status: 'failed_but_non_critical',
-              message: 'Payment record creation failed but payment processing continues'
-            } 
-          };
-        }),
+        // Only call the order update endpoint - this is all we need
         this.updateOrderStatusWithRetry(optimizedPayload)
       ];
 
@@ -103,16 +96,14 @@ export class OptimizedPaymentProcessor {
       // 6. Execute with timeout and enhanced error handling
       console.log('🔄 Executing parallel API calls...');
       const results = await Promise.allSettled(
-        promises.map(p => this.withTimeout(p, 12000)) // Increased timeout to 12 seconds
+        promises.map(p => this.withTimeout(p, 8000)) // Reduced timeout to 8 seconds for faster failure detection
       );
 
       // 7. Handle results with improved error checking
-      const paymentResult = results[0];
-      const orderResult = results[1];
-      const tableResult = results[2];
+      const orderResult = results[0];
+      const tableResult = results[1];
 
       console.log('📊 API call results:', {
-        payment: paymentResult.status,
         order: orderResult.status,
         table: tableResult?.status || 'not_applicable'
       });
@@ -148,19 +139,7 @@ export class OptimizedPaymentProcessor {
         }
       }
 
-      // Payment record creation is optional - log warning if it fails but don't fail the whole payment
-      if (paymentResult.status === 'rejected') {
-        const error = paymentResult.reason;
-        console.warn('⚠️ Payment record creation failed (non-critical):', error);
-        
-        // Special handling for timeout errors - they're non-critical
-        if (error.code === 'TIMEOUT_ERROR' || error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-          console.log('💡 Payment record creation timed out - this is non-critical, payment still succeeded');
-        }
-        // Don't throw error - payment still succeeded if order was updated
-      }
-
-      // Table release is also optional
+      // Table release is optional
       if (tableResult && tableResult.status === 'rejected') {
         console.warn('⚠️ Table release failed (non-critical):', tableResult.reason);
       }
@@ -171,10 +150,10 @@ export class OptimizedPaymentProcessor {
 
       return {
         success: true,
-        paymentId: paymentResult.status === 'fulfilled' ? paymentResult.value?.data?.id : null,
+        paymentId: null, // No payment record created - backend handles this
         orderId: orderResult.value?.data?.id || paymentData.order_id,
         processingTime: processingTime,
-        paymentRecordCreated: paymentResult.status === 'fulfilled',
+        paymentRecordCreated: false, // Skipped for performance
         orderUpdated: orderResult.status === 'fulfilled',
         tableReleased: tableResult ? tableResult.status === 'fulfilled' : false
       };

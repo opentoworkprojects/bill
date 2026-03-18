@@ -105,16 +105,26 @@ const TablesPage = ({ user }) => {
       console.log(`🍽️ Fetching tables${forceRefresh ? ' (force refresh)' : ''} with fresh=true...`);
       
       const response = await axios.get(url, { headers });
-      setTables(response.data.sort((a, b) => a.table_number - b.table_number));
-      console.log(`✅ Fetched ${response.data.length} tables`);
+      
+      // CRITICAL FIX: Only update state if response has valid data
+      if (response?.data && Array.isArray(response.data)) {
+        setTables(response.data.sort((a, b) => a.table_number - b.table_number));
+        console.log(`✅ Fetched ${response.data.length} tables`);
+      } else {
+        console.warn('⚠️ Invalid table data received, preserving existing state');
+      }
     } catch (error) { 
       console.error('Failed to fetch tables:', error);
       
+      // CRITICAL FIX: Don't clear tables on error - preserve existing state
+      // Show non-intrusive warning instead of error
       if (error.response?.status === 401) {
         toast.error('Please login again');
       } else {
-        toast.error('Failed to fetch tables');
+        // Use warning toast instead of error for less intrusive feedback
+        toast.warning('Using cached tables - refresh to update');
       }
+      // Tables state is preserved - no setTables([]) call
     }
   };
 
