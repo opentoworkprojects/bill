@@ -35,7 +35,7 @@ const _pageCache = {
   orders: null, tables: null, todaysBills: null,
   menuItems: null, businessSettings: null, loadedAt: 0,
 };
-const CACHE_TTL = 30000; // 30s fresh window
+const CACHE_TTL = 5000; // 5s fresh window - avoid showing stale data
 
 // Enhanced sound effects for better UX
 const playSound = (type) => {
@@ -607,10 +607,13 @@ const OrdersPage = ({ user }) => {
   const loadInitialData = async () => {
     const now = Date.now();
     const cacheAge = now - _pageCache.loadedAt;
-    const STALE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes for stale cache fallback
 
-    // Fresh cache (<30s): show instantly, skip network entirely
-    if (_pageCache.orders && cacheAge < CACHE_TTL) {
+    // CRITICAL FIX: Only use cache if it's very fresh (<5 seconds) to avoid inconsistent data
+    // This prevents showing stale data that gets replaced seconds later
+    const INSTANT_CACHE_TTL = 5000; // 5 seconds - only show cache if extremely fresh
+    
+    if (_pageCache.orders && cacheAge < INSTANT_CACHE_TTL) {
+      // Cache is extremely fresh - show it instantly
       setOrders(_pageCache.orders);
       if (_pageCache.tables) setTables(_pageCache.tables);
       if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
@@ -620,25 +623,17 @@ const OrdersPage = ({ user }) => {
       return;
     }
 
-    // Stale cache: show immediately then refresh in background (silently)
-    if (_pageCache.orders) {
-      setOrders(_pageCache.orders);
-      if (_pageCache.tables) setTables(_pageCache.tables);
-      if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
-      if (_pageCache.menuItems) { setMenuItems(_pageCache.menuItems); setMenuLoading(false); }
-      if (_pageCache.businessSettings) setBusinessSettings(_pageCache.businessSettings);
-      setLoading(false);
-      // Auto-refresh silently in background - no toast notification
-    }
+    // For stale cache, don't show it first - fetch fresh data directly to avoid inconsistency
+    // This prevents the confusing "flash" of old data followed by new data
 
     // Fetch all in parallel — allSettled so one failure never blocks others
     try {
       const [ordersRes, todaysBillsRes, tablesRes, menuRes, settingsRes] = await Promise.allSettled([
-        apiSilent({ method: 'get', url: `${API}/orders`, timeout: 10000 }),
-        apiSilent({ method: 'get', url: `${API}/orders/today-bills`, timeout: 8000 }),
-        apiSilent({ method: 'get', url: `${API}/tables`, timeout: 8000 }),
-        apiSilent({ method: 'get', url: `${API}/menu`, timeout: 8000 }),
-        apiSilent({ method: 'get', url: `${API}/business/settings`, timeout: 8000 }),
+        apiSilent({ method: 'get', url: `${API}/orders` }),
+        apiSilent({ method: 'get', url: `${API}/orders/today-bills` }),
+        apiSilent({ method: 'get', url: `${API}/tables` }),
+        apiSilent({ method: 'get', url: `${API}/menu` }),
+        apiSilent({ method: 'get', url: `${API}/business/settings` }),
       ]);
 
       // CRITICAL FIX: Only update state when response actually has data — never overwrite with null/empty from a failed call
@@ -657,6 +652,9 @@ const OrdersPage = ({ user }) => {
         // CRITICAL FIX: Have cache but fetch failed - keep using cache silently
         console.warn('⚠️ Failed to fetch fresh orders, using cached data');
         // Auto-refresh silently - no toast notification
+        setOrders(_pageCache.orders);
+        if (_pageCache.tables) setTables(_pageCache.tables);
+        if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
       }
 
       if (todaysBillsRes.status === 'fulfilled' && Array.isArray(todaysBillsRes.value?.data)) {
@@ -675,6 +673,7 @@ const OrdersPage = ({ user }) => {
       } else if (_pageCache.tables) {
         // CRITICAL FIX: Keep cached tables if fetch failed (silently)
         console.warn('⚠️ Failed to fetch fresh tables, using cached data');
+        setTables(_pageCache.tables);
       }
 
       if (menuRes.status === 'fulfilled' && Array.isArray(menuRes.value?.data)) {
@@ -706,6 +705,9 @@ const OrdersPage = ({ user }) => {
       if (_pageCache.orders && cacheAge < STALE_CACHE_TTL) {
         console.log('💾 Using stale cache as fallback after fetch failure');
         // Auto-refresh silently - no toast notification
+        setOrders(_pageCache.orders);
+        if (_pageCache.tables) setTables(_pageCache.tables);
+        if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
         setLoadFailed(false);
       } else {
         // Retry once after 3s if we have no usable data at all
@@ -735,8 +737,8 @@ const OrdersPage = ({ user }) => {
       const params = `?fresh=true&_t=${Date.now()}`; // Always force fresh data from DB
       const response = await apiWithRetry({
         method: 'get',
-        url: `${API}/orders${params}`,
-        timeout: 10000 // 10 second timeout
+        url: `${API}/orders${params}`
+        // No timeout - let it complete naturally
       });
       
       const ordersData = Array.isArray(response.data) ? response.data : [];
@@ -967,7 +969,7 @@ const OrdersPage = ({ user }) => {
       setShowMenuPage(false);
       setCartExpanded(false);
       
-      // 🚀 ULTRA-FAST: Create order with minimal timeout
+      // 🚀 ULTRA-FAST: Create order with no timeout
       const response = await apiWithRetry({
         method: 'post',
         url: `${API}/orders`,
@@ -980,8 +982,8 @@ const OrdersPage = ({ user }) => {
           status: 'ready',
           quick_billing: true,
           frontend_origin: window.location.origin
-        },
-        timeout: 5000 // Ultra-fast timeout
+        }
+        // No timeout - let it complete naturally
       });
 
       const newOrder = response.data;
@@ -1092,8 +1094,8 @@ const OrdersPage = ({ user }) => {
           customer_name: customerName,
           customer_phone: capturedPhone,
           frontend_origin: window.location.origin
-        },
-        timeout: 12000
+        }
+        // No timeout - let it complete naturally
       });
 
       // Add the REAL order directly — no temp swap, no inconsistency
