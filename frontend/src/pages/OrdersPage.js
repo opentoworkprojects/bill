@@ -620,7 +620,7 @@ const OrdersPage = ({ user }) => {
       return;
     }
 
-    // Stale cache: show immediately then refresh in background
+    // Stale cache: show immediately then refresh in background (silently)
     if (_pageCache.orders) {
       setOrders(_pageCache.orders);
       if (_pageCache.tables) setTables(_pageCache.tables);
@@ -628,12 +628,7 @@ const OrdersPage = ({ user }) => {
       if (_pageCache.menuItems) { setMenuItems(_pageCache.menuItems); setMenuLoading(false); }
       if (_pageCache.businessSettings) setBusinessSettings(_pageCache.businessSettings);
       setLoading(false);
-      
-      // CRITICAL FIX: Show staleness indicator if cache is old
-      if (cacheAge > CACHE_TTL && cacheAge < STALE_CACHE_TTL) {
-        const ageMinutes = Math.floor(cacheAge / 60000);
-        toast.warning(`Showing cached data from ${ageMinutes} minute${ageMinutes !== 1 ? 's' : ''} ago - Refresh to update`);
-      }
+      // Auto-refresh silently in background - no toast notification
     }
 
     // Fetch all in parallel — allSettled so one failure never blocks others
@@ -659,9 +654,9 @@ const OrdersPage = ({ user }) => {
         // No cache and no data — mark as failed so UI shows retry
         setLoadFailed(true);
       } else {
-        // CRITICAL FIX: Have cache but fetch failed - keep using cache, show warning
+        // CRITICAL FIX: Have cache but fetch failed - keep using cache silently
         console.warn('⚠️ Failed to fetch fresh orders, using cached data');
-        toast.warning('Using cached orders - refresh to update');
+        // Auto-refresh silently - no toast notification
       }
 
       if (todaysBillsRes.status === 'fulfilled' && Array.isArray(todaysBillsRes.value?.data)) {
@@ -678,7 +673,7 @@ const OrdersPage = ({ user }) => {
         setTables(valid);
         _pageCache.tables = valid;
       } else if (_pageCache.tables) {
-        // CRITICAL FIX: Keep cached tables if fetch failed
+        // CRITICAL FIX: Keep cached tables if fetch failed (silently)
         console.warn('⚠️ Failed to fetch fresh tables, using cached data');
       }
 
@@ -710,8 +705,7 @@ const OrdersPage = ({ user }) => {
       // CRITICAL FIX: If we have cache (even stale), use it instead of showing error
       if (_pageCache.orders && cacheAge < STALE_CACHE_TTL) {
         console.log('💾 Using stale cache as fallback after fetch failure');
-        const ageMinutes = Math.floor(cacheAge / 60000);
-        toast.warning(`Using cached data from ${ageMinutes} minute${ageMinutes !== 1 ? 's' : ''} ago - Server unavailable`);
+        // Auto-refresh silently - no toast notification
         setLoadFailed(false);
       } else {
         // Retry once after 3s if we have no usable data at all

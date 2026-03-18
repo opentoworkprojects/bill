@@ -117,12 +117,9 @@ const TablesPage = ({ user }) => {
       console.error('Failed to fetch tables:', error);
       
       // CRITICAL FIX: Don't clear tables on error - preserve existing state
-      // Show non-intrusive warning instead of error
+      // Auto-refresh silently - no toast notification
       if (error.response?.status === 401) {
         toast.error('Please login again');
-      } else {
-        // Use warning toast instead of error for less intrusive feedback
-        toast.warning('Using cached tables - refresh to update');
       }
       // Tables state is preserved - no setTables([]) call
     }
