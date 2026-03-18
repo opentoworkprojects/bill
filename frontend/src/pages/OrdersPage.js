@@ -218,99 +218,47 @@ const OrdersPage = ({ user }) => {
   // Listen for payment completion events from BillingPage
   useEffect(() => {
     const handlePaymentCompleted = (event) => {
-      console.log('🎯 Payment completion event received!', event.detail);
-      
-      // Don't handle payment events during order creation
-      if (globalPollingDisabled || isCreatingOrder) {
-        console.log('⏸️ Skipping payment completion handling - order creation in progress', {
-          globalPollingDisabled,
-          isCreatingOrder
-        });
-        return;
-      }
-      
       const { orderId: paidOrderId, orderData } = event.detail;
-      
-      console.log('💰 Processing payment completion for order:', paidOrderId, orderData);
-      
-      // IMMEDIATE ORDER REMOVAL: Remove paid order from active orders instantly
+      if (!paidOrderId) return;
+
+      // ALWAYS process payment — never skip, never delay
+      // Remove from active orders instantly
       setOrders(prevOrders => {
-        console.log('📋 Current orders before removal:', prevOrders.map(o => ({ id: o.id, status: o.status })));
-        
-        const paidOrder = prevOrders.find(order => order.id === paidOrderId);
-        if (paidOrder) {
-          console.log('🚀 INSTANTLY removing paid order from active orders:', paidOrderId);
-          console.log('💰 Payment details:', { 
-            isCredit: orderData.is_credit, 
-            balance: orderData.balance_amount,
-            received: orderData.payment_received,
-            total: orderData.total
-          });
-          
-          // Add to today's bills immediately - ALWAYS add to bills after payment
-          setTodaysBills(prevBills => {
-            const exists = prevBills.some(bill => bill.id === paidOrderId);
-            if (!exists) {
-              const completedOrder = { 
-                ...paidOrder, 
-                ...orderData, 
-                // Keep the server status but ensure it's in bills
-                status: orderData.status || 'completed',
-                payment_received: orderData.payment_received || paidOrder.total,
-                balance_amount: orderData.balance_amount || 0,
-                is_credit: orderData.is_credit || false
-              };
-              console.log('📝 Adding paid order to today\'s bills:', completedOrder);
-              return [completedOrder, ...prevBills];
-            }
-            return prevBills;
-          });
-          
-          // ALWAYS remove from active orders after ANY payment - NO EXCEPTIONS
-          const filteredOrders = prevOrders.filter(order => order.id !== paidOrderId);
-          console.log('✅ Orders after removal:', filteredOrders.map(o => ({ id: o.id, status: o.status })));
-          
-          // Track this payment completion to prevent polling override
-          setRecentPaymentCompletions(prev => {
-            const newSet = new Set(prev);
-            newSet.add(paidOrderId);
-            return newSet;
-          });
-          
-          // NUCLEAR PROTECTION: Disable ALL refresh mechanisms for 15 seconds
-          setPaymentProtectionActive(true);
-          console.log('🛡️ PAYMENT PROTECTION ACTIVATED - All refreshes disabled for 15 seconds');
-          
-          // Remove from tracking after 15 seconds (extended from 10)
-          setTimeout(() => {
-            setRecentPaymentCompletions(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(paidOrderId);
-              return newSet;
-            });
-            setPaymentProtectionActive(false);
-            console.log('✅ Payment protection deactivated - Normal polling resumed');
-          }, 15000);
-          
-          // Show confirmation toast
-          if (orderData.is_credit) {
-            toast.success(`💰 Partial payment received! Order moved to bills (Balance: ₹${orderData.balance_amount})`);
-          } else {
-            toast.success('✅ Payment completed! Order moved to bills');
-          }
-          
-          return filteredOrders;
-        } else {
-          console.log('⚠️ Paid order not found in active orders:', paidOrderId);
-        }
-        return prevOrders;
+        const paidOrder = prevOrders.find(o => o.id === paidOrderId);
+        if (!paidOrder) return prevOrders;
+
+        // Move to today's bills immediately
+        setTodaysBills(prevBills => {
+          if (prevBills.some(b => b.id === paidOrderId)) return prevBills;
+          return [{
+            ...paidOrder,
+            ...orderData,
+            status: orderData.status || 'completed',
+            payment_received: orderData.payment_received || paidOrder.total,
+            balance_amount: orderData.balance_amount || 0,
+            is_credit: orderData.is_credit || false
+          }, ...prevBills];
+        });
+
+        return prevOrders.filter(o => o.id !== paidOrderId);
       });
-      
-      // Optional: Force server refresh after a longer delay for sync (but order already removed from UI)
+
+      // Track to prevent polling from re-adding it
+      setRecentPaymentCompletions(prev => { const s = new Set(prev); s.add(paidOrderId); return s; });
+      setPaymentProtectionActive(true);
       setTimeout(() => {
-        console.log('🔄 Background server refresh after payment completion');
-        fetchTodaysBills();
-      }, 2000);
+        setRecentPaymentCompletions(prev => { const s = new Set(prev); s.delete(paidOrderId); return s; });
+        setPaymentProtectionActive(false);
+      }, 8000); // Reduced from 15s — 8s is enough
+
+      if (orderData.is_credit) {
+        toast.success(`💰 Partial payment! Balance: ₹${orderData.balance_amount}`);
+      } else {
+        toast.success('✅ Payment done! Order moved to bills');
+      }
+
+      // Background sync after 2s
+      setTimeout(() => fetchTodaysBills(), 2000);
     };
 
     // Listen for custom payment completion events
@@ -318,12 +266,6 @@ const OrdersPage = ({ user }) => {
     
     // Also listen for storage events (cross-tab communication)
     const handleStorageChange = (event) => {
-      // Don't handle storage events during order creation
-      if (globalPollingDisabled || isCreatingOrder) {
-        console.log('⏸️ Skipping storage event handling - order creation in progress');
-        return;
-      }
-      
       if (event.key === 'paymentCompleted') {
         try {
           const paymentData = JSON.parse(event.newValue);
@@ -342,7 +284,7 @@ const OrdersPage = ({ user }) => {
       window.removeEventListener('paymentCompleted', handlePaymentCompleted);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [globalPollingDisabled, isCreatingOrder, recentPaymentCompletions]);
+  }, []); // No deps — payment handler uses setters only, no stale closure risk
 
   // 🔧 DUPLICATE FIX: Coordinated polling to prevent duplicate orders
   useEffect(() => {
@@ -1069,160 +1011,87 @@ const OrdersPage = ({ user }) => {
 
     setIsCreatingOrder(true);
 
+    // Capture form data before closing menu (resetForm clears it)
+    const capturedTableId = formData.table_id || null;
+    const capturedPhone = formData.customer_phone || '';
+    const capturedItems = [...selectedItems];
+    const selectedTable = capturedTableId ? tables.find(t => t.id === capturedTableId) : null;
+    const customerName = formData.customer_name?.trim() || (businessSettings?.kot_mode_enabled === false ? 'Cash Sale' : '');
+
+    // Close menu immediately for instant UX — no temp order, wait for real server response
+    setShowMenuPage(false);
+    setCartExpanded(false);
+    resetForm();
+    playSound('success');
+    localStorage.setItem('lastUserInteraction', Date.now().toString());
+
     try {
-      const selectedTable = formData.table_id ? tables.find(t => t.id === formData.table_id) : null;
-      const customerName = formData.customer_name?.trim() || (businessSettings?.kot_mode_enabled === false ? 'Cash Sale' : '');
-      
-      // SIMPLIFIED: Direct server creation without optimistic updates
-      console.log('🚀 Creating order directly on server...');
-      
-      // Instant feedback
-      playSound('success');
-
-      // Build optimistic order to show instantly in UI
-      const tempId = `temp_${now}`;
-      const optimisticOrder = {
-        id: tempId,
-        table_id: formData.table_id || null,
-        table_number: selectedTable?.table_number || 0,
-        items: selectedItems,
-        customer_name: customerName,
-        customer_phone: formData.customer_phone || '',
-        status: 'pending',
-        subtotal: selectedItems.reduce((s, i) => s + i.price * i.quantity, 0),
-        tax: 0,
-        total: selectedItems.reduce((s, i) => s + i.price * i.quantity, 0),
-        payment_method: 'cash',
-        payment_received: 0,
-        balance_amount: 0,
-        is_credit: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        _optimistic: true
-      };
-
-      // 🚀 INSTANT: Show order in list immediately before server responds
-      setOrders(prevOrders => {
-        const deduped = prevOrders.filter(o => o.id !== tempId);
-        return [optimisticOrder, ...deduped];
-      });
-
-      // Close menu and reset form immediately — hide loading overlay right away
-      setShowMenuPage(false);
-      setCartExpanded(false);
-      resetForm();
-      setIsCreatingOrder(false); // Hide "Creating Bill" overlay instantly
-      // Pause polling briefly so it doesn't race with the optimistic order
-      localStorage.setItem('lastUserInteraction', Date.now().toString());
-
-      // Create order on server
       const response = await apiWithRetry({
         method: 'post',
         url: `${API}/orders`,
         data: {
-          table_id: formData.table_id || null,
+          table_id: capturedTableId,
           table_number: selectedTable?.table_number || 0,
-          items: selectedItems,
+          items: capturedItems,
           customer_name: customerName,
-          customer_phone: formData.customer_phone || '',
+          customer_phone: capturedPhone,
           frontend_origin: window.location.origin
         },
         timeout: 12000
       });
 
-      // Replace optimistic order with real server order
-      const newOrder = { 
-        ...response.data, 
-        created_at: response.data.created_at || new Date().toISOString() 
+      // Add the REAL order directly — no temp swap, no inconsistency
+      const newOrder = {
+        ...response.data,
+        created_at: response.data.created_at || new Date().toISOString()
       };
 
-      // 1. Swap temp order with real order (deduplicated)
       setOrders(prevOrders => {
-        const without = prevOrders.filter(o => o.id !== tempId && o.id !== newOrder.id);
+        // Deduplicate in case polling already picked it up
+        const without = prevOrders.filter(o => o.id !== newOrder.id);
         return [newOrder, ...without];
       });
-      
-      // Success feedback
+
       toast.success('✅ Order created!');
-      
-      // 💾 PRELOAD BILLING DATA: Prepare billing cache for new order
-      billingCache.preloadBillingData(response.data.id).catch(error => {
-        console.warn('Failed to preload billing data for new order:', error);
-      });
-      console.log('💾 Billing data preload initiated for new order:', response.data.id);
 
-      // Update last order created to prevent duplicates
-      setLastOrderCreated({
-        signature: orderSignature,
-        timestamp: now
-      });
+      // Preload billing cache in background
+      billingCache.preloadBillingData(newOrder.id).catch(() => {});
 
-      // Update local subscription status count
+      setLastOrderCreated({ signature: orderSignature, timestamp: now });
+
       setSubscriptionStatus((prev) => {
         if (!prev) return prev;
         const nextCount = (prev.bill_count || 0) + 1;
-        const shouldRequire = !prev.subscription_active && nextCount >= 50;
-        return {
-          ...prev,
-          bill_count: nextCount,
-          needs_subscription: shouldRequire ? true : prev.needs_subscription
-        };
+        return { ...prev, bill_count: nextCount, needs_subscription: !prev.subscription_active && nextCount >= 50 ? true : prev.needs_subscription };
       });
 
-      // Update table status if needed
+      // Update table status locally
       if (selectedTable && selectedTable.status === 'available') {
-        setTables(prevTables => 
-          prevTables.map(table => 
-            table.id === selectedTable.id 
-              ? { ...table, status: 'occupied' }
-              : table
-          )
-        );
+        setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, status: 'occupied' } : t));
       }
+      setTimeout(() => fetchTables(true), 1000);
 
-      // Background refresh for tables — short delay to let server finish table status update
-      setTimeout(() => {
-        fetchTables(true);
-      }, 1000);
-      
-      // Offer WhatsApp notification
       if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
         toast.success('✅ WhatsApp message sent!');
-      } else if (response.data?.whatsapp_link && formData.customer_phone) {
+      } else if (response.data?.whatsapp_link && capturedPhone) {
         window.open(response.data.whatsapp_link, '_blank');
       }
 
     } catch (error) {
       console.error('Order creation failed:', error);
-      
-      // 📊 PERFORMANCE MONITORING: Record error
-      completeOrderDisplayTiming({
-        error: error.message,
-        errorType: 'order-creation-failed'
-      });
-      
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to create order';
       if (error.response?.status === 402) {
-        // Definite server rejection — remove optimistic order
-        setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
         setSubscriptionStatus((prev) => (prev ? { ...prev, needs_subscription: true } : prev));
         toast.error(errorMsg);
         navigate('/subscription');
       } else if (error.response) {
-        // Server responded with an error (4xx/5xx) — order was NOT created
-        setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
         toast.error(`Order creation failed: ${errorMsg}`);
+        // Reopen menu so user can retry
+        setShowMenuPage(true);
       } else {
-        // Network timeout / no response — order MAY have been created on server
-        // Keep optimistic order visible and do a background fetch to confirm
-        console.warn('⚠️ Network error during order creation — keeping optimistic order, verifying with server...');
-        setTimeout(async () => {
-          try {
-            await fetchOrders(true);
-          } catch (e) {
-            setOrders(prevOrders => prevOrders.filter(order => order.id !== tempId));
-          }
-        }, 3000);
+        // Network timeout — do a background fetch to check if order was created
+        toast.warning('Checking order status...');
+        setTimeout(() => fetchOrders(true), 2000);
       }
     } finally {
       setIsCreatingOrder(false);
