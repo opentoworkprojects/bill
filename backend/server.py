@@ -7488,6 +7488,118 @@ async def get_low_stock(current_user: dict = Depends(get_current_user)):
     return low_stock
 
 
+@api_router.post("/inventory/{item_id}/adjust")
+async def adjust_inventory_stock(
+    item_id: str,
+    adjustment: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    OPTIMIZED: Single endpoint to adjust stock and record movement atomically.
+    Combines PUT /inventory/{id} + POST /inventory/movements into one fast call.
+    
+    Body: {
+        "type": "add" | "reduce",
+        "quantity": float,
+        "reason": str (optional),
+        "notes": str (optional)
+    }
+    """
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    user_org_id = get_secure_org_id(current_user)
+    
+    # Validate input
+    adjustment_type = adjustment.get("type")
+    quantity = adjustment.get("quantity")
+    
+    if adjustment_type not in ["add", "reduce"]:
+        raise HTTPException(status_code=400, detail="Type must be 'add' or 'reduce'")
+    
+    if not quantity or quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be positive")
+    
+    # IDEMPOTENCY: Check for duplicate within 5 seconds
+    five_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
+    movement_type = "in" if adjustment_type == "add" else "out"
+    
+    existing_movement = await db.stock_movements.find_one({
+        "item_id": item_id,
+        "type": movement_type,
+        "quantity": quantity,
+        "organization_id": user_org_id,
+        "created_at": {"$gte": five_seconds_ago}
+    }, {"_id": 0})
+    
+    if existing_movement:
+        # Duplicate detected - return existing inventory state
+        print(f"🔄 Duplicate adjustment detected, returning current state")
+        inventory_item = await db.inventory.find_one(
+            {"id": item_id, "organization_id": user_org_id}, {"_id": 0}
+        )
+        if isinstance(inventory_item.get("last_updated"), str):
+            inventory_item["last_updated"] = datetime.fromisoformat(inventory_item["last_updated"])
+        return {"success": True, "duplicate": True, "inventory": inventory_item}
+    
+    # Get current inventory
+    inventory_item = await db.inventory.find_one(
+        {"id": item_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    
+    if not inventory_item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    # Calculate new quantity
+    current_qty = inventory_item["quantity"]
+    if adjustment_type == "add":
+        new_qty = current_qty + quantity
+    else:  # reduce
+        new_qty = max(0, current_qty - quantity)
+    
+    # Record movement FIRST (for idempotency)
+    movement_doc = {
+        "id": f"movement_{datetime.now(timezone.utc).timestamp()}_{item_id}",
+        "item_id": item_id,
+        "type": movement_type,
+        "quantity": quantity,
+        "reason": adjustment.get("reason") or (f"Stock {'Added' if adjustment_type == 'add' else 'Reduced'}"),
+        "reference": f"Manual {'Addition' if adjustment_type == 'add' else 'Reduction'}",
+        "notes": adjustment.get("notes") or f"{'Added' if adjustment_type == 'add' else 'Reduced'} {quantity}. Previous: {current_qty}, New: {new_qty}",
+        "organization_id": user_org_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    try:
+        await db.stock_movements.insert_one(movement_doc)
+    except Exception as e:
+        print(f"❌ Failed to insert stock movement: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record stock movement")
+    
+    # Update inventory
+    await db.inventory.update_one(
+        {"id": item_id, "organization_id": user_org_id},
+        {"$set": {"quantity": new_qty, "last_updated": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Get updated inventory
+    updated_inventory = await db.inventory.find_one(
+        {"id": item_id, "organization_id": user_org_id}, {"_id": 0}
+    )
+    if isinstance(updated_inventory.get("last_updated"), str):
+        updated_inventory["last_updated"] = datetime.fromisoformat(updated_inventory["last_updated"])
+    
+    # Invalidate caches
+    try:
+        cached_service = get_cached_order_service()
+        await cached_service.invalidate_inventory_caches(user_org_id)
+        print(f"🗑️ Inventory cache invalidated for item {item_id}")
+    except Exception as e:
+        print(f"⚠️ Cache invalidation error: {e}")
+    
+    return {"success": True, "duplicate": False, "inventory": updated_inventory}
+
+
 @api_router.delete("/inventory/{item_id}")
 async def delete_inventory_item(
     item_id: str,

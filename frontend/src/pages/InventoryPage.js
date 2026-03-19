@@ -1126,27 +1126,17 @@ const InventoryPage = ({ user }) => {
     setIsAdjusting(true);
     
     try {
-      // Update inventory item quantity
-      await apiWithRetry({
-        method: 'put',
-        url: `${API}/inventory/${stockAdjustItem.id}`,
-        data: { ...stockAdjustItem, quantity: newQty },
-        timeout: 15000
-      });
-      
-      // Record stock movement
-      await apiWithRetry({
+      // OPTIMIZED: Single API call instead of two sequential calls
+      const response = await apiWithRetry({
         method: 'post',
-        url: `${API}/inventory/movements`,
+        url: `${API}/inventory/${stockAdjustItem.id}/adjust`,
         data: { 
-          item_id: stockAdjustItem.id,
-          type: stockAdjustType === 'add' ? 'in' : 'out', 
+          type: stockAdjustType,
           quantity: qty,
           reason: stockAdjustReason || (stockAdjustType === 'add' ? 'Stock Added' : 'Stock Reduced'),
-          reference: `Manual ${stockAdjustType === 'add' ? 'Addition' : 'Reduction'}`,
-          notes: `${stockAdjustType === 'add' ? 'Added' : 'Reduced'} ${qty}. Previous: ${stockAdjustItem.quantity}, New: ${newQty}` 
+          notes: `${stockAdjustType === 'add' ? 'Added' : 'Reduced'} ${qty}. Previous: ${stockAdjustItem.quantity}, New: ${newQty}`
         },
-        timeout: 15000
+        timeout: 10000  // Reduced timeout since it's now a single fast call
       });
       
       toast.success(`Stock ${stockAdjustType === 'add' ? 'added' : 'reduced'} successfully!`);
