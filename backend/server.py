@@ -5720,13 +5720,13 @@ async def create_order(
                 # Return the updated order
                 updated_order = await db.orders.find_one({"id": existing_order["id"]}, {"_id": 0})
                 
-                # Store implicit WhatsApp consent on customer record (billing flow)
+                # Store implicit WhatsApp consent on customer record (billing flow) - BACKGROUND TASK
                 if order_data.customer_phone:
-                    await ensure_customer_implicit_opt_in(
+                    asyncio.create_task(ensure_customer_implicit_opt_in(
                         user_org_id,
                         order_data.customer_phone,
                         order_data.customer_name
-                    )
+                    ))
 
                 # Generate WhatsApp notification if enabled - BACKGROUND TASK
                 whatsapp_link = None
@@ -5809,13 +5809,13 @@ async def create_order(
     # Increment bill count for org owner on order creation (free trial limit uses total orders)
     await db.users.update_one({"id": user_org_id}, {"$inc": {"bill_count": 1}})
 
-    # Store implicit WhatsApp consent on customer record (billing flow)
+    # Store implicit WhatsApp consent on customer record (billing flow) - BACKGROUND TASK
     if order_data.customer_phone:
-        await ensure_customer_implicit_opt_in(
+        asyncio.create_task(ensure_customer_implicit_opt_in(
             user_org_id,
             order_data.customer_phone,
             order_data.customer_name
-        )
+        ))
     
     # Invalidate Redis cache for active orders - BACKGROUND TASK
     try:
