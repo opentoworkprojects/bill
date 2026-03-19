@@ -5401,18 +5401,21 @@ async def send_whatsapp_notification_background(
                 whatsapp_sent = result.get("whatsapp_sent", False)
                 whatsapp_error = result.get("whatsapp_error")
                 
-                # Update order with WhatsApp status (atomic update for idempotency)
+                # Update order with WhatsApp status
                 if whatsapp_sent:
+                    # Simple update without condition - just set the flag
                     await db.orders.update_one(
-                        {"id": order_id, "whatsapp_notification_sent": False},
+                        {"id": order_id},
                         {
                             "$set": {
                                 "whatsapp_notification_sent": True,
-                                "whatsapp_notification_attempts": attempt + 1
+                                "whatsapp_notification_attempts": attempt + 1,
+                                "updated_at": datetime.now(timezone.utc).isoformat()
                             }
                         }
                     )
                     print(f"✅ WhatsApp sent successfully for order {order_id} (attempt {attempt + 1})")
+                    print(f"🔔 Frontend will show notification toast on next poll")
                     return
                 else:
                     # Log error but don't fail
@@ -5421,7 +5424,12 @@ async def send_whatsapp_notification_background(
                     # Update attempt counter
                     await db.orders.update_one(
                         {"id": order_id},
-                        {"$set": {"whatsapp_notification_attempts": attempt + 1}}
+                        {
+                            "$set": {
+                                "whatsapp_notification_attempts": attempt + 1,
+                                "updated_at": datetime.now(timezone.utc).isoformat()
+                            }
+                        }
                     )
                     
                     if attempt < max_retries - 1:
@@ -5434,7 +5442,12 @@ async def send_whatsapp_notification_background(
                 # Update attempt counter
                 await db.orders.update_one(
                     {"id": order_id},
-                    {"$set": {"whatsapp_notification_attempts": attempt + 1}}
+                    {
+                        "$set": {
+                            "whatsapp_notification_attempts": attempt + 1,
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }
+                    }
                 )
                 
                 if attempt < max_retries - 1:
