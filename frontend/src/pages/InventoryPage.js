@@ -59,6 +59,7 @@ const InventoryPage = ({ user }) => {
   const [stockAdjustType, setStockAdjustType] = useState('add');
   const [stockAdjustQty, setStockAdjustQty] = useState('');
   const [stockAdjustReason, setStockAdjustReason] = useState('');
+  const [isAdjusting, setIsAdjusting] = useState(false); // Loading state for stock adjustment
   const [businessSettings, setBusinessSettings] = useState(null);
   const [bulkEditMode, setBulkEditMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState(new Set());
@@ -1105,6 +1106,9 @@ const InventoryPage = ({ user }) => {
   };
 
   const handleStockAdjust = async () => {
+    // In-flight request guard - prevent concurrent invocations
+    if (isAdjusting) return;
+    
     if (!stockAdjustQty || parseFloat(stockAdjustQty) <= 0) { 
       toast.error('Enter valid quantity'); 
       return; 
@@ -1117,6 +1121,9 @@ const InventoryPage = ({ user }) => {
       toast.error('Cannot reduce below 0'); 
       return; 
     }
+    
+    // Set loading state immediately
+    setIsAdjusting(true);
     
     try {
       // Update inventory item quantity
@@ -1159,6 +1166,9 @@ const InventoryPage = ({ user }) => {
       }
       
       toast.error(errorMessage);
+    } finally {
+      // Always clear loading state, even on error
+      setIsAdjusting(false);
     }
   };
 
@@ -2168,12 +2178,21 @@ const InventoryPage = ({ user }) => {
                   </div>
                 )}
                 <div className="flex gap-3">
-                  <Button onClick={handleStockAdjust} disabled={!stockAdjustQty || parseFloat(stockAdjustQty) <= 0}
+                  <Button onClick={handleStockAdjust} disabled={!stockAdjustQty || parseFloat(stockAdjustQty) <= 0 || isAdjusting}
                     className={`flex-1 ${stockAdjustType === 'add' ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}>
-                    {stockAdjustType === 'add' ? <Plus className="w-4 h-4 mr-2" /> : <Minus className="w-4 h-4 mr-2" />}
-                    {stockAdjustType === 'add' ? 'Add Stock' : 'Reduce Stock'}
+                    {isAdjusting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        {stockAdjustType === 'add' ? <Plus className="w-4 h-4 mr-2" /> : <Minus className="w-4 h-4 mr-2" />}
+                        {stockAdjustType === 'add' ? 'Add Stock' : 'Reduce Stock'}
+                      </>
+                    )}
                   </Button>
-                  <Button variant="outline" onClick={() => setStockAdjustOpen(false)}>Cancel</Button>
+                  <Button variant="outline" onClick={() => setStockAdjustOpen(false)} disabled={isAdjusting}>Cancel</Button>
                 </div>
               </CardContent>
             </Card>

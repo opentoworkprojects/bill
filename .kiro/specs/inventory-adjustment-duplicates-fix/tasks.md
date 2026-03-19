@@ -1,0 +1,97 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Duplicate Stock Adjustments on Rapid Clicks
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: For deterministic bugs, scope the property to the concrete failing case(s) to ensure reproducibility
+  - Test that rapid duplicate clicks (within 5 seconds) on "Add Stock" or "Reduce Stock" create exactly ONE stock movement record and adjust inventory quantity exactly ONCE
+  - Test implementation details from Bug Condition in design: clicks with same itemId, adjustmentType, quantity within 5000ms window
+  - The test assertions should match the Expected Behavior Properties from design: exactly one movement record, quantity adjusted exactly once
+  - Test scenarios:
+    - Double click "Add Stock" within 100ms: expect +10 units, 1 movement (will fail on unfixed: +20 units, 2 movements)
+    - Triple click "Reduce Stock" within 200ms: expect -5 units, 1 movement (will fail on unfixed: -15 units, 3 movements)
+    - Click, wait 2s, click again during processing: expect +15 units, 1 movement (will fail on unfixed: +30 units, 2 movements)
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists)
+  - Document counterexamples found to understand root cause
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Sequential and Independent Adjustments
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy inputs
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements
+  - Property-based testing generates many test cases for stronger guarantees
+  - Test scenarios to observe and preserve:
+    - Sequential adjustments with >5 seconds between them: observe that each creates separate movement record
+    - Adjustments to different items (even simultaneous): observe that each processes independently
+    - Adjustments with different quantities/types to same item: observe that each processes independently
+    - Error handling for validation errors (negative quantity, unauthorized): observe error messages displayed
+    - Successful adjustments: observe inventory list refresh and low stock indicator updates
+  - Property-based test: For all adjustment sequences where NOT isBugCondition (different items OR >5s apart OR different parameters), verify each adjustment creates exactly one movement and updates quantity correctly
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [ ] 3. Fix for inventory adjustment duplicates
+
+  - [x] 3.1 Implement frontend request deduplication
+    - Add loading state management in InventoryPage.js handleStockAdjust function (line 1107)
+    - Add state variable: `const [isAdjusting, setIsAdjusting] = useState(false)`
+    - Add in-flight request guard: `if (isAdjusting) return;` at start of handleStockAdjust
+    - Set `setIsAdjusting(true)` at start of function
+    - Set `setIsAdjusting(false)` in finally block to ensure cleanup on success and error
+    - Disable button during adjustment: `disabled={!stockAdjustQty || parseFloat(stockAdjustQty) <= 0 || isAdjusting}`
+    - Add loading indicator to button: show spinner and "Processing..." text when isAdjusting is true
+    - _Bug_Condition: isBugCondition(input) where input.clickEvent = "button_click" AND EXISTS previousRequest with same parameters within 5000ms AND previousRequest.status IN ['pending', 'in-flight']_
+    - _Expected_Behavior: Exactly one stock movement record created and inventory quantity adjusted exactly once per user action (expectedBehavior from design)_
+    - _Preservation: Sequential adjustments with >5s between them, different items, different parameters must continue to process independently (Preservation Requirements from design)_
+    - _Requirements: 1.1, 1.2, 1.3, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6, 3.1, 3.2, 3.3, 3.5_
+
+  - [x] 3.2 Implement backend idempotency protection
+    - Add duplicate detection logic in server.py create_stock_movement endpoint (line 7719)
+    - Generate idempotency key: `f"{movement.item_id}:{movement.type}:{movement.quantity}:{user_org_id}"`
+    - Query stock_movements collection for records with same item_id, type, quantity, organization_id within last 5 seconds
+    - If duplicate found: log "Duplicate stock movement detected, returning existing record" and return existing record (HTTP 200)
+    - Do NOT update inventory quantity again for duplicates (it was already updated by first request)
+    - Add database compound index on stock_movements: `{item_id: 1, organization_id: 1, created_at: -1}` for fast duplicate detection
+    - _Bug_Condition: Backend receives duplicate requests with same parameters within 5-second window_
+    - _Expected_Behavior: Backend detects and rejects duplicates, returns existing record without re-updating inventory_
+    - _Preservation: Legitimate sequential requests >5s apart must continue to process independently_
+    - _Requirements: 1.4, 2.4, 3.1, 3.2, 3.3_
+
+  - [x] 3.3 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Single Adjustment Per User Action
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - Verify rapid duplicate clicks now create exactly ONE stock movement record
+    - Verify inventory quantity is adjusted exactly ONCE by the specified amount
+    - Test scenarios should now pass:
+      - Double click "Add Stock" within 100ms: +10 units, 1 movement
+      - Triple click "Reduce Stock" within 200ms: -5 units, 1 movement
+      - Click, wait 2s, click again during processing: +15 units, 1 movement
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+
+  - [x] 3.4 Verify preservation tests still pass
+    - **Property 2: Preservation** - Sequential and Independent Adjustments
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - Verify sequential adjustments with >5s between them still create separate movements
+    - Verify adjustments to different items still process independently
+    - Verify adjustments with different parameters still process independently
+    - Verify error handling for validation errors still displays correct messages
+    - Verify successful adjustments still refresh inventory list and low stock indicators
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix (no regressions)
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

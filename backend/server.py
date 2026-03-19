@@ -7724,7 +7724,24 @@ async def create_stock_movement(
 
     user_org_id = get_secure_org_id(current_user)
     
-    # Update inventory quantity based on movement
+    # IDEMPOTENCY PROTECTION: Check for duplicate requests within 5-second window
+    # This prevents duplicate stock movements from rapid button clicks
+    five_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
+    
+    existing_movement = await db.stock_movements.find_one({
+        "item_id": movement.item_id,
+        "type": movement.type,
+        "quantity": movement.quantity,
+        "organization_id": user_org_id,
+        "created_at": {"$gte": five_seconds_ago}
+    }, {"_id": 0})
+    
+    if existing_movement:
+        # Duplicate detected - return existing record without re-updating inventory
+        print(f"🔄 Duplicate stock movement detected, returning existing record (item_id={movement.item_id}, type={movement.type}, qty={movement.quantity})")
+        return StockMovement(**existing_movement)
+    
+    # Get inventory item
     inventory_item = await db.inventory.find_one(
         {"id": movement.item_id, "organization_id": user_org_id}, {"_id": 0}
     )
@@ -7741,17 +7758,25 @@ async def create_stock_movement(
     else:  # adjustment
         new_qty = movement.quantity
     
-    # Update inventory
+    # CRITICAL: Record movement FIRST, then update inventory
+    # This ensures the duplicate check catches concurrent requests before inventory is modified
+    movement_obj = StockMovement(**movement.model_dump(), organization_id=user_org_id)
+    doc = movement_obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    
+    try:
+        await db.stock_movements.insert_one(doc)
+    except Exception as e:
+        # If movement insert fails, don't update inventory
+        print(f"❌ Failed to insert stock movement: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record stock movement")
+    
+    # Update inventory after movement is recorded
     await db.inventory.update_one(
         {"id": movement.item_id, "organization_id": user_org_id},
         {"$set": {"quantity": new_qty, "last_updated": datetime.now(timezone.utc).isoformat()}}
     )
     
-    # Record movement
-    movement_obj = StockMovement(**movement.model_dump(), organization_id=user_org_id)
-    doc = movement_obj.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.stock_movements.insert_one(doc)
     return movement_obj
 
 
