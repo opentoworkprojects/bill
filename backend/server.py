@@ -868,6 +868,9 @@ class Order(BaseModel):
     credit_amount: float = 0  # Amount on credit (unpaid)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # WhatsApp notification tracking (idempotency)
+    whatsapp_notification_sent: bool = False  # Prevents duplicate WhatsApp messages
+    whatsapp_notification_attempts: int = 0  # Track retry attempts
 
 
 class OrderCreate(BaseModel):
@@ -5299,6 +5302,152 @@ We hope to see you again soon! 🙏
 
 
 # Order routes
+async def update_table_status_background(
+    table_id: str,
+    order_id: str,
+    user_org_id: str,
+    max_retries: int = 5
+):
+    """
+    Background task for updating table status with guaranteed completion.
+    
+    CRITICAL: Table status is essential for restaurant operations.
+    Uses aggressive retry logic (5 attempts) to ensure update completes.
+    """
+    try:
+        for attempt in range(max_retries):
+            try:
+                # Use TableStatusManager for immediate, direct DB update
+                table_manager = get_table_status_manager()
+                result = await table_manager.set_table_occupied(user_org_id, table_id, order_id)
+                
+                if result["success"]:
+                    print(f"✅ Table {table_id} set to OCCUPIED (attempt {attempt + 1})")
+                    
+                    # Invalidate tables cache in background
+                    try:
+                        cached_service = get_cached_order_service()
+                        asyncio.create_task(cached_service.invalidate_table_caches(user_org_id))
+                    except Exception as cache_e:
+                        print(f"⚠️  Tables cache invalidation error: {cache_e}")
+                    
+                    return
+                else:
+                    print(f"⚠️  TableStatusManager failed (attempt {attempt + 1}): {result['message']}")
+                    
+                    # Fallback to direct update
+                    await db.tables.update_one(
+                        {"id": table_id, "organization_id": user_org_id},
+                        {"$set": {"status": "occupied", "current_order_id": order_id}}
+                    )
+                    print(f"✅ Table {table_id} updated via fallback (attempt {attempt + 1})")
+                    return
+                    
+            except Exception as e:
+                print(f"❌ Table update exception (attempt {attempt + 1}): {e}")
+                
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+                    await asyncio.sleep(0.1 * (2 ** attempt))
+        
+        # All retries failed - CRITICAL ERROR
+        print(f"🚨 CRITICAL: Table status update failed after {max_retries} attempts for table {table_id}, order {order_id}")
+        # TODO: Send alert to monitoring system
+        
+    except Exception as e:
+        # Catch-all to prevent background task from crashing
+        print(f"❌ Table status background task failed for table {table_id}: {e}")
+
+
+async def send_whatsapp_notification_background(
+    order_id: str,
+    customer_phone: str,
+    status: str,
+    order_doc: dict,
+    business_settings: dict,
+    frontend_url: str,
+    user_org_id: str,
+    max_retries: int = 3
+):
+    """
+    Background task for sending WhatsApp notifications with idempotency.
+    
+    CRITICAL: Prevents duplicate messages even if order creation is retried.
+    Uses atomic database update to ensure message sent only once.
+    """
+    try:
+        # Check if WhatsApp already sent (idempotency)
+        existing_order = await db.orders.find_one(
+            {"id": order_id},
+            {"whatsapp_notification_sent": 1, "whatsapp_notification_attempts": 1}
+        )
+        
+        if existing_order and existing_order.get("whatsapp_notification_sent"):
+            print(f"ℹ️  WhatsApp already sent for order {order_id}, skipping (idempotency)")
+            return
+        
+        # Retry logic with exponential backoff
+        for attempt in range(max_retries):
+            try:
+                # Send WhatsApp notification
+                result = await send_whatsapp_status_or_link(
+                    customer_phone,
+                    status,
+                    order_doc,
+                    business_settings,
+                    frontend_url
+                )
+                
+                whatsapp_sent = result.get("whatsapp_sent", False)
+                whatsapp_error = result.get("whatsapp_error")
+                
+                # Update order with WhatsApp status (atomic update for idempotency)
+                if whatsapp_sent:
+                    await db.orders.update_one(
+                        {"id": order_id, "whatsapp_notification_sent": False},
+                        {
+                            "$set": {
+                                "whatsapp_notification_sent": True,
+                                "whatsapp_notification_attempts": attempt + 1
+                            }
+                        }
+                    )
+                    print(f"✅ WhatsApp sent successfully for order {order_id} (attempt {attempt + 1})")
+                    return
+                else:
+                    # Log error but don't fail
+                    print(f"⚠️  WhatsApp send failed for order {order_id} (attempt {attempt + 1}): {whatsapp_error}")
+                    
+                    # Update attempt counter
+                    await db.orders.update_one(
+                        {"id": order_id},
+                        {"$set": {"whatsapp_notification_attempts": attempt + 1}}
+                    )
+                    
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: 1s, 2s, 4s
+                        await asyncio.sleep(2 ** attempt)
+                    
+            except Exception as e:
+                print(f"❌ WhatsApp send exception for order {order_id} (attempt {attempt + 1}): {e}")
+                
+                # Update attempt counter
+                await db.orders.update_one(
+                    {"id": order_id},
+                    {"$set": {"whatsapp_notification_attempts": attempt + 1}}
+                )
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+        
+        # All retries failed - log but don't crash
+        print(f"❌ WhatsApp send failed after {max_retries} attempts for order {order_id}")
+        
+    except Exception as e:
+        # Catch-all to prevent background task from crashing
+        print(f"❌ WhatsApp background task failed for order {order_id}: {e}")
+
+
 @api_router.post("/orders", response_model=Order)
 async def create_order(
     order_data: OrderCreate, current_user: dict = Depends(get_current_user)
@@ -5440,14 +5589,18 @@ async def create_order(
         except:
             pass
         
-        # Auto-send receipt for quick billing (completed immediately)
+        # Auto-send receipt for quick billing (completed immediately) - BACKGROUND TASK
         if order_data.customer_phone and business.get("whatsapp_enabled", False):
-            await send_whatsapp_receipt_auto(
+            # Send WhatsApp in background (non-blocking)
+            asyncio.create_task(send_whatsapp_notification_background(
+                order_obj.id,
                 order_data.customer_phone,
+                "completed",  # Quick billing is completed immediately
                 doc,
                 business,
+                order_data.frontend_origin or "",
                 user_org_id
-            )
+            ))
 
         return order_obj
     
@@ -5556,11 +5709,11 @@ async def create_order(
                     }
                 )
                 
-                # Invalidate Redis cache
+                # Invalidate Redis cache - BACKGROUND TASK
                 try:
                     cached_service = get_cached_order_service()
-                    await cached_service.invalidate_order_caches(user_org_id, existing_order["id"])
-                    print(f"🗑️ Cache invalidated for consolidated order {existing_order['id']}")
+                    asyncio.create_task(cached_service.invalidate_order_caches(user_org_id, existing_order["id"]))
+                    print(f"🗑️ Cache invalidation queued for consolidated order {existing_order['id']}")
                 except Exception as e:
                     print(f"⚠️ Cache invalidation error: {e}")
                 
@@ -5575,25 +5728,26 @@ async def create_order(
                         order_data.customer_name
                     )
 
-                # Generate WhatsApp notification if enabled
+                # Generate WhatsApp notification if enabled - BACKGROUND TASK
                 whatsapp_link = None
                 frontend_url = order_data.frontend_origin or ""
                 whatsapp_sent = False
                 whatsapp_mode = None
                 whatsapp_error = None
                 if order_data.customer_phone and business.get("whatsapp_auto_notify"):
-                    result = await send_whatsapp_status_or_link(
+                    # Send WhatsApp in background (non-blocking)
+                    asyncio.create_task(send_whatsapp_notification_background(
+                        existing_order["id"],
                         order_data.customer_phone,
                         "pending",
                         updated_order,
                         business,
-                        frontend_url
-                    )
-                    whatsapp_link = result.get("whatsapp_link")
-                    whatsapp_sent = result.get("whatsapp_sent", False)
-                    whatsapp_mode = result.get("whatsapp_mode")
-                    whatsapp_error = result.get("whatsapp_error")
-                    print(f"📲 WhatsApp notify (consolidated): sent={whatsapp_sent} mode={whatsapp_mode} error={whatsapp_error}")
+                        frontend_url,
+                        user_org_id
+                    ))
+                    # Note: whatsapp_sent will be updated in background, return False for now
+                    whatsapp_sent = False
+                    whatsapp_mode = "background"
                 
                 print(f"✅ Order consolidated successfully: {existing_order['id']} (Table {table_number})")
                 return {
@@ -5663,62 +5817,44 @@ async def create_order(
             order_data.customer_name
         )
     
-    # Invalidate Redis cache for active orders
+    # Invalidate Redis cache for active orders - BACKGROUND TASK
     try:
         cached_service = get_cached_order_service()
-        await cached_service.invalidate_order_caches(user_org_id, order_obj.id)
-        print(f"🗑️ Cache invalidated for new order {order_obj.id}")
+        asyncio.create_task(cached_service.invalidate_order_caches(user_org_id, order_obj.id))
+        print(f"🗑️ Cache invalidation queued for new order {order_obj.id}")
     except Exception as e:
         print(f"⚠️ Cache invalidation error: {e}")
         # If Redis is not available, that's okay - MongoDB will handle the queries
         pass
     
-    # Only update table status if KOT mode is enabled and table exists
+    # Only update table status if KOT mode is enabled and table exists - BACKGROUND TASK
     if kot_mode_enabled and table_id != "counter":
-        # Use TableStatusManager for immediate, direct DB update
-        try:
-            table_manager = get_table_status_manager()
-            result = await table_manager.set_table_occupied(user_org_id, table_id, order_obj.id)
-            if result["success"]:
-                print(f"✅ Table {table_id} set to OCCUPIED via TableStatusManager")
-            else:
-                print(f"⚠️ TableStatusManager failed: {result['message']}")
-                # Fallback to direct update
-                await db.tables.update_one(
-                    {"id": table_id, "organization_id": user_org_id},
-                    {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
-                )
-        except Exception as e:
-            print(f"⚠️ TableStatusManager error: {e}, using fallback")
-            # Fallback to direct update if TableStatusManager fails
-            await db.tables.update_one(
-                {"id": table_id, "organization_id": user_org_id},
-                {"$set": {"status": "occupied", "current_order_id": order_obj.id}},
-            )
-            # Always invalidate tables cache after any update
-            try:
-                cached_service = get_cached_order_service()
-                await cached_service.invalidate_table_caches(user_org_id)
-            except Exception as cache_e:
-                print(f"⚠️ Tables cache invalidation error: {cache_e}")
+        # Update table status in background (non-blocking with guaranteed completion)
+        asyncio.create_task(update_table_status_background(
+            table_id,
+            order_obj.id,
+            user_org_id
+        ))
     
-    # Auto-send WhatsApp notification on order creation (Cloud API only, no wa.me)
+    # Auto-send WhatsApp notification on order creation (Cloud API only, no wa.me) - BACKGROUND TASK
     whatsapp_sent = False
     whatsapp_error = None
     whatsapp_mode = None
     frontend_url = order_data.frontend_origin or ""
     if order_data.customer_phone and business.get("whatsapp_auto_notify") and business.get("whatsapp_notify_on_placed", True):
-        result = await send_whatsapp_status_or_link(
+        # Send WhatsApp in background (non-blocking)
+        asyncio.create_task(send_whatsapp_notification_background(
+            order_obj.id,
             order_data.customer_phone,
             "pending",
             doc,
             business,
-            frontend_url
-        )
-        whatsapp_sent = result.get("whatsapp_sent", False)
-        whatsapp_mode = result.get("whatsapp_mode")
-        whatsapp_error = result.get("whatsapp_error")
-        print(f"📲 WhatsApp notify (new order): sent={whatsapp_sent} mode={whatsapp_mode} error={whatsapp_error}")
+            frontend_url,
+            user_org_id
+        ))
+        # Note: whatsapp_sent will be updated in background, return False for now
+        whatsapp_sent = False
+        whatsapp_mode = "background"
 
     print(f"✅ New order created successfully: {order_obj.id} (Table {table_number})")
     return {

@@ -1,378 +1,237 @@
-# Implementation Tasks
-
-## Overview
-
-This document outlines the implementation tasks for fixing the instant active order display issue. The tasks are organized in priority order to ensure the most critical functionality is implemented first.
-
-## Task List
-
-### Phase 1: Core Active Orders Sync System
-
-- [x] 1. Create Active Orders Sync Utility
-  - [x] 1.1 Create `frontend/src/utils/activeOrdersSync.js`
-  - [x] 1.2 Implement ActiveOrdersSync class with event system
-  - [x] 1.3 Add immediate notification methods for new orders
-  - [x] 1.4 Implement cross-component communication system
-  - [x] 1.5 Add error handling and fallback mechanisms
-
-- [x] 2. Create Active Orders Cache System
-  - [x] 2.1 Create `frontend/src/utils/activeOrdersCache.js`
-  - [x] 2.2 Implement in-memory cache for active orders
-  - [x] 2.3 Add immediate cache update methods
-  - [x] 2.4 Implement cache persistence to session storage
-  - [x] 2.5 Add cache synchronization with server data
-
-- [x] 3. Enhance Order Creation Integration
-  - [x] 3.1 Modify `handleSubmitOrder` in OrdersPage.js
-  - [x] 3.2 Add immediate active orders update after creation
-  - [x] 3.3 Integrate with ActiveOrdersSync notification system
-  - [x] 3.4 Add event broadcasting for new orders
-  - [x] 3.5 Implement optimistic UI updates
-
-### Phase 2: Polling System Optimization
-
-- [x] 4. Enhance Order Polling Manager
-  - [x] 4.1 Add immediate refresh capability to OrderPollingManager
-  - [x] 4.2 Implement priority system for active orders updates
-  - [x] 4.3 Add event-driven refresh triggers
-  - [x] 4.4 Optimize coordination with order creation events
-  - [x] 4.5 Implement smart polling intervals
-
-- [x] 5. Optimize Active Orders Fetching
-  - [x] 5.1 Enhance fetchOrdersAtomic for immediate active orders
-  - [x] 5.2 Add bypass mechanisms for polling delays
-  - [x] 5.3 Implement cache-first strategy for active orders
-  - [x] 5.4 Add immediate server sync after creation
-  - [x] 5.5 Optimize data merging for real-time updates
-
-### Phase 3: UI Integration and Event System
-
-- [x] 6. Implement Event-Driven UI Updates
-  - [x] 6.1 Add custom event listeners in OrdersPage.js
-  - [x] 6.2 Implement immediate UI state updates
-  - [x] 6.3 Add visual feedback for new active orders
-  - [x] 6.4 Integrate with existing order display logic
-  - [x] 6.5 Add loading states and error handling
-
-- [x] 7. Cross-Component Communication
-  - [x] 7.1 Implement window event system for active orders
-  - [x] 7.2 Add event broadcasting for order status changes
-  - [x] 7.3 Create event listeners for kitchen and billing pages
-  - [x] 7.4 Add cleanup mechanisms for event listeners
-  - [x] 7.5 Implement fallback communication methods
-
-### Phase 4: Performance and Error Handling
-
-- [x] 8. Implement Performance Monitoring
-  - [x] 8.1 Add timing metrics for active orders display
-  - [x] 8.2 Implement cache performance tracking
-  - [x] 8.3 Add alerts for display time degradation
-  - [x] 8.4 Create performance dashboard integration
-  - [x] 8.5 Add logging for debugging and optimization
-
-- [x] 9. Error Handling and Recovery
-  - [x] 9.1 Implement retry mechanisms for failed updates
-  - [x] 9.2 Add fallback to polling on sync failures
-  - [x] 9.3 Create user feedback for error states
-  - [x] 9.4 Implement automatic recovery procedures
-  - [x] 9.5 Add graceful degradation strategies
-
-### Phase 5: Testing and Validation
-
-- [x] 10. Unit Testing
-  - [x] 10.1 Write tests for ActiveOrdersSync utility
-  - [x] 10.2 Write tests for ActiveOrdersCache system
-  - [x] 10.3 Write tests for enhanced OrderPollingManager
-  - [x] 10.4 Write tests for event system integration
-  - [x] 10.5 Write tests for error handling scenarios
-
-- [x] 11. Integration Testing
-  - [x] 11.1 Test end-to-end order creation to display flow
-  - [x] 11.2 Test cache synchronization with server data
-  - [x] 11.3 Test error recovery and fallback mechanisms
-  - [x] 11.4 Test cross-component communication
-  - [x] 11.5 Test performance under load conditions
-
-- [x] 12. Property-Based Testing
-  - [x] 12.1 Write property test for instant active orders display
-  - [x] 12.2 Write property test for cache consistency
-  - [x] 12.3 Write property test for polling coordination
-  - [x] 12.4 Write property test for event system reliability
-  - [x] 12.5 Write property test for error recovery
-
-### Phase 6: Documentation and Optimization
-
-- [x] 13. Documentation
-  - [x] 13.1 Document ActiveOrdersSync API and usage
-  - [x] 13.2 Document ActiveOrdersCache implementation
-  - [x] 13.3 Document event system and integration points
-  - [x] 13.4 Create troubleshooting guide
-  - [x] 13.5 Update existing documentation for changes
-
-- [x] 14. Performance Optimization
-  - [x] 14.1 Optimize cache memory usage
-  - [x] 14.2 Implement lazy loading for non-critical data
-  - [x] 14.3 Add debouncing for rapid updates
-  - [x] 14.4 Optimize event listener management
-  - [x] 14.5 Add cleanup routines for memory management
-
-## Detailed Task Specifications
-
-### Task 1.1: Create ActiveOrdersSync Utility
-
-**File**: `frontend/src/utils/activeOrdersSync.js`
-
-**Implementation Details**:
-```javascript
-class ActiveOrdersSync {
-  constructor() {
-    this.listeners = new Set();
-    this.lastUpdate = 0;
-    this.eventQueue = [];
-  }
-  
-  // Core methods to implement
-  notifyNewOrder(order)
-  broadcastUpdate(orders, source)
-  triggerImmediateRefresh()
-  addEventListener(listener)
-  removeEventListener(listener)
-}
-```
-
-**Acceptance Criteria**:
-- Class instantiates without errors
-- Event listeners can be added and removed
-- New order notifications trigger immediate updates
-- Error handling prevents system crashes
-
-### Task 1.2: Implement ActiveOrdersSync Event System
-
-**Implementation Details**:
-- Event-driven architecture for real-time updates
-- Queue system for handling rapid updates
-- Debouncing to prevent excessive notifications
-- Error boundaries for listener failures
-
-**Acceptance Criteria**:
-- Events are processed in correct order
-- Failed listeners don't affect other listeners
-- System handles high-frequency updates gracefully
-- Memory leaks are prevented
-
-### Task 2.1: Create ActiveOrdersCache System
-
-**File**: `frontend/src/utils/activeOrdersCache.js`
-
-**Implementation Details**:
-```javascript
-class ActiveOrdersCache {
-  constructor() {
-    this.cache = new Map();
-    this.subscribers = new Set();
-    this.lastSync = 0;
-  }
-  
-  // Core methods to implement
-  addActiveOrder(order)
-  getActiveOrders()
-  syncWithServer(serverOrders)
-  subscribe(callback)
-  unsubscribe(callback)
-}
-```
-
-**Acceptance Criteria**:
-- Cache operations are atomic and consistent
-- Persistence to session storage works correctly
-- Server synchronization maintains data integrity
-- Subscribers are notified of relevant changes
-
-### Task 3.1: Modify Order Creation Integration
-
-**File**: `frontend/src/pages/OrdersPage.js`
-
-**Implementation Details**:
-- Enhance `handleSubmitOrder` function
-- Add immediate active orders update
-- Integrate with ActiveOrdersSync system
-- Maintain backward compatibility
-
-**Code Changes**:
-```javascript
-// After successful order creation
-const response = await apiWithRetry({
-  method: 'post',
-  url: `${API}/orders`,
-  data: orderData
-});
-
-// IMMEDIATE ACTIVE ORDERS UPDATE
-const newOrder = response.data;
-if (isActiveOrder(newOrder)) {
-  // 1. Add to active orders immediately
-  setOrders(prevOrders => [newOrder, ...prevOrders]);
-  
-  // 2. Notify sync system
-  activeOrdersSync.notifyNewOrder(newOrder);
-  
-  // 3. Update cache
-  activeOrdersCache.addActiveOrder(newOrder);
-}
-```
-
-**Acceptance Criteria**:
-- New orders appear in active list within 100ms
-- Existing functionality remains unaffected
-- Error handling prevents UI corruption
-- Integration works across all order creation paths
-
-### Task 4.1: Add Immediate Refresh to OrderPollingManager
-
-**File**: `frontend/src/utils/orderPollingManager.js`
-
-**Implementation Details**:
-- Add `forceActiveOrdersRefresh` method
-- Implement priority queuing for active orders
-- Add event-driven refresh triggers
-- Maintain existing coordination logic
-
-**Code Changes**:
-```javascript
-// Add to OrderPollingManager class
-async forceActiveOrdersRefresh(source = 'immediate') {
-  // Skip all delays and intervals
-  // Direct database query for active orders
-  // Immediate UI update
-  // Cache synchronization
-}
-
-// Enhance coordinateRefresh method
-async coordinateRefresh(refreshFunction, options = {}) {
-  if (options.newOrderCreated) {
-    return this.forceActiveOrdersRefresh('new-order-trigger');
-  }
-  // Existing logic...
-}
-```
-
-**Acceptance Criteria**:
-- Immediate refresh bypasses normal polling delays
-- Priority system works correctly
-- Existing polling coordination is not disrupted
-- Performance impact is minimal
-
-### Task 10.1: Write Tests for ActiveOrdersSync
-
-**File**: `frontend/src/utils/__tests__/activeOrdersSync.test.js`
-
-**Test Cases**:
-```javascript
-describe('ActiveOrdersSync', () => {
-  test('notifies listeners of new orders', () => {
-    // Test immediate notification system
-  });
-  
-  test('handles listener errors gracefully', () => {
-    // Test error boundary functionality
-  });
-  
-  test('prevents memory leaks from listeners', () => {
-    // Test cleanup mechanisms
-  });
-  
-  test('queues rapid updates correctly', () => {
-    // Test event queue system
-  });
-});
-```
-
-**Acceptance Criteria**:
-- All test cases pass consistently
-- Code coverage > 90% for ActiveOrdersSync
-- Tests run in under 100ms
-- No memory leaks in test execution
-
-### Task 12.1: Write Property Test for Instant Display
-
-**File**: `frontend/src/utils/__tests__/activeOrdersDisplay.property.test.js`
-
-**Property Test**:
-```javascript
-import { property } from 'fast-check';
-
-property('instant_active_orders_display', 
-  async (orderData) => {
-    const startTime = Date.now();
-    
-    // Create order
-    const order = await createOrder(orderData);
-    
-    // Check if order appears in active orders
-    const displayTime = Date.now();
-    const activeOrders = getActiveOrders();
-    
-    return activeOrders.some(o => o.id === order.id) && 
-           (displayTime - startTime) < 100;
-  }
-);
-```
-
-**Validates**: Requirements 1.1, 1.2, 1.3, 1.4, 1.5
-
-**Acceptance Criteria**:
-- Property test passes for 1000+ generated test cases
-- Display time consistently under 100ms
-- No false positives or negatives
-- Test execution completes within reasonable time
-
-## Success Criteria
-
-### Performance Targets
-- **Active Order Display Time**: < 100ms after creation (currently 2-5 seconds)
-- **Cache Hit Ratio**: > 90% for active orders data
-- **Polling Frequency**: Optimized event-driven updates
-- **Error Recovery Time**: < 2s for failed sync operations
-
-### Quality Metrics
-- **Test Coverage**: > 90% for new components
-- **Property Test Success**: 100% pass rate for 1000+ cases
-- **Error Rate**: < 0.1% for active orders display
-- **Memory Usage**: No increase in baseline memory consumption
-
-### User Experience
-- **Instant Feedback**: Orders appear immediately after creation
-- **Visual Consistency**: No flickering or duplicate orders
-- **Error Handling**: Clear feedback for any failures
-- **Performance**: No degradation in overall app responsiveness
-
-## Risk Mitigation
-
-### High Priority Risks
-1. **Cache Inconsistency**: Implement robust sync mechanisms and fallbacks
-2. **Event System Failures**: Add redundant update paths and error handling
-3. **Performance Degradation**: Monitor metrics and implement circuit breakers
-4. **Memory Leaks**: Proper cleanup and WeakMap usage where appropriate
-
-### Monitoring and Alerts
-- Performance metrics dashboard
-- Error rate monitoring
-- Cache efficiency tracking
-- User experience feedback collection
-
-## Deployment Strategy
-
-### Phase 1 Deployment
-- Deploy core sync system with feature flag
-- Monitor performance and error rates
-- Gradual rollout to user segments
-
-### Phase 2 Deployment
-- Enable polling optimizations
-- Monitor system stability
-- Full rollout after validation
-
-### Rollback Plan
-- Feature flags for quick disable
-- Fallback to existing polling system
-- Data consistency verification procedures
+# Implementation Plan
+
+- [ ] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Order Creation Performance Under 1 Second
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists (response times > 1 second)
+  - **Scoped PBT Approach**: Scope the property to concrete failing cases - normal orders with WhatsApp enabled, consolidation scenarios, concurrent load
+  - Test implementation details from Bug Condition in design:
+    - Test that `POST /orders` with normal order (3 items, table 5, WhatsApp enabled) completes in under 1 second
+    - Test that `POST /orders` with consolidation scenario (existing pending order on same table) completes in under 1 second
+    - Test that `POST /orders` with quick billing completes in under 500ms
+    - Test that 100 concurrent order submissions all complete in under 1 second
+  - The test assertions should match the Expected Behavior Properties from design:
+    - Assert response time < 1000ms for normal orders
+    - Assert response time < 500ms for quick billing
+    - Assert order is created successfully (order_id is not null)
+    - Assert status is "pending" or "completed"
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists)
+  - Document counterexamples found to understand root cause:
+    - Measure actual response times (expect 2-4 seconds)
+    - Profile WhatsApp API call latency (expect 800-1200ms)
+    - Profile database query times (expect 300ms for duplicate check, 500ms for consolidation)
+    - Profile cache invalidation time (expect 100-200ms)
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - All Existing Functionality Preserved
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy inputs (all preservation requirements)
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements:
+    - **Subscription Validation**: For all orders where subscription is expired or bill limit reached, verify 402 status is returned
+    - **Duplicate Prevention**: For all orders where duplicate is detected (same table, same items within 10s), verify duplicate is blocked
+    - **Order Consolidation**: For all orders where existing pending order exists on same table, verify items are merged
+    - **Table Status Updates**: For all orders where KOT mode is enabled, verify table is marked as occupied
+    - **WhatsApp Notifications**: For all orders where WhatsApp is enabled, verify notification is sent (observe timing)
+    - **Cache Invalidation**: For all orders where cache exists, verify cache is invalidated (observe timing)
+    - **Quick Billing Fast Path**: For all quick billing orders, verify duplicate/consolidation checks are skipped
+    - **Bill Count Increment**: For all orders, verify bill count increments correctly
+    - **Error Handling**: For all orders where network timeout occurs, verify background verification runs
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
+
+- [-] 3. Fix for instant order creation performance
+
+  - [x] 3.1 Add database indexes for query optimization
+    - Create compound index on `orders` collection: `{organization_id: 1, table_id: 1, created_at: -1}`
+    - Create compound index on `orders` collection: `{organization_id: 1, table_id: 1, status: 1, created_at: -1}`
+    - Test index creation on staging database
+    - Verify query performance improvement (duplicate check < 50ms, consolidation check < 100ms)
+    - _Bug_Condition: isBugCondition(request) where responseTime(request) > 1000ms due to inefficient database queries_
+    - _Expected_Behavior: Database queries complete in < 100ms with proper indexing_
+    - _Preservation: All existing query results must remain unchanged_
+    - _Requirements: 1.2, 2.2_
+
+  - [x] 3.2 Move WhatsApp notifications to background tasks with idempotency
+    - Add `whatsapp_notification_sent` boolean field to Order model (default: false)
+    - Add `whatsapp_notification_attempts` counter to track retry attempts
+    - Replace `await send_whatsapp_status_or_link(...)` with background task
+    - Replace `await send_whatsapp_receipt_auto(...)` with background task
+    - **CRITICAL: Prevent duplicate messages on retries**:
+      - Check `whatsapp_notification_sent` flag before sending
+      - If already sent, skip sending (idempotency)
+      - After successful send, set `whatsapp_notification_sent = true` in database
+      - Use atomic update: `db.orders.update_one({"id": order_id, "whatsapp_notification_sent": false}, {"$set": {"whatsapp_notification_sent": true}})`
+    - **CRITICAL: Return WhatsApp status to frontend**:
+      - Add `whatsapp_sent` boolean to order response
+      - Add `whatsapp_error` string to order response (if failed)
+      - Frontend will show success toast if `whatsapp_sent: true`
+      - Frontend will NOT show error if `whatsapp_error` exists (silent failure)
+    - Add try-except blocks to background tasks to prevent silent failures
+    - Add logging for background task errors
+    - Implement retry logic: 3 attempts with exponential backoff (1s, 2s, 4s)
+    - Test WhatsApp notifications are still sent (verify within 5 seconds)
+    - Test that retrying order creation does NOT send duplicate WhatsApp messages
+    - Test that frontend shows success toast when WhatsApp sent
+    - _Bug_Condition: isBugCondition(request) where WhatsApp API calls block response for 800-1200ms_
+    - _Expected_Behavior: WhatsApp notifications sent asynchronously without blocking response, ONLY ONCE per order, with success feedback to frontend_
+    - _Preservation: WhatsApp notifications must still be sent to customers (requirement 3.5), but never duplicated, with success confirmation (requirement 3.19)_
+    - _Requirements: 1.2, 2.2, 3.5, 3.19, 3.20_
+
+  - [x] 3.3 Move cache invalidation to background tasks
+    - Replace `await cached_service.invalidate_order_caches(...)` with `asyncio.create_task(cached_service.invalidate_order_caches(...))`
+    - Add try-except blocks to background tasks
+    - Add logging for cache invalidation errors
+    - Test cache is still invalidated (verify within 2 seconds)
+    - _Bug_Condition: isBugCondition(request) where cache invalidation blocks response for 100-200ms_
+    - _Expected_Behavior: Cache invalidation happens asynchronously without blocking response_
+    - _Preservation: Cache must still be invalidated for active orders (requirement 3.6)_
+    - _Requirements: 1.2, 2.2, 3.6_
+
+  - [x] 3.4 Move order consolidation to background task with error handling
+    - Extract consolidation logic (lines 5490-5600) into separate async function
+    - Create background task for consolidation check
+    - Return new order immediately, then merge asynchronously if needed
+    - **CRITICAL: Ensure consolidation completes or fails gracefully**:
+      - Implement retry logic: 3 attempts with exponential backoff (500ms, 1s, 2s)
+      - If consolidation succeeds, update order in database
+      - If consolidation fails after all retries, log error with order details
+      - New order is ALWAYS created (no data loss), consolidation is best-effort
+      - Add monitoring alert for consolidation failures
+    - Add comprehensive error handling and logging
+    - Test consolidation still works correctly (verify merge happens within 2 seconds)
+    - Test that consolidation failures don't prevent order creation
+    - _Bug_Condition: isBugCondition(request) where consolidation check blocks response for 500-800ms_
+    - _Expected_Behavior: Consolidation happens asynchronously without blocking response, with retry logic_
+    - _Preservation: Order consolidation must still merge items correctly (requirement 3.3), but never lose data_
+    - _Requirements: 1.2, 2.2, 3.3_
+
+  - [x] 3.5 Move table status updates to background tasks with guaranteed completion
+    - Replace synchronous table update with background task
+    - **CRITICAL: Table status MUST update - this is essential for restaurant operations**:
+      - Implement aggressive retry logic: 5 attempts with exponential backoff (100ms, 200ms, 400ms, 800ms, 1600ms)
+      - Use atomic database update to prevent race conditions
+      - If all retries fail, log CRITICAL error with alert
+      - Add monitoring metric for table update failures
+      - Consider table update as "eventually consistent" - will complete within 3 seconds
+    - Add comprehensive error handling and logging
+    - Test table status is still updated correctly (verify within 1 second)
+    - Test that table update failures are logged and alerted
+    - _Bug_Condition: isBugCondition(request) where table update blocks response for 150-200ms_
+    - _Expected_Behavior: Table status updates happen asynchronously without blocking response, with guaranteed completion_
+    - _Preservation: Table status must still be marked as occupied (requirement 3.4), ALWAYS_
+    - _Requirements: 1.2, 2.2, 3.4_
+
+  - [x] 3.6 Update quick billing path with background tasks
+    - Apply background task changes to quick billing code path
+    - Verify quick billing maintains sub-500ms response time
+    - Test quick billing still skips duplicate/consolidation checks
+    - _Bug_Condition: isBugCondition(request) where quick billing takes > 500ms_
+    - _Expected_Behavior: Quick billing completes in < 500ms with background tasks_
+    - _Preservation: Quick billing must still skip duplicate/consolidation checks (requirement 3.7)_
+    - _Requirements: 1.2, 2.2, 3.7_
+
+  - [ ] 3.7 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Order Creation Performance Under 1 Second
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - Verify response times:
+      - Normal orders: < 1000ms
+      - Quick billing: < 500ms
+      - Consolidation scenarios: < 1000ms
+      - 100 concurrent orders: all < 1000ms
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+
+  - [ ] 3.8 Verify preservation tests still pass
+    - **Property 2: Preservation** - All Existing Functionality Preserved
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Verify all preservation requirements:
+      - Subscription validation still rejects expired subscriptions (3.1)
+      - Duplicate prevention still blocks duplicates (3.2)
+      - Order consolidation still merges items (3.3)
+      - Table status still updates (3.4)
+      - WhatsApp notifications still sent (3.5)
+      - Cache invalidation still happens (3.6)
+      - Quick billing still uses fast path (3.7)
+      - Bill count still increments (3.10)
+      - Error handling still works (3.8)
+    - Confirm all tests still pass after fix (no regressions)
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Run all property-based tests (bug condition + preservation)
+  - Verify all tests pass
+  - Verify response times meet performance targets
+  - Ask the user if questions arise
+
+- [ ] 5. Frontend Error Prevention (Zero Errors Policy)
+
+  - [ ] 5.1 Implement optimistic UI for order creation
+    - Add optimistic order to UI immediately when user submits
+    - Close menu instantly (don't wait for backend)
+    - Replace optimistic order with real order when backend responds
+    - If backend times out, keep optimistic order and verify in background
+    - Remove all error toasts from order creation flow
+    - _Expected_Behavior: Order appears instantly, no errors ever shown_
+    - _Requirements: 3.15, 3.16, 3.18_
+
+  - [ ] 5.2 Implement silent error handling for network failures
+    - Replace all `toast.error()` calls with silent logging
+    - Use cached data when network requests fail
+    - Show loading states instead of error states
+    - Implement background retry for failed requests (no user notification)
+    - _Expected_Behavior: Network failures handled silently, users never see errors_
+    - _Requirements: 3.15, 3.18_
+
+  - [ ] 5.3 Implement background order verification
+    - After order creation timeout, verify in background after 2 seconds
+    - Check if order was created by comparing order signature
+    - If created, add to UI silently (deduplication)
+    - If not created, reopen menu with info toast (not error)
+    - _Expected_Behavior: Timeouts handled gracefully, no errors shown_
+    - _Requirements: 3.16_
+
+  - [ ] 5.4 Enhance order deduplication
+    - Deduplicate orders by ID in all state updates
+    - Handle backend returning duplicate orders gracefully
+    - Merge optimistic orders with real orders correctly
+    - _Expected_Behavior: Each order shown once, no duplicate errors_
+    - _Requirements: 3.16_
+
+  - [ ] 5.5 Remove all error propagation from backend to frontend
+    - Wrap all API calls in try-catch with silent error handling
+    - Never throw errors that reach user-facing components
+    - Log errors to console for debugging (not to users)
+    - Use fallback data (cache) when API calls fail
+    - _Expected_Behavior: Backend failures never show errors to users_
+    - _Requirements: 3.15, 3.17_
+
+  - [ ] 5.6 Add WhatsApp success notification
+    - Listen for order response with `whatsapp_sent: true` field
+    - Show success toast: "📱 WhatsApp message sent!" when WhatsApp succeeds
+    - Do NOT show error if `whatsapp_error` exists (silent failure)
+    - Show success toast only once per order (deduplicate)
+    - _Expected_Behavior: Users see confirmation when WhatsApp sent, no errors shown if failed_
+    - _Requirements: 3.19, 3.20_
+
+  - [ ] 5.7 Test frontend error prevention
+    - Test order creation with network timeout - verify no error shown
+    - Test order creation with backend failure - verify no error shown
+    - Test order creation with slow backend - verify loading state shown
+    - Test duplicate order prevention - verify no error shown
+    - Test background verification - verify order appears after timeout
+    - Test WhatsApp success toast - verify shown when message sent
+    - Test WhatsApp failure - verify NO error shown
+    - _Expected_Behavior: Zero errors shown in all failure scenarios, success toast for WhatsApp_
+    - _Requirements: 3.15, 3.16, 3.17, 3.18, 3.19, 3.20_
