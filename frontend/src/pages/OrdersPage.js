@@ -162,6 +162,25 @@ const OrdersPage = ({ user }) => {
   const [lastOrdersUpdate, setLastOrdersUpdate] = useState(0);
   const [isUpdatingOrders, setIsUpdatingOrders] = useState(false);
   const dataLoadedRef = useRef(false);
+  
+  // Track orders for which we've shown WhatsApp success notification
+  const whatsappNotifiedOrdersRef = useRef(new Set());
+
+  // Watch for WhatsApp notification completion (background task)
+  useEffect(() => {
+    orders.forEach(order => {
+      // Check if WhatsApp was sent and we haven't notified yet
+      if (order.whatsapp_notification_sent && !whatsappNotifiedOrdersRef.current.has(order.id)) {
+        // Show success toast
+        toast.success('📱 WhatsApp message sent!');
+        
+        // Mark as notified
+        whatsappNotifiedOrdersRef.current.add(order.id);
+        
+        console.log(`✅ WhatsApp notification confirmed for order ${order.id}`);
+      }
+    });
+  }, [orders]);
 
   // 📊 PERFORMANCE MONITORING: Performance dashboard state (hidden by default)
   const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(() => {
@@ -1132,6 +1151,19 @@ const OrdersPage = ({ user }) => {
 
       toast.success('✅ Order created!');
 
+      // WhatsApp notification feedback
+      if (response.data?.whatsapp_sent) {
+        // WhatsApp sent immediately (rare - only if very fast)
+        toast.success('📱 WhatsApp message sent!');
+      } else if (response.data?.whatsapp_mode === 'background') {
+        // WhatsApp sending in background (normal case)
+        // Will show success toast when polling detects whatsapp_notification_sent: true
+        console.log('📱 WhatsApp sending in background...');
+      } else if (response.data?.whatsapp_link && capturedPhone) {
+        // Fallback to wa.me link
+        window.open(response.data.whatsapp_link, '_blank');
+      }
+
       // Preload billing cache in background
       billingCache.preloadBillingData(newOrder.id).catch(() => {});
 
@@ -1148,12 +1180,6 @@ const OrdersPage = ({ user }) => {
         setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, status: 'occupied' } : t));
       }
       setTimeout(() => fetchTables(true), 1000);
-
-      if (response.data?.whatsapp_sent || response.data?.whatsapp_mode === 'cloud') {
-        toast.success('✅ WhatsApp message sent!');
-      } else if (response.data?.whatsapp_link && capturedPhone) {
-        window.open(response.data.whatsapp_link, '_blank');
-      }
 
     } catch (error) {
       console.error('Order creation failed:', error);
