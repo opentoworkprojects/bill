@@ -178,23 +178,23 @@ try:
         or "ssl=true" in mongo_url
         or "tls=true" in mongo_url
     ):
-        # OPTIMIZED MongoDB Atlas connection with connection pooling
+        # BALANCED MongoDB connection for 512MB with high-traffic support
+        # Uses smart pooling: fewer idle connections, but scales up on demand
         client = AsyncIOMotorClient(
             mongo_url,
             tls=True,
             tlsInsecure=True,
-            # Performance optimizations
-            maxPoolSize=100,  # High-traffic: support 1000s of concurrent restaurants
-            minPoolSize=20,   # Keep connections warm
-            maxIdleTimeMS=60000,  # Keep connections alive longer
-            serverSelectionTimeoutMS=3000,  # Faster timeout
-            connectTimeoutMS=5000,  # Faster connection
-            socketTimeoutMS=30000,  # Socket timeout
-            retryWrites=True,  # Auto-retry failed writes
-            retryReads=True,   # Auto-retry failed reads
-            # Compression for faster data transfer
-            compressors="snappy,zlib",
-            waitQueueTimeoutMS=5000,  # Don't wait forever for a connection slot
+            # BALANCED: Low idle memory, high burst capacity
+            maxPoolSize=30,  # Can handle 30 concurrent requests (good for high traffic)
+            minPoolSize=3,   # Only 3 warm connections (saves memory when idle)
+            maxIdleTimeMS=20000,  # Close idle connections faster to free memory
+            serverSelectionTimeoutMS=3000,
+            connectTimeoutMS=5000,
+            socketTimeoutMS=30000,
+            retryWrites=True,
+            retryReads=True,
+            compressors="snappy,zlib",  # Compression reduces memory usage
+            waitQueueTimeoutMS=5000,
         )
     else:
         # For local or non-SSL connections
@@ -242,10 +242,11 @@ api_router = APIRouter(prefix="/api")
 from functools import lru_cache
 import threading
 
-# Simple cache with asyncio-safe operations
+# Simple cache with asyncio-safe operations and SIZE LIMITS
 _cache = {}
 _cache_ttl = {}
 _cache_lock = asyncio.Lock()
+MAX_CACHE_SIZE = 200  # 200 entries: good for caching without memory leak
 
 # In-process idempotency map: prevents two simultaneous identical requests
 # from both passing the DB duplicate check before either has written
@@ -257,14 +258,14 @@ _pending_requests = {}
 _pending_lock = asyncio.Lock()
 
 def cache_response(ttl_seconds=60):
-    """Cache decorator for API responses"""
+    """Cache decorator for API responses with size limit"""
     def decorator(func):
         async def wrapper(*args, **kwargs):
             # Create cache key from function name and args
             cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
             current_time = time.time()
             
-            # Check if cached and not expired (no lock needed for read — dict reads are atomic in CPython)
+            # Check if cached and not expired
             if cache_key in _cache and cache_key in _cache_ttl:
                 if current_time < _cache_ttl[cache_key]:
                     return _cache[cache_key]
@@ -273,6 +274,14 @@ def cache_response(ttl_seconds=60):
             result = await func(*args, **kwargs)
             
             async with _cache_lock:
+                # MEMORY FIX: Limit cache size to prevent memory leak
+                if len(_cache) >= MAX_CACHE_SIZE:
+                    # Remove oldest entries
+                    oldest_keys = sorted(_cache_ttl.items(), key=lambda x: x[1])[:10]
+                    for key, _ in oldest_keys:
+                        _cache.pop(key, None)
+                        _cache_ttl.pop(key, None)
+                
                 _cache[cache_key] = result
                 _cache_ttl[cache_key] = current_time + ttl_seconds
             
@@ -288,8 +297,8 @@ def clear_expired_cache():
         _cache.pop(key, None)
         _cache_ttl.pop(key, None)
 
-# Semaphore to limit concurrent database operations
-DB_SEMAPHORE = asyncio.Semaphore(50)  # Allow up to 50 concurrent DB ops under high traffic
+# Semaphore to limit concurrent database operations (BALANCED for 512MB + speed)
+DB_SEMAPHORE = asyncio.Semaphore(25)  # 25 concurrent ops: good balance for speed + memory
 
 async def rate_limited_db_operation(operation):
     """Execute database operation with rate limiting for free tier"""

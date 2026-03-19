@@ -31,11 +31,12 @@ import performanceMonitor from '../utils/performanceMonitor';
 // import PerformanceDashboard from '../components/PerformanceDashboard'; // DISABLED FOR PRODUCTION
 
 // Module-level cache — survives React navigation (unmount/remount)
+// Cache provides instant loading, background refresh happens silently
 const _pageCache = {
   orders: null, tables: null, todaysBills: null,
   menuItems: null, businessSettings: null, loadedAt: 0,
 };
-const CACHE_TTL = 5000; // 5s fresh window - avoid showing stale data
+const CACHE_TTL = 30000; // 30s - cache is valid for 30 seconds
 
 // Enhanced sound effects for better UX
 const playSound = (type) => {
@@ -608,25 +609,44 @@ const OrdersPage = ({ user }) => {
     const now = Date.now();
     const cacheAge = now - _pageCache.loadedAt;
 
-    // CRITICAL FIX: Only use cache if it's very fresh (<5 seconds) to avoid inconsistent data
-    // This prevents showing stale data that gets replaced seconds later
-    const INSTANT_CACHE_TTL = 5000; // 5 seconds - only show cache if extremely fresh
-    
-    if (_pageCache.orders && cacheAge < INSTANT_CACHE_TTL) {
-      // Cache is extremely fresh - show it instantly
+    // INSTANT LOADING: Show cached data immediately if available
+    if (_pageCache.orders && cacheAge < CACHE_TTL) {
+      console.log('⚡ Instant load from cache');
       setOrders(_pageCache.orders);
       if (_pageCache.tables) setTables(_pageCache.tables);
       if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
       if (_pageCache.menuItems) { setMenuItems(_pageCache.menuItems); setMenuLoading(false); }
       if (_pageCache.businessSettings) setBusinessSettings(_pageCache.businessSettings);
       setLoading(false);
+      
+      // Background refresh - update cache silently without changing UI
+      setTimeout(() => {
+        console.log('🔄 Background refresh (silent)');
+        Promise.allSettled([
+          apiSilent({ method: 'get', url: `${API}/orders` }),
+          apiSilent({ method: 'get', url: `${API}/tables` }),
+        ]).then(([ordersRes, tablesRes]) => {
+          // Update cache silently - don't update UI to prevent glitching
+          if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value?.data)) {
+            const valid = ordersRes.value.data
+              .filter(o => o && o.id && o.created_at && o.status && typeof o.total === 'number')
+              .map(o => ({ ...o, customer_name: o.customer_name || '', table_number: o.table_number || 0, payment_method: o.payment_method || 'cash', created_at: o.created_at || new Date().toISOString() }))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            _pageCache.orders = valid;
+            _pageCache.loadedAt = Date.now();
+          }
+          if (tablesRes.status === 'fulfilled' && Array.isArray(tablesRes.value?.data)) {
+            const valid = tablesRes.value.data.filter(t => t && t.id && typeof t.table_number === 'number');
+            _pageCache.tables = valid;
+          }
+        });
+      }, 100);
+      
       return;
     }
 
-    // For stale cache, don't show it first - fetch fresh data directly to avoid inconsistency
-    // This prevents the confusing "flash" of old data followed by new data
-
-    // Fetch all in parallel — allSettled so one failure never blocks others
+    // NO CACHE: Fetch fresh data
+    console.log('🚀 Loading fresh data from server');
     try {
       const [ordersRes, todaysBillsRes, tablesRes, menuRes, settingsRes] = await Promise.allSettled([
         apiSilent({ method: 'get', url: `${API}/orders` }),
