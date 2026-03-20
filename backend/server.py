@@ -7306,8 +7306,14 @@ async def adjust_inventory_stock(
     # Validate input
     adjustment_type = adjustment.get("type")
     quantity = adjustment.get("quantity")
+    request_id = adjustment.get("requestId", "unknown")
     
-    print(f"📊 Inventory adjustment request: item={item_id}, type={adjustment_type}, quantity={quantity}")
+    print(f"📊 [INVENTORY ADJUST] [{request_id}] Received request:")
+    print(f"   - item_id: {item_id}")
+    print(f"   - type: {adjustment_type}")
+    print(f"   - quantity: {quantity} (type: {type(quantity).__name__})")
+    print(f"   - reason: {adjustment.get('reason')}")
+    print(f"   - user: {current_user.get('username')}")
     
     if adjustment_type not in ["add", "reduce"]:
         raise HTTPException(status_code=400, detail="Type must be 'add' or 'reduce'")
@@ -7315,8 +7321,8 @@ async def adjust_inventory_stock(
     if not quantity or quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be positive")
     
-    # IDEMPOTENCY: Check for duplicate within 5 seconds
-    five_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
+    # IDEMPOTENCY: Check for duplicate within 10 seconds (increased from 5)
+    ten_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
     movement_type = "in" if adjustment_type == "add" else "out"
     
     existing_movement = await db.stock_movements.find_one({
@@ -7324,12 +7330,13 @@ async def adjust_inventory_stock(
         "type": movement_type,
         "quantity": quantity,
         "organization_id": user_org_id,
-        "created_at": {"$gte": five_seconds_ago}
+        "created_at": {"$gte": ten_seconds_ago}
     }, {"_id": 0})
     
     if existing_movement:
         # Duplicate detected - return existing inventory state
-        print(f"🔄 Duplicate adjustment detected, returning current state")
+        print(f"🔄 [INVENTORY ADJUST] [{request_id}] Duplicate detected! Returning current state without changes")
+        print(f"   - Existing movement created at: {existing_movement.get('created_at')}")
         inventory_item = await db.inventory.find_one(
             {"id": item_id, "organization_id": user_org_id}, {"_id": 0}
         )
@@ -7352,7 +7359,11 @@ async def adjust_inventory_stock(
     else:  # reduce
         new_qty = max(0, current_qty - quantity)
     
-    print(f"📊 Adjusting inventory: current={current_qty}, change={quantity}, new={new_qty}")
+    print(f"📊 [INVENTORY ADJUST] [{request_id}] Calculation:")
+    print(f"   - Current quantity: {current_qty}")
+    print(f"   - Adjustment: {'+' if adjustment_type == 'add' else '-'}{quantity}")
+    print(f"   - New quantity: {new_qty}")
+    print(f"   - Change: {new_qty - current_qty}")
     
     # Record movement FIRST (for idempotency)
     movement_doc = {

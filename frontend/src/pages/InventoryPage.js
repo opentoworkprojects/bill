@@ -1120,8 +1120,16 @@ const InventoryPage = ({ user }) => {
     const qty = parseFloat(stockAdjustQty);
     const newQty = stockAdjustType === 'add' ? stockAdjustItem.quantity + qty : stockAdjustItem.quantity - qty;
     
-    console.log(`📊 Stock adjustment: ${stockAdjustType} ${qty} (input: "${stockAdjustQty}")`);
-    console.log(`📊 Current: ${stockAdjustItem.quantity}, New: ${newQty}`);
+    // Generate unique request ID for tracking
+    const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`📊 [${requestId}] Stock adjustment initiated:`);
+    console.log(`   - Type: ${stockAdjustType}`);
+    console.log(`   - Input value: "${stockAdjustQty}"`);
+    console.log(`   - Parsed quantity: ${qty} (type: ${typeof qty})`);
+    console.log(`   - Current stock: ${stockAdjustItem.quantity}`);
+    console.log(`   - Expected new stock: ${newQty}`);
+    console.log(`   - Item: ${stockAdjustItem.name} (${stockAdjustItem.id})`);
     
     if (newQty < 0) { 
       toast.error('Cannot reduce below 0'); 
@@ -1133,6 +1141,8 @@ const InventoryPage = ({ user }) => {
     setStockAdjustOpen(false);
     
     try {
+      console.log(`📤 [${requestId}] Sending API request...`);
+      
       // OPTIMIZED: Single API call instead of two sequential calls
       const response = await apiWithRetry({
         method: 'post',
@@ -1141,17 +1151,20 @@ const InventoryPage = ({ user }) => {
           type: stockAdjustType,
           quantity: qty,
           reason: stockAdjustReason || (stockAdjustType === 'add' ? 'Stock Added' : 'Stock Reduced'),
-          notes: `${stockAdjustType === 'add' ? 'Added' : 'Reduced'} ${qty}. Previous: ${stockAdjustItem.quantity}, New: ${newQty}`
+          notes: `${stockAdjustType === 'add' ? 'Added' : 'Reduced'} ${qty}. Previous: ${stockAdjustItem.quantity}, New: ${newQty}`,
+          requestId: requestId  // Include for backend tracking
         },
         timeout: 10000  // Reduced timeout since it's now a single fast call
       });
       
-      console.log(`✅ Stock adjustment response:`, response.data);
+      console.log(`✅ [${requestId}] Stock adjustment response:`, response.data);
       
       toast.success(`Stock ${stockAdjustType === 'add' ? 'added' : 'reduced'} successfully!`);
       const updatedInventory = await fetchInventory();
       setLowStock(updatedInventory.filter(item => item.quantity <= item.min_quantity));
       fetchStockMovements();
+      
+      console.log(`🎉 [${requestId}] Stock adjustment completed successfully`);
     } catch (error) { 
       let errorMessage = 'Failed to adjust stock';
       
@@ -1163,11 +1176,12 @@ const InventoryPage = ({ user }) => {
         errorMessage = error.response.data.detail;
       }
       
-      console.error('❌ Stock adjustment error:', error);
+      console.error(`❌ [${requestId}] Stock adjustment error:`, error);
       toast.error(errorMessage);
     } finally {
       // Always clear loading state, even on error
       setIsAdjusting(false);
+      console.log(`🔓 [${requestId}] Released adjustment lock`);
     }
   };
 
