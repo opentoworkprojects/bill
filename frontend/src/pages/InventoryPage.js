@@ -1106,8 +1106,11 @@ const InventoryPage = ({ user }) => {
   };
 
   const handleStockAdjust = async () => {
-    // In-flight request guard - prevent concurrent invocations
-    if (isAdjusting) return;
+    // AGGRESSIVE guard - prevent any concurrent invocations
+    if (isAdjusting) {
+      console.log('⚠️ Already adjusting, ignoring duplicate click');
+      return;
+    }
     
     if (!stockAdjustQty || parseFloat(stockAdjustQty) <= 0) { 
       toast.error('Enter valid quantity'); 
@@ -1125,8 +1128,9 @@ const InventoryPage = ({ user }) => {
       return; 
     }
     
-    // Set loading state immediately
+    // Set loading state immediately and close modal to prevent double-clicks
     setIsAdjusting(true);
+    setStockAdjustOpen(false);
     
     try {
       // OPTIMIZED: Single API call instead of two sequential calls
@@ -1145,7 +1149,6 @@ const InventoryPage = ({ user }) => {
       console.log(`✅ Stock adjustment response:`, response.data);
       
       toast.success(`Stock ${stockAdjustType === 'add' ? 'added' : 'reduced'} successfully!`);
-      setStockAdjustOpen(false);
       const updatedInventory = await fetchInventory();
       setLowStock(updatedInventory.filter(item => item.quantity <= item.min_quantity));
       fetchStockMovements();
