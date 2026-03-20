@@ -1117,6 +1117,9 @@ const InventoryPage = ({ user }) => {
     const qty = parseFloat(stockAdjustQty);
     const newQty = stockAdjustType === 'add' ? stockAdjustItem.quantity + qty : stockAdjustItem.quantity - qty;
     
+    console.log(`📊 Stock adjustment: ${stockAdjustType} ${qty} (input: "${stockAdjustQty}")`);
+    console.log(`📊 Current: ${stockAdjustItem.quantity}, New: ${newQty}`);
+    
     if (newQty < 0) { 
       toast.error('Cannot reduce below 0'); 
       return; 
@@ -1139,6 +1142,8 @@ const InventoryPage = ({ user }) => {
         timeout: 10000  // Reduced timeout since it's now a single fast call
       });
       
+      console.log(`✅ Stock adjustment response:`, response.data);
+      
       toast.success(`Stock ${stockAdjustType === 'add' ? 'added' : 'reduced'} successfully!`);
       setStockAdjustOpen(false);
       const updatedInventory = await fetchInventory();
@@ -1155,6 +1160,7 @@ const InventoryPage = ({ user }) => {
         errorMessage = error.response.data.detail;
       }
       
+      console.error('❌ Stock adjustment error:', error);
       toast.error(errorMessage);
     } finally {
       // Always clear loading state, even on error

@@ -7307,6 +7307,8 @@ async def adjust_inventory_stock(
     adjustment_type = adjustment.get("type")
     quantity = adjustment.get("quantity")
     
+    print(f"📊 Inventory adjustment request: item={item_id}, type={adjustment_type}, quantity={quantity}")
+    
     if adjustment_type not in ["add", "reduce"]:
         raise HTTPException(status_code=400, detail="Type must be 'add' or 'reduce'")
     
@@ -7349,6 +7351,8 @@ async def adjust_inventory_stock(
         new_qty = current_qty + quantity
     else:  # reduce
         new_qty = max(0, current_qty - quantity)
+    
+    print(f"📊 Adjusting inventory: current={current_qty}, change={quantity}, new={new_qty}")
     
     # Record movement FIRST (for idempotency)
     movement_doc = {
