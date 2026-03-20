@@ -168,6 +168,7 @@ const OrdersPage = ({ user }) => {
 
   // Watch for WhatsApp notification completion (background task)
   useEffect(() => {
+    console.log(`🔍 Checking ${orders.length} orders for WhatsApp notifications...`);
     orders.forEach(order => {
       // Check if WhatsApp was sent and we haven't notified yet
       if (order.whatsapp_notification_sent && !whatsappNotifiedOrdersRef.current.has(order.id)) {
@@ -178,6 +179,9 @@ const OrdersPage = ({ user }) => {
         whatsappNotifiedOrdersRef.current.add(order.id);
         
         console.log(`✅ WhatsApp notification confirmed for order ${order.id}`);
+      } else if (order.whatsapp_notification_sent) {
+        // Already notified
+        console.log(`ℹ️  Order ${order.id} WhatsApp already notified`);
       }
     });
   }, [orders]);
@@ -1157,8 +1161,11 @@ const OrdersPage = ({ user }) => {
         toast.success('📱 WhatsApp message sent!');
       } else if (response.data?.whatsapp_mode === 'background') {
         // WhatsApp sending in background (normal case)
-        // Will show success toast when polling detects whatsapp_notification_sent: true
-        console.log('📱 WhatsApp sending in background...');
+        // Show immediate feedback that WhatsApp is being sent
+        if (capturedPhone && businessSettings?.whatsapp_auto_notify) {
+          toast.info('📱 Sending WhatsApp message...', { duration: 2000 });
+          console.log('📱 WhatsApp sending in background, will show success when complete');
+        }
       } else if (response.data?.whatsapp_link && capturedPhone) {
         // Fallback to wa.me link
         window.open(response.data.whatsapp_link, '_blank');
