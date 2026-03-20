@@ -28,6 +28,9 @@ import activeOrdersSync from '../utils/activeOrdersSync';
 import activeOrdersCache from '../utils/activeOrdersCache';
 // 📊 PERFORMANCE MONITORING: Import performance monitoring systems
 import performanceMonitor from '../utils/performanceMonitor';
+// 🚀 WEBSOCKET + BATCHING: Import hybrid sync manager for real-time updates
+import hybridSyncManager from '../utils/hybridSyncManager';
+import requestBatcher from '../utils/requestBatcher';
 // import PerformanceDashboard from '../components/PerformanceDashboard'; // DISABLED FOR PRODUCTION
 
 // Module-level cache — survives React navigation (unmount/remount)
@@ -167,23 +170,44 @@ const OrdersPage = ({ user }) => {
   const whatsappNotifiedOrdersRef = useRef(new Set());
 
   // Watch for WhatsApp notification completion (background task)
+  // This effect runs whenever orders array changes
   useEffect(() => {
+    if (!orders || orders.length === 0) return;
+    
     console.log(`🔍 Checking ${orders.length} orders for WhatsApp notifications...`);
+    
+    let foundNewNotification = false;
+    
     orders.forEach(order => {
       // Check if WhatsApp was sent and we haven't notified yet
       if (order.whatsapp_notification_sent && !whatsappNotifiedOrdersRef.current.has(order.id)) {
-        // Show success toast
-        toast.success('📱 WhatsApp message sent!');
+        console.log(`🎉 NEW WhatsApp notification detected for order ${order.id}!`);
+        
+        // Show success toast with more prominent styling
+        toast.success('📱 WhatsApp message sent successfully!', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#10b981',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: '16px'
+          }
+        });
         
         // Mark as notified
         whatsappNotifiedOrdersRef.current.add(order.id);
+        foundNewNotification = true;
         
         console.log(`✅ WhatsApp notification confirmed for order ${order.id}`);
-      } else if (order.whatsapp_notification_sent) {
-        // Already notified
-        console.log(`ℹ️  Order ${order.id} WhatsApp already notified`);
       }
     });
+    
+    if (!foundNewNotification) {
+      const notifiedCount = whatsappNotifiedOrdersRef.current.size;
+      const pendingCount = orders.filter(o => o.whatsapp_notification_sent).length;
+      console.log(`ℹ️  WhatsApp status: ${notifiedCount} already notified, ${pendingCount} total sent`);
+    }
   }, [orders]);
 
   // 📊 PERFORMANCE MONITORING: Performance dashboard state (hidden by default)
@@ -324,13 +348,117 @@ const OrdersPage = ({ user }) => {
     };
   }, []); // No deps — payment handler uses setters only, no stale closure risk
 
-  // 🔧 DUPLICATE FIX: Coordinated polling to prevent duplicate orders
+  // 🚀 WEBSOCKET + BATCHING: Initialize hybrid sync manager for real-time updates
   useEffect(() => {
-    console.log('🔄 Setting up coordinated polling system');
+    console.log('🚀 Initializing WebSocket + Batching system');
+    
+    // Initialize hybrid sync with user token
+    const token = user?.token || localStorage.getItem('token');
+    if (token) {
+      hybridSyncManager.initialize(token);
+    }
+    
+    // Subscribe to real-time events
+    const unsubscribeOrderCreated = hybridSyncManager.on('order_created', (order) => {
+      console.log('📨 Real-time: Order created', order.id);
+      setOrders(prevOrders => {
+        if (prevOrders.some(o => o.id === order.id)) return prevOrders;
+        return [order, ...prevOrders];
+      });
+      toast.success('New order received!', { duration: 2000 });
+    });
+    
+    const unsubscribeOrderUpdated = hybridSyncManager.on('order_updated', (order) => {
+      console.log('📨 Real-time: Order updated', order.id);
+      setOrders(prevOrders => 
+        prevOrders.map(o => o.id === order.id ? { ...o, ...order } : o)
+      );
+    });
+    
+    const unsubscribeStatusChanged = hybridSyncManager.on('order_status_changed', (order) => {
+      console.log('📨 Real-time: Order status changed', order.id, order.status);
+      setOrders(prevOrders => 
+        prevOrders.map(o => o.id === order.id ? { ...o, status: order.status } : o)
+      );
+    });
+    
+    const unsubscribeWhatsAppSent = hybridSyncManager.on('whatsapp_sent', (orderId) => {
+      console.log('📨 Real-time: WhatsApp sent', orderId);
+      setOrders(prevOrders => 
+        prevOrders.map(o => o.id === orderId ? { ...o, whatsapp_notification_sent: true } : o)
+      );
+      toast.success('📱 WhatsApp message sent!', {
+        duration: 3000,
+        style: { background: '#10b981', color: 'white', fontWeight: 'bold' }
+      });
+    });
+    
+    const unsubscribePaymentCompleted = hybridSyncManager.on('payment_completed', (order) => {
+      console.log('📨 Real-time: Payment completed', order.id);
+      // Move to today's bills
+      setOrders(prevOrders => prevOrders.filter(o => o.id !== order.id));
+      setTodaysBills(prevBills => {
+        if (prevBills.some(b => b.id === order.id)) return prevBills;
+        return [order, ...prevBills];
+      });
+      toast.success('✅ Payment completed!');
+    });
+    
+    const unsubscribeTableUpdated = hybridSyncManager.on('table_updated', (table) => {
+      console.log('📨 Real-time: Table updated', table.id);
+      setTables(prevTables => 
+        prevTables.map(t => t.id === table.id ? { ...t, ...table } : t)
+      );
+    });
+    
+    const unsubscribeMenuUpdated = hybridSyncManager.on('menu_updated', (menu) => {
+      console.log('📨 Real-time: Menu updated');
+      if (Array.isArray(menu)) {
+        setMenuItems(menu.filter(item => item && item.id && item.name && item.available));
+      }
+    });
+    
+    // Fallback: Listen for orders_updated event (from fallback polling)
+    const unsubscribeOrdersUpdated = hybridSyncManager.on('orders_updated', (orders) => {
+      console.log('📨 Fallback polling: Orders updated', orders.length);
+      updateOrdersWithDeduplication(orders, 'fallback-polling');
+    });
+    
+    const unsubscribeTablesUpdated = hybridSyncManager.on('tables_updated', (tables) => {
+      console.log('📨 Fallback polling: Tables updated', tables.length);
+      setTables(tables);
+    });
+    
+    console.log('✅ WebSocket event listeners set up');
+    
+    // Cleanup on unmount
+    return () => {
+      console.log('🧹 Cleaning up WebSocket listeners');
+      unsubscribeOrderCreated();
+      unsubscribeOrderUpdated();
+      unsubscribeStatusChanged();
+      unsubscribeWhatsAppSent();
+      unsubscribePaymentCompleted();
+      unsubscribeTableUpdated();
+      unsubscribeMenuUpdated();
+      unsubscribeOrdersUpdated();
+      unsubscribeTablesUpdated();
+    };
+  }, [user]);
+  
+  // 🔧 DUPLICATE FIX: Coordinated polling as fallback (only when WebSocket is down)
+  useEffect(() => {
+    console.log('🔄 Setting up fallback coordinated polling system');
     
     // Create coordinated refresh function
     const coordinatedRefresh = async (options = {}) => {
       const { source = 'polling' } = options;
+      
+      // Skip if WebSocket is connected (WebSocket handles updates)
+      if (hybridSyncManager.isConnected()) {
+        console.log('⏸️ Skipping polling - WebSocket is active');
+        return;
+      }
       
       try {
         if (activeTab === 'active') {
@@ -365,8 +493,13 @@ const OrdersPage = ({ user }) => {
       }
     };
     
-    // Set up coordinated polling interval
+    // Set up coordinated polling interval (reduced frequency, only as fallback)
     const interval = setInterval(() => {
+      // Skip if WebSocket is connected
+      if (hybridSyncManager.isConnected()) {
+        return;
+      }
+      
       // Skip polling if there are active status changes
       if (processingStatusChanges.size > 0) {
         console.log('⏸️ Skipping coordinated polling - status changes in progress');
@@ -397,7 +530,7 @@ const OrdersPage = ({ user }) => {
         source: 'background-polling'
       });
       
-    }, 3000); // Increased to 3 seconds to reduce server load
+    }, 10000); // Increased to 10 seconds (only used as fallback)
     
     // Handle immediate refresh requests
     if (needsImmediateRefresh) {
@@ -1158,13 +1291,64 @@ const OrdersPage = ({ user }) => {
       // WhatsApp notification feedback
       if (response.data?.whatsapp_sent) {
         // WhatsApp sent immediately (rare - only if very fast)
-        toast.success('📱 WhatsApp message sent!');
+        toast.success('📱 WhatsApp message sent!', {
+          duration: 3000,
+          position: 'top-center',
+          style: {
+            background: '#10b981',
+            color: 'white',
+            fontWeight: 'bold'
+          }
+        });
       } else if (response.data?.whatsapp_mode === 'background') {
         // WhatsApp sending in background (normal case)
         // Show immediate feedback that WhatsApp is being sent
         if (capturedPhone && businessSettings?.whatsapp_auto_notify) {
           toast.info('📱 Sending WhatsApp message...', { duration: 2000 });
-          console.log('📱 WhatsApp sending in background, will show success when complete');
+          console.log('📱 WhatsApp sending in background for order:', newOrder.id);
+          
+          // Poll for WhatsApp completion for this specific order (reduced frequency)
+          let pollCount = 0;
+          const maxPolls = 6; // Poll for up to 30 seconds (6 polls * 5 seconds)
+          
+          const pollWhatsAppStatus = setInterval(async () => {
+            pollCount++;
+            
+            try {
+              // Fetch the specific order to check WhatsApp status
+              const orderCheck = await apiSilent({
+                method: 'get',
+                url: `${API}/orders/${newOrder.id}`,
+                timeout: 5000
+              });
+              
+              if (orderCheck?.data?.whatsapp_notification_sent) {
+                console.log('✅ WhatsApp confirmed sent for order:', newOrder.id);
+                
+                // Update the order in state
+                setOrders(prevOrders => 
+                  prevOrders.map(o => 
+                    o.id === newOrder.id 
+                      ? { ...o, whatsapp_notification_sent: true }
+                      : o
+                  )
+                );
+                
+                // Clear the polling interval
+                clearInterval(pollWhatsAppStatus);
+                
+                // The useEffect will show the toast when it detects the flag
+              } else if (pollCount >= maxPolls) {
+                console.log('⏱️ WhatsApp polling timeout for order:', newOrder.id);
+                clearInterval(pollWhatsAppStatus);
+              }
+            } catch (error) {
+              console.error('WhatsApp status poll failed:', error);
+              if (pollCount >= maxPolls) {
+                clearInterval(pollWhatsAppStatus);
+              }
+            }
+          }, 5000); // Poll every 5 seconds (reduced from 2 seconds)
         }
       } else if (response.data?.whatsapp_link && capturedPhone) {
         // Fallback to wa.me link

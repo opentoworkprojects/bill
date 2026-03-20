@@ -19,6 +19,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import Dashboard from './pages/Dashboard';
 import MenuPage from './pages/MenuPage';
 import CounterSalePage from './pages/CounterSalePage';
+import CounterSaleRouter from './pages/CounterSaleRouter';
 import OrdersPage from './pages/OrdersPage';
 import TablesPage from './pages/TablesPage';
 import KitchenPage from './pages/KitchenPage';
@@ -856,7 +857,7 @@ function App() {
             path="/counter-sale"
             element={
               <PrivateRoute isAuthChecking={isAuthChecking}>
-                <CounterSalePage user={user} />
+                <CounterSaleRouter user={user} />
               </PrivateRoute>
             }
           />
