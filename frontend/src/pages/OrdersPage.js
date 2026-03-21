@@ -350,7 +350,8 @@ const OrdersPage = ({ user }) => {
 
   // 🚀 WEBSOCKET + BATCHING: Initialize hybrid sync manager for real-time updates
   useEffect(() => {
-    console.log('🚀 Initializing WebSocket + Batching system');
+    // Activate order polling — only runs while OrdersPage is mounted
+    orderPollingManager.activate();
     
     // Initialize hybrid sync with user token
     const token = user?.token || localStorage.getItem('token');
@@ -433,7 +434,8 @@ const OrdersPage = ({ user }) => {
     
     // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up WebSocket listeners');
+      // Deactivate polling when leaving OrdersPage
+      orderPollingManager.deactivate();
       unsubscribeOrderCreated();
       unsubscribeOrderUpdated();
       unsubscribeStatusChanged();
@@ -804,12 +806,12 @@ const OrdersPage = ({ user }) => {
     // NO CACHE: Fetch fresh data
     console.log('🚀 Loading fresh data from server');
     try {
-      const [ordersRes, todaysBillsRes, tablesRes, menuRes, settingsRes] = await Promise.allSettled([
+      const [ordersRes, todaysBillsRes, tablesRes, menuData, settingsData] = await Promise.allSettled([
         apiSilent({ method: 'get', url: `${API}/orders` }),
         apiSilent({ method: 'get', url: `${API}/orders/today-bills` }),
         apiSilent({ method: 'get', url: `${API}/tables` }),
-        apiSilent({ method: 'get', url: `${API}/menu` }),
-        apiSilent({ method: 'get', url: `${API}/business/settings` }),
+        import('../utils/sharedDataCache').then(m => m.fetchMenu()),
+        import('../utils/sharedDataCache').then(m => m.fetchBusinessSettings()),
       ]);
 
       // CRITICAL FIX: Only update state when response actually has data — never overwrite with null/empty from a failed call
@@ -852,15 +854,16 @@ const OrdersPage = ({ user }) => {
         setTables(_pageCache.tables);
       }
 
-      if (menuRes.status === 'fulfilled' && Array.isArray(menuRes.value?.data)) {
-        const valid = menuRes.value.data.filter(item => item && item.id && item.name && item.available);
+      if (menuData.status === 'fulfilled') {
+        const raw = Array.isArray(menuData.value) ? menuData.value : [];
+        const valid = raw.filter(item => item && item.id && item.name && item.available);
         setMenuItems(valid);
         setMenuLoading(false);
         _pageCache.menuItems = valid;
       }
 
-      if (settingsRes.status === 'fulfilled' && settingsRes.value?.data) {
-        const s = settingsRes.value.data.business_settings || {};
+      if (settingsData.status === 'fulfilled' && settingsData.value) {
+        const s = settingsData.value.business_settings || settingsData.value || {};
         setBusinessSettings(s);
         _pageCache.businessSettings = s;
       }
@@ -907,10 +910,8 @@ const OrdersPage = ({ user }) => {
     }
     
     try {
-      // ALWAYS FETCH FRESH DATA FROM DATABASE - No caching for order status accuracy
-      console.log('🚀 Always fetching fresh orders from database (no cache)');
-      
-      const params = `?fresh=true&_t=${Date.now()}`; // Always force fresh data from DB
+      // Always fetch fresh data from DB for order status accuracy
+      const params = `?fresh=true&_t=${Date.now()}`;
       const response = await apiWithRetry({
         method: 'get',
         url: `${API}/orders${params}`
@@ -970,16 +971,10 @@ const OrdersPage = ({ user }) => {
         }
       });
       
-      console.log(`🚀 Active orders breakdown:`);
-      console.log(`   📅 Today: ${todayOrders.length} active orders`);
-      console.log(`   📅 Yesterday (uncompleted): ${yesterdayOrders.length} active orders`);
-      console.log(`   📊 Total: ${validOrders.length} active orders (including uncompleted from previous days)`);
+      console.log(`📋 Active orders: ${validOrders.length} (today: ${todayOrders.length}, older: ${yesterdayOrders.length})`);
       
       if (yesterdayOrders.length > 0) {
-        console.log(`   ⚠️ Yesterday's uncompleted orders (still showing - correct behavior):`);
-        yesterdayOrders.slice(0, 3).forEach(order => {
-          console.log(`      - Order ${order.id}: ${order.status} from ${order.created_at}`);
-        });
+        console.log(`   ⚠️ ${yesterdayOrders.length} uncompleted orders from previous days`);
       }
       
       // SIMPLIFIED: Just use server data directly, no complex merging
@@ -998,7 +993,6 @@ const OrdersPage = ({ user }) => {
         });
       }
       
-      console.log('📋 Setting TODAY\'s active orders from database:', activeServerOrders.length);
       updateOrdersWithDeduplication(activeServerOrders, 'fetchOrders');
       
     } catch (error) {

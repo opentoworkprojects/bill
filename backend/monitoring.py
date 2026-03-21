@@ -619,3 +619,41 @@ async def get_system_info():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting system info: {e}")
+
+
+import statistics
+
+# Latency tracking (in-memory ring buffer, last 1000 samples)
+_latency_samples: list = []
+_MAX_SAMPLES = 1000
+
+
+def track_request_latency(path: str, method: str, duration_ms: float):
+    """Track request latency for percentile calculation."""
+    global _latency_samples
+    _latency_samples.append(duration_ms)
+    if len(_latency_samples) > _MAX_SAMPLES:
+        _latency_samples = _latency_samples[-_MAX_SAMPLES:]
+
+
+def log_slow_query(collection: str, operation: str, duration_ms: float, query: dict = None):
+    """Log database queries that exceed 100ms threshold."""
+    if duration_ms > 100:
+        logging.getLogger("slow_query").warning(
+            f"SLOW QUERY [{duration_ms:.0f}ms] {collection}.{operation} "
+            f"query={str(query)[:200] if query else 'N/A'}"
+        )
+
+
+def get_latency_percentiles() -> dict:
+    """Return p50, p95, p99 latency percentiles from recent samples."""
+    if not _latency_samples:
+        return {"p50": 0, "p95": 0, "p99": 0, "samples": 0}
+    sorted_samples = sorted(_latency_samples)
+    n = len(sorted_samples)
+    return {
+        "p50": round(sorted_samples[int(n * 0.50)], 2),
+        "p95": round(sorted_samples[int(n * 0.95)], 2),
+        "p99": round(sorted_samples[min(int(n * 0.99), n - 1)], 2),
+        "samples": n,
+    }

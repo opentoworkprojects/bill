@@ -238,6 +238,26 @@ app = FastAPI(
 )
 api_router = APIRouter(prefix="/api")
 
+# ✅ Global exception handler — ensures ALL unhandled errors return JSON, never HTML
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler: prevents FastAPI from returning HTML 500 pages."""
+    logging.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "path": str(request.url.path)},
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Ensure HTTP exceptions also return JSON (not HTML)."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
 # In-memory cache for frequently accessed data
 from functools import lru_cache
 import threading
@@ -391,6 +411,17 @@ app.add_middleware(
 # Add GZip compression for faster response times (compress responses > 500 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
+# Add request queue middleware for high-traffic backpressure management
+from middleware.request_queue import RequestQueueMiddleware
+from config.settings import settings
+
+app.add_middleware(
+    RequestQueueMiddleware,
+    max_queue_size=settings.request_queue_max_size,
+    max_concurrent=50,
+    request_timeout=settings.request_timeout_seconds,
+)
+
 # =========================
 # Global OPTIONS preflight handler
 # Must be registered BEFORE all routes so CORS headers are always returned,
@@ -452,8 +483,14 @@ class MonitoringMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         
         # Rate limiting check
-        client_ip = request.client.host
+        client = request.client
+        client_ip = client.host if client else "unknown"
         user_agent = request.headers.get("user-agent", "")
+
+        # Skip rate limiting for CORS preflight
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            return response
         
         # Skip rate limiting for health checks and monitoring endpoints
         if request.url.path in ["/health", "/api/monitoring/health", "/nginx_status"]:
@@ -467,40 +504,56 @@ class MonitoringMiddleware(BaseHTTPMiddleware):
         except Exception:
             redis_available = False
 
-        try:
-            if redis_available:
-                if request.url.path.startswith("/api/auth/"):
-                    rate_limit_key = f"rate_limit:auth:{client_ip}"
-                    if not await redis_cache.check_rate_limit(rate_limit_key, 10, 60):
-                        raise HTTPException(status_code=429, detail="Too many authentication requests")
-                elif request.url.path.startswith("/api/orders/"):
-                    rate_limit_key = f"rate_limit:orders:{client_ip}"
-                    if not await redis_cache.check_rate_limit(rate_limit_key, 200, 60):
-                        raise HTTPException(status_code=429, detail="Too many order requests")
+        # Skip rate limiting for high-frequency read-only shared endpoints
+        _skip_rate_limit_paths = (
+            "/api/menu",
+            "/api/business/settings",
+            "/api/subscription/status",
+            "/api/auth/me",
+            "/api/ping",
+            "/api/public/",
+            "/api/app/latest",
+        )
+        _is_read_only_exempt = request.method == "GET" and any(
+            request.url.path.startswith(p) for p in _skip_rate_limit_paths
+        )
+        if not _is_read_only_exempt:
+            try:
+                if redis_available:
+                    if request.url.path.startswith("/api/auth/"):
+                        rate_limit_key = f"rate_limit:auth:{client_ip}"
+                        if not await redis_cache.check_rate_limit(rate_limit_key, 20, 60):
+                            return JSONResponse(status_code=429, content={"detail": "Too many authentication requests"}, headers={"Retry-After": "60"})
+                    elif request.url.path.startswith("/api/orders"):
+                        rate_limit_key = f"rate_limit:orders:{client_ip}"
+                        if not await redis_cache.check_rate_limit(rate_limit_key, 600, 60):
+                            return JSONResponse(status_code=429, content={"detail": "Too many order requests"}, headers={"Retry-After": "10"})
+                    else:
+                        rate_limit_key = f"rate_limit:general:{client_ip}"
+                        if not await redis_cache.check_rate_limit(rate_limit_key, 500, 60):
+                            return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"}, headers={"Retry-After": "10"})
                 else:
-                    rate_limit_key = f"rate_limit:general:{client_ip}"
-                    if not await redis_cache.check_rate_limit(rate_limit_key, 100, 60):
-                        raise HTTPException(status_code=429, detail="Rate limit exceeded")
-            else:
-                # Fallback in-memory rate limiting
-                if request.url.path.startswith("/api/auth/"):
-                    if not await _check_memory_rate_limit(f"auth:{client_ip}", 10, 60):
-                        raise HTTPException(status_code=429, detail="Too many authentication requests")
-                elif request.url.path.startswith("/api/orders"):
-                    if not await _check_memory_rate_limit(f"orders:{client_ip}", 300, 60):
-                        raise HTTPException(status_code=429, detail="Too many order requests")
-        except HTTPException:
-            raise
-        except Exception as e:
-            print(f"Rate limiting error: {e}")
+                    # Fallback in-memory rate limiting
+                    if request.url.path.startswith("/api/auth/"):
+                        if not await _check_memory_rate_limit(f"auth:{client_ip}", 20, 60):
+                            return JSONResponse(status_code=429, content={"detail": "Too many authentication requests"}, headers={"Retry-After": "60"})
+                    elif request.url.path.startswith("/api/orders"):
+                        if not await _check_memory_rate_limit(f"orders:{client_ip}", 600, 60):
+                            return JSONResponse(status_code=429, content={"detail": "Too many order requests"}, headers={"Retry-After": "10"})
+                    else:
+                        if not await _check_memory_rate_limit(f"general:{client_ip}", 500, 60):
+                            return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"}, headers={"Retry-After": "10"})
+            except Exception as e:
+                print(f"Rate limiting error: {e}")
         
         # Process request
         try:
             response = await call_next(request)
             is_error = response.status_code >= 400
-        except Exception as e:
-            is_error = True
-            response = Response(content=str(e), status_code=500)
+        except Exception:
+            # Log full traceback and re-raise so Uvicorn shows the root cause
+            logging.exception("Unhandled exception during request processing")
+            raise
         
         # Record metrics
         response_time = (time.time() - start_time) * 1000  # Convert to milliseconds
@@ -1053,7 +1106,7 @@ async def generate_unique_referral_code() -> str:
     for _ in range(max_attempts):
         code = generate_referral_code_string()
         # Check if code already exists (case-insensitive)
-        existing = await db.users.find_one({"referral_code": {"$regex": f"^{code}$", "$options": "i"}})
+        existing = await db.users.find_one({"referral_code": code.upper()})
         if not existing:
             return code
     
@@ -1076,7 +1129,7 @@ async def validate_referral_code(code: str) -> dict:
         return {"valid": False, "error": "Invalid referral code format"}
     
     # Case-insensitive lookup
-    referrer = await db.users.find_one({"referral_code": {"$regex": f"^{code}$", "$options": "i"}})
+    referrer = await db.users.find_one({"referral_code": code.upper()})
     
     if not referrer:
         return {"valid": False, "error": "Invalid referral code"}
@@ -1720,6 +1773,34 @@ def get_secure_org_id(current_user: dict) -> str:
     return org_id
 
 
+
+# ── User auth cache ────────────────────────────────────────────────────────────
+_user_cache: dict = {}
+_user_cache_ttl: dict = {}
+_USER_CACHE_TTL_SECONDS = 60
+
+def _user_cache_get(user_id: str):
+    expiry = _user_cache_ttl.get(user_id)
+    if expiry and time.time() < expiry:
+        return _user_cache.get(user_id)
+    _user_cache.pop(user_id, None)
+    _user_cache_ttl.pop(user_id, None)
+    return None
+
+def _user_cache_set(user_id: str, user: dict):
+    if len(_user_cache) >= 500:
+        oldest = sorted(_user_cache_ttl.items(), key=lambda x: x[1])[:100]
+        for uid, _ in oldest:
+            _user_cache.pop(uid, None)
+            _user_cache_ttl.pop(uid, None)
+    _user_cache[user_id] = user
+    _user_cache_ttl[user_id] = time.time() + _USER_CACHE_TTL_SECONDS
+
+def invalidate_user_cache(user_id: str):
+    _user_cache.pop(user_id, None)
+    _user_cache_ttl.pop(user_id, None)
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -1728,11 +1809,15 @@ async def get_current_user(
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
         if user_id is None:
-            print(f"❌ Invalid token: no user_id in payload")
             raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Check in-process cache first — avoids a DB round-trip on every request
+        cached = _user_cache_get(user_id)
+        if cached is not None:
+            return cached
+
         user = await db.users.find_one({"id": user_id}, {"_id": 0})
         if user is None:
-            print(f"❌ User not found: {user_id}")
             raise HTTPException(status_code=401, detail="User not found")
 
         # Ensure all required fields exist with defaults
@@ -1743,33 +1828,26 @@ async def get_current_user(
         user.setdefault("razorpay_key_id", None)
         user.setdefault("razorpay_key_secret", None)
         user.setdefault("subscription_expires_at", None)
-        
+
         # CRITICAL: Ensure organization_id is properly set
-        # For admin users: organization_id = their own id
-        # For staff users: organization_id MUST be set from database (linked to admin)
         if user["role"] == "admin":
             user["organization_id"] = user["id"]
         elif not user.get("organization_id"):
-            # Staff without organization_id is a security risk - deny access
-            print(f"❌ SECURITY: Staff user {user['email']} has no organization_id!")
             raise HTTPException(
-                status_code=403, 
+                status_code=403,
                 detail="Staff account not properly linked to organization. Contact your admin."
             )
 
+        _user_cache_set(user_id, user)
         return user
     except jwt.ExpiredSignatureError:
-        print(f"❌ Token expired")
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.exceptions.InvalidTokenError as e:
-        print(f"❌ JWT Error: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid token")
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Auth error: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
-
 
 async def get_trial_days_config() -> int:
     """Get trial_days from pricing_config, with fallback to default"""
@@ -2500,9 +2578,7 @@ async def verify_registration(verify_data: VerifyRegistrationOTP):
     if referral_code:
         try:
             # Find the referrer by code
-            referrer = await db.users.find_one({
-                "referral_code": {"$regex": f"^{referral_code}$", "$options": "i"}
-            })
+            referrer = await db.users.find_one({"referral_code": referral_code.upper()})
             if referrer:
                 # Create referral record with PENDING status
                 referral_record = {
@@ -2635,9 +2711,7 @@ async def register_direct(user_data: UserCreate):
     if referral_code:
         try:
             # Find the referrer by code
-            referrer = await db.users.find_one({
-                "referral_code": {"$regex": f"^{referral_code}$", "$options": "i"}
-            })
+            referrer = await db.users.find_one({"referral_code": referral_code.upper()})
             if referrer:
                 # Create referral record with PENDING status
                 referral_record = {
@@ -5825,76 +5899,21 @@ async def get_orders(
     
     # SECURITY: Ensure organization_id is valid
     if not user_org_id:
-        print(f"🚨 SECURITY ALERT: User {current_user.get('email')} attempted to fetch orders without organization_id!")
         raise HTTPException(status_code=403, detail="Organization not configured. Contact support.")
 
-    # Security log
-    print(f"🔒 User {current_user['email']} (org: {user_org_id}) fetching orders with status: {status}")
-
     try:
-        # ALWAYS CHECK DATABASE FIRST for most accurate order status
-        print(f"📊 Always fetching fresh data from database for org {user_org_id}")
-        
-        # Build query with proper status filtering (NO date filter for active orders)
+        # Build query - let MongoDB do the filtering, not Python
+        completed_statuses = ["completed", "cancelled", "paid", "billed", "settled"]
         query = {"organization_id": user_org_id}
-        
         if status:
             query["status"] = status
-            # For completed/paid orders, don't filter by date (show all history)
-            # For active orders, also don't filter by date (show uncompleted orders from any date)
         else:
-            # No status specified = get active orders (uncompleted) from any date
-            # Business Logic: Show ALL uncompleted orders, even from yesterday
-            # BULLETPROOF: Exclude ALL possible completed statuses
-            completed_statuses = ["completed", "cancelled", "paid", "billed", "settled"]
             query["status"] = {"$nin": completed_statuses}
-            # NO DATE FILTER: Yesterday's uncompleted orders should still show as active
 
         try:
-            # ALWAYS fetch from database for most current status
-            orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(1000).to_list(1000)
-            
-            # IMPROVED BUSINESS LOGIC: Filter based on status, not payment amount
-            if not status or status not in ["completed", "paid", "cancelled", "billed", "settled"]:
-                # Filter out orders based on STATUS only, not payment amount
-                # This ensures orders stay active until explicitly completed through billing
-                filtered_orders = []
-                for order in orders:
-                    # Check status (primary filter)
-                    order_status = order.get("status", "").lower()
-                    completed_statuses = ["completed", "cancelled", "paid", "billed", "settled"]
-                    
-                    if order_status in completed_statuses:
-                        print(f"🚫 Filtering out completed order from active list: {order.get('id')} ({order_status})")
-                        continue
-                    
-                    # RESTAURANT BUSINESS LOGIC: Keep orders active even if payment_received >= total
-                    # Orders should only be removed when explicitly marked as completed through billing
-                    payment_received = order.get("payment_received", 0) or 0
-                    total = order.get("total", 0) or 0
-                    
-                    # Log payment status but don't filter based on it
-                    if payment_received >= total and total > 0:
-                        print(f"💰 Order has full payment but staying active: {order.get('id')} (₹{payment_received}/₹{total}) - status: {order_status}")
-                    
-                    filtered_orders.append(order)
-                
-                orders = filtered_orders
-                print(f"🔍 After status-based filtering: {len(orders)} truly active orders")
-            
-            # Convert datetime objects for consistency
-            for order in orders:
-                if isinstance(order.get("created_at"), str):
-                    try:
-                        order["created_at"] = datetime.fromisoformat(order["created_at"])
-                    except:
-                        pass
-                if isinstance(order.get("updated_at"), str):
-                    try:
-                        order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-                    except:
-                        pass
-            
+            # Fetch from DB - MongoDB handles filtering via index
+            orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
+
             # Log orders by date for business visibility (but don't filter them out)
             if not status or status not in ["completed", "paid", "cancelled"]:
                 today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -5907,57 +5926,36 @@ async def get_orders(
                         order_date = order.get("created_at")
                         if isinstance(order_date, str):
                             order_date = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
-                        
                         if order_date >= today_start:
                             today_orders.append(order)
-                        elif order_date >= (today_start - timedelta(days=1)):
-                            yesterday_orders.append(order)
                         else:
-                            older_orders.append(order)
-                    except Exception as date_error:
-                        print(f"⚠️ Date parsing error for order {order.get('id')}: {date_error}")
-                        today_orders.append(order)  # Default to today if parsing fails
-                
-                print(f"🚀 Active orders breakdown:")
-                print(f"   📅 Today: {len(today_orders)} active orders")
-                print(f"   📅 Yesterday (uncompleted): {len(yesterday_orders)} active orders")
-                print(f"   📅 Older (uncompleted): {len(older_orders)} active orders")
-                print(f"   📊 Total active orders: {len(orders)} (including uncompleted from previous days)")
-                
-                if yesterday_orders:
-                    print(f"   ⚠️ Yesterday's uncompleted orders (still active - correct behavior):")
-                    for order in yesterday_orders[:3]:  # Show first 3
-                        print(f"      - Order {order.get('id', 'unknown')}: {order.get('status')} from {order.get('created_at')}")
-            else:
-                print(f"📊 Returned {len(orders)} {status} orders from database")
-            
+                            yesterday_orders.append(order)
+                    except Exception:
+                        today_orders.append(order)
+
             # SMART CACHING: Cache fresh results for very short time (30 seconds only)
             if not fresh:
                 try:
                     cached_service = get_cached_order_service()
                     if cached_service and not status:
-                        # Only cache active orders for 30 seconds
                         await cached_service.cache.set_active_orders(user_org_id, orders, ttl=30)
-                        print(f"💾 Cached {len(orders)} orders for 30 seconds")
-                except Exception as cache_error:
-                    print(f"⚠️ Cache write error: {cache_error}")
-            
+                except Exception:
+                    pass
+
             return orders
-            
+
         except Exception as db_error:
-            print(f"❌ MongoDB query error: {db_error}")
-            # Fallback to cached service if database fails - NO date filtering for active orders
+            # Fallback to cached service if database fails
             try:
                 cached_service = get_cached_order_service()
                 if cached_service:
                     orders = await cached_service.get_active_orders(user_org_id, use_cache=True)
-                    
-                    # Log the fallback orders by date for visibility (but don't filter them)
+
                     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                     today_count = 0
                     yesterday_count = 0
                     older_count = 0
-                    
+
                     for order in orders:
                         try:
                             order_date = order.get("created_at")
@@ -5989,28 +5987,8 @@ async def get_orders(
                 print(f"❌ Cache fallback also failed: {cache_error}")
         
         # Final fallback: return empty list
-        print(f"🆘 All strategies failed, returning empty list")
         return []
             
-        # Basic datetime conversion
-        for order in orders:
-            try:
-                if isinstance(order.get("created_at"), str):
-                    order["created_at"] = datetime.fromisoformat(order["created_at"])
-                if isinstance(order.get("updated_at"), str):
-                    order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-            except:
-                # If datetime conversion fails, leave as string
-                pass
-        
-        print(f"🆘 Fallback returned {len(orders)} orders")
-        return orders
-            
-    except Exception as final_error:
-        print(f"❌ Final fallback failed: {final_error}")
-        # Return empty list rather than crash
-        return []
-        
     except Exception as e:
         print(f"❌ Critical error in get_orders: {e}")
         # Last resort: return empty list to prevent API crash
@@ -10996,39 +10974,35 @@ async def ai_support_chat(chat_request: AIChatRequest):
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for monitoring and load balancers"""
-    try:
-        # Check database connection with timeout
-        await db.users.find_one({}, {"_id": 1})
-        return {
-            "status": "healthy",
-            "message": "BillByteKOT Server is running",
-            "version": "2.1.0",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "services": {"database": "connected", "api": "operational"},
-            "database": db.name,
-            "connection": "active",
-        }
-    except Exception as e:
-        # Try a simple ping command as fallback
+    """
+    Health check endpoint for load balancer probes.
+    Returns worker info, uptime, and queue depth.
+    """
+    import os
+    from core.connection_pool import get_pool_manager
+    from middleware.request_queue import get_queue_middleware
+
+    pool_manager = get_pool_manager()
+    queue_middleware = get_queue_middleware()
+
+    pool_health = {}
+    if pool_manager:
         try:
-            await db.command("ping")
-            return {
-                "status": "degraded",
-                "message": "Database ping successful but query failed",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "services": {"database": "limited", "api": "operational"},
-                "database": db.name,
-                "connection": "limited",
-            }
-        except Exception as ping_error:
-            return {
-                "status": "unhealthy",
-                "message": f"Database connection failed: {str(e)}",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "services": {"database": "disconnected", "api": "operational"},
-                "troubleshooting": "Check MongoDB Atlas connection string and network access",
-            }
+            pool_health = await pool_manager.health_check()
+        except Exception:
+            pool_health = {"status": "unknown"}
+
+    queue_metrics = {}
+    if queue_middleware:
+        queue_metrics = queue_middleware.get_metrics()
+
+    return {
+        "status": "ok",
+        "worker_pid": os.getpid(),
+        "timestamp": time.time(),
+        "database": pool_health.get("status", "unknown"),
+        "queue": queue_metrics,
+    }
 
 
 @app.get("/api/health")
@@ -11443,6 +11417,26 @@ async def startup_validation():
     except Exception as e:
         print(f"⚠️ Monitoring initialization failed: {e}")
         print("📝 Continuing without monitoring")
+
+    # Initialize connection pool manager and warm the pool
+    try:
+        from core.connection_pool import init_pool_manager
+        pool_manager = init_pool_manager(client, db)
+        await pool_manager.warm_pool(connections=5)
+        print("✅ Connection pool manager initialized and warmed")
+    except Exception as e:
+        print(f"⚠️ Connection pool warming failed: {e}")
+        print("📝 Continuing without pool warming")
+
+    # Initialize distributed cache (Redis-backed with in-memory fallback)
+    try:
+        from utils.cache import init_cache
+        from config.settings import settings
+        await init_cache(redis_url=settings.redis_url)
+        print("✅ Distributed cache initialized")
+    except Exception as e:
+        print(f"⚠️ Distributed cache initialization failed: {e}")
+        print("📝 Continuing without distributed cache")
     
     # Start background cache cleanup task
     asyncio.create_task(periodic_cache_cleanup())
@@ -12033,9 +12027,7 @@ async def validate_referral_code_endpoint(request: ReferralValidateRequest, http
         )
     
     # Find the referrer by code (case-insensitive)
-    referrer = await db.users.find_one({
-        "referral_code": {"$regex": f"^{code}$", "$options": "i"}
-    })
+    referrer = await db.users.find_one({"referral_code": code.upper()})
     
     if not referrer:
         raise HTTPException(
@@ -12139,9 +12131,7 @@ async def apply_referral_code(
     referee_user_id = request.referee_user_id
     
     # Find the referrer by code
-    referrer = await db.users.find_one({
-        "referral_code": {"$regex": f"^{code}$", "$options": "i"}
-    })
+    referrer = await db.users.find_one({"referral_code": code.upper()})
     
     if not referrer:
         raise HTTPException(

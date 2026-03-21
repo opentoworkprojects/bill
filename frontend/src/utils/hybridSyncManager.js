@@ -5,9 +5,9 @@
  */
 
 import websocketManager from './websocketManager';
-import requestBatcher from './requestBatcher';
 import { apiWithRetry } from './apiClient';
 import { API } from '../App';
+import requestBatcher from './requestBatcher';
 
 class HybridSyncManager {
   constructor() {
@@ -16,6 +16,7 @@ class HybridSyncManager {
     this.listeners = new Map();
     this.pendingUpdates = new Map();
     this.batchTimer = null;
+    this.wsEverConnected = false; // track if WS ever succeeded
   }
 
   /**
@@ -23,20 +24,14 @@ class HybridSyncManager {
    */
   initialize(token) {
     if (this.isInitialized) {
-      console.log('🔄 Hybrid sync already initialized');
       return;
     }
-
-    console.log('🚀 Initializing hybrid sync manager');
     
     // Connect WebSocket
     websocketManager.connect(token);
 
     // Set up WebSocket event listeners
     this.setupWebSocketListeners();
-
-    // Set up fallback polling (only if WebSocket fails)
-    this.setupFallbackPolling();
 
     this.isInitialized = true;
   }
@@ -45,71 +40,52 @@ class HybridSyncManager {
    * Set up WebSocket event listeners
    */
   setupWebSocketListeners() {
-    // Order created
     websocketManager.on('order_created', (order) => {
-      console.log('📨 WS: Order created', order.id);
       this.emit('order_created', order);
     });
 
-    // Order updated
     websocketManager.on('order_updated', (order) => {
-      console.log('📨 WS: Order updated', order.id);
       this.emit('order_updated', order);
     });
 
-    // Order status changed
     websocketManager.on('order_status_changed', (order) => {
-      console.log('📨 WS: Order status changed', order.id, order.status);
       this.emit('order_status_changed', order);
     });
 
-    // WhatsApp sent
     websocketManager.on('whatsapp_sent', (orderId) => {
-      console.log('📨 WS: WhatsApp sent for order', orderId);
       this.emit('whatsapp_sent', orderId);
     });
 
-    // Payment completed
     websocketManager.on('payment_completed', (order) => {
-      console.log('📨 WS: Payment completed', order.id);
       this.emit('payment_completed', order);
     });
 
-    // Table updated
     websocketManager.on('table_updated', (table) => {
-      console.log('📨 WS: Table updated', table.id);
       this.emit('table_updated', table);
     });
 
-    // Menu updated
     websocketManager.on('menu_updated', (menu) => {
-      console.log('📨 WS: Menu updated');
       this.emit('menu_updated', menu);
     });
 
-    // WebSocket disconnected - start fallback
+    // Only start fallback if WS was previously working and then dropped
     websocketManager.on('disconnected', () => {
-      console.warn('⚠️ WebSocket disconnected, using fallback polling');
-      this.startFallbackPolling();
+      if (this.wsEverConnected) {
+        console.warn('⚠️ WebSocket disconnected, using fallback polling');
+        this.startFallbackPolling();
+      }
+      // If WS never connected (no /ws endpoint), don't start fallback —
+      // OrdersPage handles its own polling via orderPollingManager
     });
 
-    // WebSocket reconnected - stop fallback
     websocketManager.on('connected', () => {
-      console.log('✅ WebSocket reconnected, stopping fallback polling');
+      this.wsEverConnected = true;
       this.stopFallbackPolling();
     });
   }
 
   /**
-   * Set up fallback polling (only used when WebSocket is down)
-   */
-  setupFallbackPolling() {
-    // Fallback polling is only started when WebSocket disconnects
-    console.log('📡 Fallback polling configured (inactive until needed)');
-  }
-
-  /**
-   * Start fallback polling (only when WebSocket is down)
+   * Start fallback polling using real /orders endpoint
    */
   startFallbackPolling() {
     if (this.fallbackPolling) return;
@@ -118,22 +94,19 @@ class HybridSyncManager {
     
     this.fallbackPolling = setInterval(async () => {
       try {
-        // Batch fetch all necessary data in one call
-        const data = await requestBatcher.prefetchBatch([
-          { type: 'orders', id: 'active' },
-          { type: 'tables', id: 'all' }
-        ]);
-
-        if (data.orders) {
-          this.emit('orders_updated', data.orders);
-        }
-        if (data.tables) {
-          this.emit('tables_updated', data.tables);
+        const response = await apiWithRetry({
+          method: 'get',
+          url: `${API}/orders?fresh=true&_t=${Date.now()}`,
+          timeout: 8000
+        });
+        const orders = Array.isArray(response.data) ? response.data : [];
+        if (orders.length > 0) {
+          this.emit('orders_updated', orders);
         }
       } catch (error) {
-        console.error('Fallback polling failed:', error);
+        // Silent — fallback polling failures are expected occasionally
       }
-    }, 10000); // Poll every 10 seconds (much less aggressive than before)
+    }, 10000);
   }
 
   /**
@@ -151,36 +124,32 @@ class HybridSyncManager {
    * Batch multiple order status updates
    */
   async batchStatusUpdate(orderId, status) {
-    // Add to pending updates
     this.pendingUpdates.set(orderId, status);
 
-    // Clear existing timer
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
     }
 
-    // Execute batch after short delay (allows collecting multiple updates)
     this.batchTimer = setTimeout(async () => {
       const updates = Array.from(this.pendingUpdates.entries()).map(([id, st]) => ({
         orderId: id,
         status: st
       }));
-
       this.pendingUpdates.clear();
 
       try {
-        const results = await requestBatcher.batchUpdateStatus(updates);
-        console.log(`✅ Batch updated ${results.length} order statuses`);
-        
-        // Emit individual updates
-        results.forEach(order => {
-          this.emit('order_status_changed', order);
+        // Use the real batch-update-status endpoint
+        const response = await apiWithRetry({
+          method: 'post',
+          url: `${API}/orders/batch-update-status`,
+          data: { updates: updates.map(u => ({ order_id: u.orderId, status: u.status })) }
         });
+        const results = Array.isArray(response.data) ? response.data : [];
+        results.forEach(order => this.emit('order_status_changed', order));
       } catch (error) {
-        console.error('Batch status update failed:', error);
-        throw error;
+        console.warn('Batch status update failed:', error.message);
       }
-    }, 100); // Wait 100ms to collect updates
+    }, 100);
   }
 
   /**
@@ -188,11 +157,14 @@ class HybridSyncManager {
    */
   async fetchOrders(orderIds) {
     try {
-      const orders = await requestBatcher.batchFetchOrders(orderIds);
-      console.log(`✅ Batch fetched ${orders.length} orders`);
-      return orders;
+      const response = await apiWithRetry({
+        method: 'get',
+        url: `${API}/orders?fresh=true`,
+        timeout: 8000
+      });
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      console.error('Batch fetch orders failed:', error);
+      console.warn('Fetch orders failed:', error.message);
       throw error;
     }
   }
@@ -246,10 +218,12 @@ class HybridSyncManager {
   }
 
   /**
-   * Check if connected (WebSocket or fallback)
+   * Check if connected (WebSocket or active fallback)
    */
   isConnected() {
-    return websocketManager.isConnected() || this.fallbackPolling !== null;
+    // Only report connected if WS is actually open
+    // Don't count fallback polling as "connected" — that would suppress OrdersPage polling
+    return websocketManager.isConnected();
   }
 }
 

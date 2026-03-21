@@ -5,6 +5,8 @@ RestoBill AI - Production Server Runner
 
 import logging
 import os
+import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -141,33 +143,70 @@ def print_startup_info():
     print("=" * 60)
 
 
-def run_server():
-    """Run the server with appropriate configuration"""
-    # Determine SSL configuration
-    ssl_keyfile = SSL_KEY_PATH if SSL_KEY_PATH else None
-    ssl_certfile = SSL_CERT_PATH if SSL_CERT_PATH else None
+def _is_gunicorn_available() -> bool:
+    """Check if gunicorn is available (Linux/Mac only)."""
+    if sys.platform == "win32":
+        return False
+    try:
+        import gunicorn  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
-    # Server configuration
+
+def run_server():
+    """Run the server - gunicorn on Linux/Mac production, uvicorn everywhere else."""
+    if ENVIRONMENT == "production" and _is_gunicorn_available():
+        _run_gunicorn()
+    else:
+        if ENVIRONMENT == "production" and sys.platform == "win32":
+            print("ℹ️  Windows detected: gunicorn not supported. Using uvicorn with multiple workers.")
+        _run_uvicorn()
+
+
+def _run_gunicorn():
+    """Launch gunicorn with UvicornWorker for production (Linux/Mac)."""
+    gunicorn_config = Path(__file__).parent / "gunicorn_config.py"
+    cmd = [
+        sys.executable, "-m", "gunicorn",
+        "server:app",
+        "-c", str(gunicorn_config),
+    ]
+    print("Starting Gunicorn (production mode)...")
+    proc = subprocess.Popen(cmd, cwd=str(Path(__file__).parent))
+
+    def _shutdown(signum, frame):
+        print(f"\nShutting down Gunicorn (signal {signum})...")
+        proc.terminate()
+        proc.wait(timeout=30)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+    proc.wait()
+
+
+def _run_uvicorn():
+    """Launch uvicorn - single worker for dev, multiple for production on Windows."""
+    import multiprocessing
+    # On Windows production: use multiple workers for concurrency
+    if ENVIRONMENT == "production" and sys.platform == "win32":
+        worker_count = (2 * multiprocessing.cpu_count()) + 1
+    else:
+        worker_count = 1
+
+    print(f"Starting Uvicorn with {worker_count} worker(s)...")
     config = {
-        "app": "server:app",  # Import from server.py
+        "app": "server:app",
         "host": HOST,
         "port": PORT,
         "log_level": LOG_LEVEL,
         "access_log": True,
-        "reload": False,  # Never reload in production
-        "workers": 1,  # Render free tier works better with 1 worker
+        "reload": DEBUG and worker_count == 1,  # reload only works with 1 worker
+        "workers": worker_count,
     }
-
-    # Add SSL configuration if provided
-    if ssl_keyfile and ssl_certfile:
-        config.update(
-            {
-                "ssl_keyfile": ssl_keyfile,
-                "ssl_certfile": ssl_certfile,
-            }
-        )
-
-    # Run the server
+    if SSL_CERT_PATH and SSL_KEY_PATH:
+        config.update({"ssl_keyfile": SSL_KEY_PATH, "ssl_certfile": SSL_CERT_PATH})
     uvicorn.run(**config)
 
 

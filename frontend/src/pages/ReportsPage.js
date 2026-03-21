@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { API } from "../App";
+import { fetchMenu, fetchBusinessSettings as fetchBusinessSettingsShared } from "../utils/sharedDataCache";
 import Layout from "../components/Layout";
 import TrialBanner from "../components/TrialBanner";
 import { Button } from "../components/ui/button";
@@ -210,20 +211,20 @@ const ReportsPage = ({ user }) => {
   }, [fetchReportOrders]);
 
   useEffect(() => {
-    const fetchMenuAndSettings = async () => {
+    const loadMenuAndSettings = async () => {
       try {
-        const [menuRes, settingsRes] = await Promise.all([
-          axios.get(`${API}/menu?fresh=true&_t=${Date.now()}`),
-          axios.get(`${API}/business/settings`)
+        const [menuData, settingsData] = await Promise.all([
+          fetchMenu(),
+          fetchBusinessSettingsShared()
         ]);
-        const items = Array.isArray(menuRes.data) ? menuRes.data.filter((item) => item && item.available !== false) : [];
+        const items = Array.isArray(menuData) ? menuData.filter((item) => item && item.available !== false) : [];
         setMenuItems(items);
-        setBusinessSettings(settingsRes.data?.business_settings || {});
+        setBusinessSettings(settingsData?.business_settings || settingsData || {});
       } catch (error) {
         console.error("Failed to load menu/settings for reports", error);
       }
     };
-    fetchMenuAndSettings();
+    loadMenuAndSettings();
   }, []);
 
   const fetchDailyReport = async () => {

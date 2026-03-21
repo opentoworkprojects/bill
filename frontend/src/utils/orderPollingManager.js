@@ -5,6 +5,8 @@
  * preventing duplicate orders from appearing during overlapping polling cycles.
  */
 
+import { API } from '../App';
+
 class OrderPollingManager {
   constructor() {
     this.isRefreshing = false;
@@ -70,10 +72,9 @@ class OrderPollingManager {
     // Initialize event-driven triggers
     this.initializeEventTriggers();
     
-    // Initialize smart polling
-    this.initializeSmartPolling();
-    
-    console.log('🔄 OrderPollingManager initialized with priority system, event triggers, and smart polling');
+    // NOTE: Smart polling is NOT started here.
+    // Call activate() from OrdersPage to start polling, deactivate() on unmount.
+    this.active = false;
   }
 
   /**
@@ -82,13 +83,42 @@ class OrderPollingManager {
   hasAuthToken() {
     return !!localStorage.getItem('token');
   }
+
+  /**
+   * Activate polling — call this from OrdersPage on mount
+   */
+  activate() {
+    if (this.active) return;
+    this.active = true;
+    this.initializeSmartPolling();
+  }
+
+  /**
+   * Deactivate polling — call this from OrdersPage on unmount
+   */
+  deactivate() {
+    this.active = false;
+    if (this.smartPolling.intervalId) {
+      clearInterval(this.smartPolling.intervalId);
+      this.smartPolling.intervalId = null;
+    }
+    this.clearPriorityQueue();
+    // Abort any in-flight request — catch the rejection so it doesn't surface as an unhandled error
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    if (this.refreshPromise) {
+      this.refreshPromise.catch(() => {}); // swallow the AbortError
+      this.refreshPromise = null;
+    }
+    this.isRefreshing = false;
+  }
   
   /**
    * Initialize smart polling system
    */
   initializeSmartPolling() {
-    console.log('🧠 Initializing smart polling system');
-    
     // Track user activity for adaptive polling
     this.trackUserActivity();
     
@@ -163,21 +193,14 @@ class OrderPollingManager {
     
     // Determine interval based on activity patterns
     if (activityType === 'order_created' || activityType === 'status_changed') {
-      // High activity - use fast interval
       newInterval = this.smartPolling.fastInterval;
-      console.log(`⚡ FAST POLLING: Order activity detected, switching to ${newInterval}ms`);
     } else if (timeSinceLastActivity < this.smartPolling.fastModeThreshold) {
-      // Recent activity - use fast interval
       newInterval = this.smartPolling.fastInterval;
-      console.log(`🏃 ACTIVE POLLING: Recent activity, using ${newInterval}ms`);
     } else if (timeSinceLastActivity > this.smartPolling.activityThreshold) {
-      // No recent activity - use slow interval
       newInterval = this.smartPolling.slowInterval;
-      console.log(`🐌 SLOW POLLING: No recent activity, using ${newInterval}ms`);
     } else {
-      // Normal activity - use base interval
       newInterval = this.smartPolling.baseInterval;
-      console.log(`🚶 NORMAL POLLING: Standard activity, using ${newInterval}ms`);
+      newInterval = this.smartPolling.baseInterval;
     }
     
     // Only update if interval changed significantly
@@ -195,8 +218,6 @@ class OrderPollingManager {
       clearInterval(this.smartPolling.intervalId);
     }
     
-    console.log(`🔄 Starting adaptive polling with ${this.smartPolling.currentInterval}ms interval`);
-    
     this.smartPolling.intervalId = setInterval(() => {
       // Only poll if no high-priority operations are in progress
       if (!this.hasAuthToken()) {
@@ -212,7 +233,6 @@ class OrderPollingManager {
    * Restart adaptive polling with new interval
    */
   restartAdaptivePolling() {
-    console.log(`🔄 Restarting adaptive polling with new interval: ${this.smartPolling.currentInterval}ms`);
     this.startAdaptivePolling();
   }
   
@@ -339,8 +359,6 @@ class OrderPollingManager {
     
     this.eventListeners.get(eventType).add(callback);
     
-    console.log(`🎧 Event listener added for: ${eventType}`);
-    
     // Return cleanup function
     return () => this.removeEventListener(eventType, callback);
   }
@@ -370,8 +388,6 @@ class OrderPollingManager {
     };
     
     this.eventQueue.push(event);
-    
-    console.log(`📡 Event dispatched: ${eventType}`, data);
     
     // Process events immediately
     this.processEventQueue();
@@ -413,10 +429,7 @@ class OrderPollingManager {
    * Trigger event-driven refresh
    */
   triggerEventRefresh(source, priority = this.PRIORITY_LEVELS.NORMAL, eventData = {}) {
-    console.log(`🎯 Event-driven refresh triggered: ${source} (priority: ${priority})`);
-
-    if (!this.hasAuthToken()) {
-      console.log(`🔒 Skipping refresh "${source}" - no auth token`);
+    if (!this.active || !this.hasAuthToken()) {
       return;
     }
     
@@ -426,7 +439,7 @@ class OrderPollingManager {
       
       try {
         // Determine refresh strategy based on event type
-        let refreshUrl = `${window.API || '/api'}/orders?fresh=true&_t=${Date.now()}`;
+        let refreshUrl = `${API}/orders?fresh=true&_t=${Date.now()}`;
         
         if (source === 'order-created' || source === 'status-changed') {
           refreshUrl += '&active_only=true';
@@ -455,7 +468,8 @@ class OrderPollingManager {
         
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error(`❌ Event refresh failed for ${source}:`, error);
+          // Background polling failures are expected occasionally — warn, don't error
+          console.warn(`⚠️ Event refresh failed for ${source}:`, error.message);
         }
         throw error;
       }
@@ -499,8 +513,6 @@ class OrderPollingManager {
     
     this.priorityQueue.splice(insertIndex, 0, queueItem);
     
-    console.log(`📋 Added to priority queue: ${source} (priority: ${priority}, position: ${insertIndex})`);
-    
     // Process queue if not already processing
     if (!this.isProcessingPriority) {
       this.processPriorityQueue();
@@ -524,13 +536,14 @@ class OrderPollingManager {
         const queueItem = this.priorityQueue.shift();
         const { refreshFunction, options } = queueItem;
         
-        console.log(`🚀 Processing priority queue item: ${options.source} (priority: ${options.priority})`);
-        
         try {
           // Execute with original coordinateRefresh logic but bypass queue
           await this.executeDirectRefresh(refreshFunction, options);
         } catch (error) {
-          console.error(`❌ Priority queue item failed: ${options.source}`, error);
+          // Background queue failures — warn only, don't spam console
+          if (error.name !== 'AbortError') {
+            console.warn(`⚠️ Priority queue item failed: ${options.source}`, error.message);
+          }
           // Continue processing other items even if one fails
         }
         
@@ -552,7 +565,6 @@ class OrderPollingManager {
     
     // For critical priority, always execute immediately
     if (options.priority === this.PRIORITY_LEVELS.CRITICAL || force) {
-      console.log(`⚡ CRITICAL PRIORITY: Executing ${source} immediately`);
       return this.executeRefresh(refreshFunction, source);
     }
     
@@ -595,7 +607,6 @@ class OrderPollingManager {
    */
   cancelCurrentRefresh() {
     if (this.abortController) {
-      console.log('🚫 Cancelling in-flight refresh operation');
       this.abortController.abort();
       this.abortController = null;
     }
@@ -637,27 +648,20 @@ class OrderPollingManager {
     
     // OPTIMIZED ORDER CREATION COORDINATION
     if (newOrderCreated) {
-      console.log(`🚀 NEW ORDER COORDINATION: Optimizing refresh for order creation`);
-      
-      // Dispatch order creation event for other components
       if (orderCreationData) {
         this.dispatchEvent(this.REFRESH_EVENTS.ORDER_CREATED, orderCreationData);
       }
-      
-      // Use specialized order creation refresh
       return this.coordinateOrderCreationRefresh(refreshFunction, orderCreationData, source);
     }
     
     // PRIORITY SYSTEM: Priority refresh for active orders bypasses normal queuing
     if (priorityRefresh && !this.isRefreshing) {
-      console.log(`⚡ PRIORITY REFRESH: Executing immediately`);
       force = true;
       immediate = true;
     }
     
     // If refresh is in progress and not forced, queue it
     if (this.isRefreshing && !force) {
-      console.log(`⏳ Refresh already in progress, queuing request from: ${source}`);
       this.pendingRefresh = true;
       
       // Wait for current refresh to complete, then execute pending
@@ -675,7 +679,6 @@ class OrderPollingManager {
     
     // Check minimum interval (unless immediate or forced)
     if (!immediate && !force && this.getTimeSinceLastRefresh() < this.MIN_REFRESH_INTERVAL) {
-      console.log(`⏸️ Skipping refresh from ${source} - too soon (${this.getTimeSinceLastRefresh()}ms < ${this.MIN_REFRESH_INTERVAL}ms)`);
       return;
     }
     
@@ -692,12 +695,9 @@ class OrderPollingManager {
     
     try {
       const result = await this.refreshPromise;
-      console.log(`✅ Refresh completed successfully from: ${source}`);
       return result;
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log(`🚫 Refresh cancelled from: ${source}`);
-      } else {
+      if (error.name !== 'AbortError') {
         console.error(`❌ Refresh failed from: ${source}`, error);
       }
       throw error;
@@ -721,18 +721,12 @@ class OrderPollingManager {
    * Specialized coordination for order creation events
    */
   async coordinateOrderCreationRefresh(refreshFunction, orderData, source) {
-    console.log(`🎯 ORDER CREATION COORDINATION: Optimizing refresh for new order`);
-    
-    // Create optimized refresh function for order creation
     const orderCreationRefreshFunction = async (options = {}) => {
       const { signal } = options;
       
       try {
         // Strategy 1: If we have order data, use optimistic update approach
         if (orderData && orderData.id) {
-          console.log(`⚡ OPTIMISTIC: Using order data for immediate update`);
-          
-          // Return the new order immediately for instant UI update
           const optimisticResult = {
             activeOrders: [orderData],
             source: 'optimistic-order-creation',
@@ -748,10 +742,8 @@ class OrderPollingManager {
           return optimisticResult;
         }
         
-        // Strategy 2: Fallback to immediate server refresh
-        console.log(`🔄 FALLBACK: Immediate server refresh for order creation`);
-        
-        const response = await fetch(`${window.API || '/api'}/orders?fresh=true&active_only=true&_t=${Date.now()}`, {
+        // Fallback to immediate server refresh
+        const response = await fetch(`${API}/orders?fresh=true&active_only=true&_t=${Date.now()}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -793,25 +785,12 @@ class OrderPollingManager {
    * Handle order creation event from external components
    */
   handleOrderCreation(orderData) {
-    console.log(`📥 ORDER CREATION EVENT: Received order data`, orderData);
-    
-    // Dispatch to event system
     this.dispatchEvent(this.REFRESH_EVENTS.ORDER_CREATED, orderData);
-    
-    // Trigger immediate optimized refresh
     this.coordinateOrderCreationRefresh(null, orderData, 'external-order-creation');
   }
   
-  /**
-   * Handle order status change event
-   */
   handleOrderStatusChange(statusData) {
-    console.log(`📝 ORDER STATUS CHANGE: Received status data`, statusData);
-    
-    // Dispatch to event system
     this.dispatchEvent(this.REFRESH_EVENTS.ORDER_STATUS_CHANGED, statusData);
-    
-    // Trigger high priority refresh for status changes
     this.triggerEventRefresh('status-change-coordination', this.PRIORITY_LEVELS.HIGH, statusData);
   }
   
@@ -862,15 +841,12 @@ class OrderPollingManager {
    * @returns {Promise} - Promise that resolves when refresh is complete
    */
   async forceActiveOrdersRefresh(source = 'immediate') {
-    console.log(`🚀 Force active orders refresh from: ${source}`);
-    
-    // Create a specialized refresh function for active orders
     const activeOrdersRefreshFunction = async (options = {}) => {
       const { signal } = options;
       
       try {
         // Skip all delays and intervals - direct database query
-        const response = await fetch(`${window.API || '/api'}/orders?fresh=true&active_only=true&_t=${Date.now()}`, {
+        const response = await fetch(`${API}/orders?fresh=true&active_only=true&_t=${Date.now()}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -884,7 +860,6 @@ class OrderPollingManager {
         }
         
         const data = await response.json();
-        console.log(`✅ Force refresh completed: ${data.length} active orders`);
         
         return {
           activeOrders: Array.isArray(data) ? data : [],
@@ -944,7 +919,6 @@ class OrderPollingManager {
    * Reset the polling manager state
    */
   reset() {
-    console.log('🔄 Resetting OrderPollingManager');
     this.cancelCurrentRefresh();
     this.clearScheduledRefresh();
     

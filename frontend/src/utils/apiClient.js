@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 
 // Create axios instance with default timeout and retry logic
 const apiClient = axios.create({
-  timeout: 20000, // 20 second default timeout (increased from 15)
+  timeout: 10000, // 10 second default — fast fail, don't hang the UI
   headers: {
     'Content-Type': 'application/json',
   }
@@ -12,69 +12,50 @@ const apiClient = axios.create({
 // Request interceptor to add auth token and timeout handling
 apiClient.interceptors.request.use(
   (config) => {
-    // Add auth token if available
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Set shorter timeout for specific endpoints
-    if (config.url?.includes('/orders/status') || config.url?.includes('/tables')) {
-      config.timeout = 10000; // 10 seconds for status updates (increased from 8)
+
+    // Polling endpoints get short timeouts — fail fast, next poll will retry
+    if (config.url?.includes('/orders') || config.url?.includes('/tables') || config.url?.includes('/menu')) {
+      config.timeout = config.timeout || 8000;
     }
-    
-    // Set longer timeout for file uploads or heavy operations
+
+    // Uploads/exports get longer timeout
     if (config.url?.includes('/upload') || config.url?.includes('/export')) {
-      config.timeout = 45000; // 45 seconds for uploads (increased from 30)
+      config.timeout = 45000;
     }
-    
-    // Initialize retry count
+
     if (!config._retryCount) {
       config._retryCount = 0;
     }
-    
+
     return config;
   },
-  (error) => {
-    console.error('Request interceptor error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling and retry logic
+// Response interceptor — only retry network errors, NOT timeouts on polling
 apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    // Max 3 retries for retryable errors
-    const maxRetries = 3;
     const retryCount = originalRequest?._retryCount || 0;
-    
-    // Handle timeout errors with exponential backoff
-    if ((error.code === 'ECONNABORTED' || error.message?.includes('timeout')) && retryCount < maxRetries) {
-      originalRequest._retryCount = retryCount + 1;
-      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
-      originalRequest.timeout = Math.max(originalRequest.timeout || 20000, 25000 + (delay * 2));
-      
-      try {
-        return await apiClient(originalRequest);
-      } catch (retryError) {
-        return Promise.reject(retryError);
-      }
+
+    // DO NOT retry timeouts on polling endpoints — just fail fast and show error
+    const isPollingEndpoint = originalRequest?.url?.includes('/orders') ||
+                              originalRequest?.url?.includes('/tables') ||
+                              originalRequest?.url?.includes('/menu');
+
+    if ((error.code === 'ECONNABORTED' || error.message?.includes('timeout')) && isPollingEndpoint) {
+      return Promise.reject(error); // Fail immediately, no retry
     }
-    
-    // Handle network errors with retries
-    if ((error.code === 'ERR_NETWORK' || !error.response) && retryCount < maxRetries) {
+
+    // Retry network errors once (not timeouts) for non-polling endpoints
+    if ((error.code === 'ERR_NETWORK' || !error.response) && retryCount < 1 && !isPollingEndpoint) {
       originalRequest._retryCount = retryCount + 1;
-      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
+      await new Promise(resolve => setTimeout(resolve, 1000));
       try {
         return await apiClient(originalRequest);
       } catch (retryError) {
@@ -107,35 +88,34 @@ apiClient.interceptors.response.use(
 );
 
 // Helper function for critical operations with custom retry logic
-export const apiWithRetry = async (requestConfig, maxRetries = 2) => {
+export const apiWithRetry = async (requestConfig, maxRetries = 1) => {
   let lastError;
-  
+
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
       const response = await apiClient(requestConfig);
       return response;
     } catch (error) {
       lastError = error;
-      
+
       const status = error.response?.status;
-      
-      // Don't retry on definitive client errors (except 408 timeout and 429 rate limit)
-      if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
-        break;
-      }
-      
-      if (attempt === maxRetries + 1) {
-        break;
-      }
-      
-      // Retry on 503 (server overloaded/cold start) with longer delay
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+
+      // Never retry timeouts — fail fast so UI shows error immediately
+      if (isTimeout) break;
+
+      // Don't retry definitive client errors
+      if (status >= 400 && status < 500 && status !== 408 && status !== 429) break;
+
+      if (attempt === maxRetries + 1) break;
+
       const delay = status === 503
-        ? Math.min(2000 * attempt, 8000)
-        : Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        ? Math.min(2000 * attempt, 6000)
+        : Math.min(1000 * attempt, 3000);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError;
 };
 

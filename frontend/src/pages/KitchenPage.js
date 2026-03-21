@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API } from '../App';
+import { fetchBusinessSettings as fetchBusinessSettingsShared } from '../utils/sharedDataCache';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -152,8 +153,8 @@ const KitchenPage = ({ user }) => {
 
   const fetchBusinessSettings = async () => {
     try {
-      const response = await axios.get(`${API}/business/settings`);
-      setBusinessSettings(response.data.business_settings);
+      const data = await fetchBusinessSettingsShared();
+      setBusinessSettings(data?.business_settings || data);
     } catch (error) {
       console.error('Failed to fetch business settings', error);
     }

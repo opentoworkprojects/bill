@@ -346,8 +346,12 @@ axios.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Add timestamp to prevent caching issues
-    if (config.method === 'get') {
+    // Only add cache-busting timestamp to real-time endpoints that must always be fresh.
+    // Static/shared data (menu, settings) uses localStorage TTL in sharedDataCache instead.
+    const CACHE_BUST_PATHS = ['/orders', '/tables', '/kitchen', '/notifications'];
+    const needsCacheBust = config.method === 'get' &&
+      CACHE_BUST_PATHS.some(p => config.url?.includes(p));
+    if (needsCacheBust) {
       config.params = { ...config.params, _t: Date.now() };
     }
     return config;

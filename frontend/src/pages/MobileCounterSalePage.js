@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API } from '../App';
 import { apiWithRetry, apiSilent } from '../utils/apiClient';
+import { fetchMenu, fetchBusinessSettings } from '../utils/sharedDataCache';
 import { processPaymentFast } from '../utils/optimizedPayment';
 import { computePaymentState } from '../utils/orderWorkflowRules';
 import { validatePayment } from '../utils/paymentValidator';
@@ -117,23 +118,15 @@ const MobileCounterSalePage = ({ user }) => {
       }
 
       // Fetch fresh data in background
-      const [menuRes, settingsRes] = await Promise.all([
-        apiWithRetry({ 
-          method: 'get', 
-          url: `${API}/menu?fresh=true&_t=${Date.now()}`, 
-          timeout: 10000 
-        }),
-        apiWithRetry({ 
-          method: 'get', 
-          url: `${API}/business/settings`, 
-          timeout: 10000 
-        })
+      const [menuData, settingsData] = await Promise.all([
+        fetchMenu(true),
+        fetchBusinessSettings()
       ]);
 
-      const items = Array.isArray(menuRes.data) 
-        ? menuRes.data.filter((item) => item && item.available !== false) 
+      const items = Array.isArray(menuData) 
+        ? menuData.filter((item) => item && item.available !== false) 
         : [];
-      const settings = settingsRes.data?.business_settings || {};
+      const settings = settingsData?.business_settings || settingsData || {};
 
       setMenuItems(items);
       setBusinessSettings(settings);
@@ -492,15 +485,39 @@ const MobileCounterSalePage = ({ user }) => {
       // Show success feedback immediately (optimistic UI)
       toast.success('Processing payment...');
 
-      // Process payment in background
-      const paymentData = {
-        orderData,
-        paymentMethod,
-        paymentAmount,
-        customerInfo: { name: customerName, phone: customerPhone }
-      };
+      // Single API call — create order with payment data included
+      const orderResponse = await apiWithRetry({
+        method: 'post',
+        url: `${API}/orders`,
+        data: {
+          table_id: 'counter',
+          table_number: 0,
+          items: selectedItems,
+          customer_name: customerName || 'Counter Sale',
+          customer_phone: customerPhone || '',
+          order_type: 'takeaway',
+          status: 'completed',
+          frontend_origin: window.location.origin,
+          quick_billing: true,
+          payment_method: paymentMethod === 'split' ? 'split' : paymentMethod,
+          payment_received: paymentStats.payment_received,
+          balance_amount: paymentStats.balance_amount,
+          is_credit: paymentStats.is_credit,
+          discount: discountAmount,
+          discount_amount: discountAmount,
+          discount_type: discountType,
+          tax_rate_override: taxRate,
+          ...(paymentMethod === 'split' ? {
+            cash_amount: parseFloat(cashAmount) || 0,
+            card_amount: parseFloat(cardAmount) || 0,
+            upi_amount: parseFloat(upiAmount) || 0,
+            credit_amount: splitCredit
+          } : {})
+        },
+        timeout: 8000
+      });
 
-      const result = await processPaymentFast(paymentData);
+      const result = { order: orderResponse.data };
 
       if (result?.order) {
         setCompletedSaleOrder(result.order);

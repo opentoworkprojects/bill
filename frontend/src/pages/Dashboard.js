@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
+import { fetchBusinessSettings as fetchBusinessSettingsShared } from '../utils/sharedDataCache';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
@@ -43,11 +44,10 @@ const Dashboard = ({ user }) => {
         console.log('🔍 Dashboard: Fetching data directly from API...');
         
         // Fetch all data in parallel
-        const [dashboardRes, ordersRes, billsRes, settingsRes] = await Promise.all([
+        const [dashboardRes, ordersRes, billsRes] = await Promise.all([
           fetch(`${API}/dashboard`, { headers }),
           fetch(`${API}/orders`, { headers }),
-          fetch(`${API}/orders/today-bills`, { headers }),
-          fetch(`${API}/business/settings`, { headers })
+          fetch(`${API}/orders/today-bills`, { headers })
         ]);
 
         if (dashboardRes.ok) {
@@ -68,10 +68,13 @@ const Dashboard = ({ user }) => {
           console.log('✅ Dashboard: Today\'s bills loaded:', data.length, 'bills');
         }
 
-        if (settingsRes.ok) {
-          const data = await settingsRes.json();
-          setBusinessSettingsData(data);
+        // Use shared cache for business settings
+        try {
+          const settingsData = await fetchBusinessSettingsShared();
+          setBusinessSettingsData({ business_settings: settingsData?.business_settings || settingsData });
           console.log('✅ Dashboard: Business settings loaded');
+        } catch (e) {
+          console.error('Dashboard: Failed to load business settings', e);
         }
 
       } catch (error) {

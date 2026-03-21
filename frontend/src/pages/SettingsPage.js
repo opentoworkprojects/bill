@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
+import { invalidateShared } from '../utils/sharedDataCache';
 import Layout from '../components/Layout';
 import TrialBanner from '../components/TrialBanner';
 import { Button } from '../components/ui/button';
@@ -506,6 +507,9 @@ const SettingsPage = ({ user }) => {
       
       console.log('Save response:', response.data);
       toast.success(`Settings saved! Type: ${businessSettings.business_type}, KOT: ${businessSettings.kot_mode_enabled ? 'ON' : 'OFF'}`);
+      
+      // Bust the shared cache so other pages pick up the new settings
+      invalidateShared('business/settings');
       
       // Update local storage user data
       const user = JSON.parse(localStorage.getItem('user') || '{}');

@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import { API } from '../App';
+import { fetchBusinessSettings as fetchBusinessSettingsShared } from '../utils/sharedDataCache';
 import Layout from '../components/Layout';
 import TrialBanner from '../components/TrialBanner';
 import { Button } from '../components/ui/button';
@@ -134,12 +135,8 @@ const InventoryPage = ({ user }) => {
 
   const fetchBusinessSettings = async () => {
     try {
-      const response = await apiWithRetry({
-        method: 'get',
-        url: `${API}/business/settings`,
-        timeout: 10000
-      });
-      setBusinessSettings(response.data.business_settings);
+      const data = await fetchBusinessSettingsShared();
+      setBusinessSettings(data?.business_settings || data);
     } catch (error) {
       // Business settings are optional
     }

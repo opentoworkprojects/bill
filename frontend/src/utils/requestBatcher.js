@@ -86,18 +86,17 @@ class RequestBatcher {
   }
 
   /**
-   * Batch multiple order fetches into single call
+   * Batch multiple order fetches — falls back to fetching all orders
+   * (no dedicated batch-by-id endpoint exists on the backend)
    */
   async batchFetchOrders(orderIds) {
     if (!orderIds || orderIds.length === 0) return [];
 
     try {
-      // Single API call to fetch multiple orders
-      const response = await axios.post(`${API}/orders/batch`, {
-        order_ids: orderIds
-      });
-
-      return response.data;
+      const response = await axios.get(`${API}/orders`);
+      const all = Array.isArray(response.data) ? response.data : [];
+      const idSet = new Set(orderIds);
+      return all.filter(o => idSet.has(o.id));
     } catch (error) {
       console.error('Batch fetch orders failed:', error);
       throw error;
@@ -105,14 +104,13 @@ class RequestBatcher {
   }
 
   /**
-   * Batch multiple status updates into single call
+   * Batch status updates — uses the real batch-update-status endpoint
    */
   async batchUpdateStatus(updates) {
     if (!updates || updates.length === 0) return [];
 
     try {
-      // Single API call to update multiple order statuses
-      const response = await axios.post(`${API}/orders/batch-status`, {
+      const response = await axios.post(`${API}/orders/batch-update-status`, {
         updates: updates.map(u => ({
           order_id: u.orderId,
           status: u.status
@@ -127,25 +125,11 @@ class RequestBatcher {
   }
 
   /**
-   * Prefetch multiple resources in a single batch
+   * Prefetch multiple resources — no-op stub (no batch/prefetch endpoint on backend).
+   * Kept for API compatibility.
    */
   async prefetchBatch(resources) {
-    if (!resources || resources.length === 0) return {};
-
-    try {
-      // Single API call to fetch multiple resources
-      const response = await axios.post(`${API}/batch/prefetch`, {
-        resources: resources.map(r => ({
-          type: r.type, // 'order', 'menu', 'table', 'settings'
-          id: r.id
-        }))
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Batch prefetch failed:', error);
-      throw error;
-    }
+    return {};
   }
 
   /**

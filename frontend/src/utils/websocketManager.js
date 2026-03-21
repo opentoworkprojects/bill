@@ -3,6 +3,8 @@
  * Replaces aggressive polling with efficient WebSocket connections
  */
 
+import { API } from '../App';
+
 class WebSocketManager {
   constructor() {
     this.ws = null;
@@ -11,6 +13,7 @@ class WebSocketManager {
     this.reconnectDelay = 1000;
     this.listeners = new Map();
     this.isConnecting = false;
+    this.wasConnected = false;
     this.heartbeatInterval = null;
     this.missedHeartbeats = 0;
     this.maxMissedHeartbeats = 3;
@@ -33,10 +36,13 @@ class WebSocketManager {
     this.isConnecting = true;
 
     try {
-      // Determine WebSocket URL based on current location
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws?token=${encodeURIComponent(token)}`;
+      // Derive WebSocket URL from the API base URL (handles both dev and prod)
+      // API = "https://restro-ai.onrender.com/api" → wss://restro-ai.onrender.com/ws
+      // API = "http://localhost:10000/api"         → ws://localhost:10000/ws
+      const apiBase = API.replace(/\/api$/, '');
+      const wsProtocol = apiBase.startsWith('https') ? 'wss:' : 'ws:';
+      const wsHost = apiBase.replace(/^https?:\/\//, '');
+      const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
 
       console.log('🔌 Connecting to WebSocket:', wsUrl);
       this.ws = new WebSocket(wsUrl);
@@ -44,6 +50,7 @@ class WebSocketManager {
       this.ws.onopen = () => {
         console.log('✅ WebSocket connected');
         this.isConnecting = false;
+        this.wasConnected = true;
         this.reconnectAttempts = 0;
         this.reconnectDelay = 1000;
         this.startHeartbeat();
@@ -93,16 +100,21 @@ class WebSocketManager {
       };
 
       this.ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
+        // Suppress error log — WS endpoint may not exist, fallback polling handles it
         this.isConnecting = false;
       };
 
       this.ws.onclose = () => {
-        console.log('🔌 WebSocket disconnected');
         this.isConnecting = false;
         this.stopHeartbeat();
         this.emit('disconnected');
-        this.attemptReconnect(token);
+        // Only attempt reconnect if we successfully connected before (not on initial failure)
+        if (this.reconnectAttempts === 0 && this.wasConnected) {
+          this.attemptReconnect(token);
+        } else if (this.reconnectAttempts > 0) {
+          this.attemptReconnect(token);
+        }
+        // If never connected, don't retry — backend has no WS endpoint
       };
 
     } catch (error) {

@@ -3,9 +3,9 @@
  * Pre-loads and caches billing data with persistent storage and background updates
  */
 
-import axios from 'axios';
 import { API } from '../App';
 import { performanceMonitor, trackCacheHit, trackCacheMiss } from './performanceMonitor';
+import { fetchBusinessSettings, fetchMenu } from './sharedDataCache';
 
 class BillingCache {
   constructor() {
@@ -170,27 +170,20 @@ class BillingCache {
       'Content-Type': 'application/json'
     };
 
-    // Fetch all required data in parallel for speed
-    const [orderRes, businessRes, menuRes] = await Promise.allSettled([
-      axios.get(`${API}/orders/${orderId}`, { headers, timeout: 5000 }),
-      axios.get(`${API}/business/settings`, { headers, timeout: 5000 }),
-      axios.get(`${API}/menu`, { headers, timeout: 5000 })
+    // Order must be fetched fresh; settings/menu use shared cache
+    const [orderRes, businessSettings, menuItems] = await Promise.allSettled([
+      fetch(`${API}/orders/${orderId}`, { headers }).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+      fetchBusinessSettings().then(d => d?.business_settings ?? d ?? {}),
+      fetchMenu().then(d => Array.isArray(d) ? d.filter(item => item.available) : []),
     ]);
 
-    // Process results with error handling
-    const order = orderRes.status === 'fulfilled' ? orderRes.value.data : null;
-    const businessSettings = businessRes.status === 'fulfilled' ? businessRes.value.data.business_settings : {};
-    const menuItems = menuRes.status === 'fulfilled' ? 
-      (Array.isArray(menuRes.value.data) ? menuRes.value.data.filter(item => item.available) : []) : [];
-
-    if (!order) {
-      throw new Error('Failed to fetch order data');
-    }
+    const order = orderRes.status === 'fulfilled' ? orderRes.value : null;
+    if (!order) throw new Error('Failed to fetch order data');
 
     return {
       order,
-      businessSettings,
-      menuItems,
+      businessSettings: businessSettings.status === 'fulfilled' ? businessSettings.value : {},
+      menuItems: menuItems.status === 'fulfilled' ? menuItems.value : [],
       timestamp: Date.now()
     };
   }

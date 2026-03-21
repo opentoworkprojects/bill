@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { API } from '../App';
 import { apiWithRetry, apiSilent } from '../utils/apiClient';
+import { fetchMenu, fetchBusinessSettings } from '../utils/sharedDataCache';
 import { processPaymentFast } from '../utils/optimizedPayment';
 import { computePaymentState, determineBillingCompletionStatus } from '../utils/orderWorkflowRules';
 import { validatePayment } from '../utils/paymentValidator';
@@ -97,18 +98,46 @@ const CounterSalePage = ({ user }) => {
   const currency = useMemo(() => getCurrencySymbol(businessSettings?.currency), [businessSettings?.currency]);
   const taxRate = businessSettings?.tax_rate ?? 5;
 
-  const fetchData = useCallback(async () => {
-    setMenuLoading(true);
+  const fetchData = useCallback(async ({ silent = false } = {}) => {
+    // Show cached data instantly while fetching fresh data
+    const cachedMenu = localStorage.getItem('counterSale_menuCache');
+    const cachedSettings = localStorage.getItem('counterSale_settingsCache');
+    const cacheAge = parseInt(localStorage.getItem('counterSale_cacheTime') || '0', 10);
+    const cacheValid = Date.now() - cacheAge < 5 * 60 * 1000; // 5 min TTL
+
+    if (cachedMenu && cachedSettings && cacheValid) {
+      try {
+        const items = JSON.parse(cachedMenu);
+        const settings = JSON.parse(cachedSettings);
+        setMenuItems(items);
+        setBusinessSettings(settings);
+        if (!silent) setMenuLoading(false); // Show cached data immediately
+      } catch {
+        // Ignore parse errors, fall through to fetch
+      }
+    }
+
+    if (!silent) setMenuLoading(true);
     try {
-      const [menuRes, settingsRes] = await Promise.all([
-        apiWithRetry({ method: 'get', url: `${API}/menu?fresh=true&_t=${Date.now()}`, timeout: 10000 }),
-        apiWithRetry({ method: 'get', url: `${API}/business/settings`, timeout: 10000 })
+      const [menuData, settingsData] = await Promise.all([
+        fetchMenu(true),
+        fetchBusinessSettings()
       ]);
-      const items = Array.isArray(menuRes.data) ? menuRes.data.filter((item) => item && item.available !== false) : [];
+      const items = Array.isArray(menuData) ? menuData.filter((item) => item && item.available !== false) : [];
+      const settings = settingsData?.business_settings || settingsData || {};
       setMenuItems(items);
-      setBusinessSettings(settingsRes.data?.business_settings || {});
+      setBusinessSettings(settings);
+      // Cache for next load
+      try {
+        localStorage.setItem('counterSale_menuCache', JSON.stringify(items));
+        localStorage.setItem('counterSale_settingsCache', JSON.stringify(settings));
+        localStorage.setItem('counterSale_cacheTime', String(Date.now()));
+      } catch { /* storage full — ignore */ }
     } catch (error) {
-      toast.error('Failed to load menu for counter sale');
+      if (!cachedMenu) {
+        toast.error('Failed to load menu. Check your connection.');
+      }
+      // If we have cached data, silently fail — user already sees the menu
     } finally {
       setMenuLoading(false);
     }
@@ -387,7 +416,7 @@ const CounterSalePage = ({ user }) => {
     try {
       let createdOrderId = null;
 
-      // Create order in background
+      // Create order with payment data in a single API call (no second PUT needed)
       const orderResponse = await apiWithRetry({
         method: 'post',
         url: `${API}/orders`,
@@ -398,9 +427,25 @@ const CounterSalePage = ({ user }) => {
           customer_name: customerName || 'Counter Sale',
           customer_phone: customerPhone || '',
           order_type: 'takeaway',
-          status: 'completed',  // Counter sales are completed immediately
+          status: 'completed',
           frontend_origin: window.location.origin,
-          quick_billing: true
+          quick_billing: true,
+          // Payment fields — included here so no second PUT is needed
+          payment_method: paymentMethod === 'split' ? 'split' : paymentMethod,
+          payment_received: paymentStats.payment_received,
+          balance_amount: paymentStats.balance_amount,
+          is_credit: paymentStats.is_credit,
+          discount: discountAmount,
+          discount_type: discountType,
+          discount_value: parseFloat(discountValue) || 0,
+          discount_amount: discountAmount,
+          tax_rate_override: taxRate,
+          ...(paymentMethod === 'split' ? {
+            cash_amount: cashValue,
+            card_amount: cardValue,
+            upi_amount: upiValue,
+            credit_amount: splitCredit
+          } : {})
         },
         timeout: 8000
       });
@@ -424,6 +469,8 @@ const CounterSalePage = ({ user }) => {
 
       const completionStatus = 'completed';
 
+      // Payment was already included in the POST /orders call above — no second PUT needed.
+      // Just build paymentData for the event dispatch below.
       const paymentData = {
         order_id: createdOrderId,
         status: completionStatus,
@@ -431,28 +478,7 @@ const CounterSalePage = ({ user }) => {
         payment_received: paymentStats.payment_received,
         balance_amount: paymentStats.balance_amount,
         is_credit: paymentStats.is_credit,
-        discount: discountAmount,
-        discount_type: discountType,
-        discount_value: parseFloat(discountValue) || 0,
-        discount_amount: discountAmount,
-        total: total,
-        subtotal: Math.max(0, subtotal - discountAmount),
-        tax,
-        tax_rate: taxRate,
-        customer_name: customerName || order?.customer_name,
-        customer_phone: customerPhone || order?.customer_phone,
-        items: selectedItems
       };
-
-      if (paymentMethod === 'split') {
-        paymentData.cash_amount = cashValue;
-        paymentData.card_amount = cardValue;
-        paymentData.upi_amount = upiValue;
-        paymentData.credit_amount = splitCredit;
-      }
-
-      // Process payment in background
-      await processPaymentFast(paymentData);
 
       // Dispatch payment completed event
       const paymentEvent = new CustomEvent('paymentCompleted', {

@@ -367,21 +367,6 @@ const BillingPage = ({ user }) => {
     }
   };
 
-  const fetchBusinessSettings = async () => {
-    try {
-      const response = await apiSilent({
-        method: 'get',
-        url: `${API}/business/settings`,
-        timeout: 8000
-      });
-      if (response?.data) {
-        setBusinessSettings(response.data.business_settings);
-      }
-    } catch (error) {
-      console.error('Failed to fetch business settings', error);
-    }
-  };
-
   const fetchMenuItems = async (forceRefresh = false) => {
     setMenuLoading(true);
     setMenuError(null);
