@@ -407,7 +407,13 @@ axios.interceptors.response.use(
       config.retry = 0;
     }
     
+    // Only retry requests to our own API — never retry external URLs (AdSense, CDNs, etc.)
+    const isOwnApi = config?.url?.includes('restro-ai.onrender.com') ||
+      config?.url?.startsWith('/api') ||
+      config?.baseURL?.includes('restro-ai.onrender.com');
+    
     const shouldRetry = 
+      isOwnApi &&
       config.retry < 2 && // Max 2 retries
       (!error.response || error.response.status >= 500 || error.code === 'ECONNABORTED');
     
