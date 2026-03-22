@@ -11,6 +11,7 @@ import {
   Smartphone, Globe, HeadphonesIcon, Rocket, Timer, Wallet, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { invalidateShared } from '../utils/sharedDataCache';
 
 const SubscriptionPage = ({ user }) => {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
@@ -213,6 +214,8 @@ const SubscriptionPage = ({ user }) => {
               months: plan.months
             });
             toast.success(verifyResponse.data.message || '🎉 Premium activated! Welcome to BillByteKOT AI Pro!');
+            // Invalidate cached auth/settings so app picks up subscription_active=True immediately
+            invalidateShared('business/settings');
             fetchSubscriptionStatus();
             // Update local user data
             const userData = JSON.parse(localStorage.getItem('user') || '{}');

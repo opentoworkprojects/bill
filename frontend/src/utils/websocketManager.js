@@ -108,13 +108,10 @@ class WebSocketManager {
         this.isConnecting = false;
         this.stopHeartbeat();
         this.emit('disconnected');
-        // Only attempt reconnect if we successfully connected before (not on initial failure)
-        if (this.reconnectAttempts === 0 && this.wasConnected) {
-          this.attemptReconnect(token);
-        } else if (this.reconnectAttempts > 0) {
+        // Only reconnect if we had a successful connection before — don't retry on initial failure
+        if (this.wasConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.attemptReconnect(token);
         }
-        // If never connected, don't retry — backend has no WS endpoint
       };
 
     } catch (error) {

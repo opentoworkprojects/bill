@@ -3,10 +3,6 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || 'https://restro-ai.onrender.com/api';
 
-// VAPID public key - this should match the backend
-// Generate with: npx web-push generate-vapid-keys
-const VAPID_PUBLIC_KEY = process.env.REACT_APP_VAPID_PUBLIC_KEY || 'BLBx-hf5WZXjMYkPqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXEqPXE';
-
 // Convert VAPID key to Uint8Array
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -53,28 +49,33 @@ export async function subscribeToPush(userId = null) {
   if (!isPushSupported()) {
     return { success: false, error: 'Push notifications not supported' };
   }
-  
+
+  const vapidKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
+  if (!vapidKey || vapidKey.length < 87) {
+    // VAPID key not configured — skip silently, don't spam console
+    return { success: false, error: 'VAPID key not configured' };
+  }
+
   try {
     // Request permission first
     const permResult = await requestNotificationPermission();
     if (!permResult.success) {
       return { success: false, error: 'Permission denied' };
     }
-    
+
     // Get service worker registration
     const registration = await navigator.serviceWorker.ready;
-    
+
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription();
-    
+
     if (!subscription) {
-      // Create new subscription
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
       });
     }
-    
+
     // Send subscription to backend
     const response = await axios.post(`${API}/push/subscribe`, {
       subscription: subscription.toJSON(),
@@ -85,7 +86,7 @@ export async function subscribeToPush(userId = null) {
         language: navigator.language
       }
     });
-    
+
     return { success: true, subscription, response: response.data };
   } catch (error) {
     console.error('Push subscription error:', error);

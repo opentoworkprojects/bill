@@ -1920,6 +1920,8 @@ async def check_subscription(user: dict):
                     {"id": user["id"]},
                     {"$set": {"subscription_active": False}}
                 )
+                # Evict cache so next request re-fetches the deactivated user
+                invalidate_user_cache(user["id"])
                 # Fall through to check trial
             else:
                 # Active subscription - allow access
@@ -4314,6 +4316,9 @@ async def verify_subscription_payment(
         
         print(f"Subscription activated for user: {current_user['id']} via campaign: {campaign_name}, plan: {plan_type} ({plan_months} months)")
         
+        # Invalidate user cache so next request picks up subscription_active=True immediately
+        invalidate_user_cache(current_user["id"])
+        
         # Trigger referral completion after successful payment
         # Requirements: 4.1, 4.2 - Credit referrer wallet with ₹300 after payment
         referral_result = None
@@ -4378,6 +4383,9 @@ async def verify_subscription_payment(
                 )
             except Exception as ref_error:
                 print(f"Referral completion error in fallback (non-blocking): {ref_error}")
+            
+            # Invalidate cache so next request picks up subscription_active=True
+            invalidate_user_cache(current_user["id"])
             
             return {
                 "status": "subscription_activated", 
@@ -5540,6 +5548,13 @@ async def create_order(
     order_data: OrderCreate, current_user: dict = Depends(get_current_user)
 ):
     # ⚡ ULTRA-FAST ORDER CREATION - Absolute minimum critical path
+    # Subscription check is fast (uses in-memory user cache) — adds <1ms
+    sub = await check_subscription(current_user)
+    if not sub["allowed"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Subscription required: {sub['reason']}. Bill count: {sub['bill_count']}."
+        )
     # Target: <200ms response time
     # Only UUID generation + database insert in critical path
     
