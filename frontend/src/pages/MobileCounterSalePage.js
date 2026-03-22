@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API } from '../App';
@@ -53,6 +53,7 @@ const MobileCounterSalePage = ({ user }) => {
   const [upiAmount, setUpiAmount] = useState('');
 
   // UI state
+  const completeSaleRef = useRef(null); // ref to break circular dep with handleCustomerInfoSave
   const [cartExpanded, setCartExpanded] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
@@ -342,9 +343,9 @@ const MobileCounterSalePage = ({ user }) => {
     setCustomerModalOpen(false);
     // Retry payment after customer info is provided
     if (paymentModalOpen) {
-      completeSale();
+      completeSaleRef.current?.();
     }
-  }, [paymentModalOpen, completeSale]);
+  }, [paymentModalOpen]);
 
   // Handle receipt modal close
   const handleReceiptClose = useCallback(() => {
@@ -436,7 +437,7 @@ const MobileCounterSalePage = ({ user }) => {
       });
 
       if (!validation.isValid) {
-        toast.error(validation.errors[0] || 'Payment validation failed');
+        toast.error(validation.error || 'Payment validation failed');
         setProcessing(false);
         return;
       }
@@ -590,6 +591,9 @@ const MobileCounterSalePage = ({ user }) => {
     businessSettings, customerName, customerPhone, total, receivedAmount, cashAmount,
     cardAmount, upiAmount, subtotal, tax, taxRate, discountAmount, discountType, resetSale
   ]);
+
+  // Keep ref in sync so handleCustomerInfoSave can call completeSale without circular dep
+  completeSaleRef.current = completeSale;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col" data-testid="mobile-counter-sale-page">
