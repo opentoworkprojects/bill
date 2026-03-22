@@ -83,8 +83,8 @@ Pygments==2.19.2
 PyJWT==2.10.1
 pymongo==4.5.0
 pyparsing==3.2.5
-pytest==9.0.1
-pytest-asyncio==0.23.8
+pytest==8.3.5
+pytest-asyncio==0.24.0
 hypothesis==6.150.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
