@@ -188,13 +188,13 @@ try:
             maxPoolSize=30,  # Can handle 30 concurrent requests (good for high traffic)
             minPoolSize=3,   # Only 3 warm connections (saves memory when idle)
             maxIdleTimeMS=20000,  # Close idle connections faster to free memory
-            serverSelectionTimeoutMS=3000,
-            connectTimeoutMS=5000,
+            serverSelectionTimeoutMS=10000,  # 10s — Atlas needs time on cold start
+            connectTimeoutMS=15000,
             socketTimeoutMS=30000,
             retryWrites=True,
             retryReads=True,
-            compressors="snappy,zlib",  # Compression reduces memory usage
-            waitQueueTimeoutMS=5000,
+            compressors="zlib",  # snappy not installed; zlib is built-in
+            waitQueueTimeoutMS=10000,
         )
     else:
         # For local or non-SSL connections
@@ -6342,6 +6342,9 @@ async def update_order(
         
         user_org_id = get_secure_org_id(current_user)
         
+        # Business settings — used for WhatsApp auto-send checks
+        business = current_user.get("business_settings") or {}
+        
         # Validate order_id format
         if not order_id or not isinstance(order_id, str):
             print(f"❌ Invalid order_id format: {order_id}")
@@ -11198,9 +11201,9 @@ async def startup_validation():
                 tls=True,
                 tlsInsecure=True,
                 tlsAllowInvalidCertificates=True,
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=8000,
-                maxPoolSize=50,
+                serverSelectionTimeoutMS=15000,
+                connectTimeoutMS=20000,
+                maxPoolSize=30,
             )
             alt_db = alt_client[os.getenv("DB_NAME", "restrobill")]
             await alt_db.command("ping")
