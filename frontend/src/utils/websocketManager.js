@@ -24,12 +24,10 @@ class WebSocketManager {
    */
   connect(token) {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-      console.log('🔌 WebSocket already connected or connecting');
       return;
     }
 
     if (this.isConnecting) {
-      console.log('🔌 WebSocket connection already in progress');
       return;
     }
 
@@ -43,12 +41,9 @@ class WebSocketManager {
       const wsProtocol = apiBase.startsWith('https') ? 'wss:' : 'ws:';
       const wsHost = apiBase.replace(/^https?:\/\//, '');
       const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
-
-      console.log('🔌 Connecting to WebSocket:', wsUrl);
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('✅ WebSocket connected');
         this.isConnecting = false;
         this.wasConnected = true;
         this.reconnectAttempts = 0;
@@ -60,7 +55,6 @@ class WebSocketManager {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('📨 WebSocket message:', data.type);
           
           // Reset heartbeat counter on any message
           this.missedHeartbeats = 0;
@@ -92,7 +86,6 @@ class WebSocketManager {
               this.emit('menu_updated', data.menu);
               break;
             default:
-              console.log('Unknown WebSocket message type:', data.type);
           }
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
@@ -132,7 +125,6 @@ class WebSocketManager {
         this.missedHeartbeats++;
         
         if (this.missedHeartbeats >= this.maxMissedHeartbeats) {
-          console.warn('💔 Too many missed heartbeats, reconnecting...');
           this.ws.close();
           return;
         }
@@ -167,8 +159,6 @@ class WebSocketManager {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
     
-    console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    
     setTimeout(() => {
       this.connect(token);
     }, delay);
@@ -182,7 +172,6 @@ class WebSocketManager {
       this.ws.send(JSON.stringify(data));
       return true;
     }
-    console.warn('⚠️ WebSocket not connected, cannot send message');
     return false;
   }
 

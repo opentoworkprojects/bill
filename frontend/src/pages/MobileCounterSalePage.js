@@ -180,7 +180,6 @@ const MobileCounterSalePage = ({ user }) => {
 
   // 🚀 WEBSOCKET + BATCHING: Initialize hybrid sync manager for real-time updates
   useEffect(() => {
-    console.log('🚀 [Mobile] Initializing WebSocket + Batching system');
     
     // Initialize hybrid sync with user token
     const token = user?.token || localStorage.getItem('token');
@@ -190,7 +189,6 @@ const MobileCounterSalePage = ({ user }) => {
     
     // Subscribe to menu updates
     const unsubscribeMenuUpdated = hybridSyncManager.on('menu_updated', (menu) => {
-      console.log('📨 [Mobile] Real-time: Menu updated');
       if (Array.isArray(menu)) {
         const items = menu.filter(item => item && item.available !== false);
         setMenuItems(items);
@@ -201,11 +199,8 @@ const MobileCounterSalePage = ({ user }) => {
       }
     });
     
-    console.log('✅ [Mobile] WebSocket event listeners set up');
-    
     // Cleanup on unmount
     return () => {
-      console.log('🧹 [Mobile] Cleaning up WebSocket listeners');
       unsubscribeMenuUpdated();
     };
   }, [user]);

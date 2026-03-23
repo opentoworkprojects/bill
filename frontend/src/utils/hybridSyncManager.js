@@ -71,7 +71,6 @@ class HybridSyncManager {
     // Only start fallback if WS was previously working and then dropped
     websocketManager.on('disconnected', () => {
       if (this.wsEverConnected) {
-        console.warn('⚠️ WebSocket disconnected, using fallback polling');
         this.startFallbackPolling();
       }
       // If WS never connected (no /ws endpoint), don't start fallback —
@@ -89,8 +88,6 @@ class HybridSyncManager {
    */
   startFallbackPolling() {
     if (this.fallbackPolling) return;
-
-    console.log('🔄 Starting fallback polling (WebSocket unavailable)');
     
     this.fallbackPolling = setInterval(async () => {
       try {
@@ -116,7 +113,6 @@ class HybridSyncManager {
     if (this.fallbackPolling) {
       clearInterval(this.fallbackPolling);
       this.fallbackPolling = null;
-      console.log('⏹️ Fallback polling stopped');
     }
   }
 
@@ -147,7 +143,6 @@ class HybridSyncManager {
         const results = Array.isArray(response.data) ? response.data : [];
         results.forEach(order => this.emit('order_status_changed', order));
       } catch (error) {
-        console.warn('Batch status update failed:', error.message);
       }
     }, 100);
   }
@@ -164,7 +159,6 @@ class HybridSyncManager {
       });
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      console.warn('Fetch orders failed:', error.message);
       throw error;
     }
   }
@@ -210,7 +204,6 @@ class HybridSyncManager {
    * Disconnect and cleanup
    */
   disconnect() {
-    console.log('🔌 Disconnecting hybrid sync manager');
     websocketManager.disconnect();
     this.stopFallbackPolling();
     requestBatcher.clearAll();

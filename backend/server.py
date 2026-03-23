@@ -5643,6 +5643,7 @@ async def create_order(
         ))
     
     # Background: WhatsApp notification
+    whatsapp_queued = False
     if order_data.customer_phone and business.get("whatsapp_auto_notify"):
         status_for_whatsapp = "completed" if getattr(order_data, "quick_billing", False) else "pending"
         asyncio.create_task(send_whatsapp_notification_background(
@@ -5654,12 +5655,13 @@ async def create_order(
             frontend_url,
             user_org_id
         ))
+        whatsapp_queued = True
     
     print(f"⚡ Order created instantly: {order_id} (Table {table_number})")
     return {
         **order_obj.model_dump(),
-        "whatsapp_sent": False,  # Will be updated in background
-        "whatsapp_mode": "background",
+        "whatsapp_sent": False,
+        "whatsapp_mode": "background" if whatsapp_queued else "none",
         "tracking_token": tracking_token,
         "tracking_url": f"{frontend_url}/track/{tracking_token}" if frontend_url else ""
     }

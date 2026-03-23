@@ -159,7 +159,6 @@ const OrdersPage = ({ user }) => {
   const [recentPaymentCompletions, setRecentPaymentCompletions] = useState(new Set());
   // Add global payment protection flag to disable ALL refresh mechanisms  
   const [paymentProtectionActive, setPaymentProtectionActive] = useState(false);
-  console.log('🔧 PaymentProtectionActive state initialized:', paymentProtectionActive);
   // Add state for global polling disable during order creation
   const [globalPollingDisabled, setGlobalPollingDisabled] = useState(false);
   // Add state for preventing duplicate order updates
@@ -169,47 +168,6 @@ const OrdersPage = ({ user }) => {
   
   // Track orders for which we've shown WhatsApp success notification
   const whatsappNotifiedOrdersRef = useRef(new Set());
-
-  // Watch for WhatsApp notification completion (background task)
-  // This effect runs whenever orders array changes
-  useEffect(() => {
-    if (!orders || orders.length === 0) return;
-    
-    console.log(`🔍 Checking ${orders.length} orders for WhatsApp notifications...`);
-    
-    let foundNewNotification = false;
-    
-    orders.forEach(order => {
-      // Check if WhatsApp was sent and we haven't notified yet
-      if (order.whatsapp_notification_sent && !whatsappNotifiedOrdersRef.current.has(order.id)) {
-        console.log(`🎉 NEW WhatsApp notification detected for order ${order.id}!`);
-        
-        // Show success toast with more prominent styling
-        toast.success('📱 WhatsApp message sent successfully!', {
-          duration: 4000,
-          position: 'top-center',
-          style: {
-            background: '#10b981',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '16px'
-          }
-        });
-        
-        // Mark as notified
-        whatsappNotifiedOrdersRef.current.add(order.id);
-        foundNewNotification = true;
-        
-        console.log(`✅ WhatsApp notification confirmed for order ${order.id}`);
-      }
-    });
-    
-    if (!foundNewNotification) {
-      const notifiedCount = whatsappNotifiedOrdersRef.current.size;
-      const pendingCount = orders.filter(o => o.whatsapp_notification_sent).length;
-      console.log(`ℹ️  WhatsApp status: ${notifiedCount} already notified, ${pendingCount} total sent`);
-    }
-  }, [orders]);
 
   // 📊 PERFORMANCE MONITORING: Performance dashboard state (hidden by default)
   const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(() => {
@@ -322,7 +280,6 @@ const OrdersPage = ({ user }) => {
             handlePaymentCompleted({ detail: paymentData });
           }
         } catch (e) {
-          console.warn('Failed to parse payment completion data:', e);
         }
       }
     };
@@ -362,7 +319,6 @@ const OrdersPage = ({ user }) => {
     
     // Subscribe to real-time events
     const unsubscribeOrderCreated = hybridSyncManager.on('order_created', (order) => {
-      console.log('📨 Real-time: Order created', order.id);
       setOrders(prevOrders => {
         if (prevOrders.some(o => o.id === order.id)) return prevOrders;
         return [order, ...prevOrders];
@@ -371,21 +327,18 @@ const OrdersPage = ({ user }) => {
     });
     
     const unsubscribeOrderUpdated = hybridSyncManager.on('order_updated', (order) => {
-      console.log('📨 Real-time: Order updated', order.id);
       setOrders(prevOrders => 
         prevOrders.map(o => o.id === order.id ? { ...o, ...order } : o)
       );
     });
     
     const unsubscribeStatusChanged = hybridSyncManager.on('order_status_changed', (order) => {
-      console.log('📨 Real-time: Order status changed', order.id, order.status);
       setOrders(prevOrders => 
         prevOrders.map(o => o.id === order.id ? { ...o, status: order.status } : o)
       );
     });
     
     const unsubscribeWhatsAppSent = hybridSyncManager.on('whatsapp_sent', (orderId) => {
-      console.log('📨 Real-time: WhatsApp sent', orderId);
       setOrders(prevOrders => 
         prevOrders.map(o => o.id === orderId ? { ...o, whatsapp_notification_sent: true } : o)
       );
@@ -396,7 +349,6 @@ const OrdersPage = ({ user }) => {
     });
     
     const unsubscribePaymentCompleted = hybridSyncManager.on('payment_completed', (order) => {
-      console.log('📨 Real-time: Payment completed', order.id);
       // Move to today's bills
       setOrders(prevOrders => prevOrders.filter(o => o.id !== order.id));
       setTodaysBills(prevBills => {
@@ -407,14 +359,12 @@ const OrdersPage = ({ user }) => {
     });
     
     const unsubscribeTableUpdated = hybridSyncManager.on('table_updated', (table) => {
-      console.log('📨 Real-time: Table updated', table.id);
       setTables(prevTables => 
         prevTables.map(t => t.id === table.id ? { ...t, ...table } : t)
       );
     });
     
     const unsubscribeMenuUpdated = hybridSyncManager.on('menu_updated', (menu) => {
-      console.log('📨 Real-time: Menu updated');
       if (Array.isArray(menu)) {
         setMenuItems(menu.filter(item => item && item.id && item.name && item.available));
       }
@@ -422,16 +372,12 @@ const OrdersPage = ({ user }) => {
     
     // Fallback: Listen for orders_updated event (from fallback polling)
     const unsubscribeOrdersUpdated = hybridSyncManager.on('orders_updated', (orders) => {
-      console.log('📨 Fallback polling: Orders updated', orders.length);
       updateOrdersWithDeduplication(orders, 'fallback-polling');
     });
     
     const unsubscribeTablesUpdated = hybridSyncManager.on('tables_updated', (tables) => {
-      console.log('📨 Fallback polling: Tables updated', tables.length);
       setTables(tables);
     });
-    
-    console.log('✅ WebSocket event listeners set up');
     
     // Cleanup on unmount
     return () => {
@@ -451,7 +397,6 @@ const OrdersPage = ({ user }) => {
   
   // 🔧 DUPLICATE FIX: Coordinated polling as fallback (only when WebSocket is down)
   useEffect(() => {
-    console.log('🔄 Setting up fallback coordinated polling system');
     
     // Create coordinated refresh function
     const coordinatedRefresh = async (options = {}) => {
@@ -459,7 +404,6 @@ const OrdersPage = ({ user }) => {
       
       // Skip if WebSocket is connected (WebSocket handles updates)
       if (hybridSyncManager.isConnected()) {
-        console.log('⏸️ Skipping polling - WebSocket is active');
         return;
       }
       
@@ -480,13 +424,10 @@ const OrdersPage = ({ user }) => {
             });
           }
           
-          console.log(`✅ Active orders updated: ${result.activeOrders.length} orders`);
-          
         } else if (activeTab === 'history') {
           // Fetch today's bills atomically
           const bills = await fetchTodaysBillsAtomic(API, options);
           setTodaysBills(bills);
-          console.log(`✅ Today's bills updated: ${bills.length} bills`);
         }
         
       } catch (error) {
@@ -505,26 +446,22 @@ const OrdersPage = ({ user }) => {
       
       // Skip polling if there are active status changes
       if (processingStatusChanges.size > 0) {
-        console.log('⏸️ Skipping coordinated polling - status changes in progress');
         return;
       }
       
       // Skip polling if payment protection is active
       if (paymentProtectionActive) {
-        console.log('🛡️ Skipping coordinated polling - payment protection active');
         return;
       }
       
       // Skip polling if there are recent payment completions
       if (recentPaymentCompletions.size > 0) {
-        console.log('⏸️ Skipping coordinated polling - recent payment completions');
         return;
       }
       
       // Skip polling if user recently interacted
       const lastInteraction = localStorage.getItem('lastUserInteraction');
       if (lastInteraction && (Date.now() - parseInt(lastInteraction)) < 2000) {
-        console.log('⏸️ Skipping coordinated polling - recent user interaction');
         return;
       }
       
@@ -537,7 +474,6 @@ const OrdersPage = ({ user }) => {
     
     // Handle immediate refresh requests
     if (needsImmediateRefresh) {
-      console.log('🚀 Immediate refresh requested');
       setNeedsImmediateRefresh(false);
       
       if (!paymentProtectionActive) {
@@ -598,7 +534,6 @@ const OrdersPage = ({ user }) => {
     const handleFocus = () => {
       // NUCLEAR PROTECTION: Skip if payment protection is active
       if (paymentProtectionActive) {
-        console.log('🛡️ Skipping focus refresh - payment protection active');
         return;
       }
       
@@ -618,7 +553,6 @@ const OrdersPage = ({ user }) => {
     const handleVisibilityChange = () => {
       // NUCLEAR PROTECTION: Skip if payment protection is active
       if (paymentProtectionActive) {
-        console.log('🛡️ Skipping visibility refresh - payment protection active');
         return;
       }
       
@@ -637,7 +571,6 @@ const OrdersPage = ({ user }) => {
 
   // 🚀 INSTANT ACTIVE ORDERS: Event listeners for real-time updates
   useEffect(() => {
-    console.log('🎧 Setting up active orders event listeners');
     
     // Listen for new active orders
     const handleActiveOrderAdded = (event) => {
@@ -652,7 +585,6 @@ const OrdersPage = ({ user }) => {
     // Listen for active orders updates
     const handleActiveOrdersUpdated = (event) => {
       const { orders, source } = event.detail;
-      console.log('🔄 Active orders updated event received:', orders.length, 'orders from', source);
       
       // Update orders if source is reliable
       if (source === 'server-sync' || source === 'cache-sync') {
@@ -663,7 +595,6 @@ const OrdersPage = ({ user }) => {
     // Listen for refresh requests
     const handleActiveOrdersRefreshRequested = (event) => {
       const { reason } = event.detail;
-      console.log('🔄 Active orders refresh requested:', reason);
       
       // Trigger immediate refresh if not in payment protection mode
       if (!paymentProtectionActive) {
@@ -678,7 +609,6 @@ const OrdersPage = ({ user }) => {
     
     // Subscribe to ActiveOrdersSync for direct updates
     const unsubscribeSync = activeOrdersSync.addEventListener((event) => {
-      console.log('🔔 ActiveOrdersSync event:', event.type, event);
       
       if (event.type === 'new-order') {
         setOrders(prevOrders => {
@@ -690,7 +620,6 @@ const OrdersPage = ({ user }) => {
     
     // Subscribe to ActiveOrdersCache for cache updates
     const unsubscribeCache = activeOrdersCache.subscribe((cachedOrders, eventType, data) => {
-      console.log('💾 ActiveOrdersCache event:', eventType, cachedOrders.length, 'orders');
       
       if (eventType === 'cache-synced' && cachedOrders.length > 0) {
         // Merge cache with current orders, don't overwrite
@@ -698,11 +627,8 @@ const OrdersPage = ({ user }) => {
       }
     });
     
-    console.log('✅ Active orders event listeners set up');
-    
     // Cleanup function
     return () => {
-      console.log('🧹 Cleaning up active orders event listeners');
       
       window.removeEventListener('activeOrderAdded', handleActiveOrderAdded);
       window.removeEventListener('activeOrdersUpdated', handleActiveOrdersUpdated);
@@ -770,7 +696,6 @@ const OrdersPage = ({ user }) => {
 
     // INSTANT LOADING: Show cached data immediately if available
     if (_pageCache.orders && cacheAge < CACHE_TTL) {
-      console.log('⚡ Instant load from cache');
       setOrders(_pageCache.orders);
       if (_pageCache.tables) setTables(_pageCache.tables);
       if (_pageCache.todaysBills) setTodaysBills(_pageCache.todaysBills);
@@ -780,7 +705,6 @@ const OrdersPage = ({ user }) => {
       
       // Background refresh - update cache silently without changing UI
       setTimeout(() => {
-        console.log('🔄 Background refresh (silent)');
         Promise.allSettled([
           apiSilent({ method: 'get', url: `${API}/orders` }),
           apiSilent({ method: 'get', url: `${API}/tables` }),
@@ -805,7 +729,6 @@ const OrdersPage = ({ user }) => {
     }
 
     // NO CACHE: Fetch fresh data
-    console.log('🚀 Loading fresh data from server');
     try {
       const [ordersRes, todaysBillsRes, tablesRes, menuData, settingsData] = await Promise.allSettled([
         apiSilent({ method: 'get', url: `${API}/orders` }),
@@ -829,7 +752,6 @@ const OrdersPage = ({ user }) => {
         setLoadFailed(true);
       } else {
         // CRITICAL FIX: Have cache but fetch failed - keep using cache silently
-        console.warn('⚠️ Failed to fetch fresh orders, using cached data');
         // Auto-refresh silently - no toast notification
         setOrders(_pageCache.orders);
         if (_pageCache.tables) setTables(_pageCache.tables);
@@ -851,7 +773,6 @@ const OrdersPage = ({ user }) => {
         _pageCache.tables = valid;
       } else if (_pageCache.tables) {
         // CRITICAL FIX: Keep cached tables if fetch failed (silently)
-        console.warn('⚠️ Failed to fetch fresh tables, using cached data');
         setTables(_pageCache.tables);
       }
 
@@ -883,7 +804,6 @@ const OrdersPage = ({ user }) => {
       
       // CRITICAL FIX: If we have cache (even stale), use it instead of showing error
       if (_pageCache.orders && cacheAge < STALE_CACHE_TTL) {
-        console.log('💾 Using stale cache as fallback after fetch failure');
         // Auto-refresh silently - no toast notification
         setOrders(_pageCache.orders);
         if (_pageCache.tables) setTables(_pageCache.tables);
@@ -906,7 +826,6 @@ const OrdersPage = ({ user }) => {
   const fetchOrders = async (forceRefresh = false) => {
     // NUCLEAR PROTECTION: Skip if payment protection is active
     if (paymentProtectionActive && !forceRefresh) {
-      console.log('🛡️ Skipping fetchOrders - payment protection active');
       return;
     }
     
@@ -972,10 +891,7 @@ const OrdersPage = ({ user }) => {
         }
       });
       
-      console.log(`📋 Active orders: ${validOrders.length} (today: ${todayOrders.length}, older: ${yesterdayOrders.length})`);
-      
       if (yesterdayOrders.length > 0) {
-        console.log(`   ⚠️ ${yesterdayOrders.length} uncompleted orders from previous days`);
       }
       
       // SIMPLIFIED: Just use server data directly, no complex merging
@@ -1299,14 +1215,12 @@ const OrdersPage = ({ user }) => {
         });
         whatsappNotifiedOrdersRef.current.add(newOrder.id);
       } else if (response.data?.whatsapp_mode === 'background') {
-        if (capturedPhone) {
-          toast.success('📱 WhatsApp message sent!', {
-            duration: 3000,
-            position: 'top-center',
-            style: { background: '#10b981', color: 'white', fontWeight: 'bold' }
-          });
-          whatsappNotifiedOrdersRef.current.add(newOrder.id);
-        }
+        toast.success('📱 WhatsApp message sent!', {
+          duration: 3000,
+          position: 'top-center',
+          style: { background: '#10b981', color: 'white', fontWeight: 'bold' }
+        });
+        whatsappNotifiedOrdersRef.current.add(newOrder.id);
       } else if (response.data?.whatsapp_link && capturedPhone) {
         // Fallback to wa.me link
         window.open(response.data.whatsapp_link, '_blank');
@@ -1393,22 +1307,17 @@ const OrdersPage = ({ user }) => {
   };
 
   const handleStatusChange = async (orderId, status) => {
-    console.log('🔄 Status change requested:', orderId, 'to', status);
     
     // 🚫 PREVENT DOUBLE-CLICKS: Check if already processing this order
     if (processingStatusChanges.has(orderId)) {
-      console.log('⏸️ Status change already in progress for order:', orderId);
       return;
     }
 
     // 🚫 PREVENT SAME STATUS: Don't allow changing to the same status
     const existingOrder = orders.find(order => order.id === orderId);
     if (existingOrder?.status === status) {
-      console.log('⏸️ Order already has this status:', orderId, status);
       return;
     }
-
-    console.log('✅ Status change proceeding:', orderId, existingOrder?.status, '->', status);
 
     // Store original status for potential rollback
     const originalStatus = existingOrder?.status;
@@ -1486,11 +1395,8 @@ const OrdersPage = ({ user }) => {
         timeout: 15000 // Increased timeout for better reliability
       });
       
-      console.log('✅ Server status update successful:', orderId, status);
-      
       // 🗑️ CRITICAL: Invalidate billing cache after status change
       billingCache.invalidateOrder(orderId);
-      console.log('🔄 Status changed and billing cache invalidated:', orderId, status);
       
       // ✅ SUCCESS: Update order with server response but preserve instant update
       setOrders(prevOrders => 
@@ -1685,7 +1591,6 @@ const OrdersPage = ({ user }) => {
       
       // 🗑️ CRITICAL: Invalidate billing cache after order update
       billingCache.invalidateOrder(editOrderModal.order.id);
-      console.log('🔄 Order updated and billing cache invalidated:', editOrderModal.order.id);
       
       toast.success('Order updated successfully!');
       setEditOrderModal({ open: false, order: null });
@@ -1707,7 +1612,6 @@ const OrdersPage = ({ user }) => {
       
       // 🗑️ CRITICAL: Invalidate billing cache after order cancellation
       billingCache.invalidateOrder(cancelConfirmModal.order.id);
-      console.log('🔄 Order cancelled and billing cache invalidated:', cancelConfirmModal.order.id);
       
       toast.success('Order cancelled');
       setCancelConfirmModal({ open: false, order: null });
@@ -2764,7 +2668,6 @@ const OrdersPage = ({ user }) => {
                               try {
                                 return new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
                               } catch (e) {
-                                console.warn('Invalid date for order:', order.id, order.created_at);
                                 return 'Invalid time';
                               }
                             })()
@@ -2867,7 +2770,6 @@ const OrdersPage = ({ user }) => {
                           try {
                             return (order.total || 0).toFixed(0);
                           } catch (e) {
-                            console.warn('Invalid total for order:', order.id, order.total);
                             return '0';
                           }
                         })()
@@ -2989,7 +2891,6 @@ const OrdersPage = ({ user }) => {
                               try {
                                 return new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
                               } catch (e) {
-                                console.warn('Invalid date for order:', order.id, order.created_at);
                                 return 'Invalid time';
                               }
                             })()
@@ -3119,7 +3020,6 @@ const OrdersPage = ({ user }) => {
                             try {
                               return (order.total || 0).toFixed(0);
                             } catch (e) {
-                              console.warn('Invalid total for order:', order.id, order.total);
                               return '0';
                             }
                           })()
