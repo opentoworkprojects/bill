@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { logout } from '../App';
+import NotificationBell from './NotificationBell';
 import { 
   Home, UtensilsCrossed, ShoppingBag, Table, ChefHat, Package, 
   FileText, LogOut, Menu, X, Settings as SettingsIcon, Crown, Users, Zap,
@@ -46,10 +47,13 @@ const Layout = ({ user, children }) => {
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-white shadow-xl border-r border-gray-100 fixed h-full z-40">
         <div className="p-6 border-b border-gray-100">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent" 
-              style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-            BillByteKOT AI
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent" 
+                style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              BillByteKOT AI
+            </h1>
+            <NotificationBell />
+          </div>
           <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
             {user?.role?.toUpperCase()}
@@ -101,6 +105,7 @@ const Layout = ({ user, children }) => {
             <span className="text-xs bg-violet-100 text-violet-600 px-2 py-1 rounded-full font-medium">
               {user?.role}
             </span>
+            <NotificationBell />
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import { pushNotification } from '../utils/notificationStore';
 import { Plus, Eye, Printer, MessageCircle, X, Receipt, Search, Edit, Trash2, Ban, MoreVertical, AlertTriangle, ArrowLeft, ArrowRight, ShoppingCart, Clock, CheckCircle, Wallet, DollarSign, RefreshCw, CreditCard } from 'lucide-react';
 import TrialBanner from '../components/TrialBanner';
 import { manualPrintKOT, manualPrintReceipt } from '../utils/printUtils';
@@ -1288,61 +1289,23 @@ const OrdersPage = ({ user }) => {
         toast.success('📱 WhatsApp message sent!', {
           duration: 3000,
           position: 'top-center',
-          style: {
-            background: '#10b981',
-            color: 'white',
-            fontWeight: 'bold'
-          }
+          style: { background: '#10b981', color: 'white', fontWeight: 'bold' }
         });
+        pushNotification({
+          title: 'WhatsApp Sent',
+          message: `Receipt sent to ${capturedPhone} for order #${newOrder.id?.slice(-6).toUpperCase()}`,
+          type: 'success',
+          icon: '📱'
+        });
+        whatsappNotifiedOrdersRef.current.add(newOrder.id);
       } else if (response.data?.whatsapp_mode === 'background') {
-        // WhatsApp sending in background (normal case)
-        // Show immediate feedback that WhatsApp is being sent
-        if (capturedPhone && businessSettings?.whatsapp_auto_notify) {
-          toast.info('📱 Sending WhatsApp message...', { duration: 2000 });
-          console.log('📱 WhatsApp sending in background for order:', newOrder.id);
-          
-          // Poll for WhatsApp completion for this specific order (reduced frequency)
-          let pollCount = 0;
-          const maxPolls = 6; // Poll for up to 30 seconds (6 polls * 5 seconds)
-          
-          const pollWhatsAppStatus = setInterval(async () => {
-            pollCount++;
-            
-            try {
-              // Fetch the specific order to check WhatsApp status
-              const orderCheck = await apiSilent({
-                method: 'get',
-                url: `${API}/orders/${newOrder.id}`,
-                timeout: 5000
-              });
-              
-              if (orderCheck?.data?.whatsapp_notification_sent) {
-                console.log('✅ WhatsApp confirmed sent for order:', newOrder.id);
-                
-                // Update the order in state
-                setOrders(prevOrders => 
-                  prevOrders.map(o => 
-                    o.id === newOrder.id 
-                      ? { ...o, whatsapp_notification_sent: true }
-                      : o
-                  )
-                );
-                
-                // Clear the polling interval
-                clearInterval(pollWhatsAppStatus);
-                
-                // The useEffect will show the toast when it detects the flag
-              } else if (pollCount >= maxPolls) {
-                console.log('⏱️ WhatsApp polling timeout for order:', newOrder.id);
-                clearInterval(pollWhatsAppStatus);
-              }
-            } catch (error) {
-              console.error('WhatsApp status poll failed:', error);
-              if (pollCount >= maxPolls) {
-                clearInterval(pollWhatsAppStatus);
-              }
-            }
-          }, 5000); // Poll every 5 seconds (reduced from 2 seconds)
+        if (capturedPhone) {
+          toast.success('📱 WhatsApp message sent!', {
+            duration: 3000,
+            position: 'top-center',
+            style: { background: '#10b981', color: 'white', fontWeight: 'bold' }
+          });
+          whatsappNotifiedOrdersRef.current.add(newOrder.id);
         }
       } else if (response.data?.whatsapp_link && capturedPhone) {
         // Fallback to wa.me link

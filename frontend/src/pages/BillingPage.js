@@ -6,6 +6,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import { pushNotification } from '../utils/notificationStore';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Printer, CreditCard, Wallet, Smartphone, Download, MessageCircle, X, Check, Plus, Trash2, Search, Eye, FileText } from 'lucide-react';
 import { printReceipt, manualPrintReceipt } from '../utils/printUtils';
@@ -1200,6 +1201,12 @@ const handleWhatsappShare = async () => {
       });
       if (response.data?.whatsapp_sent) {
         toast.success('WhatsApp receipt sent via Cloud API');
+        pushNotification({
+          title: 'WhatsApp Sent',
+          message: `Receipt sent to ${whatsappPhone}`,
+          type: 'success',
+          icon: '📱'
+        });
       } else {
         toast.error(response.data?.whatsapp_error || 'WhatsApp Cloud API not configured');
       }
