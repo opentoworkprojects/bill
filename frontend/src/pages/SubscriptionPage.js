@@ -26,12 +26,12 @@ const SubscriptionPage = ({ user }) => {
   const [selectedPlan, setSelectedPlan] = useState('yearly'); // Plan selection: monthly, quarterly, half-yearly, yearly
   const navigate = useNavigate();
 
-  // Pricing plans
+  // Pricing plans — 40% OFF sale (ongoing, resets daily)
   const plans = {
-    monthly: { months: 1, price: 199, originalPrice: 199, discount: 0, label: '1 Month', perMonth: 199 },
-    quarterly: { months: 3, price: 549, originalPrice: 597, discount: 8, label: '3 Months', perMonth: 183 },
-    halfYearly: { months: 6, price: 999, originalPrice: 1194, discount: 16, label: '6 Months', perMonth: 167 },
-    yearly: { months: 12, price: 1899, originalPrice: 1999, discount: 5, label: '1 Year', perMonth: 159, popular: true }
+    monthly: { months: 1, price: 119, originalPrice: 199, discount: 40, label: '1 Month', perMonth: 119 },
+    quarterly: { months: 3, price: 329, originalPrice: 549, discount: 40, label: '3 Months', perMonth: 110 },
+    halfYearly: { months: 6, price: 599, originalPrice: 999, discount: 40, label: '6 Months', perMonth: 100 },
+    yearly: { months: 12, price: 1199, originalPrice: 1999, discount: 40, label: '1 Year', perMonth: 100, popular: true }
   };
 
   useEffect(() => {
@@ -61,17 +61,17 @@ const SubscriptionPage = ({ user }) => {
       if (pricingRes.data) {
         setPricing(pricingRes.data);
       } else {
-        // Fallback pricing - base price ₹1999
+        // Fallback pricing - 40% OFF sale
         setPricing({
           regular_price: 1999,
           regular_price_display: '₹1999',
-          campaign_price: 1799,
-          campaign_price_display: '₹1799',
-          campaign_active: false,
-          campaign_discount_percent: 10,
-          trial_expired_discount: 10,
-          trial_expired_price: 1799,
-          trial_expired_price_display: '₹1799',
+          campaign_price: 1199,
+          campaign_price_display: '₹1199',
+          campaign_active: true,
+          campaign_discount_percent: 40,
+          trial_expired_discount: 40,
+          trial_expired_price: 1199,
+          trial_expired_price_display: '₹1199',
           trial_days: 7
         });
       }
@@ -79,14 +79,11 @@ const SubscriptionPage = ({ user }) => {
       // Set sale offer if enabled
       if (saleOfferRes.data?.enabled) {
         setSaleOffer(saleOfferRes.data);
-        // Setup countdown timer for sale offer
         const endDate = saleOfferRes.data.valid_until || saleOfferRes.data.end_date;
-        if (endDate) {
-          setupCountdownTimer(endDate);
-        }
-      } else if (pricingRes.data?.campaign_active && pricingRes.data?.campaign_end_date) {
-        // Fallback to pricing campaign if no sale offer
-        setupCountdownTimer(pricingRes.data.campaign_end_date);
+        setupCountdownTimer(endDate);
+      } else {
+        // Always show rolling 24h countdown
+        setupCountdownTimer(null);
       }
     } catch (error) {
       console.error('Failed to load page data', error);
@@ -95,42 +92,50 @@ const SubscriptionPage = ({ user }) => {
     }
   };
 
-  // Helper to get current sale/campaign info
+  // Helper to get current sale/campaign info — always 40% OFF
   const getSaleInfo = () => {
-    // Priority: Sale offer from super admin > Pricing campaign
     if (saleOffer?.enabled) {
       return {
         isActive: true,
-        discountPercent: saleOffer.discount_percent || 10,
+        discountPercent: saleOffer.discount_percent || 40,
         originalPrice: saleOffer.original_price || 1999,
-        salePrice: saleOffer.sale_price || 1799,
+        salePrice: saleOffer.sale_price || 1199,
         originalPriceDisplay: `₹${saleOffer.original_price || 1999}`,
-        salePriceDisplay: `₹${saleOffer.sale_price || 1799}`,
-        campaignName: saleOffer.title || 'Special Offer',
-        savings: (saleOffer.original_price || 1999) - (saleOffer.sale_price || 1799)
+        salePriceDisplay: `₹${saleOffer.sale_price || 1199}`,
+        campaignName: saleOffer.title || '🔥 Flash Sale',
+        savings: (saleOffer.original_price || 1999) - (saleOffer.sale_price || 1199)
       };
     }
-    if (pricing?.campaign_active) {
-      return {
-        isActive: true,
-        discountPercent: pricing.campaign_discount_percent || 10,
-        originalPrice: pricing.regular_price || 1999,
-        salePrice: pricing.campaign_price || 1799,
-        originalPriceDisplay: pricing.regular_price_display || '₹1999',
-        salePriceDisplay: pricing.campaign_price_display || '₹1799',
-        campaignName: pricing.campaign_name || 'Special Offer',
-        savings: (pricing.regular_price || 1999) - (pricing.campaign_price || 1799)
-      };
-    }
-    return { isActive: false };
+    // Always active 40% off sale
+    return {
+      isActive: true,
+      discountPercent: 40,
+      originalPrice: 1999,
+      salePrice: 1199,
+      originalPriceDisplay: '₹1999',
+      salePriceDisplay: '₹1199',
+      campaignName: '🔥 Flash Sale',
+      savings: 800
+    };
   };
 
+  // Rolling 24h countdown — resets every day, never expires
   const setupCountdownTimer = (endDateStr) => {
+    const getEnd = () => {
+      if (endDateStr) {
+        const d = new Date(endDateStr);
+        if (d > new Date()) return d;
+      }
+      // Rolling: end of current day
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      return end;
+    };
+
     const calculateTimeLeft = () => {
-      const endDate = new Date(endDateStr);
+      const end = getEnd();
       const now = new Date();
-      const difference = endDate - now;
-      
+      const difference = end - now;
       if (difference > 0) {
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
@@ -138,9 +143,12 @@ const SubscriptionPage = ({ user }) => {
           minutes: Math.floor((difference / 1000 / 60) % 60),
           seconds: Math.floor((difference / 1000) % 60)
         });
+      } else {
+        // Reset to next day end
+        setTimeLeft({ days: 0, hours: 23, minutes: 59, seconds: 59 });
       }
     };
-    
+
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(timer);

@@ -24,32 +24,24 @@ const EarlyAdopterBanner = ({ pricing }) => {
     // Always show banner with fallback data
     setIsVisible(true);
     
-    // Calculate time left until March 31, 2026
+    // Rolling 24h countdown — resets at midnight every day
     const calculateTimeLeft = () => {
-      const end = new Date('2026-03-31T23:59:59');
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
       const now = new Date();
       const diff = end - now;
       
-      if (diff <= 0) {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return false;
-      } else {
-        setTimeLeft({
-          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-          minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((diff % (1000 * 60)) / 1000)
-        });
-        return true;
-      }
+      setTimeLeft({
+        days: 0,
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60)
+      });
+      return true;
     };
     
     calculateTimeLeft();
-    const timer = setInterval(() => {
-      if (!calculateTimeLeft()) {
-        clearInterval(timer);
-      }
-    }, 1000);
+    const timer = setInterval(calculateTimeLeft, 1000);
     
     return () => clearInterval(timer);
   }, []);
@@ -61,12 +53,12 @@ const EarlyAdopterBanner = ({ pricing }) => {
 
   if (!isVisible) return null;
 
-  // Use fallback values if pricing not loaded
-  const spotsLeft = pricing?.early_adopter_spots_left || 850;
-  const monthlyPrice = 159; // ₹1899/12 months
-  const yearlyPrice = 1899;
+  // Use fallback values if pricing not loaded — 40% OFF
+  const spotsLeft = pricing?.early_adopter_spots_left || 47;
+  const monthlyPrice = 100; // ₹1199/12 months
+  const yearlyPrice = 1199;
   const originalYearlyPrice = 1999;
-  const discountPercent = 5;
+  const discountPercent = 40;
 
   return (
     <div className="relative overflow-hidden text-white" style={{
@@ -88,7 +80,7 @@ const EarlyAdopterBanner = ({ pricing }) => {
           <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-400/50">
             <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
             <span className="font-black text-sm tracking-wide text-yellow-100">
-              🚀 EARLY ADOPTER SPECIAL
+              🔥 40% OFF — TODAY ONLY
             </span>
             <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
           </div>
@@ -150,14 +142,14 @@ const EarlyAdopterBanner = ({ pricing }) => {
         {/* Scrolling urgency text */}
         <div className="mt-1 overflow-hidden border-t border-white/10 pt-1">
           <div className="animate-marquee whitespace-nowrap text-xs font-medium">
-            <span className="mx-4 text-yellow-200">🔥 JUST ₹{monthlyPrice}/MONTH</span>
-            <span className="mx-4 text-white">⚡ UNLIMITED BILLS FOREVER</span>
-            <span className="mx-4 text-yellow-200">💎 ALL PREMIUM FEATURES</span>
+            <span className="mx-4 text-yellow-200">🔥 40% OFF — OFFER ENDS TONIGHT</span>
+            <span className="mx-4 text-white">⚡ ONLY ₹{monthlyPrice}/MONTH</span>
+            <span className="mx-4 text-yellow-200">💎 ALL PREMIUM FEATURES INCLUDED</span>
             <span className="mx-4 text-white">📞 24/7 PRIORITY SUPPORT</span>
-            <span className="mx-4 text-yellow-200">⏰ LIMITED TIME ONLY</span>
-            <span className="mx-4 text-white">🚀 EARLY ADOPTERS ONLY</span>
-            <span className="mx-4 text-yellow-200">🔥 JUST ₹{monthlyPrice}/MONTH</span>
-            <span className="mx-4 text-white">⚡ UNLIMITED BILLS FOREVER</span>
+            <span className="mx-4 text-yellow-200">⏰ PRICE GOES BACK TO ₹{originalYearlyPrice} TOMORROW</span>
+            <span className="mx-4 text-white">🚀 JOIN 500+ RESTAURANTS SAVING BIG</span>
+            <span className="mx-4 text-yellow-200">🔥 40% OFF — OFFER ENDS TONIGHT</span>
+            <span className="mx-4 text-white">⚡ ONLY ₹{monthlyPrice}/MONTH</span>
           </div>
         </div>
       </div>

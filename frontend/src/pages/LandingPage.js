@@ -364,29 +364,25 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      // Use valid_until from saleOffer if available, otherwise end_date
-      let endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
-      if (!endDateStr) return;
-      
-      // If it's just a date (YYYY-MM-DD), add end of day time
-      if (endDateStr.length === 10) {
-        endDateStr = endDateStr + 'T23:59:59';
+      let endDate;
+      const endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
+      if (endDateStr) {
+        const d = new Date(endDateStr.length === 10 ? endDateStr + 'T23:59:59' : endDateStr);
+        if (d > new Date()) endDate = d;
       }
-      
-      const endDate = new Date(endDateStr);
+      // Rolling 24h countdown — always ends tonight
+      if (!endDate) {
+        endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+      }
       const now = new Date();
       const difference = endDate - now;
-      
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60)
-        });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      }
+      setTimeLeft({
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      });
     };
     
     calculateTimeLeft();
@@ -397,10 +393,10 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing }) => {
   // Get dynamic values from saleOffer (priority) or pricing
   const offerTitle = saleOffer?.title || 'Special Offer';
   const offerSubtitle = saleOffer?.subtitle || 'Limited time deal!';
-  const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 10;
+  const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 40;
   const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   // Use sale offer prices if available, otherwise fall back to pricing
-  const salePrice = saleOffer?.sale_price ? `₹${saleOffer.sale_price}` : (pricing?.campaign_price_display || '₹1799');
+  const salePrice = saleOffer?.sale_price ? `₹${saleOffer.sale_price}` : (pricing?.campaign_price_display || '₹1199');
   const originalPrice = saleOffer?.original_price ? `₹${saleOffer.original_price}` : (pricing?.regular_price_display || '₹1999');
   const bgColor = saleOffer?.bg_color || 'from-red-500 via-orange-500 to-yellow-500';
 
@@ -562,28 +558,27 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
   
   useEffect(() => {
     const calculateTimeLeft = () => {
-      let endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
-      if (!endDateStr) return;
-      
-      // If it's just a date (YYYY-MM-DD), add end of day time
-      if (endDateStr.length === 10) {
-        endDateStr = endDateStr + 'T23:59:59';
+      let endDate;
+      const endDateStr = saleOffer?.valid_until || saleOffer?.end_date;
+      if (endDateStr) {
+        const d = new Date(endDateStr.length === 10 ? endDateStr + 'T23:59:59' : endDateStr);
+        if (d > new Date()) {
+          endDate = d;
+        }
       }
-      
-      const endDate = new Date(endDateStr);
+      // Rolling 24h — always count down to end of today
+      if (!endDate) {
+        endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+      }
       const now = new Date();
       const difference = endDate - now;
-      
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60)
-        });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      }
+      setTimeLeft({
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      });
     };
     
     calculateTimeLeft();
@@ -592,8 +587,8 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
   }, [saleOffer]);
 
   // Get dynamic values - use sale offer prices if available
-  const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 10;
-  const salePrice = saleOffer?.sale_price ? `₹${saleOffer.sale_price}` : (pricing?.campaign_price_display || '₹1799');
+  const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 40;
+  const salePrice = saleOffer?.sale_price ? `₹${saleOffer.sale_price}` : (pricing?.campaign_price_display || '₹1199');
   const originalPrice = saleOffer?.original_price ? `₹${saleOffer.original_price}` : (pricing?.regular_price_display || '₹1999');
   const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   const badgeText = saleOffer?.badge_text || 'SPECIAL OFFER';
@@ -827,25 +822,24 @@ const LandingPage = () => {
 
   // Dynamic pricing plans based on API data
   const getPricingPlans = () => {
-    // Priority: Sale offer from super admin > Pricing campaign
+    // Always show 40% off sale
     const isSaleActive = saleOffer?.enabled === true;
     const isPricingCampaignActive = pricing?.campaign_active === true;
-    const isPromoActive = isSaleActive || isPricingCampaignActive;
+    const isPromoActive = true; // always active
     
-    // Get pricing from sale offer if active, otherwise from pricing endpoint
     let currentPrice, originalPrice, discountPercent;
     if (isSaleActive) {
-      currentPrice = `₹${saleOffer.sale_price || 1799}`;
+      currentPrice = `₹${saleOffer.sale_price || 1199}`;
       originalPrice = `₹${saleOffer.original_price || 1999}`;
-      discountPercent = saleOffer.discount_percent || 10;
+      discountPercent = saleOffer.discount_percent || 40;
     } else if (isPricingCampaignActive) {
-      currentPrice = pricing?.campaign_price_display || '₹1799';
+      currentPrice = pricing?.campaign_price_display || '₹1199';
       originalPrice = pricing?.regular_price_display || '₹1999';
-      discountPercent = pricing?.campaign_discount_percent || 10;
+      discountPercent = pricing?.campaign_discount_percent || 40;
     } else {
-      currentPrice = pricing?.regular_price_display || '₹1999';
-      originalPrice = null;
-      discountPercent = 0;
+      currentPrice = '₹1199';
+      originalPrice = '₹1999';
+      discountPercent = 40;
     }
     
     return [
