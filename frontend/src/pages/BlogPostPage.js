@@ -413,6 +413,7 @@ const BlogPostPage = () => {
         <ArticleSidebar timeLeft={timeLeft} relatedPosts={blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
         </div>
         </div>
+        </div>
       </>
     );
   }
@@ -652,9 +653,12 @@ const BlogPostPage = () => {
         <ArticleSidebar timeLeft={timeLeft} relatedPosts={blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
         </div>
         </div>
+        </div>
       </>
     );
   }
+
+  const blogContent = {
     'restaurant-billing-software-guide-2025': {
       title: 'Complete Guide to Restaurant Billing Software in 2025',
       author: 'BillByteKOT Team',
