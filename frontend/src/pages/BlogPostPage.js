@@ -2,18 +2,99 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
-import { ChefHat, Calendar, User, Clock, ArrowLeft, Share2, BookmarkPlus } from 'lucide-react';
+import { ChefHat, Calendar, User, Clock, ArrowLeft, Share2, BookmarkPlus, Flame, Tag, Zap, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { BlogPostSEO } from '../seo';
 import AdSense from '../components/AdSense';
 import { useState, useEffect } from 'react';
 
+// Rolling 24h countdown
+const useCountdown = () => {
+  const [t, setT] = useState({ hours: 23, minutes: 59, seconds: 59 });
+  useEffect(() => {
+    const tick = () => {
+      const end = new Date(); end.setHours(23, 59, 59, 999);
+      const diff = end - new Date();
+      setT({ hours: Math.floor((diff / 3600000) % 24), minutes: Math.floor((diff / 60000) % 60), seconds: Math.floor((diff / 1000) % 60) });
+    };
+    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
+  }, []);
+  return t;
+};
+
+// Sticky article sidebar
+const ArticleSidebar = ({ timeLeft, relatedPosts = [] }) => (
+  <aside className="hidden xl:block w-72 flex-shrink-0">
+    <div className="sticky top-24 space-y-5">
+      {/* FOMO box */}
+      <div className="bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 rounded-2xl p-4 text-white shadow-xl">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Flame className="w-4 h-4 animate-pulse" />
+          <span className="font-black text-xs tracking-widest">TODAY ONLY — 40% OFF</span>
+        </div>
+        <div className="text-3xl font-black">₹1199<span className="text-base font-normal">/yr</span></div>
+        <div className="text-white/60 text-xs line-through mb-2">Regular ₹1999/yr — Save ₹800</div>
+        <div className="flex gap-1 mb-3">
+          {[{ v: timeLeft.hours, l: 'H' }, { v: timeLeft.minutes, l: 'M' }, { v: timeLeft.seconds, l: 'S' }].map((x, i) => (
+            <div key={i} className="flex-1 bg-black/30 rounded-lg py-1 text-center">
+              <div className="font-mono font-black text-lg">{String(x.v).padStart(2, '0')}</div>
+              <div className="text-[9px] text-white/60">{x.l}</div>
+            </div>
+          ))}
+        </div>
+        <Link to="/login"><button className="w-full bg-white text-orange-600 font-black py-2 rounded-xl text-xs hover:bg-yellow-50 transition-all">Claim 40% OFF →</button></Link>
+        <p className="text-[9px] text-white/50 text-center mt-1">Resets midnight • No credit card</p>
+      </div>
+
+      {/* Ad slot */}
+      <AdSense slot="2847291650" format="auto" responsive="true" />
+
+      {/* Related posts */}
+      {relatedPosts.length > 0 && (
+        <div className="bg-white rounded-2xl p-4 shadow border">
+          <div className="font-bold text-gray-800 text-sm mb-3">Related Articles</div>
+          <ul className="space-y-3">
+            {relatedPosts.slice(0, 4).map(p => (
+              <li key={p.id}>
+                <Link to={`/blog/${p.slug}`} className="flex gap-2 group">
+                  <img src={p.image} alt={p.title} className="w-14 h-14 object-cover rounded-lg flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-gray-800 group-hover:text-violet-600 line-clamp-2 leading-snug">{p.title}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{p.readTime}</p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Ad slot 2 */}
+      <AdSense slot="3958402761" format="auto" responsive="true" />
+
+      {/* Keywords */}
+      <div className="bg-white rounded-2xl p-4 shadow border">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Tag className="w-3.5 h-3.5 text-violet-600" />
+          <span className="font-bold text-gray-800 text-sm">Popular Topics</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {['KOT System', 'GST Billing', 'POS India', 'Thermal Printer', 'WhatsApp Billing', 'Free Trial', 'Inventory', 'Cloud Kitchen'].map(tag => (
+            <span key={tag} className="bg-violet-50 text-violet-700 text-[10px] px-2 py-0.5 rounded-full border border-violet-100">{tag}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  </aside>
+);
+
 const BlogPostPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [markdownContent, setMarkdownContent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const timeLeft = useCountdown();
 
   // List of markdown blog files
   const markdownBlogs = [
@@ -132,13 +213,15 @@ const BlogPostPage = () => {
           </div>
         </header>
 
-        {/* Article */}
-        <article className="container mx-auto px-4 py-12 max-w-4xl">
+        {/* Article + Sidebar */}
+        <div className="container mx-auto px-4 py-10">
+          <div className="flex gap-8 max-w-7xl mx-auto">
+          <article className="flex-1 min-w-0 max-w-4xl">
           {/* Hero Image */}
           <img 
             src={image} 
             alt={title}
-            className="w-full h-96 object-cover rounded-2xl shadow-2xl mb-8"
+            className="w-full h-80 object-cover rounded-2xl shadow-2xl mb-6"
           />
 
           {/* Meta Info */}
@@ -269,40 +352,66 @@ const BlogPostPage = () => {
           </div>
 
           {/* Ad - Middle of Article */}
-          <div className="my-8">
-            <AdSense 
-              slot="1635338536"
-              format="auto"
-              responsive="true"
-              className="my-8"
-            />
+          <div className="my-6">
+            <AdSense slot="2847291650" format="auto" responsive="true" />
+          </div>
+
+          {/* FOMO inline CTA */}
+          <div className="my-8 p-5 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl text-white text-center">
+            <Flame className="w-6 h-6 mx-auto mb-1 text-yellow-300 animate-pulse" />
+            <div className="font-black text-lg mb-1">🔥 40% OFF — Offer Ends Tonight</div>
+            <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800 • Resets at midnight</div>
+            <Link to="/login"><button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">Claim 40% OFF Now →</button></Link>
           </div>
 
           {/* CTA */}
-          <div className="mt-12 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
-            <h3 className="text-2xl font-bold mb-4">Ready to Get Started?</h3>
-            <p className="text-lg mb-6 opacity-90">
-              Start your 7-day free trial today. No credit card required.
-            </p>
-            <Button 
-              size="lg"
-              className="bg-white text-violet-600 hover:bg-gray-100 h-12 px-8"
-              onClick={() => navigate('/login')}
-            >
-              Start Free Trial
-            </Button>
+          <div className="mt-10 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
+            <h3 className="text-2xl font-bold mb-3">Ready to Get Started?</h3>
+            <p className="text-base mb-5 opacity-90">Start your 7-day free trial today. No credit card required.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 h-11 px-6" onClick={() => navigate('/login')}>
+                Start Free Trial
+              </Button>
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 h-11 px-6" onClick={() => navigate('/login')}>
+                🔥 Get 40% OFF — ₹1199/yr
+              </Button>
+            </div>
           </div>
 
           {/* Ad - Bottom of Article */}
-          <div className="mt-8">
-            <AdSense 
-              slot="1635338536"
-              format="auto"
-              responsive="true"
-              className="mt-8"
-            />
+          <div className="mt-6">
+            <AdSense slot="3958402761" format="auto" responsive="true" />
+          </div>
+
+          {/* Related posts */}
+          {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).length > 0 && (
+            <div className="mt-10">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Related Articles</h3>
+              <div className="grid sm:grid-cols-3 gap-4">
+                {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).map(p => (
+                  <Link key={p.id} to={`/blog/${p.slug}`} className="group">
+                    <div className="rounded-xl overflow-hidden border hover:shadow-lg transition-shadow">
+                      <img src={p.image} alt={p.title} className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="p-3">
+                        <p className="text-sm font-medium text-gray-800 group-hover:text-violet-600 line-clamp-2 leading-snug">{p.title}</p>
+                        <p className="text-xs text-gray-400 mt-1">{p.readTime}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Final ad */}
+          <div className="mt-6">
+            <AdSense slot="1635338536" format="auto" responsive="true" />
           </div>
         </article>
+
+        {/* Sidebar */}
+        <ArticleSidebar timeLeft={timeLeft} relatedPosts={blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
+        </div>
         </div>
       </>
     );
@@ -371,13 +480,15 @@ const BlogPostPage = () => {
           </div>
         </header>
 
-        {/* Article */}
-        <article className="container mx-auto px-4 py-12 max-w-4xl">
+        {/* Article + Sidebar */}
+        <div className="container mx-auto px-4 py-10">
+          <div className="flex gap-8 max-w-7xl mx-auto">
+          <article className="flex-1 min-w-0 max-w-4xl">
           {/* Hero Image */}
           <img 
             src={newBlogPost.image} 
             alt={newBlogPost.title}
-            className="w-full h-96 object-cover rounded-2xl shadow-2xl mb-8"
+            className="w-full h-80 object-cover rounded-2xl shadow-2xl mb-6"
           />
 
           {/* Meta Info */}
@@ -405,13 +516,8 @@ const BlogPostPage = () => {
           </h1>
 
           {/* Ad - Top of Article */}
-          <div className="my-8">
-            <AdSense 
-              slot="1635338536"
-              format="auto"
-              responsive="true"
-              className="mb-8"
-            />
+          <div className="my-6">
+            <AdSense slot="1635338536" format="auto" responsive="true" />
           </div>
 
           {/* Content */}
@@ -485,46 +591,70 @@ const BlogPostPage = () => {
           </div>
 
           {/* Ad - Middle of Article */}
-          <div className="my-8">
-            <AdSense 
-              slot="1635338536"
-              format="auto"
-              responsive="true"
-              className="my-8"
-            />
+          <div className="my-6">
+            <AdSense slot="2847291650" format="auto" responsive="true" />
+          </div>
+
+          {/* FOMO inline CTA */}
+          <div className="my-8 p-5 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl text-white text-center">
+            <Flame className="w-6 h-6 mx-auto mb-1 text-yellow-300 animate-pulse" />
+            <div className="font-black text-lg mb-1">🔥 40% OFF — Offer Ends Tonight</div>
+            <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800 • Resets at midnight</div>
+            <Link to="/login"><button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">Claim 40% OFF Now →</button></Link>
           </div>
 
           {/* CTA */}
-          <div className="mt-12 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
-            <h3 className="text-2xl font-bold mb-4">Ready to Get Started?</h3>
-            <p className="text-lg mb-6 opacity-90">
-              Start your 7-day free trial today. No credit card required.
-            </p>
-            <Button 
-              size="lg"
-              className="bg-white text-violet-600 hover:bg-gray-100 h-12 px-8"
-              onClick={() => navigate('/login')}
-            >
-              Start Free Trial
-            </Button>
+          <div className="mt-10 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
+            <h3 className="text-2xl font-bold mb-3">Ready to Get Started?</h3>
+            <p className="text-base mb-5 opacity-90">Start your 7-day free trial today. No credit card required.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 h-11 px-6" onClick={() => navigate('/login')}>
+                Start Free Trial
+              </Button>
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 h-11 px-6" onClick={() => navigate('/login')}>
+                🔥 Get 40% OFF — ₹1199/yr
+              </Button>
+            </div>
           </div>
 
           {/* Ad - Bottom of Article */}
-          <div className="mt-8">
-            <AdSense 
-              slot="1635338536"
-              format="auto"
-              responsive="true"
-              className="mt-8"
-            />
+          <div className="mt-6">
+            <AdSense slot="3958402761" format="auto" responsive="true" />
+          </div>
+
+          {/* Related posts */}
+          {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).length > 0 && (
+            <div className="mt-10">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Related Articles</h3>
+              <div className="grid sm:grid-cols-3 gap-4">
+                {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).map(p => (
+                  <Link key={p.id} to={`/blog/${p.slug}`} className="group">
+                    <div className="rounded-xl overflow-hidden border hover:shadow-lg transition-shadow">
+                      <img src={p.image} alt={p.title} className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="p-3">
+                        <p className="text-sm font-medium text-gray-800 group-hover:text-violet-600 line-clamp-2 leading-snug">{p.title}</p>
+                        <p className="text-xs text-gray-400 mt-1">{p.readTime}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Final ad */}
+          <div className="mt-6">
+            <AdSense slot="1635338536" format="auto" responsive="true" />
           </div>
         </article>
+
+        {/* Sidebar */}
+        <ArticleSidebar timeLeft={timeLeft} relatedPosts={blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
+        </div>
         </div>
       </>
     );
   }
-
-  const blogContent = {
     'restaurant-billing-software-guide-2025': {
       title: 'Complete Guide to Restaurant Billing Software in 2025',
       author: 'BillByteKOT Team',

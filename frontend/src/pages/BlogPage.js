@@ -3,199 +3,154 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp } from 'lucide-react';
+import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp, Flame, Clock, Tag, Zap } from 'lucide-react';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { CategoryPageSEO } from '../seo';
 import AdSense from '../components/AdSense';
 
+// Rolling 24h countdown hook
+const useCountdown = () => {
+  const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
+  useState(() => {
+    const tick = () => {
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      const diff = end - new Date();
+      setTimeLeft({
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      });
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  });
+  return timeLeft;
+};
+
+// Sticky sidebar ad + CTA widget
+const Sidebar = ({ timeLeft }) => (
+  <aside className="hidden lg:block w-80 flex-shrink-0">
+    <div className="sticky top-24 space-y-6">
+
+      {/* FOMO offer box */}
+      <div className="bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 rounded-2xl p-5 text-white shadow-xl">
+        <div className="flex items-center gap-2 mb-2">
+          <Flame className="w-5 h-5 animate-pulse" />
+          <span className="font-black text-sm tracking-widest">FLASH SALE — TODAY ONLY</span>
+        </div>
+        <div className="text-4xl font-black mb-1">40% OFF</div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="line-through text-white/60 text-lg">₹1999/yr</span>
+          <span className="text-2xl font-black">₹1199/yr</span>
+        </div>
+        <div className="flex gap-1 mb-4">
+          {[
+            { v: timeLeft.hours, l: 'HRS' },
+            { v: timeLeft.minutes, l: 'MIN' },
+            { v: timeLeft.seconds, l: 'SEC' },
+          ].map((item, i) => (
+            <div key={i} className="flex-1 bg-black/30 rounded-lg py-1 text-center">
+              <div className="font-mono font-black text-xl">{String(item.v).padStart(2, '0')}</div>
+              <div className="text-[9px] text-white/70">{item.l}</div>
+            </div>
+          ))}
+        </div>
+        <Link to="/login">
+          <button className="w-full bg-white text-orange-600 font-black py-2.5 rounded-xl hover:bg-yellow-50 transition-all text-sm">
+            Claim 40% OFF Now →
+          </button>
+        </Link>
+        <p className="text-[10px] text-white/60 text-center mt-2">Price resets at midnight • No credit card</p>
+      </div>
+
+      {/* Ad slot 1 */}
+      <AdSense slot="1635338536" format="auto" responsive="true" />
+
+      {/* Popular keywords / tags */}
+      <div className="bg-white rounded-2xl p-5 shadow border">
+        <div className="flex items-center gap-2 mb-3">
+          <Tag className="w-4 h-4 text-violet-600" />
+          <span className="font-bold text-gray-800">Popular Topics</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            'Restaurant Billing', 'KOT System', 'POS India', 'GST Billing',
+            'Thermal Printer', 'WhatsApp Billing', 'Inventory Management',
+            'Free Trial', 'Restaurant Software 2026', 'Billing Software',
+            'Table Management', 'Cloud Kitchen', 'QSR Billing', 'UPI Payments',
+          ].map(tag => (
+            <span key={tag} className="bg-violet-50 text-violet-700 text-xs px-2 py-1 rounded-full border border-violet-100 hover:bg-violet-100 cursor-pointer transition-colors">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Ad slot 2 */}
+      <AdSense slot="2847291650" format="auto" responsive="true" />
+
+      {/* Quick stats */}
+      <div className="bg-white rounded-2xl p-5 shadow border">
+        <div className="font-bold text-gray-800 mb-3">Why BillByteKOT?</div>
+        <ul className="space-y-2 text-sm text-gray-600">
+          {[
+            ['500+', 'Restaurants using it'],
+            ['80%', 'Fewer kitchen errors'],
+            ['3x', 'Faster table turnover'],
+            ['₹100/mo', 'At 40% off yearly plan'],
+            ['5 min', 'Setup time'],
+            ['7 days', 'Free trial, no card'],
+          ].map(([stat, label]) => (
+            <li key={stat} className="flex items-center justify-between">
+              <span className="font-black text-violet-600">{stat}</span>
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
+        <Link to="/login">
+          <button className="w-full mt-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold py-2 rounded-xl text-sm hover:opacity-90 transition-all">
+            Start Free Trial
+          </button>
+        </Link>
+      </div>
+
+      {/* Ad slot 3 */}
+      <AdSense slot="3958402761" format="auto" responsive="true" />
+    </div>
+  </aside>
+);
+
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const timeLeft = useCountdown();
 
-  const blogPosts = blogPostsData.concat([
+  const extraPosts = [
     {
-      id: 0,
-      title: 'Lightning-Fast Restaurant Billing: The Future is Here ⚡',
-      excerpt: 'Discover how lightning-fast restaurant billing systems are transforming restaurants worldwide. Learn why 10,000+ restaurants switched to instant payment processing. Includes case studies and ROI analysis.',
-      author: 'BillByteKOT Team',
-      date: '2025-02-10',
-      category: 'Business Strategy',
-      readTime: '12 min read',
-      image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
-      slug: 'lightning-fast-restaurant-billing',
-      featured: true,
-      content: 'Restaurant owners worldwide are facing the same problem: long billing queues are killing their efficiency and customer satisfaction. But what if the future of restaurant billing is here—and it\'s transforming how restaurants operate globally? Modern POS systems now offer instant billing, thermal printing, mobile-first design, keyboard shortcuts, and split payments. See how restaurants increased their revenue by 20-40% with faster billing.'
+      id: 0, title: 'Lightning-Fast Restaurant Billing: The Future is Here ⚡',
+      excerpt: 'Discover how lightning-fast restaurant billing systems are transforming restaurants worldwide. Learn why 10,000+ restaurants switched to instant payment processing.',
+      author: 'BillByteKOT Team', date: '2025-02-10', category: 'Business Strategy',
+      readTime: '12 min read', image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+      slug: 'lightning-fast-restaurant-billing', featured: true,
     },
     {
-      id: -1,
-      title: 'How to 10X Your Restaurant Revenue Without Hiring More Staff 📈',
-      excerpt: 'Discover how top restaurants are increasing revenue 10x without hiring more staff. The secret? Smart billing systems and automation. Includes detailed case studies showing 20-100% revenue increase.',
-      author: 'BillByteKOT Team',
-      date: '2025-02-10',
-      category: 'Revenue Growth',
-      readTime: '14 min read',
-      image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800',
-      slug: 'restaurant-revenue-10x-without-hiring',
-      featured: true,
-      content: 'Instead of hiring 10 more staff members, optimize your existing systems. Learn the 6 strategies that changed everything: eliminate billing delays (20% increase), reduce billing errors (15%), optimize payment methods (10%), maximize table turnover (25%), real-time data insights (15%), and credit sales management (10%). Total potential: 95% revenue increase without hiring!'
+      id: -1, title: 'How to 10X Your Restaurant Revenue Without Hiring More Staff 📈',
+      excerpt: 'Discover how top restaurants are increasing revenue 10x without hiring more staff. The secret? Smart billing systems and automation.',
+      author: 'BillByteKOT Team', date: '2025-02-10', category: 'Revenue Growth',
+      readTime: '14 min read', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800',
+      slug: 'restaurant-revenue-10x-without-hiring', featured: true,
     },
     {
-      id: -2,
-      title: 'Why Your Restaurant Lost That Customer (And How to Get Them Back) 💔',
-      excerpt: 'Did your restaurant lose a customer today? Find out the #1 reason customers leave and how simple fixes like instant billing can bring them back. Includes recovery strategy.',
-      author: 'BillByteKOT Team',
-      date: '2025-02-10',
-      category: 'Customer Retention',
-      readTime: '11 min read',
-      image: 'https://images.unsplash.com/photo-1554224311-beee415c15c?w=800',
-      slug: 'restaurant-lost-customer-recovery',
-      featured: true,
-      content: '80% of service complaints are about speed, not food quality. The biggest culprit? Waiting at checkout. Learn how slow checkout is costing you ₹2.5-5 lakhs annually. See real customer stories and discover how instant billing transforms the checkout experience from frustrating to delightful.'
+      id: -2, title: 'Why Your Restaurant Lost That Customer (And How to Get Them Back) 💔',
+      excerpt: 'Did your restaurant lose a customer today? Find out the #1 reason customers leave and how simple fixes like instant billing can bring them back.',
+      author: 'BillByteKOT Team', date: '2025-02-10', category: 'Customer Retention',
+      readTime: '11 min read', image: 'https://images.unsplash.com/photo-1554224311-beee415c15c?w=800',
+      slug: 'restaurant-lost-customer-recovery', featured: true,
     },
-    {
-      id: 1,
-      title: 'Complete Guide to Restaurant Billing Software in India 2024',
-      excerpt: 'Everything you need to know about choosing the right billing software for your restaurant. Compare features, pricing, and benefits. Includes ROI calculator and implementation guide.',
-      author: 'BillByteKOT Team',
-      date: '2024-12-09',
-      category: 'Complete Guide',
-      readTime: '15 min read',
-      image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
-      slug: 'restaurant-billing-software-guide-2024',
-      featured: true
-    },
-    {
-      id: 2,
-      title: 'Free vs Paid Restaurant Billing Software: Complete Comparison',
-      excerpt: 'Detailed comparison of free and paid restaurant billing software. Learn when to upgrade, hidden costs, and which option is right for your business size.',
-      author: 'BillByteKOT Team',
-      date: '2024-12-09',
-      category: 'Comparison',
-      readTime: '12 min read',
-      image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800',
-      slug: 'free-vs-paid-restaurant-software',
-      featured: true
-    },
-    {
-      id: 3,
-      title: 'WhatsApp Integration for Restaurants: Send Bills & Updates Instantly',
-      excerpt: 'Learn how to send digital receipts and order updates directly to customer WhatsApp using Meta\'s official Cloud API. No login required! Includes setup guide and cost analysis.',
-      author: 'BillByteKOT Team',
-      date: '2024-12-09',
-      category: 'Features',
-      readTime: '8 min read',
-      image: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800',
-      slug: 'whatsapp-integration-restaurants',
-      featured: true
-    },
-    {
-      id: 4,
-      title: 'Thermal Printing for Restaurants: Complete Guide to KOT & Receipt Printing',
-      excerpt: 'Master thermal printing with our complete guide. Covers 6 professional receipt themes, printer selection, customization options, and ROI calculation. Save ₹24,000/year!',
-      author: 'BillByteKOT Team',
-      date: '2024-12-09',
-      category: 'Hardware Guide',
-      readTime: '10 min read',
-      image: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=800',
-      slug: 'thermal-printing-guide-restaurants',
-      featured: true
-    },
-    {
-      id: 5,
-      title: 'Bulk Upload Menu & Inventory: Save 95% Time on Data Entry',
-      excerpt: 'Import hundreds of menu items and inventory records in minutes using CSV files. Complete guide with templates, error handling, and best practices. Save hours of manual work!',
-      author: 'BillByteKOT Team',
-      date: '2024-12-09',
-      category: 'Productivity',
-      readTime: '7 min read',
-      image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800',
-      slug: 'bulk-upload-menu-inventory',
-      featured: false
-    },
-    {
-      id: 6,
-      title: 'What is KOT System? Benefits for Your Restaurant',
-      excerpt: 'Learn how Kitchen Order Ticket (KOT) systems streamline restaurant operations, reduce errors by 80%, and improve kitchen efficiency. Real case studies included.',
-      author: 'Restaurant Expert',
-      date: '2024-12-05',
-      category: 'KOT System',
-      readTime: '6 min read',
-      image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800',
-      slug: 'kot-system-benefits-restaurants',
-      featured: false
-    },
-    {
-      id: 7,
-      title: 'Multi-Currency Support: Serve International Customers',
-      excerpt: 'Accept payments in multiple currencies with automatic conversion. Perfect for tourist areas and international chains. Supports INR, USD, EUR, GBP, and more.',
-      author: 'BillByteKOT Team',
-      date: '2024-12-03',
-      category: 'Features',
-      readTime: '5 min read',
-      image: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800',
-      slug: 'multi-currency-support-restaurants',
-      featured: false
-    },
-    {
-      id: 8,
-      title: 'Restaurant Inventory Management: Never Run Out of Stock',
-      excerpt: 'Master inventory management with proven strategies. Reduce waste by 40%, control costs, optimize stock levels, and get low-stock alerts automatically.',
-      author: 'Operations Manager',
-      date: '2024-12-01',
-      category: 'Management',
-      readTime: '9 min read',
-      image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800',
-      slug: 'restaurant-inventory-management',
-      featured: false
-    },
-    {
-      id: 9,
-      title: 'Table Management & Reservations: Optimize Your Seating',
-      excerpt: 'Maximize table turnover with smart table management. Handle reservations, waitlists, and optimize seating arrangements. Increase revenue by 30%.',
-      author: 'BillByteKOT Team',
-      date: '2024-11-28',
-      category: 'Features',
-      readTime: '7 min read',
-      image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
-      slug: 'table-management-reservations',
-      featured: false
-    },
-    {
-      id: 10,
-      title: 'Staff Management: Track Performance & Payroll',
-      excerpt: 'Manage staff efficiently with attendance tracking, performance metrics, and automated payroll. Includes shift scheduling and commission tracking.',
-      author: 'HR Expert',
-      date: '2024-11-25',
-      category: 'Management',
-      readTime: '8 min read',
-      image: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=800',
-      slug: 'staff-management-payroll',
-      featured: false
-    },
-    {
-      id: 11,
-      title: 'Analytics & Reports: Data-Driven Restaurant Decisions',
-      excerpt: 'Make smarter decisions with comprehensive analytics. Track sales, identify trends, analyze customer behavior, and optimize your menu for maximum profit.',
-      author: 'Data Analyst',
-      date: '2024-11-20',
-      category: 'Analytics',
-      readTime: '10 min read',
-      image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800',
-      slug: 'restaurant-analytics-reports',
-      featured: false
-    },
-    {
-      id: 12,
-      title: 'Payment Integration: Accept All Payment Methods',
-      excerpt: 'Integrate Razorpay and accept UPI, cards, wallets, and more. Handle split bills, discounts, tips, and refunds seamlessly. PCI-DSS compliant.',
-      author: 'Payment Expert',
-      date: '2024-11-15',
-      category: 'Payments',
-      readTime: '6 min read',
-      image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800',
-      slug: 'payment-integration-razorpay',
-      featured: false
-    }
-  ]);
+  ];
+
+  const blogPosts = [...blogPostsData, ...extraPosts];
 
   const filteredPosts = blogPosts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -203,23 +158,20 @@ const BlogPage = () => {
     post.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const featuredPosts = blogPosts.filter(p => p.featured).slice(0, 4);
+
   return (
     <>
-      {/* SEO Meta Tags and Schema Markup */}
       <CategoryPageSEO
         title="Restaurant Billing Software Blog | Tips, Guides & Updates | BillByteKOT"
-        description="Expert guides on restaurant billing software, KOT systems, thermal printing, inventory management, and restaurant technology. Free tips and tutorials for restaurant owners."
+        description="Expert guides on restaurant billing software, KOT systems, thermal printing, inventory management, and restaurant technology. Free tips and tutorials for restaurant owners in India."
         keywords={[
-          'restaurant billing software blog',
-          'KOT system guide',
-          'restaurant POS tips',
-          'thermal printer setup',
-          'restaurant management tips',
-          'restaurant software tutorials',
-          'billing software guides',
-          'restaurant technology blog',
-          'POS system tips',
-          'restaurant business tips'
+          'restaurant billing software blog', 'KOT system guide', 'restaurant POS tips India',
+          'thermal printer setup restaurant', 'restaurant management tips 2026',
+          'restaurant software tutorials', 'billing software guides', 'restaurant technology blog',
+          'POS system India 2026', 'restaurant business tips', 'GST billing software',
+          'cloud kitchen billing', 'QSR POS system', 'restaurant inventory management',
+          'WhatsApp billing restaurant', 'free restaurant software trial',
         ]}
         url="https://billbytekot.in/blog"
         image="https://billbytekot.in/og-blog.jpg"
@@ -227,305 +179,317 @@ const BlogPage = () => {
           name: 'Restaurant Software Blog',
           description: 'Expert guides and tips on restaurant billing software, KOT systems, and restaurant technology.',
           items: filteredPosts.slice(0, 10).map(post => ({
-            name: post.title,
-            description: post.excerpt,
-            url: `https://billbytekot.in/blog/${post.slug}`
-          }))
+            name: post.title, description: post.excerpt,
+            url: `https://billbytekot.in/blog/${post.slug}`,
+          })),
         }}
       />
-      
+
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <ChefHat className="w-6 h-6 text-white" />
+
+        {/* Header */}
+        <header className="bg-white border-b sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Link to="/" className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <ChefHat className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                  BillByteKOT
+                </span>
+              </Link>
+              <div className="flex items-center gap-3">
+                {/* Mini countdown in header */}
+                <div className="hidden sm:flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full">
+                  <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                  <span className="text-xs font-bold text-red-600">40% OFF ends in</span>
+                  <span className="font-mono text-xs font-black text-red-700">
+                    {String(timeLeft.hours).padStart(2,'0')}:{String(timeLeft.minutes).padStart(2,'0')}:{String(timeLeft.seconds).padStart(2,'0')}
+                  </span>
+                </div>
+                <Link to="/login">
+                  <Button className="bg-gradient-to-r from-violet-600 to-purple-600">
+                    Get Started
+                  </Button>
+                </Link>
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                BillByteKOT
-              </span>
-            </Link>
-            <Link to="/login">
-              <Button className="bg-gradient-to-r from-violet-600 to-purple-600">
-                Get Started
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-5xl font-bold mb-6">BillByteKOT Blog</h1>
-            <p className="text-xl text-white/90 mb-8">
-              Expert insights on restaurant management, billing systems, and industry trends
-            </p>
-            
-            {/* Search Bar */}
-            <div className="relative max-w-xl mx-auto">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search articles..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-14 text-lg"
-              />
             </div>
           </div>
-        </div>
-      </section>
+        </header>
 
-      {/* Featured Posts */}
-      {!searchQuery && (
-        <section className="py-16 bg-white">
+        {/* Top banner ad */}
+        <div className="bg-white border-b">
+          <div className="container mx-auto px-4 py-2">
+            <AdSense slot="1635338536" format="auto" responsive="true" />
+          </div>
+        </div>
+
+        {/* Hero */}
+        <section className="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white py-16">
           <div className="container mx-auto px-4">
-            <div className="flex items-center gap-3 mb-8">
-              <TrendingUp className="w-8 h-8 text-violet-600" />
-              <h2 className="text-3xl font-bold">Featured Articles</h2>
-            </div>
-            <div className="grid md:grid-cols-2 gap-8">
-              {blogPosts.filter(post => post.featured).slice(0, 4).map((post) => (
-                <Card key={post.id} className="overflow-hidden hover:shadow-2xl transition-all border-2 border-violet-100">
-                  <div className="relative h-64 overflow-hidden">
-                    <img
-                      src={post.image}
-                      alt={post.title}
-                      className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
-                    />
-                    <div className="absolute top-4 left-4 flex gap-2">
-                      <span className="bg-violet-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                        {post.category}
-                      </span>
-                      <span className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
-                        Featured
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <CardHeader>
-                    <CardTitle className="text-2xl hover:text-violet-600 transition-colors">
-                      <Link to={`/blog/${post.slug}`}>
-                        {post.title}
-                      </Link>
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4">
-                    <p className="text-gray-600 line-clamp-2">{post.excerpt}</p>
-                    
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        <span>{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(post.date).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <span className="text-sm font-medium text-violet-600">{post.readTime}</span>
-                      <Link to={`/blog/${post.slug}`}>
-                        <Button className="bg-gradient-to-r from-violet-600 to-purple-600">
-                          Read Article <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="max-w-3xl mx-auto text-center">
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-1.5 rounded-full mb-4 text-sm font-bold">
+                <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
+                🔥 40% OFF — Restaurant Billing Software — Offer Ends Tonight
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">BillByteKOT Blog</h1>
+              <p className="text-lg text-white/90 mb-6">
+                Expert insights on restaurant billing software, KOT systems, POS India, GST billing, inventory management &amp; more
+              </p>
+              <div className="relative max-w-xl mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search: KOT system, billing software, POS India..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 h-12 text-base"
+                />
+              </div>
             </div>
           </div>
         </section>
-      )}
 
-      {/* All Blog Posts Grid */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          {!searchQuery && (
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold mb-2">All Articles</h2>
-              <p className="text-gray-600">Explore our complete collection of restaurant management guides</p>
-            </div>
-          )}
-
-          {/* Ad - Before Blog Grid */}
-          <div className="mb-8">
-            <AdSense 
-              slot="1635338536"
-              format="auto"
-              responsive="true"
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredPosts.map((post) => (
-              <Card key={post.id} className="overflow-hidden hover:shadow-xl transition-shadow">
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={post.image}
-                    alt={post.title}
-                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
-                  />
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-violet-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                      {post.category}
-                    </span>
-                  </div>
-                </div>
-                
-                <CardHeader>
-                  <CardTitle className="text-xl hover:text-violet-600 transition-colors">
-                    <Link to={`/blog/${post.slug}`}>
-                      {post.title}
-                    </Link>
-                  </CardTitle>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <p className="text-gray-600 line-clamp-3">{post.excerpt}</p>
-                  
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span>{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>{new Date(post.date).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <span className="text-sm text-gray-500">{post.readTime}</span>
-                    <Link to={`/blog/${post.slug}`}>
-                      <Button variant="ghost" size="sm" className="text-violet-600">
-                        Read More <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {filteredPosts.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No articles found matching your search.</p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-violet-600 to-purple-600 text-white py-16">
-        <div className="container mx-auto px-4 text-center">
-          <TrendingUp className="w-16 h-16 mx-auto mb-6" />
-          <h2 className="text-4xl font-bold mb-4">Ready to Transform Your Restaurant?</h2>
-          <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-            Join 500+ successful restaurants using BillByteKOT for KOT-first automation, restaurant management, and more.
-          </p>
-          <Link to="/login">
-            <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 h-14 px-8 text-lg">
-              Start Free Trial
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="font-bold text-lg mb-4">BillByteKOT</h3>
-              <p className="text-gray-400">
-                India's #1 restaurant billing and KOT management system.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link to="/features" className="hover:text-white">Features</Link></li>
-                <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
-                <li><Link to="/download" className="hover:text-white">Download</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Resources</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link to="/blog" className="hover:text-white">Blog</Link></li>
-                <li><Link to="/contact" className="hover:text-white">Contact Us</Link></li>
-                <li><Link to="/docs" className="hover:text-white">Documentation</Link></li>
-                <li><Link to="/support" className="hover:text-white">Support</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Follow Us</h4>
-              <div className="flex gap-3 mb-4">
-                <a 
-                  href="https://www.instagram.com/billbytekot" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-lg flex items-center justify-center hover:opacity-80 transition-opacity"
-                  aria-label="Instagram"
-                >
-                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                  </svg>
-                </a>
-                <a 
-                  href="https://www.youtube.com/@billbytekot" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center hover:opacity-80 transition-opacity"
-                  aria-label="YouTube"
-                >
-                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                  </svg>
-                </a>
-                <a 
-                  href="https://twitter.com/billbytekot" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-black rounded-lg flex items-center justify-center hover:opacity-80 transition-opacity"
-                  aria-label="X (Twitter)"
-                >
-                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
-                </a>
-                <a 
-                  href="https://www.linkedin.com/company/billbytekot" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-blue-700 rounded-lg flex items-center justify-center hover:opacity-80 transition-opacity"
-                  aria-label="LinkedIn"
-                >
-                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                  </svg>
-                </a>
+        {/* Featured Posts */}
+        {!searchQuery && (
+          <section className="py-12 bg-white">
+            <div className="container mx-auto px-4">
+              <div className="flex items-center gap-3 mb-6">
+                <TrendingUp className="w-7 h-7 text-violet-600" />
+                <h2 className="text-2xl font-bold">Featured Articles</h2>
+                <span className="ml-auto text-sm text-gray-500">Restaurant billing software guides &amp; tips</span>
               </div>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                <li><a href="https://www.instagram.com/billbytekot" target="_blank" rel="noopener noreferrer" className="hover:text-white">@billbytekot</a></li>
-              </ul>
+              <div className="grid md:grid-cols-2 gap-6">
+                {featuredPosts.map((post) => (
+                  <Card key={post.id} className="overflow-hidden hover:shadow-2xl transition-all border-2 border-violet-100">
+                    <div className="relative h-56 overflow-hidden">
+                      <img src={post.image} alt={post.title} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
+                      <div className="absolute top-3 left-3 flex gap-2">
+                        <span className="bg-violet-600 text-white px-2.5 py-0.5 rounded-full text-xs font-medium">{post.category}</span>
+                        <span className="bg-yellow-500 text-white px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" /> Featured
+                        </span>
+                      </div>
+                    </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xl hover:text-violet-600 transition-colors leading-snug">
+                        <Link to={`/blog/${post.slug}`}>{post.title}</Link>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-gray-600 text-sm line-clamp-2">{post.excerpt}</p>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span className="flex items-center gap-1"><User className="w-3 h-3" />{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{post.readTime}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t">
+                        <span className="text-xs text-gray-400">{new Date(post.date).toLocaleDateString()}</span>
+                        <Link to={`/blog/${post.slug}`}>
+                          <Button size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 h-8 text-xs">
+                            Read Article <ArrowRight className="w-3 h-3 ml-1" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Main content + sidebar */}
+        <section className="py-10">
+          <div className="container mx-auto px-4">
+            <div className="flex gap-8">
+
+              {/* Posts grid */}
+              <div className="flex-1 min-w-0">
+                {!searchQuery && (
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold mb-1">All Articles</h2>
+                    <p className="text-gray-500 text-sm">Restaurant billing software guides, KOT system tips, POS India reviews &amp; more</p>
+                  </div>
+                )}
+
+                {/* Ad between header and grid */}
+                <div className="mb-6">
+                  <AdSense slot="2847291650" format="auto" responsive="true" />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {filteredPosts.map((post, idx) => (
+                    <>
+                      <Card key={post.id} className="overflow-hidden hover:shadow-xl transition-shadow">
+                        <div className="relative h-44 overflow-hidden">
+                          <img src={post.image} alt={post.title} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
+                          <div className="absolute top-3 left-3">
+                            <span className="bg-violet-600 text-white px-2.5 py-0.5 rounded-full text-xs font-medium">{post.category}</span>
+                          </div>
+                        </div>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base hover:text-violet-600 transition-colors leading-snug">
+                            <Link to={`/blog/${post.slug}`}>{post.title}</Link>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <p className="text-gray-600 text-sm line-clamp-2">{post.excerpt}</p>
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span className="flex items-center gap-1"><User className="w-3 h-3" />{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(post.date).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-3 border-t">
+                            <span className="text-xs text-gray-400">{post.readTime}</span>
+                            <Link to={`/blog/${post.slug}`}>
+                              <Button variant="ghost" size="sm" className="text-violet-600 h-7 text-xs">
+                                Read More <ArrowRight className="w-3 h-3 ml-1" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Inject ad every 6 posts */}
+                      {(idx + 1) % 6 === 0 && (
+                        <div key={`ad-${idx}`} className="md:col-span-2">
+                          <AdSense slot="3958402761" format="auto" responsive="true" />
+                        </div>
+                      )}
+
+                      {/* Inject FOMO CTA every 10 posts */}
+                      {(idx + 1) % 10 === 0 && (
+                        <div key={`cta-${idx}`} className="md:col-span-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white text-center">
+                          <Zap className="w-8 h-8 mx-auto mb-2 text-yellow-300" />
+                          <div className="font-black text-xl mb-1">🔥 40% OFF — Ends Tonight</div>
+                          <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800 • Offer resets at midnight</div>
+                          <Link to="/login">
+                            <button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">
+                              Claim 40% OFF Now →
+                            </button>
+                          </Link>
+                        </div>
+                      )}
+                    </>
+                  ))}
+                </div>
+
+                {filteredPosts.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">No articles found matching your search.</p>
+                  </div>
+                )}
+
+                {/* Bottom ad */}
+                <div className="mt-8">
+                  <AdSense slot="1635338536" format="auto" responsive="true" />
+                </div>
+              </div>
+
+              {/* Sidebar */}
+              <Sidebar timeLeft={timeLeft} />
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>© 2025 BillByteKOT by BillByte Innovations. All rights reserved.</p>
+        </section>
+
+        {/* SEO keyword-rich section */}
+        <section className="bg-white py-10 border-t">
+          <div className="container mx-auto px-4 max-w-4xl">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Restaurant Billing Software — Complete Resource Hub</h2>
+            <div className="grid md:grid-cols-3 gap-6 text-sm text-gray-600">
+              <div>
+                <h3 className="font-bold text-gray-800 mb-2">Popular Guides</h3>
+                <ul className="space-y-1">
+                  {['Restaurant billing software India 2026', 'KOT system for restaurants', 'GST billing software free', 'Thermal printer for restaurant', 'WhatsApp billing integration', 'Restaurant POS system comparison'].map(t => (
+                    <li key={t} className="flex items-center gap-1"><ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />{t}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800 mb-2">By Restaurant Type</h3>
+                <ul className="space-y-1">
+                  {['Cloud kitchen billing software', 'QSR POS system India', 'Fine dining billing system', 'Cafe billing software', 'Dhaba billing software', 'Food truck POS system'].map(t => (
+                    <li key={t} className="flex items-center gap-1"><ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />{t}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800 mb-2">By City</h3>
+                <ul className="space-y-1">
+                  {['Restaurant billing software Mumbai', 'POS system Bangalore', 'Billing software Delhi', 'Restaurant software Hyderabad', 'POS system Chennai', 'Billing software Pune'].map(t => (
+                    <li key={t} className="flex items-center gap-1"><ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />{t}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
-        </div>
-      </footer>
+        </section>
+
+        {/* CTA Section */}
+        <section className="bg-gradient-to-r from-violet-600 to-purple-600 text-white py-14">
+          <div className="container mx-auto px-4 text-center">
+            <div className="inline-flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full mb-4 text-sm font-bold">
+              <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
+              40% OFF — ₹1999 → ₹1199/year — Offer ends tonight
+            </div>
+            <h2 className="text-3xl font-bold mb-3">Ready to Transform Your Restaurant?</h2>
+            <p className="text-lg text-white/90 mb-6 max-w-xl mx-auto">
+              Join 500+ restaurants using BillByteKOT. KOT-first billing, GST invoices, thermal printing, WhatsApp integration — all in one.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link to="/login">
+                <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 h-12 px-8 font-bold">
+                  Start Free 7-Day Trial
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 h-12 px-8">
+                  🔥 Claim 40% OFF — ₹1199/yr
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="bg-gray-900 text-white py-10">
+          <div className="container mx-auto px-4">
+            <div className="grid md:grid-cols-4 gap-8">
+              <div>
+                <h3 className="font-bold text-lg mb-3">BillByteKOT</h3>
+                <p className="text-gray-400 text-sm">India's #1 KOT-first restaurant billing and automation system. GST compliant, WhatsApp integrated, offline ready.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-3">Product</h4>
+                <ul className="space-y-1.5 text-gray-400 text-sm">
+                  <li><Link to="/features" className="hover:text-white">Features</Link></li>
+                  <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
+                  <li><Link to="/download" className="hover:text-white">Download</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-3">Resources</h4>
+                <ul className="space-y-1.5 text-gray-400 text-sm">
+                  <li><Link to="/blog" className="hover:text-white">Blog</Link></li>
+                  <li><Link to="/contact" className="hover:text-white">Contact Us</Link></li>
+                  <li><Link to="/support" className="hover:text-white">Support</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-3">Popular Searches</h4>
+                <ul className="space-y-1.5 text-gray-400 text-sm">
+                  <li>Restaurant billing software India</li>
+                  <li>KOT system for restaurants</li>
+                  <li>GST billing software free</li>
+                  <li>Restaurant POS system 2026</li>
+                </ul>
+              </div>
+            </div>
+            <div className="border-t border-gray-800 mt-8 pt-6 text-center text-gray-400 text-sm">
+              <p>© 2026 BillByteKOT by BillByte Innovations. All rights reserved.</p>
+            </div>
+          </div>
+        </footer>
       </div>
     </>
   );
