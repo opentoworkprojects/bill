@@ -1,125 +1,182 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { ChefHat, Search, Calendar, User, ArrowRight, TrendingUp, Flame, Clock, Tag, Zap } from 'lucide-react';
+import {
+  ChefHat, Search, Calendar, User, ArrowRight, TrendingUp,
+  Flame, Clock, Tag, Zap, BookOpen, Star
+} from 'lucide-react';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { CategoryPageSEO } from '../seo';
 import AdSense from '../components/AdSense';
 
-// Rolling 24h countdown hook
+// Rolling 24h countdown
 const useCountdown = () => {
-  const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
-  useState(() => {
+  const [t, setT] = useState({ hours: 23, minutes: 59, seconds: 59 });
+  useEffect(() => {
     const tick = () => {
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
+      const end = new Date(); end.setHours(23, 59, 59, 999);
       const diff = end - new Date();
-      setTimeLeft({
-        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((diff / 1000 / 60) % 60),
+      setT({
+        hours: Math.floor((diff / 3600000) % 24),
+        minutes: Math.floor((diff / 60000) % 60),
         seconds: Math.floor((diff / 1000) % 60),
       });
     };
     tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
-  });
-  return timeLeft;
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return t;
 };
 
-// Sticky sidebar ad + CTA widget
-const Sidebar = ({ timeLeft }) => (
-  <aside className="hidden lg:block w-80 flex-shrink-0">
-    <div className="sticky top-24 space-y-6">
+const authorName = (author) =>
+  typeof author === 'string' ? author : author?.name || 'BillByteKOT Team';
 
-      {/* FOMO offer box */}
-      <div className="bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 rounded-2xl p-5 text-white shadow-xl">
-        <div className="flex items-center gap-2 mb-2">
-          <Flame className="w-5 h-5 animate-pulse" />
-          <span className="font-black text-sm tracking-widest">FLASH SALE — TODAY ONLY</span>
+// Sidebar — only shown on lg+
+const Sidebar = ({ timeLeft }) => (
+  <aside className="hidden lg:block w-72 xl:w-80 flex-shrink-0">
+    <div className="sticky top-24 space-y-5">
+
+      {/* FOMO card */}
+      <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: 'linear-gradient(135deg,#f97316,#ef4444,#dc2626)' }}>
+        <div className="p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Flame className="w-4 h-4 text-yellow-300 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-black tracking-widest uppercase">Flash Sale — Today Only</span>
+          </div>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-4xl font-black">40%</span>
+            <span className="text-xl font-bold">OFF</span>
+          </div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-white/50 line-through text-sm">₹1999/yr</span>
+            <span className="text-white font-black text-xl">₹1199/yr</span>
+            <span className="bg-yellow-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded">SAVE ₹800</span>
+          </div>
+          {/* Countdown */}
+          <div className="flex gap-1.5 mb-4">
+            {[{ v: timeLeft.hours, l: 'HRS' }, { v: timeLeft.minutes, l: 'MIN' }, { v: timeLeft.seconds, l: 'SEC' }].map((x, i) => (
+              <div key={i} className="flex-1 bg-black/25 rounded-xl py-2 text-center">
+                <div className="font-mono font-black text-2xl leading-none">{String(x.v).padStart(2, '0')}</div>
+                <div className="text-[9px] text-white/60 mt-0.5">{x.l}</div>
+              </div>
+            ))}
+          </div>
+          <Link to="/login">
+            <button className="w-full bg-white text-red-600 font-black py-2.5 rounded-xl text-sm hover:bg-yellow-50 transition-all shadow">
+              Claim 40% OFF Now →
+            </button>
+          </Link>
+          <p className="text-[10px] text-white/50 text-center mt-2">Resets at midnight • No credit card needed</p>
         </div>
-        <div className="text-4xl font-black mb-1">40% OFF</div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="line-through text-white/60 text-lg">₹1999/yr</span>
-          <span className="text-2xl font-black">₹1199/yr</span>
-        </div>
-        <div className="flex gap-1 mb-4">
-          {[
-            { v: timeLeft.hours, l: 'HRS' },
-            { v: timeLeft.minutes, l: 'MIN' },
-            { v: timeLeft.seconds, l: 'SEC' },
-          ].map((item, i) => (
-            <div key={i} className="flex-1 bg-black/30 rounded-lg py-1 text-center">
-              <div className="font-mono font-black text-xl">{String(item.v).padStart(2, '0')}</div>
-              <div className="text-[9px] text-white/70">{item.l}</div>
-            </div>
-          ))}
-        </div>
-        <Link to="/login">
-          <button className="w-full bg-white text-orange-600 font-black py-2.5 rounded-xl hover:bg-yellow-50 transition-all text-sm">
-            Claim 40% OFF Now →
-          </button>
-        </Link>
-        <p className="text-[10px] text-white/60 text-center mt-2">Price resets at midnight • No credit card</p>
       </div>
 
-      {/* Ad slot 1 */}
-      <AdSense slot="1635338536" format="auto" responsive="true" />
+      {/* Ad */}
+      <div className="rounded-xl overflow-hidden">
+        <AdSense slot="1635338536" format="auto" responsive="true" />
+      </div>
 
-      {/* Popular keywords / tags */}
-      <div className="bg-white rounded-2xl p-5 shadow border">
+      {/* Popular topics */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
         <div className="flex items-center gap-2 mb-3">
-          <Tag className="w-4 h-4 text-violet-600" />
-          <span className="font-bold text-gray-800">Popular Topics</span>
+          <Tag className="w-4 h-4 text-violet-500" />
+          <span className="font-bold text-gray-800 text-sm">Popular Topics</span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {[
             'Restaurant Billing', 'KOT System', 'POS India', 'GST Billing',
-            'Thermal Printer', 'WhatsApp Billing', 'Inventory Management',
-            'Free Trial', 'Restaurant Software 2026', 'Billing Software',
-            'Table Management', 'Cloud Kitchen', 'QSR Billing', 'UPI Payments',
+            'Thermal Printer', 'WhatsApp Billing', 'Inventory', 'Free Trial',
+            'Cloud Kitchen', 'QSR Billing', 'UPI Payments', 'Table Management',
           ].map(tag => (
-            <span key={tag} className="bg-violet-50 text-violet-700 text-xs px-2 py-1 rounded-full border border-violet-100 hover:bg-violet-100 cursor-pointer transition-colors">
+            <span key={tag} className="bg-violet-50 text-violet-700 text-[11px] px-2.5 py-1 rounded-full border border-violet-100 hover:bg-violet-100 cursor-pointer transition-colors font-medium">
               {tag}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Ad slot 2 */}
-      <AdSense slot="2847291650" format="auto" responsive="true" />
+      {/* Ad */}
+      <div className="rounded-xl overflow-hidden">
+        <AdSense slot="2847291650" format="auto" responsive="true" />
+      </div>
 
-      {/* Quick stats */}
-      <div className="bg-white rounded-2xl p-5 shadow border">
-        <div className="font-bold text-gray-800 mb-3">Why BillByteKOT?</div>
-        <ul className="space-y-2 text-sm text-gray-600">
+      {/* Stats */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-2 mb-3">
+          <Star className="w-4 h-4 text-yellow-500" />
+          <span className="font-bold text-gray-800 text-sm">Why BillByteKOT?</span>
+        </div>
+        <ul className="space-y-2.5">
           {[
             ['500+', 'Restaurants using it'],
             ['80%', 'Fewer kitchen errors'],
             ['3x', 'Faster table turnover'],
-            ['₹100/mo', 'At 40% off yearly plan'],
+            ['₹100/mo', 'Yearly plan at 40% off'],
             ['5 min', 'Setup time'],
             ['7 days', 'Free trial, no card'],
           ].map(([stat, label]) => (
-            <li key={stat} className="flex items-center justify-between">
+            <li key={stat} className="flex items-center justify-between text-sm">
               <span className="font-black text-violet-600">{stat}</span>
-              <span>{label}</span>
+              <span className="text-gray-500">{label}</span>
             </li>
           ))}
         </ul>
         <Link to="/login">
-          <button className="w-full mt-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold py-2 rounded-xl text-sm hover:opacity-90 transition-all">
+          <button className="w-full mt-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold py-2.5 rounded-xl text-sm hover:opacity-90 transition-all">
             Start Free Trial
           </button>
         </Link>
       </div>
 
-      {/* Ad slot 3 */}
-      <AdSense slot="3958402761" format="auto" responsive="true" />
+      {/* Ad */}
+      <div className="rounded-xl overflow-hidden">
+        <AdSense slot="3958402761" format="auto" responsive="true" />
+      </div>
     </div>
   </aside>
+);
+
+// Post card
+const PostCard = ({ post, featured = false }) => (
+  <Link to={`/blog/${post.slug}`} className="group block">
+    <div className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col ${featured ? 'border-violet-200' : ''}`}>
+      <div className="relative overflow-hidden" style={{ height: featured ? '200px' : '160px' }}>
+        <img
+          src={post.image}
+          alt={post.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        <div className="absolute top-3 left-3 flex gap-1.5">
+          <span className="bg-violet-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            {post.category}
+          </span>
+          {featured && (
+            <span className="bg-yellow-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+              <Star className="w-2.5 h-2.5" /> Featured
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="p-4 flex flex-col flex-1">
+        <h3 className={`font-bold text-gray-900 group-hover:text-violet-600 transition-colors leading-snug mb-2 ${featured ? 'text-base' : 'text-sm'}`}>
+          {post.title}
+        </h3>
+        <p className="text-gray-500 text-xs line-clamp-2 mb-3 flex-1">{post.excerpt}</p>
+        <div className="flex items-center justify-between text-[11px] text-gray-400 pt-3 border-t border-gray-50">
+          <span className="flex items-center gap-1">
+            <User className="w-3 h-3" />
+            {authorName(post.author)}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {post.readTime}
+          </span>
+        </div>
+      </div>
+    </div>
+  </Link>
 );
 
 const BlogPage = () => {
@@ -129,321 +186,289 @@ const BlogPage = () => {
   const extraPosts = [
     {
       id: 0, title: 'Lightning-Fast Restaurant Billing: The Future is Here ⚡',
-      excerpt: 'Discover how lightning-fast restaurant billing systems are transforming restaurants worldwide. Learn why 10,000+ restaurants switched to instant payment processing.',
+      excerpt: 'Discover how lightning-fast restaurant billing systems are transforming restaurants worldwide.',
       author: 'BillByteKOT Team', date: '2025-02-10', category: 'Business Strategy',
       readTime: '12 min read', image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
       slug: 'lightning-fast-restaurant-billing', featured: true,
     },
     {
       id: -1, title: 'How to 10X Your Restaurant Revenue Without Hiring More Staff 📈',
-      excerpt: 'Discover how top restaurants are increasing revenue 10x without hiring more staff. The secret? Smart billing systems and automation.',
+      excerpt: 'Discover how top restaurants are increasing revenue 10x without hiring more staff.',
       author: 'BillByteKOT Team', date: '2025-02-10', category: 'Revenue Growth',
       readTime: '14 min read', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800',
       slug: 'restaurant-revenue-10x-without-hiring', featured: true,
     },
     {
       id: -2, title: 'Why Your Restaurant Lost That Customer (And How to Get Them Back) 💔',
-      excerpt: 'Did your restaurant lose a customer today? Find out the #1 reason customers leave and how simple fixes like instant billing can bring them back.',
+      excerpt: 'Find out the #1 reason customers leave and how simple fixes like instant billing can bring them back.',
       author: 'BillByteKOT Team', date: '2025-02-10', category: 'Customer Retention',
       readTime: '11 min read', image: 'https://images.unsplash.com/photo-1554224311-beee415c15c?w=800',
       slug: 'restaurant-lost-customer-recovery', featured: true,
     },
   ];
 
-  const blogPosts = [...blogPostsData, ...extraPosts];
-
-  const filteredPosts = blogPosts.filter(post =>
+  const allPosts = [...blogPostsData, ...extraPosts];
+  const featuredPosts = allPosts.filter(p => p.featured).slice(0, 4);
+  const filteredPosts = allPosts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (post.excerpt || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const featuredPosts = blogPosts.filter(p => p.featured).slice(0, 4);
 
   return (
     <>
       <CategoryPageSEO
         title="Restaurant Billing Software Blog | Tips, Guides & Updates | BillByteKOT"
-        description="Expert guides on restaurant billing software, KOT systems, thermal printing, inventory management, and restaurant technology. Free tips and tutorials for restaurant owners in India."
+        description="Expert guides on restaurant billing software, KOT systems, thermal printing, inventory management, and restaurant technology. Free tips for restaurant owners in India."
         keywords={[
           'restaurant billing software blog', 'KOT system guide', 'restaurant POS tips India',
-          'thermal printer setup restaurant', 'restaurant management tips 2026',
-          'restaurant software tutorials', 'billing software guides', 'restaurant technology blog',
-          'POS system India 2026', 'restaurant business tips', 'GST billing software',
-          'cloud kitchen billing', 'QSR POS system', 'restaurant inventory management',
-          'WhatsApp billing restaurant', 'free restaurant software trial',
+          'GST billing software', 'restaurant management tips 2026', 'billing software guides',
+          'POS system India 2026', 'cloud kitchen billing', 'WhatsApp billing restaurant',
         ]}
         url="https://billbytekot.in/blog"
         image="https://billbytekot.in/og-blog.jpg"
         schemaData={{
           name: 'Restaurant Software Blog',
-          description: 'Expert guides and tips on restaurant billing software, KOT systems, and restaurant technology.',
-          items: filteredPosts.slice(0, 10).map(post => ({
-            name: post.title, description: post.excerpt,
-            url: `https://billbytekot.in/blog/${post.slug}`,
+          description: 'Expert guides on restaurant billing software, KOT systems, and restaurant technology.',
+          items: filteredPosts.slice(0, 10).map(p => ({
+            name: p.title, description: p.excerpt, url: `https://billbytekot.in/blog/${p.slug}`,
           })),
         }}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="min-h-screen bg-gray-50">
 
-        {/* Header */}
-        <header className="bg-white border-b sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <Link to="/" className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <ChefHat className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                  BillByteKOT
-                </span>
-              </Link>
-              <div className="flex items-center gap-3">
-                {/* Mini countdown in header */}
-                <div className="hidden sm:flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full">
-                  <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-                  <span className="text-xs font-bold text-red-600">40% OFF ends in</span>
-                  <span className="font-mono text-xs font-black text-red-700">
-                    {String(timeLeft.hours).padStart(2,'0')}:{String(timeLeft.minutes).padStart(2,'0')}:{String(timeLeft.seconds).padStart(2,'0')}
-                  </span>
-                </div>
-                <Link to="/login">
-                  <Button className="bg-gradient-to-r from-violet-600 to-purple-600">
-                    Get Started
-                  </Button>
-                </Link>
+        {/* ── HEADER ── */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
+                <ChefHat className="w-5 h-5 text-white" />
               </div>
+              <span className="text-xl font-black bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                BillByteKOT
+              </span>
+            </Link>
+
+            <div className="flex items-center gap-3">
+              {/* Countdown pill */}
+              <div className="hidden sm:flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full">
+                <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                <span className="text-xs font-bold text-red-600">40% OFF ends</span>
+                <span className="font-mono text-xs font-black text-red-700 tabular-nums">
+                  {String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
+                </span>
+              </div>
+              <Link to="/login">
+                <Button size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 shadow-sm">
+                  Get Started
+                </Button>
+              </Link>
             </div>
           </div>
         </header>
 
-        {/* Top banner ad */}
-        <div className="bg-white border-b">
-          <div className="container mx-auto px-4 py-2">
-            <AdSense slot="1635338536" format="auto" responsive="true" />
-          </div>
-        </div>
-
-        {/* Hero */}
-        <section className="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-1.5 rounded-full mb-4 text-sm font-bold">
+        {/* ── HERO ── */}
+        <section className="bg-gradient-to-br from-violet-700 via-purple-700 to-pink-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-20">
+            <div className="max-w-2xl mx-auto text-center">
+              {/* Offer badge */}
+              <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
                 <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
-                🔥 40% OFF — Restaurant Billing Software — Offer Ends Tonight
+                40% OFF — Restaurant Billing Software — Offer Ends Tonight
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">BillByteKOT Blog</h1>
-              <p className="text-lg text-white/90 mb-6">
-                Expert insights on restaurant billing software, KOT systems, POS India, GST billing, inventory management &amp; more
+              <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight">
+                BillByteKOT Blog
+              </h1>
+              <p className="text-white/80 text-base md:text-lg mb-8 leading-relaxed">
+                Restaurant billing software guides, KOT system tips, POS India reviews, GST billing &amp; more
               </p>
-              <div className="relative max-w-xl mx-auto">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              {/* Search */}
+              <div className="relative max-w-lg mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search: KOT system, billing software, POS India..."
+                  placeholder="Search articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-12 text-base"
+                  className="pl-11 h-12 bg-white text-gray-900 border-0 shadow-lg rounded-xl text-sm"
                 />
               </div>
             </div>
           </div>
         </section>
 
-        {/* Featured Posts */}
-        {!searchQuery && (
-          <section className="py-12 bg-white">
-            <div className="container mx-auto px-4">
-              <div className="flex items-center gap-3 mb-6">
-                <TrendingUp className="w-7 h-7 text-violet-600" />
-                <h2 className="text-2xl font-bold">Featured Articles</h2>
-                <span className="ml-auto text-sm text-gray-500">Restaurant billing software guides &amp; tips</span>
-              </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                {featuredPosts.map((post) => (
-                  <Card key={post.id} className="overflow-hidden hover:shadow-2xl transition-all border-2 border-violet-100">
-                    <div className="relative h-56 overflow-hidden">
-                      <img src={post.image} alt={post.title} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
-                      <div className="absolute top-3 left-3 flex gap-2">
-                        <span className="bg-violet-600 text-white px-2.5 py-0.5 rounded-full text-xs font-medium">{post.category}</span>
-                        <span className="bg-yellow-500 text-white px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" /> Featured
-                        </span>
-                      </div>
-                    </div>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-xl hover:text-violet-600 transition-colors leading-snug">
-                        <Link to={`/blog/${post.slug}`}>{post.title}</Link>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-gray-600 text-sm line-clamp-2">{post.excerpt}</p>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span className="flex items-center gap-1"><User className="w-3 h-3" />{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{post.readTime}</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-3 border-t">
-                        <span className="text-xs text-gray-400">{new Date(post.date).toLocaleDateString()}</span>
-                        <Link to={`/blog/${post.slug}`}>
-                          <Button size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 h-8 text-xs">
-                            Read Article <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        {/* ── MAIN ── */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+          <div className="flex gap-8">
 
-        {/* Main content + sidebar */}
-        <section className="py-10">
-          <div className="container mx-auto px-4">
-            <div className="flex gap-8">
+            {/* Left: content */}
+            <div className="flex-1 min-w-0">
 
-              {/* Posts grid */}
-              <div className="flex-1 min-w-0">
-                {!searchQuery && (
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-bold mb-1">All Articles</h2>
-                    <p className="text-gray-500 text-sm">Restaurant billing software guides, KOT system tips, POS India reviews &amp; more</p>
+              {/* Featured grid — only when not searching */}
+              {!searchQuery && (
+                <div className="mb-10">
+                  <div className="flex items-center gap-2 mb-5">
+                    <TrendingUp className="w-5 h-5 text-violet-600" />
+                    <h2 className="text-xl font-black text-gray-900">Featured Articles</h2>
                   </div>
-                )}
+                  {/* Hero featured post + 3 smaller */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Big hero card */}
+                    <Link to={`/blog/${featuredPosts[0]?.slug}`} className="group md:row-span-2 block">
+                      <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 h-full flex flex-col">
+                        <div className="relative overflow-hidden flex-1" style={{ minHeight: '260px' }}>
+                          <img
+                            src={featuredPosts[0]?.image}
+                            alt={featuredPosts[0]?.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 absolute inset-0"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                          <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
+                            <span className="bg-violet-600 text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 inline-block">
+                              {featuredPosts[0]?.category}
+                            </span>
+                            <h3 className="font-black text-lg leading-snug group-hover:text-yellow-300 transition-colors">
+                              {featuredPosts[0]?.title}
+                            </h3>
+                            <p className="text-white/70 text-xs mt-1 line-clamp-2">{featuredPosts[0]?.excerpt}</p>
+                            <div className="flex items-center gap-3 mt-2 text-white/60 text-[11px]">
+                              <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{featuredPosts[0]?.readTime}</span>
+                              <span className="flex items-center gap-1"><User className="w-3 h-3" />{authorName(featuredPosts[0]?.author)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
 
-                {/* Ad between header and grid */}
-                <div className="mb-6">
+                    {/* 3 smaller featured */}
+                    {featuredPosts.slice(1, 4).map(post => (
+                      <PostCard key={post.id} post={post} featured />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ad — between featured and all posts */}
+              {!searchQuery && (
+                <div className="mb-8 rounded-xl overflow-hidden">
                   <AdSense slot="2847291650" format="auto" responsive="true" />
                 </div>
+              )}
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  {filteredPosts.map((post, idx) => (
-                    <>
-                      <Card key={post.id} className="overflow-hidden hover:shadow-xl transition-shadow">
-                        <div className="relative h-44 overflow-hidden">
-                          <img src={post.image} alt={post.title} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
-                          <div className="absolute top-3 left-3">
-                            <span className="bg-violet-600 text-white px-2.5 py-0.5 rounded-full text-xs font-medium">{post.category}</span>
-                          </div>
-                        </div>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base hover:text-violet-600 transition-colors leading-snug">
-                            <Link to={`/blog/${post.slug}`}>{post.title}</Link>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <p className="text-gray-600 text-sm line-clamp-2">{post.excerpt}</p>
-                          <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span className="flex items-center gap-1"><User className="w-3 h-3" />{typeof post.author === 'string' ? post.author : post.author?.name || 'BillByteKOT Team'}</span>
-                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(post.date).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex items-center justify-between pt-3 border-t">
-                            <span className="text-xs text-gray-400">{post.readTime}</span>
-                            <Link to={`/blog/${post.slug}`}>
-                              <Button variant="ghost" size="sm" className="text-violet-600 h-7 text-xs">
-                                Read More <ArrowRight className="w-3 h-3 ml-1" />
-                              </Button>
-                            </Link>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Inject ad every 6 posts */}
-                      {(idx + 1) % 6 === 0 && (
-                        <div key={`ad-${idx}`} className="md:col-span-2">
-                          <AdSense slot="3958402761" format="auto" responsive="true" />
-                        </div>
-                      )}
-
-                      {/* Inject FOMO CTA every 10 posts */}
-                      {(idx + 1) % 10 === 0 && (
-                        <div key={`cta-${idx}`} className="md:col-span-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white text-center">
-                          <Zap className="w-8 h-8 mx-auto mb-2 text-yellow-300" />
-                          <div className="font-black text-xl mb-1">🔥 40% OFF — Ends Tonight</div>
-                          <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800 • Offer resets at midnight</div>
-                          <Link to="/login">
-                            <button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">
-                              Claim 40% OFF Now →
-                            </button>
-                          </Link>
-                        </div>
-                      )}
-                    </>
-                  ))}
+              {/* All posts */}
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900">
+                    {searchQuery ? `Results for "${searchQuery}"` : 'All Articles'}
+                  </h2>
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    {filteredPosts.length} articles on restaurant billing, KOT systems &amp; more
+                  </p>
                 </div>
+              </div>
 
-                {filteredPosts.length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">No articles found matching your search.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredPosts.map((post, idx) => (
+                  <div key={post.id}>
+                    <PostCard post={post} />
+
+                    {/* Ad every 6 posts — full width */}
+                    {(idx + 1) % 6 === 0 && (
+                      <div className="sm:col-span-2 xl:col-span-3 mt-4 rounded-xl overflow-hidden">
+                        <AdSense slot="3958402761" format="auto" responsive="true" />
+                      </div>
+                    )}
+
+                    {/* FOMO CTA every 12 posts */}
+                    {(idx + 1) % 12 === 0 && (
+                      <div className="sm:col-span-2 xl:col-span-3 mt-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white text-center">
+                        <Zap className="w-7 h-7 mx-auto mb-2 text-yellow-300" />
+                        <div className="font-black text-lg mb-1">🔥 40% OFF — Ends Tonight</div>
+                        <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800</div>
+                        <Link to="/login">
+                          <button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">
+                            Claim 40% OFF →
+                          </button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
+              </div>
 
-                {/* Bottom ad */}
-                <div className="mt-8">
-                  <AdSense slot="1635338536" format="auto" responsive="true" />
+              {filteredPosts.length === 0 && (
+                <div className="text-center py-16">
+                  <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-400 font-medium">No articles found for "{searchQuery}"</p>
                 </div>
-              </div>
+              )}
 
-              {/* Sidebar */}
-              <Sidebar timeLeft={timeLeft} />
+              {/* Bottom ad */}
+              <div className="mt-10 rounded-xl overflow-hidden">
+                <AdSense slot="1635338536" format="auto" responsive="true" />
+              </div>
+            </div>
+
+            {/* Right: sidebar */}
+            <Sidebar timeLeft={timeLeft} />
+          </div>
+        </div>
+
+        {/* ── SEO KEYWORDS SECTION ── */}
+        <section className="bg-white border-t border-gray-100 py-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <h2 className="text-base font-bold text-gray-700 mb-5">Restaurant Billing Software — Resource Hub</h2>
+            <div className="grid sm:grid-cols-3 gap-6 text-sm text-gray-500">
+              {[
+                {
+                  title: 'Popular Guides',
+                  items: ['Restaurant billing software India 2026', 'KOT system for restaurants', 'GST billing software free', 'Thermal printer for restaurant', 'WhatsApp billing integration', 'Restaurant POS system comparison'],
+                },
+                {
+                  title: 'By Restaurant Type',
+                  items: ['Cloud kitchen billing software', 'QSR POS system India', 'Fine dining billing system', 'Cafe billing software', 'Dhaba billing software', 'Food truck POS system'],
+                },
+                {
+                  title: 'By City',
+                  items: ['Restaurant billing software Mumbai', 'POS system Bangalore', 'Billing software Delhi', 'Restaurant software Hyderabad', 'POS system Chennai', 'Billing software Pune'],
+                },
+              ].map(col => (
+                <div key={col.title}>
+                  <h3 className="font-bold text-gray-700 mb-2 text-sm">{col.title}</h3>
+                  <ul className="space-y-1.5">
+                    {col.items.map(t => (
+                      <li key={t} className="flex items-center gap-1.5">
+                        <ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* SEO keyword-rich section */}
-        <section className="bg-white py-10 border-t">
-          <div className="container mx-auto px-4 max-w-4xl">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Restaurant Billing Software — Complete Resource Hub</h2>
-            <div className="grid md:grid-cols-3 gap-6 text-sm text-gray-600">
-              <div>
-                <h3 className="font-bold text-gray-800 mb-2">Popular Guides</h3>
-                <ul className="space-y-1">
-                  {['Restaurant billing software India 2026', 'KOT system for restaurants', 'GST billing software free', 'Thermal printer for restaurant', 'WhatsApp billing integration', 'Restaurant POS system comparison'].map(t => (
-                    <li key={t} className="flex items-center gap-1"><ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />{t}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-800 mb-2">By Restaurant Type</h3>
-                <ul className="space-y-1">
-                  {['Cloud kitchen billing software', 'QSR POS system India', 'Fine dining billing system', 'Cafe billing software', 'Dhaba billing software', 'Food truck POS system'].map(t => (
-                    <li key={t} className="flex items-center gap-1"><ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />{t}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-800 mb-2">By City</h3>
-                <ul className="space-y-1">
-                  {['Restaurant billing software Mumbai', 'POS system Bangalore', 'Billing software Delhi', 'Restaurant software Hyderabad', 'POS system Chennai', 'Billing software Pune'].map(t => (
-                    <li key={t} className="flex items-center gap-1"><ArrowRight className="w-3 h-3 text-violet-400 flex-shrink-0" />{t}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="bg-gradient-to-r from-violet-600 to-purple-600 text-white py-14">
-          <div className="container mx-auto px-4 text-center">
-            <div className="inline-flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full mb-4 text-sm font-bold">
+        {/* ── CTA ── */}
+        <section className="bg-gradient-to-r from-violet-700 to-purple-700 text-white py-14">
+          <div className="max-w-3xl mx-auto px-4 text-center">
+            <div className="inline-flex items-center gap-2 bg-white/15 border border-white/20 px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
               <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
               40% OFF — ₹1999 → ₹1199/year — Offer ends tonight
             </div>
-            <h2 className="text-3xl font-bold mb-3">Ready to Transform Your Restaurant?</h2>
-            <p className="text-lg text-white/90 mb-6 max-w-xl mx-auto">
-              Join 500+ restaurants using BillByteKOT. KOT-first billing, GST invoices, thermal printing, WhatsApp integration — all in one.
+            <h2 className="text-3xl md:text-4xl font-black mb-3">Ready to Transform Your Restaurant?</h2>
+            <p className="text-white/75 text-base mb-8 max-w-lg mx-auto">
+              Join 500+ restaurants using BillByteKOT. KOT-first billing, GST invoices, thermal printing, WhatsApp integration.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link to="/login">
-                <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 h-12 px-8 font-bold">
+                <Button size="lg" className="bg-white text-violet-700 hover:bg-gray-50 h-12 px-8 font-black shadow-lg">
                   Start Free 7-Day Trial
                 </Button>
               </Link>
               <Link to="/login">
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 h-12 px-8">
+                <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 h-12 px-8 font-bold">
                   🔥 Claim 40% OFF — ₹1199/yr
                 </Button>
               </Link>
@@ -451,42 +476,46 @@ const BlogPage = () => {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="bg-gray-900 text-white py-10">
-          <div className="container mx-auto px-4">
-            <div className="grid md:grid-cols-4 gap-8">
+        {/* ── FOOTER ── */}
+        <footer className="bg-gray-950 text-white py-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
-                <h3 className="font-bold text-lg mb-3">BillByteKOT</h3>
-                <p className="text-gray-400 text-sm">India's #1 KOT-first restaurant billing and automation system. GST compliant, WhatsApp integrated, offline ready.</p>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <ChefHat className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="font-black text-lg">BillByteKOT</span>
+                </div>
+                <p className="text-gray-400 text-sm leading-relaxed">India's KOT-first restaurant billing system. GST compliant, WhatsApp integrated, offline ready.</p>
               </div>
               <div>
-                <h4 className="font-semibold mb-3">Product</h4>
-                <ul className="space-y-1.5 text-gray-400 text-sm">
-                  <li><Link to="/features" className="hover:text-white">Features</Link></li>
-                  <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
-                  <li><Link to="/download" className="hover:text-white">Download</Link></li>
+                <h4 className="font-bold text-sm mb-3 text-gray-300">Product</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  {[['/', 'Home'], ['/login', 'Get Started'], ['/blog', 'Blog']].map(([to, label]) => (
+                    <li key={to}><Link to={to} className="hover:text-white transition-colors">{label}</Link></li>
+                  ))}
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold mb-3">Resources</h4>
-                <ul className="space-y-1.5 text-gray-400 text-sm">
-                  <li><Link to="/blog" className="hover:text-white">Blog</Link></li>
-                  <li><Link to="/contact" className="hover:text-white">Contact Us</Link></li>
-                  <li><Link to="/support" className="hover:text-white">Support</Link></li>
+                <h4 className="font-bold text-sm mb-3 text-gray-300">Resources</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  {[['/contact', 'Contact Us'], ['/support', 'Support'], ['/blog', 'All Articles']].map(([to, label]) => (
+                    <li key={to}><Link to={to} className="hover:text-white transition-colors">{label}</Link></li>
+                  ))}
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold mb-3">Popular Searches</h4>
-                <ul className="space-y-1.5 text-gray-400 text-sm">
-                  <li>Restaurant billing software India</li>
-                  <li>KOT system for restaurants</li>
-                  <li>GST billing software free</li>
-                  <li>Restaurant POS system 2026</li>
+                <h4 className="font-bold text-sm mb-3 text-gray-300">Popular Searches</h4>
+                <ul className="space-y-1.5 text-gray-400 text-xs">
+                  {['Restaurant billing software India', 'KOT system for restaurants', 'GST billing software free', 'Restaurant POS system 2026'].map(t => (
+                    <li key={t}>{t}</li>
+                  ))}
                 </ul>
               </div>
             </div>
-            <div className="border-t border-gray-800 mt-8 pt-6 text-center text-gray-400 text-sm">
-              <p>© 2026 BillByteKOT by BillByte Innovations. All rights reserved.</p>
+            <div className="border-t border-gray-800 pt-6 text-center text-gray-500 text-xs">
+              © 2026 BillByteKOT by BillByte Innovations. All rights reserved.
             </div>
           </div>
         </footer>
