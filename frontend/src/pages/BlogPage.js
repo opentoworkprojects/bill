@@ -4,7 +4,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import {
   ChefHat, Search, Calendar, User, ArrowRight, TrendingUp,
-  Flame, Clock, Tag, Zap, BookOpen, Star
+  Flame, Clock, Tag, Zap, BookOpen, Star, Smartphone, Monitor,
+  Download, CheckCircle, Globe, Wifi
 } from 'lucide-react';
 import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { CategoryPageSEO } from '../seo';
@@ -33,7 +34,74 @@ const useCountdown = () => {
 const authorName = (author) =>
   typeof author === 'string' ? author : author?.name || 'BillByteKOT Team';
 
-// Sidebar — only shown on lg+
+// App promo card — used in sidebar and inline
+const AppPromoCard = ({ compact = false }) => (
+  <div className={`rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white ${compact ? '' : ''}`}>
+    <div className="p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
+          <Smartphone className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <div className="font-black text-sm">BillByteKOT App</div>
+          <div className="text-gray-400 text-[10px]">Android • Windows • Web</div>
+        </div>
+      </div>
+      {!compact && (
+        <p className="text-gray-300 text-xs mb-4 leading-relaxed">
+          Manage your restaurant from anywhere. Bill faster, track inventory, send KOTs — all on your phone or PC.
+        </p>
+      )}
+      <div className="space-y-2">
+        {/* Android */}
+        <Link to="/download">
+          <div className="flex items-center gap-3 bg-green-600 hover:bg-green-500 transition-colors rounded-xl px-3 py-2.5 cursor-pointer">
+            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Smartphone className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-green-200 leading-none">GET IT ON</div>
+              <div className="font-black text-sm leading-tight">Google Play Store</div>
+            </div>
+            <Download className="w-4 h-4 text-green-200 flex-shrink-0" />
+          </div>
+        </Link>
+        {/* Windows */}
+        <Link to="/download">
+          <div className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 transition-colors rounded-xl px-3 py-2.5 cursor-pointer">
+            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Monitor className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-blue-200 leading-none">DOWNLOAD FOR</div>
+              <div className="font-black text-sm leading-tight">Windows Desktop</div>
+            </div>
+            <Download className="w-4 h-4 text-blue-200 flex-shrink-0" />
+          </div>
+        </Link>
+        {/* Web */}
+        <Link to="/login">
+          <div className="flex items-center gap-3 bg-white/10 hover:bg-white/15 transition-colors rounded-xl px-3 py-2.5 cursor-pointer border border-white/10">
+            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Globe className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-gray-400 leading-none">USE IN BROWSER</div>
+              <div className="font-black text-sm leading-tight">Web App — Free Trial</div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </div>
+        </Link>
+      </div>
+      {!compact && (
+        <div className="mt-3 flex items-center gap-1.5 text-[10px] text-gray-500">
+          <CheckCircle className="w-3 h-3 text-green-400" />
+          <span>Works offline • No internet needed for billing</span>
+        </div>
+      )}
+    </div>
+  </div>
+);
 const Sidebar = ({ timeLeft }) => (
   <aside className="hidden lg:block w-72 xl:w-80 flex-shrink-0">
     <div className="sticky top-24 space-y-5">
@@ -128,6 +196,9 @@ const Sidebar = ({ timeLeft }) => (
           </button>
         </Link>
       </div>
+
+      {/* App promo */}
+      <AppPromoCard />
 
       {/* Ad */}
       <div className="rounded-xl overflow-hidden">
@@ -224,6 +295,9 @@ const BlogPage = () => {
           'restaurant billing software blog', 'KOT system guide', 'restaurant POS tips India',
           'GST billing software', 'restaurant management tips 2026', 'billing software guides',
           'POS system India 2026', 'cloud kitchen billing', 'WhatsApp billing restaurant',
+          'restaurant billing app Android', 'restaurant POS Windows app', 'KOT app download',
+          'restaurant billing software UAE', 'restaurant POS UK', 'restaurant app worldwide',
+          'offline restaurant billing app', 'best restaurant app 2026',
         ]}
         url="https://billbytekot.in/blog"
         image="https://billbytekot.in/og-blog.jpg"
@@ -415,6 +489,119 @@ const BlogPage = () => {
           </div>
         </div>
 
+        {/* ── APP PROMOTION SECTION ── */}
+        <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-14">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 px-4 py-1.5 rounded-full text-green-400 text-sm font-bold mb-4">
+                <Smartphone className="w-4 h-4" />
+                Available on Android, Windows &amp; Web — Worldwide
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black mb-3">
+                Restaurant Billing App for{' '}
+                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">Every Device</span>
+              </h2>
+              <p className="text-gray-400 text-base max-w-2xl mx-auto">
+                The #1 KOT-first restaurant billing app. Works on Android phones, Windows PCs, and any web browser — online or offline. Used by restaurants across India, UAE, UK, USA &amp; more.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6 mb-10">
+              {/* Android */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform">
+                  <Smartphone className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="font-black text-lg mb-1">Android App</h3>
+                <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                  Native Android app for restaurant billing on the go. Bill customers, send KOTs, track inventory — all from your phone. Works offline too.
+                </p>
+                <ul className="space-y-1.5 mb-5">
+                  {['Restaurant billing app Android', 'KOT system mobile app', 'GST invoice app India', 'Offline billing app', 'Works on any Android phone'].map(f => (
+                    <li key={f} className="flex items-center gap-2 text-xs text-gray-300">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />{f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/download">
+                  <button className="w-full bg-green-500 hover:bg-green-400 text-white font-black py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Download Android APK
+                  </button>
+                </Link>
+                <p className="text-[10px] text-gray-500 text-center mt-2">Free download • No Play Store needed</p>
+              </div>
+
+              {/* Windows */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform">
+                  <Monitor className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="font-black text-lg mb-1">Windows Desktop App</h3>
+                <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                  Full-featured Windows desktop app for restaurant billing. Connects to thermal printers, works offline, and syncs with your team in real-time.
+                </p>
+                <ul className="space-y-1.5 mb-5">
+                  {['Restaurant billing software Windows', 'Thermal printer integration', 'Offline POS system', 'Auto-sync with cloud', 'Works on Windows 10/11'].map(f => (
+                    <li key={f} className="flex items-center gap-2 text-xs text-gray-300">
+                      <CheckCircle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />{f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/download">
+                  <button className="w-full bg-blue-500 hover:bg-blue-400 text-white font-black py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Download for Windows
+                  </button>
+                </Link>
+                <p className="text-[10px] text-gray-500 text-center mt-2">Free download • Windows 10/11</p>
+              </div>
+
+              {/* Web / PWA */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all group relative overflow-hidden">
+                <div className="absolute top-3 right-3 bg-violet-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">INSTANT ACCESS</div>
+                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform">
+                  <Globe className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="font-black text-lg mb-1">Web App (Any Device)</h3>
+                <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                  Use BillByteKOT directly in your browser — no download needed. Works on iPhone, iPad, Mac, Linux, Chromebook, and any device worldwide.
+                </p>
+                <ul className="space-y-1.5 mb-5">
+                  {['Works on iPhone & iPad', 'Mac & Linux compatible', 'No installation needed', 'Instant 7-day free trial', 'Access from anywhere worldwide'].map(f => (
+                    <li key={f} className="flex items-center gap-2 text-xs text-gray-300">
+                      <CheckCircle className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />{f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/login">
+                  <button className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90 text-white font-black py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    Start Free Trial — No Download
+                  </button>
+                </Link>
+                <p className="text-[10px] text-gray-500 text-center mt-2">7 days free • No credit card</p>
+              </div>
+            </div>
+
+            {/* Worldwide availability strip */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <Globe className="w-5 h-5 text-green-400" />
+                <span className="font-bold text-white">Available Worldwide</span>
+              </div>
+              <p className="text-gray-400 text-sm mb-4">
+                BillByteKOT works in every country. Restaurant owners in India, UAE, UK, USA, Canada, Australia, Singapore &amp; 50+ countries use it daily.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {['🇮🇳 India', '🇦🇪 UAE', '🇬🇧 UK', '🇺🇸 USA', '🇨🇦 Canada', '🇦🇺 Australia', '🇸🇬 Singapore', '🇳🇿 New Zealand', '🇿🇦 South Africa', '🌍 +50 more'].map(c => (
+                  <span key={c} className="bg-white/10 text-gray-300 text-xs px-3 py-1 rounded-full">{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── SEO KEYWORDS SECTION ── */}
         <section className="bg-white border-t border-gray-100 py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -426,12 +613,12 @@ const BlogPage = () => {
                   items: ['Restaurant billing software India 2026', 'KOT system for restaurants', 'GST billing software free', 'Thermal printer for restaurant', 'WhatsApp billing integration', 'Restaurant POS system comparison'],
                 },
                 {
-                  title: 'By Restaurant Type',
-                  items: ['Cloud kitchen billing software', 'QSR POS system India', 'Fine dining billing system', 'Cafe billing software', 'Dhaba billing software', 'Food truck POS system'],
+                  title: 'App Downloads',
+                  items: ['Restaurant billing app Android', 'Restaurant POS Windows app', 'KOT app for Android phone', 'Offline restaurant billing app', 'Restaurant software free download', 'Best restaurant app India 2026'],
                 },
                 {
-                  title: 'By City',
-                  items: ['Restaurant billing software Mumbai', 'POS system Bangalore', 'Billing software Delhi', 'Restaurant software Hyderabad', 'POS system Chennai', 'Billing software Pune'],
+                  title: 'Worldwide',
+                  items: ['Restaurant billing software UAE', 'POS system UK restaurants', 'Restaurant app USA', 'Billing software Singapore', 'Restaurant POS Australia', 'KOT system worldwide'],
                 },
               ].map(col => (
                 <div key={col.title}>
