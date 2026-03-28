@@ -346,12 +346,8 @@ axios.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Only add cache-busting timestamp to real-time endpoints that must always be fresh.
-    // Static/shared data (menu, settings) uses localStorage TTL in sharedDataCache instead.
-    const CACHE_BUST_PATHS = ['/orders', '/tables', '/kitchen', '/notifications'];
-    const needsCacheBust = config.method === 'get' &&
-      CACHE_BUST_PATHS.some(p => config.url?.includes(p));
-    if (needsCacheBust) {
+    // Add timestamp to prevent caching issues
+    if (config.method === 'get') {
       config.params = { ...config.params, _t: Date.now() };
     }
     return config;
@@ -407,13 +403,7 @@ axios.interceptors.response.use(
       config.retry = 0;
     }
     
-    // Only retry requests to our own API — never retry external URLs (AdSense, CDNs, etc.)
-    const isOwnApi = config?.url?.includes('restro-ai.onrender.com') ||
-      config?.url?.startsWith('/api') ||
-      config?.baseURL?.includes('restro-ai.onrender.com');
-    
     const shouldRetry = 
-      isOwnApi &&
       config.retry < 2 && // Max 2 retries
       (!error.response || error.response.status >= 500 || error.code === 'ECONNABORTED');
     

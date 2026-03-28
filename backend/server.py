@@ -1,5 +1,6 @@
 
 import base64
+import html
 import json
 import hashlib
 import logging
@@ -2326,6 +2327,192 @@ This is a computer generated receipt
 """,
     }
     return templates.get(theme, templates["classic"])
+
+
+def get_public_backend_url() -> str:
+    """Resolve the public backend base URL used in customer-facing links."""
+    return (
+        os.getenv("PUBLIC_BACKEND_URL")
+        or os.getenv("BACKEND_URL")
+        or "https://restro-ai.onrender.com"
+    ).rstrip("/")
+
+
+def build_public_receipt_url(tracking_token: str) -> str:
+    """Build the public receipt page URL for an order."""
+    return f"{get_public_backend_url()}/api/public/receipt/{tracking_token}"
+
+
+async def generate_receipt_pdf(order: dict, business: dict) -> StreamingResponse:
+    """Generate a simple printable receipt PDF for a public order receipt."""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PDF generation is unavailable")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=16 * mm,
+        leftMargin=16 * mm,
+        topMargin=16 * mm,
+        bottomMargin=16 * mm
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'ReceiptTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#18181b'),
+        spaceAfter=6
+    )
+    meta_style = ParagraphStyle(
+        'ReceiptMeta',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#52525b'),
+        spaceAfter=10
+    )
+    section_style = ParagraphStyle(
+        'ReceiptSection',
+        parent=styles['Heading2'],
+        fontSize=11,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor('#27272a'),
+        spaceBefore=8,
+        spaceAfter=6
+    )
+    normal_style = ParagraphStyle(
+        'ReceiptNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#18181b')
+    )
+
+    currency_code = business.get("currency", "INR")
+    currency_symbol = CURRENCY_SYMBOLS.get(currency_code, "₹")
+    restaurant_name = business.get("restaurant_name", "Restaurant")
+    invoice_label = order.get("invoice_number") or str(order.get("id", ""))[:8].upper()
+    created_at = order.get("created_at")
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except Exception:
+            created_at = None
+
+    elements = []
+    elements.append(Paragraph(restaurant_name, title_style))
+    elements.append(Paragraph(f"Receipt #{invoice_label}", meta_style))
+
+    contact_lines = []
+    if business.get("address"):
+        contact_lines.append(html.escape(str(business["address"])))
+    if business.get("phone"):
+        contact_lines.append(f"Phone: {html.escape(str(business['phone']))}")
+    if business.get("gstin"):
+        contact_lines.append(f"GSTIN: {html.escape(str(business['gstin']))}")
+    if contact_lines:
+        elements.append(Paragraph("<br/>".join(contact_lines), meta_style))
+
+    details = [
+        ["Invoice", str(invoice_label)],
+        ["Table", str(order.get("table_number") or "Counter")],
+        ["Customer", str(order.get("customer_name") or "Guest")],
+        ["Server", str(order.get("waiter_name") or "Staff")],
+        ["Status", str(order.get("status") or "pending").title()],
+    ]
+    if created_at:
+        details.append(["Date", created_at.astimezone().strftime("%d-%m-%Y %I:%M %p")])
+
+    details_table = Table(details, colWidths=[40 * mm, 120 * mm])
+    details_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#18181b')),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#fafafa')]),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#d4d4d8')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e4e4e7')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(details_table)
+    elements.append(Spacer(1, 10))
+
+    elements.append(Paragraph("Items", section_style))
+    item_rows = [["Item", "Qty", "Price", "Amount"]]
+    for item in order.get("items", []):
+        qty = float(item.get("quantity", 0) or 0)
+        price = float(item.get("price", 0) or 0)
+        item_rows.append([
+            str(item.get("name") or ""),
+            f"{qty:g}",
+            f"{currency_symbol}{price:.2f}",
+            f"{currency_symbol}{qty * price:.2f}"
+        ])
+
+    item_table = Table(item_rows, colWidths=[95 * mm, 20 * mm, 30 * mm, 35 * mm])
+    item_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#18181b')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fafafa')]),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#d4d4d8')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e4e4e7')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(item_table)
+    elements.append(Spacer(1, 10))
+
+    summary_rows = [
+        ["Subtotal", f"{currency_symbol}{float(order.get('subtotal', 0) or 0):.2f}"],
+        [f"Tax ({float(order.get('tax_rate', business.get('tax_rate', 5)) or 0):g}%)", f"{currency_symbol}{float(order.get('tax', 0) or 0):.2f}"],
+        ["Discount", f"{currency_symbol}{float(order.get('discount', 0) or 0):.2f}"],
+        ["Total", f"{currency_symbol}{float(order.get('total', 0) or 0):.2f}"],
+    ]
+    summary_table = Table(summary_rows, colWidths=[120 * mm, 40 * mm])
+    summary_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -2), 'Helvetica'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#18181b')),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 12))
+
+    footer_message = business.get("footer_message") or "Thank you for dining with us."
+    elements.append(Paragraph(html.escape(str(footer_message)), meta_style))
+    elements.append(Paragraph("This is a computer generated receipt.", normal_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+    filename = f"receipt-{invoice_label}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 # Auth routes
@@ -5263,12 +5450,13 @@ async def send_whatsapp_receipt_auto(
         cleaned_phone = normalize_phone_e164(customer_phone)
         template_name = whatsapp_api.get_bill_template_name()
         customer_name = (order.get("customer_name") or "Customer")
-        order_id_short = str(order.get("id", ""))[:8].upper()
+        order_id_short = str(order.get("invoice_number") or order.get("id", ""))[:8].upper()
         currency = (business or {}).get("currency", "INR")
         amount = f"{currency} {order.get('total', 0):.2f}"
         template_params = [customer_name, order_id_short, amount]
+        receipt_url = build_public_receipt_url(order.get("tracking_token", "")) if order.get("tracking_token") else None
 
-        result = await send_whatsapp_receipt_cloud(cleaned_phone, order, business)
+        result = await send_whatsapp_receipt_cloud(cleaned_phone, order, business, receipt_url=receipt_url)
         msg_id = result.get("messages", [{}])[0].get("id", "")
         print(f"✅ WA receipt sent | to={cleaned_phone} | template={template_name} | params={template_params} | status=sent | msg_id={msg_id}")
         return {"whatsapp_sent": True, "whatsapp_mode": "cloud", "whatsapp_error": None, "message_id": msg_id}
@@ -9925,10 +10113,12 @@ Tax: {currency_symbol}{order['tax']:.2f}
     # Prefer Cloud API if configured
     if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
         try:
+            receipt_url = build_public_receipt_url(order.get("tracking_token", "")) if order.get("tracking_token") else None
             result = await send_whatsapp_receipt_cloud(
                 message_data.phone_number,
                 order,
-                business
+                business,
+                receipt_url=receipt_url
             )
             return {
                 "success": True,
@@ -9937,6 +10127,7 @@ Tax: {currency_symbol}{order['tax']:.2f}
                 "whatsapp_mode": "cloud",
                 "whatsapp_error": None,
                 "message_id": result.get("messages", [{}])[0].get("id"),
+                "receipt_url": receipt_url,
                 "phone_number": phone,
                 "order_id": order_id,
                 "whatsapp_enabled": whatsapp_enabled
@@ -10064,10 +10255,12 @@ async def send_receipt_via_cloud_api(
     
     try:
         # Send via WhatsApp Cloud API
+        receipt_url = build_public_receipt_url(order.get("tracking_token", "")) if order.get("tracking_token") else None
         result = await send_whatsapp_receipt_cloud(
             phone=message_data.phone_number,
             order=order,
-            business=business
+            business=business,
+            receipt_url=receipt_url
         )
         
         return {
@@ -10075,6 +10268,7 @@ async def send_receipt_via_cloud_api(
             "message": "Receipt sent via WhatsApp",
             "message_id": result.get("messages", [{}])[0].get("id"),
             "phone_number": message_data.phone_number,
+            "receipt_url": receipt_url,
             "order_id": order_id,
             "method": "cloud_api"
         }
@@ -10249,6 +10443,129 @@ async def track_order_public(tracking_token: str):
         "restaurant_phone": business.get("phone", ""),
         "currency": business.get("currency", "INR")
     }
+
+
+@app.get("/api/public/receipt/{tracking_token}")
+async def receipt_public(tracking_token: str, download: int = 0):
+    """Public customer receipt page for invoice viewing/downloading."""
+    order = await db.orders.find_one(
+        {"tracking_token": tracking_token},
+        {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+    admin = await db.users.find_one(
+        {"id": order.get("organization_id") or order.get("waiter_id")},
+        {"_id": 0, "business_settings": 1}
+    )
+    business = admin.get("business_settings", {}) if admin else {}
+    currency_code = business.get("currency", "INR")
+    currency_symbol = CURRENCY_SYMBOLS.get(currency_code, "₹")
+    theme = business.get("receipt_theme", "classic")
+    receipt_content = get_receipt_template(theme, business, order, currency_symbol)
+    invoice_label = order.get("invoice_number") or str(order.get("id", ""))[:8].upper()
+    restaurant_name = business.get("restaurant_name", "Restaurant")
+
+    if download:
+        return await generate_receipt_pdf(order, business)
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Receipt {invoice_label}</title>
+  <style>
+    body {{
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f4f5;
+      color: #18181b;
+    }}
+    .wrap {{
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }}
+    .card {{
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }}
+    .header {{
+      padding: 20px 24px;
+      border-bottom: 1px solid #e4e4e7;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }}
+    .title {{
+      font-size: 20px;
+      font-weight: 700;
+    }}
+    .subtitle {{
+      font-size: 14px;
+      color: #52525b;
+      margin-top: 4px;
+    }}
+    .actions {{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }}
+    .btn {{
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }}
+    .btn-primary {{
+      background: #18181b;
+      color: #ffffff;
+    }}
+    .btn-secondary {{
+      background: #f4f4f5;
+      color: #18181b;
+      border: 1px solid #d4d4d8;
+    }}
+    pre {{
+      margin: 0;
+      padding: 24px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      background: #ffffff;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div>
+          <div class="title">{restaurant_name}</div>
+          <div class="subtitle">Receipt #{invoice_label}</div>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="/api/public/receipt/{tracking_token}?download=1">Download</a>
+          <a class="btn btn-secondary" href="javascript:window.print()">Print</a>
+        </div>
+      </div>
+      <pre>{html.escape(receipt_content)}</pre>
+    </div>
+  </div>
+</body>
+</html>"""
+    return Response(content=html, media_type="text/html; charset=utf-8")
 
 
 @app.get("/api/public/menu/{org_id}")

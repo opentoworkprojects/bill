@@ -41,6 +41,8 @@ class WhatsAppCloudAPI:
         self.template_lang = os.getenv("WHATSAPP_TEMPLATE_LANG", "en_US").strip()
         # Transactional templates (defaults match approved names)
         self.template_bill_confirmation = os.getenv("WHATSAPP_TEMPLATE_BILL_CONFIRMATION", "bill_confirmation").strip()
+        self.template_bill_uses_receipt_url = os.getenv("WHATSAPP_TEMPLATE_BILL_USES_RECEIPT_URL", "false").strip().lower() in ("1", "true", "yes", "on")
+        self.template_bill_use_url_button = os.getenv("WHATSAPP_TEMPLATE_BILL_USE_URL_BUTTON", "false").strip().lower() in ("1", "true", "yes", "on")
         self.template_status_pending = os.getenv("WHATSAPP_TEMPLATE_STATUS_PENDING", "").strip() or self.template_bill_confirmation
         self.template_status_preparing = os.getenv("WHATSAPP_TEMPLATE_STATUS_PREPARING", "order_preparing").strip()
         self.template_status_ready = os.getenv("WHATSAPP_TEMPLATE_STATUS_READY", "order_ready").strip()
@@ -141,7 +143,14 @@ class WhatsAppCloudAPI:
         print(f"✅ WA sent | to={phone} | msg_id={msg_id}")
         return result
 
-    async def send_template_message(self, to_phone: str, template_name: str, params: list, language: str = "en_US") -> Dict[str, Any]:
+    async def send_template_message(
+        self,
+        to_phone: str,
+        template_name: str,
+        params: list,
+        language: str = "en_US",
+        button_url: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Send a template message (required for business-initiated messaging)."""
         if not self.is_configured():
             raise ValueError("WhatsApp Cloud API not configured. Set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN.")
@@ -151,6 +160,13 @@ class WhatsAppCloudAPI:
             "type": "body",
             "parameters": [{"type": "text", "text": str(p)} for p in params]
         }]
+        if button_url:
+            components.append({
+                "type": "button",
+                "sub_type": "url",
+                "index": "0",
+                "parameters": [{"type": "text", "text": str(button_url)}]
+            })
 
         # Build template object
         # NOTE: Category is set when creating the template in Meta Business Manager,
@@ -232,7 +248,13 @@ class WhatsAppCloudAPI:
         raise Exception("Unknown error in send_template_message")
 
 
-    async def send_receipt(self, to_phone: str, order: Dict[str, Any], business: Dict[str, Any]) -> Dict[str, Any]:
+    async def send_receipt(
+        self,
+        to_phone: str,
+        order: Dict[str, Any],
+        business: Dict[str, Any],
+        receipt_url: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Send receipt using approved template only."""
         template_name = self.get_bill_template_name()
         if not template_name:
@@ -240,15 +262,20 @@ class WhatsAppCloudAPI:
 
         currency = business.get("currency", "INR")
         customer_name = (order.get("customer_name") or "Customer")
-        order_id = str(order.get("id", ""))[:8].upper()
+        invoice_number = order.get("invoice_number")
+        order_id = str(invoice_number or order.get("id", ""))[:8].upper()
         total = order.get("total", 0)
         amount = f"{currency} {total:.2f}"
+        body_params = [customer_name, order_id, amount]
+        if receipt_url and self.template_bill_uses_receipt_url:
+            body_params.append(receipt_url)
 
         return await self.send_template_message(
             to_phone,
             template_name,
-            [customer_name, order_id, amount],
-            self.template_lang
+            body_params,
+            self.template_lang,
+            button_url=receipt_url if receipt_url and self.template_bill_use_url_button else None
         )
 
     async def send_order_status(
@@ -286,9 +313,14 @@ whatsapp_api = WhatsAppCloudAPI()
 
 # ─── Helper functions ────────────────────────────────────────────────────────
 
-async def send_whatsapp_receipt(phone: str, order: Dict[str, Any], business: Dict[str, Any]) -> Dict[str, Any]:
+async def send_whatsapp_receipt(
+    phone: str,
+    order: Dict[str, Any],
+    business: Dict[str, Any],
+    receipt_url: Optional[str] = None
+) -> Dict[str, Any]:
     """Send receipt via WhatsApp Cloud API."""
-    return await whatsapp_api.send_receipt(phone, order, business)
+    return await whatsapp_api.send_receipt(phone, order, business, receipt_url=receipt_url)
 
 
 async def send_whatsapp_status(

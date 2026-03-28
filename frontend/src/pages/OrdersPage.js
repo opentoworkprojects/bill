@@ -181,6 +181,23 @@ const OrdersPage = ({ user }) => {
   // 🔧 DUPLICATE FIX: Order deduplication function
   const updateOrdersWithDeduplication = (newOrders, source = 'unknown') => {
     setOrders(prevOrders => {
+      const newlyNotifiedOrders = [];
+      newOrders.forEach((order) => {
+        if (!order?.id || !order?.whatsapp_notification_sent) return;
+        const previousOrder = prevOrders.find((prev) => prev.id === order.id);
+        if (!previousOrder?.whatsapp_notification_sent && !whatsappNotifiedOrdersRef.current.has(order.id)) {
+          newlyNotifiedOrders.push(order.id);
+          whatsappNotifiedOrdersRef.current.add(order.id);
+        }
+      });
+
+      newlyNotifiedOrders.forEach(() => {
+        toast.success('WhatsApp message sent!', {
+          duration: 3000,
+          style: { background: '#10b981', color: 'white', fontWeight: 'bold' }
+        });
+      });
+
       // Keep any optimistic (temp) orders that haven't been confirmed yet
       const optimisticOrders = prevOrders.filter(o => o._optimistic);
       
@@ -1213,6 +1230,7 @@ const OrdersPage = ({ user }) => {
           type: 'success',
           icon: '📱'
         });
+        newOrder.whatsapp_notification_sent = true;
         whatsappNotifiedOrdersRef.current.add(newOrder.id);
       } else if (response.data?.whatsapp_mode === 'background') {
         toast.success('📱 WhatsApp message sent!', {
@@ -1224,6 +1242,14 @@ const OrdersPage = ({ user }) => {
       } else if (response.data?.whatsapp_link && capturedPhone) {
         // Fallback to wa.me link
         window.open(response.data.whatsapp_link, '_blank');
+      }
+
+      if (response.data?.whatsapp_mode === 'background') {
+        whatsappNotifiedOrdersRef.current.delete(newOrder.id);
+        toast('WhatsApp notification queued. A sent confirmation will appear after delivery.', {
+          duration: 3000,
+          position: 'top-center'
+        });
       }
 
       // Preload billing cache in background
@@ -1527,10 +1553,12 @@ const OrdersPage = ({ user }) => {
         timeout: 10000
       });
       
-      if (response.data?.whatsapp_link && !response.data?.whatsapp_sent) {
-        window.open(response.data.whatsapp_link, '_blank');
+      if (response.data?.whatsapp_sent) {
+        toast.success('✅ WhatsApp message sent!');
+      } else {
+        toast.error(response.data?.whatsapp_error || 'WhatsApp Cloud API not configured');
+        return;
       }
-      toast.success('✅ WhatsApp message sent!');
       setWhatsappModal({ open: false, orderId: null, customerName: '' });
       setWhatsappPhone('');
     } catch (error) {
@@ -3084,7 +3112,7 @@ const OrdersPage = ({ user }) => {
                     onClick={handleWhatsappShare}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-sm sm:text-base"
                   >
-                    Open WhatsApp
+                    Share
                   </Button>
                   <Button
                     variant="outline"
