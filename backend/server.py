@@ -2083,34 +2083,43 @@ def get_receipt_template(
     sep_heavy = "═" * 48
     sep_light_48 = "─" * 48
 
+    order_id_short = str(order.get("invoice_number") or order.get("id", ""))[:8].upper() or "RECEIPT"
+    table_label = order.get("table_number") or order.get("table_name") or "N/A"
+    waiter_label = order.get("waiter_name") or "N/A"
+    customer_label = order.get("customer_name") or "Guest"
+    items = order.get("items") or []
+    subtotal = float(order.get("subtotal") or 0)
+    tax = float(order.get("tax") or 0)
+    total = float(order.get("total") or 0)
+
     items_text = "".join(
         [
             f"{item['quantity']}x {item['name']:<30} {currency_symbol}{item['price'] * item['quantity']:.2f}\n"
-            for item in order["items"]
+            for item in items
         ]
     )
     items_modern = "".join(
         [
             f"  {item['quantity']}× {item['name']:<28} {currency_symbol}{item['price'] * item['quantity']:.2f}\n"
-            for item in order["items"]
+            for item in items
         ]
     )
     items_minimal = "".join(
         [
             f"{item['quantity']}× {item['name']}: {currency_symbol}{item['price'] * item['quantity']:.2f}\n"
-            for item in order["items"]
+            for item in items
         ]
     )
     items_elegant = "".join(
         [
             f"{item['quantity']:>3} × {item['name']:<28} {currency_symbol}{item['price'] * item['quantity']:>8.2f}\n"
-            for item in order["items"]
+            for item in items
         ]
     )
     items_compact = "".join(
         [
             f"{item['quantity']}x {item['name'][:20]:<20} {currency_symbol}{item['price'] * item['quantity']:.2f}\n"
-            for item in order["items"]
+            for item in items
         ]
     )
 
@@ -10470,6 +10479,26 @@ async def receipt_public(tracking_token: str, download: int = 0):
         {"_id": 0, "business_settings": 1}
     )
     business = admin.get("business_settings", {}) if admin else {}
+    sanitized_items = []
+    for item in order.get("items") or []:
+        sanitized_items.append({
+            **item,
+            "name": item.get("name") or "Item",
+            "quantity": item.get("quantity") or 0,
+            "price": float(item.get("price") or 0),
+        })
+
+    order = {
+        **order,
+        "id": str(order.get("invoice_number") or order.get("id", "")),
+        "table_number": order.get("table_number") or order.get("table_name") or "N/A",
+        "waiter_name": order.get("waiter_name") or "N/A",
+        "customer_name": order.get("customer_name") or "Guest",
+        "items": sanitized_items,
+        "subtotal": float(order.get("subtotal") or 0),
+        "tax": float(order.get("tax") or 0),
+        "total": float(order.get("total") or 0),
+    }
     currency_code = business.get("currency", "INR")
     currency_symbol = CURRENCY_SYMBOLS.get(currency_code, "₹")
     theme = business.get("receipt_theme", "classic")
