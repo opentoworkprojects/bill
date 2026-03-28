@@ -1,5 +1,8 @@
+import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://restro-ai.onrender.com';
 
 const CURRENCY_SYMBOLS = {
   INR: '₹',
@@ -8,32 +11,6 @@ const CURRENCY_SYMBOLS = {
   GBP: '£',
   AED: 'د.إ'
 };
-
-function decodeBase64Url(input) {
-  const normalized = (input || '').replace(/-/g, '+').replace(/_/g, '/');
-  const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
-  const binary = atob(normalized + padding);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-async function inflateReceiptPayload(encoded) {
-  if (!encoded) return null;
-
-  try {
-    const compressed = decodeBase64Url(encoded);
-
-    if (typeof DecompressionStream !== 'undefined') {
-      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate'));
-      const text = await new Response(stream).text();
-      return JSON.parse(text);
-    }
-
-    const legacyText = new TextDecoder().decode(compressed);
-    return JSON.parse(legacyText);
-  } catch {
-    return null;
-  }
-}
 
 function formatDate(value) {
   if (!value) return 'N/A';
@@ -51,17 +28,29 @@ function formatDate(value) {
 export default function SharedReceiptPage() {
   const { encodedReceipt } = useParams();
   const [receipt, setReceipt] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
 
     const loadReceipt = async () => {
-      setIsLoading(true);
-      const data = await inflateReceiptPayload(encodedReceipt);
-      if (active) {
-        setReceipt(data);
-        setIsLoading(false);
+      setLoading(true);
+      setError('');
+      try {
+        const response = await axios.get(`${BACKEND_URL}/api/public/receipt-data/${encodedReceipt}`);
+        if (active) {
+          setReceipt(response.data);
+        }
+      } catch (err) {
+        if (active) {
+          setError('Receipt not found');
+          setReceipt(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
@@ -76,7 +65,7 @@ export default function SharedReceiptPage() {
     [receipt]
   );
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center text-gray-600">
@@ -86,12 +75,12 @@ export default function SharedReceiptPage() {
     );
   }
 
-  if (!receipt) {
+  if (error || !receipt) {
     return (
       <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center">
           <h1 className="text-xl font-bold text-gray-900">Receipt unavailable</h1>
-          <p className="text-sm text-gray-600 mt-2">This shared receipt link is invalid.</p>
+          <p className="text-sm text-gray-600 mt-2">{error || 'This receipt link is invalid.'}</p>
         </div>
       </div>
     );

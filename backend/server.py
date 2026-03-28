@@ -15,7 +15,7 @@ import io
 import time
 import random
 import math
-import zlib
+import secrets
 import builtins
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -2358,53 +2358,22 @@ def get_public_backend_url() -> str:
     ).rstrip("/")
 
 
-def _encode_receipt_payload(payload: dict) -> str:
-    """Encode compact receipt payload for frontend-only public sharing."""
-    json_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    compressed = zlib.compress(json_bytes, level=9)
-    return base64.urlsafe_b64encode(compressed).decode("ascii").rstrip("=")
-
-
 def build_public_receipt_url(tracking_token: str, order: Optional[dict] = None, business: Optional[dict] = None) -> str:
     """Build the public receipt URL for an order."""
-    if order:
-        items = []
-        for item in order.get("items") or []:
-            try:
-                quantity = float(item.get("quantity") or 0)
-            except Exception:
-                quantity = 0
-            try:
-                price = float(item.get("price") or 0)
-            except Exception:
-                price = 0
-            items.append({
-                "name": item.get("name") or "Item",
-                "quantity": quantity,
-                "price": price,
-            })
+    return f"{get_public_site_url()}/receipt/{tracking_token}"
 
-        payload = {
-            "token": tracking_token,
-            "invoice_number": order.get("invoice_number") or str(order.get("id", ""))[:8].upper(),
-            "created_at": order.get("created_at").isoformat() if isinstance(order.get("created_at"), datetime) else str(order.get("created_at") or ""),
-            "table_number": order.get("table_number") or order.get("table_name") or "",
-            "waiter_name": order.get("waiter_name") or "",
-            "customer_name": order.get("customer_name") or "",
-            "subtotal": float(order.get("subtotal") or 0),
-            "tax": float(order.get("tax") or 0),
-            "total": float(order.get("total") or 0),
-            "currency": (business or {}).get("currency", "INR"),
-            "restaurant_name": (business or {}).get("restaurant_name", "Restaurant"),
-            "restaurant_phone": (business or {}).get("phone", ""),
-            "restaurant_address": (business or {}).get("address", ""),
-            "footer_message": (business or {}).get("footer_message", "Thank you for dining with us!"),
-            "items": items,
-        }
-        encoded = _encode_receipt_payload(payload)
-        return f"{get_public_site_url()}/receipt/{encoded}"
 
-    return f"{get_public_site_url()}/api/public/receipt/{tracking_token}"
+async def generate_short_tracking_token(length: int = 8) -> str:
+    """Generate a short public tracking token with collision checking."""
+    alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+    for _ in range(10):
+        token = "".join(secrets.choice(alphabet) for _ in range(length))
+        existing = await db.orders.find_one({"tracking_token": token}, {"_id": 1})
+        if not existing:
+            return token
+
+    return "".join(secrets.choice(alphabet) for _ in range(length + 2))
 
 
 async def generate_receipt_pdf(order: dict, business: dict) -> StreamingResponse:
@@ -5825,7 +5794,7 @@ async def create_order(
     total = subtotal + tax
     
     # Generate IDs (fast, in-memory, <1ms)
-    tracking_token = str(uuid.uuid4())[:12]
+    tracking_token = await generate_short_tracking_token()
     order_id = str(uuid.uuid4())
     
     # Create order object WITHOUT invoice number (will be set in background)
@@ -10652,6 +10621,53 @@ async def receipt_public(tracking_token: str, download: int = 0):
     return Response(content=html, media_type="text/html; charset=utf-8")
 
 
+@app.get("/api/public/receipt-data/{tracking_token}")
+async def receipt_public_data(tracking_token: str):
+    """Public customer receipt data for frontend receipt rendering."""
+    order = await db.orders.find_one(
+        {"tracking_token": tracking_token},
+        {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+    admin = await db.users.find_one(
+        {"id": order.get("organization_id") or order.get("waiter_id")},
+        {"_id": 0, "business_settings": 1}
+    )
+    business = admin.get("business_settings", {}) if admin else {}
+
+    sanitized_items = []
+    for item in order.get("items") or []:
+        sanitized_items.append({
+            "name": item.get("name") or "Item",
+            "quantity": float(item.get("quantity") or 0),
+            "price": float(item.get("price") or 0),
+        })
+
+    created_at = order.get("created_at")
+    if isinstance(created_at, datetime):
+        created_at = created_at.isoformat()
+
+    return {
+        "tracking_token": tracking_token,
+        "invoice_number": order.get("invoice_number") or str(order.get("id", ""))[:8].upper(),
+        "created_at": created_at or "",
+        "table_number": order.get("table_number") or order.get("table_name") or "",
+        "waiter_name": order.get("waiter_name") or "",
+        "customer_name": order.get("customer_name") or "",
+        "subtotal": float(order.get("subtotal") or 0),
+        "tax": float(order.get("tax") or 0),
+        "total": float(order.get("total") or 0),
+        "currency": business.get("currency", "INR"),
+        "restaurant_name": business.get("restaurant_name", "Restaurant"),
+        "restaurant_phone": business.get("phone", ""),
+        "restaurant_address": business.get("address", ""),
+        "footer_message": business.get("footer_message", "Thank you for dining with us!"),
+        "items": sanitized_items,
+    }
+
+
 @app.get("/api/public/menu/{org_id}")
 async def get_public_menu(org_id: str):
     """Public endpoint for customers to view menu (for self-ordering)"""
@@ -10878,7 +10894,7 @@ async def create_customer_order(order_data: CustomerOrderCreate):
     total = subtotal + tax
     
     # Generate tracking token
-    tracking_token = str(uuid.uuid4())[:12]
+    tracking_token = await generate_short_tracking_token()
     
     order_obj = Order(
         table_id=order_data.table_id,
