@@ -6708,7 +6708,11 @@ async def update_order(
 
                 # Auto-send WhatsApp receipt after billing completion
                 try:
-                    if completed_phone and business.get("whatsapp_enabled", False):
+                    should_auto_send_receipt = (
+                        business.get("whatsapp_auto_notify", False)
+                        and business.get("whatsapp_notify_on_completed", True)
+                    )
+                    if completed_phone and should_auto_send_receipt:
                         updated_order = await db.orders.find_one(
                             {"id": order_id, "organization_id": user_org_id},
                             {"_id": 0}
@@ -7026,7 +7030,11 @@ async def update_order(
             try:
                 new_status = update_data.get("status", existing_order.get("status"))
                 is_fully_paid = (update_data.get("balance_amount", calculated_balance) == 0 and not is_credit)
-                if updated_phone and business.get("whatsapp_enabled", False) and (new_status in ["completed", "paid", "settled"] or is_fully_paid):
+                should_auto_send_receipt = (
+                    business.get("whatsapp_auto_notify", False)
+                    and business.get("whatsapp_notify_on_completed", True)
+                )
+                if updated_phone and should_auto_send_receipt and (new_status in ["completed", "paid", "settled"] or is_fully_paid):
                     updated_order = await db.orders.find_one(
                         {"id": order_id, "organization_id": user_org_id},
                         {"_id": 0}
