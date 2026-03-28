@@ -34,6 +34,7 @@ import StaffManagementPage from './pages/StaffManagementPage';
 import LandingPage from './pages/LandingPage';
 import SEOPage from './pages/SEOPage';
 import TrackOrderPage from './pages/TrackOrderPage';
+import SharedReceiptPage from './pages/SharedReceiptPage';
 import CustomerOrderPage from './pages/CustomerOrderPage';
 import DownloadPage from './pages/DownloadPage';
 import BlogPage from './pages/BlogPage';
@@ -967,6 +968,7 @@ function App() {
           <Route path="/about-billbytekot" element={<BrandPage />} />
           <Route path="/what-is-billbytekot" element={<BrandPage />} />
           <Route path="/track/:trackingToken" element={<TrackOrderPage />} />
+          <Route path="/shared-receipt" element={<SharedReceiptPage />} />
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/menu/:orgId" element={<PublicMenuPage />} />
           <Route path="/r/:restaurantSlug/menu" element={<PublicMenuPage />} />

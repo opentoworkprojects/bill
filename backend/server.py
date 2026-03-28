@@ -2357,8 +2357,51 @@ def get_public_backend_url() -> str:
     ).rstrip("/")
 
 
-def build_public_receipt_url(tracking_token: str) -> str:
-    """Build the public receipt page URL for an order."""
+def _encode_receipt_payload(payload: dict) -> str:
+    """Encode compact receipt payload for frontend-only public sharing."""
+    json_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return base64.urlsafe_b64encode(json_bytes).decode("ascii").rstrip("=")
+
+
+def build_public_receipt_url(tracking_token: str, order: Optional[dict] = None, business: Optional[dict] = None) -> str:
+    """Build the public receipt URL for an order."""
+    if order:
+        items = []
+        for item in order.get("items") or []:
+            try:
+                quantity = float(item.get("quantity") or 0)
+            except Exception:
+                quantity = 0
+            try:
+                price = float(item.get("price") or 0)
+            except Exception:
+                price = 0
+            items.append({
+                "name": item.get("name") or "Item",
+                "quantity": quantity,
+                "price": price,
+            })
+
+        payload = {
+            "token": tracking_token,
+            "invoice_number": order.get("invoice_number") or str(order.get("id", ""))[:8].upper(),
+            "created_at": order.get("created_at").isoformat() if isinstance(order.get("created_at"), datetime) else str(order.get("created_at") or ""),
+            "table_number": order.get("table_number") or order.get("table_name") or "",
+            "waiter_name": order.get("waiter_name") or "",
+            "customer_name": order.get("customer_name") or "",
+            "subtotal": float(order.get("subtotal") or 0),
+            "tax": float(order.get("tax") or 0),
+            "total": float(order.get("total") or 0),
+            "currency": (business or {}).get("currency", "INR"),
+            "restaurant_name": (business or {}).get("restaurant_name", "Restaurant"),
+            "restaurant_phone": (business or {}).get("phone", ""),
+            "restaurant_address": (business or {}).get("address", ""),
+            "footer_message": (business or {}).get("footer_message", "Thank you for dining with us!"),
+            "items": items,
+        }
+        encoded = _encode_receipt_payload(payload)
+        return f"{get_public_site_url()}/shared-receipt?d={encoded}"
+
     return f"{get_public_site_url()}/api/public/receipt/{tracking_token}"
 
 
@@ -5473,7 +5516,7 @@ async def send_whatsapp_receipt_auto(
         currency = (business or {}).get("currency", "INR")
         amount = f"{currency} {order.get('total', 0):.2f}"
         template_params = [customer_name, order_id_short, amount]
-        receipt_url = build_public_receipt_url(order.get("tracking_token", "")) if order.get("tracking_token") else None
+        receipt_url = build_public_receipt_url(order.get("tracking_token", ""), order=order, business=business) if order.get("tracking_token") else None
 
         result = await send_whatsapp_receipt_cloud(cleaned_phone, order, business, receipt_url=receipt_url)
         msg_id = result.get("messages", [{}])[0].get("id", "")
@@ -10132,7 +10175,7 @@ Tax: {currency_symbol}{order['tax']:.2f}
     # Prefer Cloud API if configured
     if _WHATSAPP_CLOUD_AVAILABLE and whatsapp_api and whatsapp_api.is_configured():
         try:
-            receipt_url = build_public_receipt_url(order.get("tracking_token", "")) if order.get("tracking_token") else None
+            receipt_url = build_public_receipt_url(order.get("tracking_token", ""), order=order, business=business) if order.get("tracking_token") else None
             result = await send_whatsapp_receipt_cloud(
                 message_data.phone_number,
                 order,
@@ -10274,7 +10317,7 @@ async def send_receipt_via_cloud_api(
     
     try:
         # Send via WhatsApp Cloud API
-        receipt_url = build_public_receipt_url(order.get("tracking_token", "")) if order.get("tracking_token") else None
+        receipt_url = build_public_receipt_url(order.get("tracking_token", ""), order=order, business=business) if order.get("tracking_token") else None
         result = await send_whatsapp_receipt_cloud(
             phone=message_data.phone_number,
             order=order,
