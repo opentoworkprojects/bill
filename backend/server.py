@@ -2329,6 +2329,16 @@ This is a computer generated receipt
     return templates.get(theme, templates["classic"])
 
 
+def get_public_site_url() -> str:
+    """Resolve the public site base URL used in customer-facing links."""
+    return (
+        os.getenv("PUBLIC_FRONTEND_URL")
+        or os.getenv("FRONTEND_URL")
+        or os.getenv("PUBLIC_SITE_URL")
+        or "https://billbytekot.in"
+    ).rstrip("/")
+
+
 def get_public_backend_url() -> str:
     """Resolve the public backend base URL used in customer-facing links."""
     return (
@@ -2340,7 +2350,7 @@ def get_public_backend_url() -> str:
 
 def build_public_receipt_url(tracking_token: str) -> str:
     """Build the public receipt page URL for an order."""
-    return f"{get_public_backend_url()}/api/public/receipt/{tracking_token}"
+    return f"{get_public_site_url()}/api/public/receipt/{tracking_token}"
 
 
 async def generate_receipt_pdf(order: dict, business: dict) -> StreamingResponse:
