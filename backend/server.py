@@ -15,6 +15,7 @@ import io
 import time
 import random
 import math
+import zlib
 import builtins
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -2360,7 +2361,8 @@ def get_public_backend_url() -> str:
 def _encode_receipt_payload(payload: dict) -> str:
     """Encode compact receipt payload for frontend-only public sharing."""
     json_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return base64.urlsafe_b64encode(json_bytes).decode("ascii").rstrip("=")
+    compressed = zlib.compress(json_bytes, level=9)
+    return base64.urlsafe_b64encode(compressed).decode("ascii").rstrip("=")
 
 
 def build_public_receipt_url(tracking_token: str, order: Optional[dict] = None, business: Optional[dict] = None) -> str:
@@ -2400,7 +2402,7 @@ def build_public_receipt_url(tracking_token: str, order: Optional[dict] = None, 
             "items": items,
         }
         encoded = _encode_receipt_payload(payload)
-        return f"{get_public_site_url()}/shared-receipt?d={encoded}"
+        return f"{get_public_site_url()}/receipt/{encoded}"
 
     return f"{get_public_site_url()}/api/public/receipt/{tracking_token}"
 

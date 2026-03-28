@@ -968,7 +968,7 @@ function App() {
           <Route path="/about-billbytekot" element={<BrandPage />} />
           <Route path="/what-is-billbytekot" element={<BrandPage />} />
           <Route path="/track/:trackingToken" element={<TrackOrderPage />} />
-          <Route path="/shared-receipt" element={<SharedReceiptPage />} />
+          <Route path="/receipt/:encodedReceipt" element={<SharedReceiptPage />} />
           <Route path="/order/:orgId" element={<CustomerOrderPage />} />
           <Route path="/menu/:orgId" element={<PublicMenuPage />} />
           <Route path="/r/:restaurantSlug/menu" element={<PublicMenuPage />} />

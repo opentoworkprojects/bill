@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 
 const CURRENCY_SYMBOLS = {
   INR: '₹',
@@ -9,13 +9,27 @@ const CURRENCY_SYMBOLS = {
   AED: 'د.إ'
 };
 
-function decodePayload(encoded) {
+function decodeBase64Url(input) {
+  const normalized = (input || '').replace(/-/g, '+').replace(/_/g, '/');
+  const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(normalized + padding);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function inflateReceiptPayload(encoded) {
   if (!encoded) return null;
+
   try {
-    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
-    const json = atob(normalized + padding);
-    return JSON.parse(json);
+    const compressed = decodeBase64Url(encoded);
+
+    if (typeof DecompressionStream !== 'undefined') {
+      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate'));
+      const text = await new Response(stream).text();
+      return JSON.parse(text);
+    }
+
+    const legacyText = new TextDecoder().decode(compressed);
+    return JSON.parse(legacyText);
   } catch {
     return null;
   }
@@ -35,21 +49,54 @@ function formatDate(value) {
 }
 
 export default function SharedReceiptPage() {
-  const [searchParams] = useSearchParams();
-  const receipt = useMemo(() => decodePayload(searchParams.get('d')), [searchParams]);
+  const { encodedReceipt } = useParams();
+  const [receipt, setReceipt] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!receipt) {
+  useEffect(() => {
+    let active = true;
+
+    const loadReceipt = async () => {
+      setIsLoading(true);
+      const data = await inflateReceiptPayload(encodedReceipt);
+      if (active) {
+        setReceipt(data);
+        setIsLoading(false);
+      }
+    };
+
+    loadReceipt();
+    return () => {
+      active = false;
+    };
+  }, [encodedReceipt]);
+
+  const currency = useMemo(
+    () => CURRENCY_SYMBOLS[receipt?.currency] || CURRENCY_SYMBOLS.INR,
+    [receipt]
+  );
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center">
-          <h1 className="text-xl font-bold text-gray-900">Receipt unavailable</h1>
-          <p className="text-sm text-gray-600 mt-2">This shared invoice link is invalid or incomplete.</p>
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center text-gray-600">
+          Loading receipt...
         </div>
       </div>
     );
   }
 
-  const currency = CURRENCY_SYMBOLS[receipt.currency] || CURRENCY_SYMBOLS.INR;
+  if (!receipt) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center">
+          <h1 className="text-xl font-bold text-gray-900">Receipt unavailable</h1>
+          <p className="text-sm text-gray-600 mt-2">This shared receipt link is invalid.</p>
+        </div>
+      </div>
+    );
+  }
+
   const items = Array.isArray(receipt.items) ? receipt.items : [];
 
   return (
