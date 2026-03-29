@@ -37,6 +37,17 @@ const SuperAdminPage = () => {
   const [teamStats, setTeamStats] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
+  // Blog management state
+  const [blogPosts, setBlogPosts] = useState([]);
+  const [showBlogForm, setShowBlogForm] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [blogForm, setBlogForm] = useState({
+    title: '', slug: '', metaTitle: '', metaDescription: '', excerpt: '',
+    category: 'Software Guide', content: '', readTime: '5 min read',
+    image: '', imageAlt: '', primaryKeyword: '', targetMarket: 'India',
+    status: 'published', contentType: 'standard', featured: false,
+    leadMagnet: false, appPromo: false,
+  });
   const [showCreateLead, setShowCreateLead] = useState(false);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -740,7 +751,7 @@ const SuperAdminPage = () => {
   // Get available tabs based on user type and permissions
   const getAvailableTabs = () => {
     if (userType === 'super-admin') {
-      return ['dashboard', 'users', 'leads', 'team', 'tickets', 'analytics', 'app-versions', 'promotions', 'pricing', 'referrals', 'notifications'];
+      return ['dashboard', 'users', 'leads', 'team', 'tickets', 'analytics', 'app-versions', 'promotions', 'pricing', 'referrals', 'notifications', 'blog'];
     }
     const tabs = [];
     if (hasPermission('analytics')) tabs.push('dashboard');
@@ -5527,6 +5538,301 @@ const SuperAdminPage = () => {
                     )}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Blog Management Tab */}
+        {activeTab === 'blog' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                  <BookOpen className="w-6 h-6 text-purple-600" />
+                  Blog Management
+                </h2>
+                <p className="text-gray-500 text-sm mt-1">Create and manage blog posts for SEO and lead generation</p>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingPost(null);
+                  setBlogForm({
+                    title: '', slug: '', metaTitle: '', metaDescription: '', excerpt: '',
+                    category: 'Software Guide', content: '', readTime: '5 min read',
+                    image: '', imageAlt: '', primaryKeyword: '', targetMarket: 'India',
+                    status: 'published', contentType: 'standard', featured: false,
+                    leadMagnet: false, appPromo: false,
+                  });
+                  setShowBlogForm(true);
+                }}
+                className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                New Blog Post
+              </Button>
+            </div>
+
+            {/* Blog Form Modal */}
+            {showBlogForm && (
+              <Card className="border-2 border-purple-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{editingPost ? 'Edit Blog Post' : 'Create New Blog Post'}</span>
+                    <button onClick={() => setShowBlogForm(false)} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label>Title *</Label>
+                      <Input
+                        value={blogForm.title}
+                        onChange={e => {
+                          const title = e.target.value;
+                          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                          setBlogForm(f => ({ ...f, title, slug, metaTitle: title }));
+                        }}
+                        placeholder="Blog post title"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Slug *</Label>
+                      <Input value={blogForm.slug} onChange={e => setBlogForm(f => ({ ...f, slug: e.target.value }))} placeholder="url-friendly-slug" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label>Primary Keyword</Label>
+                      <Input value={blogForm.primaryKeyword} onChange={e => setBlogForm(f => ({ ...f, primaryKeyword: e.target.value }))} placeholder="main SEO keyword" className="mt-1" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Meta Title</Label>
+                      <Input value={blogForm.metaTitle} onChange={e => setBlogForm(f => ({ ...f, metaTitle: e.target.value }))} placeholder="SEO meta title (60 chars)" className="mt-1" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Meta Description</Label>
+                      <Input value={blogForm.metaDescription} onChange={e => setBlogForm(f => ({ ...f, metaDescription: e.target.value }))} placeholder="SEO meta description (160 chars)" className="mt-1" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Excerpt</Label>
+                      <Input value={blogForm.excerpt} onChange={e => setBlogForm(f => ({ ...f, excerpt: e.target.value }))} placeholder="Short summary shown in blog listing" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label>Category</Label>
+                      <select value={blogForm.category} onChange={e => setBlogForm(f => ({ ...f, category: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                        {['Software Guide','Comparison','How-To','Industry News','Case Studies','City Guides','Restaurant Tips','Technology','Lead Generation','Free Resources'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Target Market</Label>
+                      <select value={blogForm.targetMarket} onChange={e => setBlogForm(f => ({ ...f, targetMarket: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                        {['India','US','UK','UAE','Singapore','Malaysia','Australia','Canada','Global'].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Status</Label>
+                      <select value={blogForm.status} onChange={e => setBlogForm(f => ({ ...f, status: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                        <option value="published">Published</option>
+                        <option value="draft">Draft</option>
+                        <option value="scheduled">Scheduled</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Content Type</Label>
+                      <select value={blogForm.contentType} onChange={e => setBlogForm(f => ({ ...f, contentType: e.target.value }))} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                        {['standard','pillar','comparison','how-to','listicle','case-study','tool-page','city-guide','app-feature'].map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Read Time</Label>
+                      <Input value={blogForm.readTime} onChange={e => setBlogForm(f => ({ ...f, readTime: e.target.value }))} placeholder="5 min read" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label>Image URL</Label>
+                      <Input value={blogForm.image} onChange={e => setBlogForm(f => ({ ...f, image: e.target.value }))} placeholder="https://images.unsplash.com/..." className="mt-1" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Image Alt Text</Label>
+                      <Input value={blogForm.imageAlt} onChange={e => setBlogForm(f => ({ ...f, imageAlt: e.target.value }))} placeholder="Descriptive alt text for SEO" className="mt-1" />
+                    </div>
+                    <div className="flex items-center gap-6 md:col-span-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={blogForm.featured} onChange={e => setBlogForm(f => ({ ...f, featured: e.target.checked }))} className="w-4 h-4" />
+                        <span className="text-sm font-medium">Featured Post</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={blogForm.leadMagnet} onChange={e => setBlogForm(f => ({ ...f, leadMagnet: e.target.checked }))} className="w-4 h-4" />
+                        <span className="text-sm font-medium">Lead Magnet</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={blogForm.appPromo} onChange={e => setBlogForm(f => ({ ...f, appPromo: e.target.checked }))} className="w-4 h-4" />
+                        <span className="text-sm font-medium">App Promo</span>
+                      </label>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Content (Markdown) *</Label>
+                      <textarea
+                        value={blogForm.content}
+                        onChange={e => setBlogForm(f => ({ ...f, content: e.target.value }))}
+                        placeholder="Write your blog post content in Markdown format..."
+                        rows={16}
+                        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">{blogForm.content.split(/\s+/).filter(Boolean).length} words</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 mt-6">
+                    <Button
+                      onClick={() => {
+                        if (!blogForm.title || !blogForm.slug || !blogForm.content) {
+                          toast.error('Title, slug, and content are required');
+                          return;
+                        }
+                        const newPost = {
+                          ...blogForm,
+                          id: Date.now(),
+                          date: new Date().toISOString().split('T')[0],
+                          lastModified: new Date().toISOString().split('T')[0],
+                          targetMarket: [blogForm.targetMarket],
+                          author: { name: 'BillByteKOT Team', bio: 'Restaurant technology experts', avatar: '/images/authors/team.jpg', social: {} },
+                          tags: [blogForm.category.toLowerCase(), blogForm.primaryKeyword].filter(Boolean),
+                          keywords: [blogForm.primaryKeyword].filter(Boolean),
+                          relatedPosts: [],
+                        };
+                        if (editingPost) {
+                          setBlogPosts(prev => prev.map(p => p.id === editingPost.id ? { ...newPost, id: editingPost.id } : p));
+                          toast.success('Blog post updated');
+                        } else {
+                          setBlogPosts(prev => [newPost, ...prev]);
+                          toast.success('Blog post created — copy the JS object below to add it to blogPosts.js');
+                        }
+                        setShowBlogForm(false);
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingPost ? 'Update Post' : 'Create Post'}
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowBlogForm(false)}>Cancel</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Blog Posts List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Blog Posts ({blogPosts.length} in session)</span>
+                  {blogPosts.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const code = blogPosts.map(p => JSON.stringify(p, null, 2)).join(',\n');
+                        navigator.clipboard.writeText(code);
+                        toast.success('Copied to clipboard — paste into blogPosts.js');
+                      }}
+                      className="flex items-center gap-1 text-xs"
+                    >
+                      <Copy className="w-3 h-3" />
+                      Copy All as JS
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {blogPosts.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">
+                    <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No posts created yet</p>
+                    <p className="text-sm mt-1">Click "New Blog Post" to create your first post</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {blogPosts.map(post => (
+                      <div key={post.id} className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-purple-200 transition-colors">
+                        {post.image && (
+                          <img src={post.image} alt={post.imageAlt} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm text-gray-900 truncate">{post.title}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${post.status === 'published' ? 'bg-green-100 text-green-700' : post.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {post.status}
+                            </span>
+                            {post.featured && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">Featured</span>}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">{post.category} • {post.targetMarket?.join(', ')} • {post.readTime}</div>
+                          <div className="text-xs text-purple-600 font-mono mt-0.5">/blog/{post.slug}</div>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(JSON.stringify(post, null, 2));
+                              toast.success('Post JSON copied — paste into blogPosts.js');
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-purple-600 rounded"
+                            title="Copy JSON"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPost(post);
+                              setBlogForm({
+                                ...post,
+                                targetMarket: Array.isArray(post.targetMarket) ? post.targetMarket[0] : post.targetMarket,
+                              });
+                              setShowBlogForm(true);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setBlogPosts(prev => prev.filter(p => p.id !== post.id));
+                              toast.success('Post removed from session');
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                            title="Remove"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Instructions */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="pt-4">
+                <div className="flex gap-3">
+                  <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-bold mb-1">How to publish posts</p>
+                    <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                      <li>Create your post using the form above</li>
+                      <li>Click the <strong>Copy</strong> icon to copy the post JSON</li>
+                      <li>Open <code className="bg-blue-100 px-1 rounded">frontend/src/data/blogPosts.js</code></li>
+                      <li>Paste the JSON object inside the <code className="bg-blue-100 px-1 rounded">blogPosts</code> array</li>
+                      <li>Deploy — the post will appear on the live blog immediately</li>
+                    </ol>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

@@ -7,9 +7,11 @@ import {
   Flame, Clock, Tag, Zap, BookOpen, Star, Smartphone, Monitor,
   Download, CheckCircle, Globe, Wifi
 } from 'lucide-react';
-import { blogPosts as blogPostsData } from '../data/blogPosts';
+import { blogPosts as blogPostsData, publishedPosts } from '../data/blogPosts';
 import { CategoryPageSEO } from '../seo';
 import AdSense from '../components/AdSense';
+import AppPromoCard from '../components/blog/AppPromoCard';
+import MarketFilter from '../components/blog/MarketFilter';
 
 // Rolling 24h countdown
 const useCountdown = () => {
@@ -34,74 +36,6 @@ const useCountdown = () => {
 const authorName = (author) =>
   typeof author === 'string' ? author : author?.name || 'BillByteKOT Team';
 
-// App promo card — used in sidebar and inline
-const AppPromoCard = ({ compact = false }) => (
-  <div className={`rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white ${compact ? '' : ''}`}>
-    <div className="p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
-          <Smartphone className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <div className="font-black text-sm">BillByteKOT App</div>
-          <div className="text-gray-400 text-[10px]">Android • Windows • Web</div>
-        </div>
-      </div>
-      {!compact && (
-        <p className="text-gray-300 text-xs mb-4 leading-relaxed">
-          Manage your restaurant from anywhere. Bill faster, track inventory, send KOTs — all on your phone or PC.
-        </p>
-      )}
-      <div className="space-y-2">
-        {/* Android */}
-        <Link to="/download">
-          <div className="flex items-center gap-3 bg-green-600 hover:bg-green-500 transition-colors rounded-xl px-3 py-2.5 cursor-pointer">
-            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Smartphone className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-green-200 leading-none">GET IT ON</div>
-              <div className="font-black text-sm leading-tight">Google Play Store</div>
-            </div>
-            <Download className="w-4 h-4 text-green-200 flex-shrink-0" />
-          </div>
-        </Link>
-        {/* Windows */}
-        <Link to="/download">
-          <div className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 transition-colors rounded-xl px-3 py-2.5 cursor-pointer">
-            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Monitor className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-blue-200 leading-none">DOWNLOAD FOR</div>
-              <div className="font-black text-sm leading-tight">Windows Desktop</div>
-            </div>
-            <Download className="w-4 h-4 text-blue-200 flex-shrink-0" />
-          </div>
-        </Link>
-        {/* Web */}
-        <Link to="/login">
-          <div className="flex items-center gap-3 bg-white/10 hover:bg-white/15 transition-colors rounded-xl px-3 py-2.5 cursor-pointer border border-white/10">
-            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Globe className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-gray-400 leading-none">USE IN BROWSER</div>
-              <div className="font-black text-sm leading-tight">Web App — Free Trial</div>
-            </div>
-            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          </div>
-        </Link>
-      </div>
-      {!compact && (
-        <div className="mt-3 flex items-center gap-1.5 text-[10px] text-gray-500">
-          <CheckCircle className="w-3 h-3 text-green-400" />
-          <span>Works offline • No internet needed for billing</span>
-        </div>
-      )}
-    </div>
-  </div>
-);
 const Sidebar = ({ timeLeft }) => (
   <aside className="hidden lg:block w-72 xl:w-80 flex-shrink-0">
     <div className="sticky top-24 space-y-5">
@@ -209,6 +143,8 @@ const Sidebar = ({ timeLeft }) => (
 );
 
 // Post card
+const isNewPost = (post) => new Date() - new Date(post.date) < 14 * 24 * 60 * 60 * 1000;
+
 const PostCard = ({ post, featured = false }) => (
   <Link to={`/blog/${post.slug}`} className="group block">
     <div className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col ${featured ? 'border-violet-200' : ''}`}>
@@ -226,6 +162,11 @@ const PostCard = ({ post, featured = false }) => (
           {featured && (
             <span className="bg-yellow-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
               <Star className="w-2.5 h-2.5" /> Featured
+            </span>
+          )}
+          {isNewPost(post) && (
+            <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+              New
             </span>
           )}
         </div>
@@ -250,8 +191,12 @@ const PostCard = ({ post, featured = false }) => (
   </Link>
 );
 
+const POSTS_PER_PAGE = 20;
+
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMarket, setSelectedMarket] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const timeLeft = useCountdown();
 
   const extraPosts = [
@@ -278,13 +223,23 @@ const BlogPage = () => {
     },
   ];
 
-  const allPosts = [...blogPostsData, ...extraPosts];
+  const allMarkets = [...new Set(publishedPosts.flatMap(p => p.targetMarket || []))].filter(Boolean);
+
+  const allPosts = [...(publishedPosts.length > 0 ? publishedPosts : blogPostsData), ...extraPosts];
   const featuredPosts = allPosts.filter(p => p.featured).slice(0, 4);
-  const filteredPosts = allPosts.filter(post =>
+
+  const marketFilteredPosts = selectedMarket
+    ? allPosts.filter(p => p.targetMarket?.includes(selectedMarket))
+    : allPosts;
+
+  const filteredPosts = marketFilteredPosts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (post.excerpt || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const paginatedPosts = filteredPosts.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
 
   return (
     <>
@@ -442,8 +397,17 @@ const BlogPage = () => {
                 </div>
               </div>
 
+              {/* Market filter */}
+              {!searchQuery && allMarkets.length > 1 && (
+                <MarketFilter
+                  markets={allMarkets}
+                  selected={selectedMarket}
+                  onChange={(market) => { setSelectedMarket(market); setCurrentPage(1); }}
+                />
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredPosts.map((post, idx) => (
+                {paginatedPosts.map((post, idx) => (
                   <div key={post.id}>
                     <PostCard post={post} />
 
@@ -475,6 +439,18 @@ const BlogPage = () => {
                 <div className="text-center py-16">
                   <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-400 font-medium">No articles found for "{searchQuery}"</p>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center gap-2 mt-8">
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button key={i} onClick={() => setCurrentPage(i + 1)}
+                      className={`w-9 h-9 rounded-lg text-sm font-bold ${currentPage === i + 1 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                      {i + 1}
+                    </button>
+                  ))}
                 </div>
               )}
 

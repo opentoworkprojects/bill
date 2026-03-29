@@ -220,25 +220,52 @@ export const ProductPageSEO = ({
   />
 );
 
+// ISO 3166-1 alpha-2 geo region map for targetMarket values
+const GEO_REGION_MAP = {
+  India: 'IN',
+  US: 'US',
+  UK: 'GB',
+  UAE: 'AE',
+  Singapore: 'SG',
+  Malaysia: 'MY',
+  Australia: 'AU',
+  Canada: 'CA',
+  Global: null,
+};
+
 /**
  * Blog Post SEO Component
+ * Supports targetMarket for geo.region meta tag injection
+ * Supports isDraft to set noindex/nofollow on unpublished posts
  */
 export const BlogPostSEO = ({ 
   title,
   description,
   author = 'BillByteKOT Team',
   keywords = ['restaurant management', 'restaurant tips', 'food business'],
+  targetMarket = [],
+  isDraft = false,
   ...props 
-}) => (
-  <EnhancedSEOHead
-    title={title}
-    description={description}
-    author={author}
-    keywords={keywords}
-    contentType={ContentType.BLOG_POST}
-    {...props}
-  />
-);
+}) => {
+  // Build geo meta tag if market is country-specific
+  const primaryMarket = Array.isArray(targetMarket) ? targetMarket[0] : targetMarket;
+  const geoCode = primaryMarket ? GEO_REGION_MAP[primaryMarket] : null;
+  const geoMeta = geoCode ? { 'geo.region': geoCode } : {};
+
+  return (
+    <EnhancedSEOHead
+      title={title}
+      description={description}
+      author={author}
+      keywords={keywords}
+      contentType={ContentType.BLOG_POST}
+      noIndex={isDraft}
+      noFollow={isDraft}
+      customMeta={geoMeta}
+      {...props}
+    />
+  );
+};
 
 /**
  * Landing Page SEO Component

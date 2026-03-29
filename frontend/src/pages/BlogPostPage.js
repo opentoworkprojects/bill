@@ -8,6 +8,16 @@ import { blogPosts as blogPostsData } from '../data/blogPosts';
 import { BlogPostSEO } from '../seo';
 import AdSense from '../components/AdSense';
 import { useState, useEffect } from 'react';
+import { publishedPosts } from '../data/blogPosts';
+import BreadcrumbNav from '../components/blog/BreadcrumbNav';
+import AppDownloadBanner from '../components/blog/AppDownloadBanner';
+import LeadCaptureForm from '../components/blog/LeadCaptureForm';
+import TimedPopup from '../components/blog/TimedPopup';
+import RelatedArticles from '../components/blog/RelatedArticles';
+import AppPromoCard from '../components/blog/AppPromoCard';
+import InlineCTA from '../components/blog/InlineCTA';
+import StickyMobileCTA from '../components/blog/StickyMobileCTA';
+import { PLAY_STORE_URL } from '../utils/playStoreUrl';
 
 // Rolling 24h countdown
 const useCountdown = () => {
@@ -213,6 +223,8 @@ const BlogPostPage = () => {
           </div>
         </header>
 
+        <AppDownloadBanner mobile targetMarket={['India']} />
+
         {/* Article + Sidebar */}
         <div className="container mx-auto px-4 py-10">
           <div className="flex gap-8 max-w-7xl mx-auto">
@@ -247,6 +259,7 @@ const BlogPostPage = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
             {title}
           </h1>
+          <BreadcrumbNav category={category} postTitle={title} />
 
           {/* Ad - Top of Article */}
           <div className="my-8">
@@ -260,95 +273,93 @@ const BlogPostPage = () => {
 
           {/* Content */}
           <div className="prose prose-lg max-w-none">
-            {markdownContent.split('\n\n').map((paragraph, index) => {
-              // Skip empty paragraphs and metadata lines
-              if (!paragraph.trim() || paragraph.startsWith('*Published:') || paragraph.startsWith('*Reading Time:')) return null;
-              
-              // Headers
-              if (paragraph.startsWith('# ')) {
-                return <h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>;
-              } else if (paragraph.startsWith('## ')) {
-                return <h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>;
-              } else if (paragraph.startsWith('### ')) {
-                return <h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>;
-              } else if (paragraph.startsWith('#### ')) {
-                return <h4 key={index} className="text-xl font-bold mt-6 mb-2 text-gray-900">{paragraph.substring(5)}</h4>;
-              }
-              
-              // Bold text
-              if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
-                return <p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>;
-              }
-              
-              // Lists
-              if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
-                const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
-                return (
-                  <ul key={index} className="list-disc ml-6 my-4 space-y-2">
-                    {items.map((item, i) => {
-                      let itemText = item.substring(2);
-                      // Handle inline formatting
-                      itemText = itemText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
-                      itemText = itemText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
-                      return (
-                        <li key={i} className="text-gray-700" dangerouslySetInnerHTML={{ __html: itemText }} />
-                      );
-                    })}
-                  </ul>
-                );
-              }
-              
-              // Links/Buttons
-              const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
-              if (linkMatch && paragraph.trim().startsWith('[')) {
-                return (
-                  <div key={index} className="my-6">
-                    <Link to={linkMatch[2]}>
-                      <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-                        {linkMatch[1]}
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              }
-              
-              // Horizontal rule
-              if (paragraph.trim() === '---') {
-                return <hr key={index} className="my-8 border-gray-300" />;
-              }
-              
-              // Blockquotes
-              if (paragraph.startsWith('> ')) {
-                return (
-                  <blockquote key={index} className="border-l-4 border-violet-600 pl-4 italic text-gray-700 my-4">
-                    {paragraph.substring(2)}
-                  </blockquote>
-                );
-              }
-              
-              // Regular paragraph with inline formatting
-              let formattedText = paragraph;
-              
-              // Handle bold text
-              formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
-              
-              // Handle italic text
-              formattedText = formattedText.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
-              
-              // Handle links
-              formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
-              
-              // Handle inline code
-              formattedText = formattedText.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-2 py-1 rounded text-sm">$1</code>');
-              
-              return (
-                <p 
-                  key={index} 
-                  className="text-gray-700 leading-relaxed my-4 text-lg"
-                  dangerouslySetInnerHTML={{ __html: formattedText }}
-                />
-              );
-            })}
+            {(() => {
+              const paragraphs = markdownContent.split('\n\n');
+              const wordCount = markdownContent.split(/\s+/).length;
+              const injectInlineCTA = wordCount > 2000;
+              const inlineCTAIndex = injectInlineCTA ? Math.floor(paragraphs.length * 0.5) : -1;
+              const elements = [];
+              let adCount = 0;
+
+              paragraphs.forEach((paragraph, index) => {
+                // Skip empty paragraphs and metadata lines
+                if (!paragraph.trim() || paragraph.startsWith('*Published:') || paragraph.startsWith('*Reading Time:')) return;
+
+                // Inject InlineCTA at ~50% position
+                if (index === inlineCTAIndex) {
+                  elements.push(<InlineCTA key={`cta-${index}`} market="India" />);
+                }
+
+                // Headers
+                if (paragraph.startsWith('# ')) {
+                  elements.push(<h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>);
+                } else if (paragraph.startsWith('## ')) {
+                  elements.push(<h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>);
+                } else if (paragraph.startsWith('### ')) {
+                  elements.push(<h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>);
+                } else if (paragraph.startsWith('#### ')) {
+                  elements.push(<h4 key={index} className="text-xl font-bold mt-6 mb-2 text-gray-900">{paragraph.substring(5)}</h4>);
+                } else if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                  elements.push(<p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>);
+                } else if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
+                  const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
+                  elements.push(
+                    <ul key={index} className="list-disc ml-6 my-4 space-y-2">
+                      {items.map((item, i) => {
+                        let itemText = item.substring(2);
+                        itemText = itemText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+                        itemText = itemText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+                        return <li key={i} className="text-gray-700" dangerouslySetInnerHTML={{ __html: itemText }} />;
+                      })}
+                    </ul>
+                  );
+                } else if (paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/) && paragraph.trim().startsWith('[')) {
+                  const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                  elements.push(
+                    <div key={index} className="my-6">
+                      <Link to={linkMatch[2]}>
+                        <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+                          {linkMatch[1]}
+                        </Button>
+                      </Link>
+                    </div>
+                  );
+                } else if (paragraph.trim() === '---') {
+                  elements.push(<hr key={index} className="my-8 border-gray-300" />);
+                } else if (paragraph.startsWith('> ')) {
+                  elements.push(
+                    <blockquote key={index} className="border-l-4 border-violet-600 pl-4 italic text-gray-700 my-4">
+                      {paragraph.substring(2)}
+                    </blockquote>
+                  );
+                } else {
+                  let formattedText = paragraph;
+                  formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+                  formattedText = formattedText.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+                  formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+                  formattedText = formattedText.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-2 py-1 rounded text-sm">$1</code>');
+                  elements.push(
+                    <p key={index} className="text-gray-700 leading-relaxed my-4 text-lg" dangerouslySetInnerHTML={{ __html: formattedText }} />
+                  );
+                }
+
+                // Inject in-content AdSense every ~800 words when total > 2000, max 5 units
+                if (injectInlineCTA && adCount < 5) {
+                  const wordsPerParagraph = wordCount / paragraphs.length;
+                  const paragraphsPerAd = Math.max(1, Math.floor(800 / wordsPerParagraph));
+                  if ((index + 1) % paragraphsPerAd === 0) {
+                    elements.push(
+                      <div key={`ad-inline-${index}`} className="my-6">
+                        <AdSense slot="2847291650" format="auto" responsive="true" />
+                      </div>
+                    );
+                    adCount++;
+                  }
+                }
+              });
+
+              return elements;
+            })()}
           </div>
 
           {/* Ad - Middle of Article */}
@@ -363,6 +374,8 @@ const BlogPostPage = () => {
             <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800 • Resets at midnight</div>
             <Link to="/login"><button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">Claim 40% OFF Now →</button></Link>
           </div>
+
+          <AppDownloadBanner targetMarket={['India']} />
 
           {/* CTA */}
           <div className="mt-10 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
@@ -383,25 +396,13 @@ const BlogPostPage = () => {
             <AdSense slot="3958402761" format="auto" responsive="true" />
           </div>
 
-          {/* Related posts */}
-          {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).length > 0 && (
-            <div className="mt-10">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Related Articles</h3>
-              <div className="grid sm:grid-cols-3 gap-4">
-                {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).map(p => (
-                  <Link key={p.id} to={`/blog/${p.slug}`} className="group">
-                    <div className="rounded-xl overflow-hidden border hover:shadow-lg transition-shadow">
-                      <img src={p.image} alt={p.title} className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" />
-                      <div className="p-3">
-                        <p className="text-sm font-medium text-gray-800 group-hover:text-violet-600 line-clamp-2 leading-snug">{p.title}</p>
-                        <p className="text-xs text-gray-400 mt-1">{p.readTime}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+          <LeadCaptureForm />
+          <RelatedArticles
+            posts={publishedPosts.length > 0 ? publishedPosts : blogPostsData}
+            currentSlug={slug}
+            targetMarket={['India']}
+            category={category}
+          />
 
           {/* Final ad */}
           <div className="mt-6">
@@ -414,12 +415,14 @@ const BlogPostPage = () => {
         </div>
         </div>
         </div>
+        <TimedPopup />
+        <StickyMobileCTA />
       </>
     );
   }
 
   // Check if post exists in new blog posts data
-  const newBlogPost = blogPostsData.find(post => post.slug === slug);
+  const newBlogPost = (publishedPosts.length > 0 ? publishedPosts : blogPostsData).find(post => post.slug === slug);
   
   if (newBlogPost) {
     return (
@@ -457,6 +460,11 @@ const BlogPostPage = () => {
               description: 'Tips and guides for restaurant owners and managers'
             }
           }}
+          customMeta={{
+            ...(newBlogPost.targetMarket?.[0] && newBlogPost.targetMarket[0] !== 'Global' ? {
+              'geo.region': { India: 'IN', US: 'US', UK: 'GB', UAE: 'AE', Singapore: 'SG', Malaysia: 'MY', Australia: 'AU', Canada: 'CA' }[newBlogPost.targetMarket[0]] || 'IN'
+            } : {})
+          }}
         />
         
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -480,6 +488,8 @@ const BlogPostPage = () => {
             </div>
           </div>
         </header>
+
+        <AppDownloadBanner mobile targetMarket={newBlogPost.targetMarket || ['India']} />
 
         {/* Article + Sidebar */}
         <div className="container mx-auto px-4 py-10">
@@ -515,80 +525,107 @@ const BlogPostPage = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
             {newBlogPost.title}
           </h1>
+          <BreadcrumbNav category={newBlogPost.category} postTitle={newBlogPost.title} />
 
           {/* Ad - Top of Article */}
           <div className="my-6">
             <AdSense slot="1635338536" format="auto" responsive="true" />
           </div>
 
+          {/* App feature showcase for app-feature content type */}
+          {newBlogPost.contentType === 'app-feature' && (
+            <div className="rounded-2xl bg-green-50 border border-green-200 p-6 mb-6">
+              <h2 className="font-black text-xl text-gray-900 mb-3">📱 BillByteKOT Android App</h2>
+              <ul className="text-sm text-gray-700 space-y-1 mb-4">
+                {['Fast KOT-first billing', 'Offline mode with auto-sync', 'WhatsApp bill sharing', 'Real-time inventory tracking', 'Multi-staff management'].map(f => (
+                  <li key={f} className="flex items-center gap-2">✅ {f}</li>
+                ))}
+              </ul>
+              <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-block bg-green-600 hover:bg-green-500 text-white font-black px-6 py-2.5 rounded-xl text-sm">GET IT ON Google Play</a>
+            </div>
+          )}
+
           {/* Content */}
           <div className="prose prose-lg max-w-none">
-            {newBlogPost.content.split('\n\n').map((paragraph, index) => {
-              // Skip empty paragraphs
-              if (!paragraph.trim()) return null;
-              
-              // Headers
-              if (paragraph.startsWith('# ')) {
-                return <h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>;
-              } else if (paragraph.startsWith('## ')) {
-                return <h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>;
-              } else if (paragraph.startsWith('### ')) {
-                return <h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>;
-              }
-              
-              // Bold text
-              if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
-                return <p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>;
-              }
-              
-              // Lists
-              if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
-                const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
-                return (
-                  <ul key={index} className="list-disc ml-6 my-4 space-y-2">
-                    {items.map((item, i) => (
-                      <li key={i} className="text-gray-700">{item.substring(2)}</li>
-                    ))}
-                  </ul>
-                );
-              }
-              
-              // Links/Buttons
-              const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
-              if (linkMatch) {
-                return (
-                  <div key={index} className="my-6">
-                    <Link to={linkMatch[2]}>
-                      <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-                        {linkMatch[1]}
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              }
-              
-              // Horizontal rule
-              if (paragraph.trim() === '---') {
-                return <hr key={index} className="my-8 border-gray-300" />;
-              }
-              
-              // Regular paragraph with inline formatting
-              let formattedText = paragraph;
-              
-              // Handle bold text
-              formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
-              
-              // Handle links
-              formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
-              
-              return (
-                <p 
-                  key={index} 
-                  className="text-gray-700 leading-relaxed my-4 text-lg"
-                  dangerouslySetInnerHTML={{ __html: formattedText }}
-                />
-              );
-            })}
+            {(() => {
+              const paragraphs = newBlogPost.content.split('\n\n');
+              const wordCount = newBlogPost.content.split(/\s+/).length;
+              const injectInlineCTA = wordCount > 2000;
+              const inlineCTAIndex = injectInlineCTA ? Math.floor(paragraphs.length * 0.5) : -1;
+              const elements = [];
+              let adCount = 0;
+
+              paragraphs.forEach((paragraph, index) => {
+                // Skip empty paragraphs
+                if (!paragraph.trim()) return;
+
+                // Inject AppPromoCard between 2nd and 3rd paragraph
+                if (index === 2 && newBlogPost.appPromo === true) {
+                  elements.push(<AppPromoCard key={`promo-${index}`} compact />);
+                }
+
+                // Inject InlineCTA at ~50% position
+                if (index === inlineCTAIndex) {
+                  elements.push(<InlineCTA key={`cta-${index}`} market={newBlogPost.targetMarket?.[0] || 'India'} />);
+                }
+
+                // Headers
+                if (paragraph.startsWith('# ')) {
+                  elements.push(<h1 key={index} className="text-4xl font-bold mt-12 mb-6 text-gray-900">{paragraph.substring(2)}</h1>);
+                } else if (paragraph.startsWith('## ')) {
+                  elements.push(<h2 key={index} className="text-3xl font-bold mt-10 mb-4 text-gray-900">{paragraph.substring(3)}</h2>);
+                } else if (paragraph.startsWith('### ')) {
+                  elements.push(<h3 key={index} className="text-2xl font-bold mt-8 mb-3 text-gray-900">{paragraph.substring(4)}</h3>);
+                } else if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                  elements.push(<p key={index} className="font-bold text-lg my-4 text-gray-900">{paragraph.slice(2, -2)}</p>);
+                } else if (paragraph.includes('\n- ') || paragraph.startsWith('- ')) {
+                  const items = paragraph.split('\n').filter(line => line.trim().startsWith('- '));
+                  elements.push(
+                    <ul key={index} className="list-disc ml-6 my-4 space-y-2">
+                      {items.map((item, i) => (
+                        <li key={i} className="text-gray-700">{item.substring(2)}</li>
+                      ))}
+                    </ul>
+                  );
+                } else if (paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/)) {
+                  const linkMatch = paragraph.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                  elements.push(
+                    <div key={index} className="my-6">
+                      <Link to={linkMatch[2]}>
+                        <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+                          {linkMatch[1]}
+                        </Button>
+                      </Link>
+                    </div>
+                  );
+                } else if (paragraph.trim() === '---') {
+                  elements.push(<hr key={index} className="my-8 border-gray-300" />);
+                } else {
+                  let formattedText = paragraph;
+                  formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+                  formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-violet-600 hover:text-violet-700 underline">$1</a>');
+                  elements.push(
+                    <p key={index} className="text-gray-700 leading-relaxed my-4 text-lg" dangerouslySetInnerHTML={{ __html: formattedText }} />
+                  );
+                }
+
+                // Inject in-content AdSense every ~800 words when total > 2000, max 5 units
+                if (injectInlineCTA && adCount < 5 && wordCount > 2000) {
+                  const wordsPerParagraph = wordCount / paragraphs.length;
+                  const paragraphsPerAd = Math.max(1, Math.floor(800 / wordsPerParagraph));
+                  if ((index + 1) % paragraphsPerAd === 0) {
+                    elements.push(
+                      <div key={`ad-inline-${index}`} className="my-6">
+                        <AdSense slot="2847291650" format="auto" responsive="true" />
+                      </div>
+                    );
+                    adCount++;
+                  }
+                }
+              });
+
+              return elements;
+            })()}
           </div>
 
           {/* Ad - Middle of Article */}
@@ -603,6 +640,8 @@ const BlogPostPage = () => {
             <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800 • Resets at midnight</div>
             <Link to="/login"><button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">Claim 40% OFF Now →</button></Link>
           </div>
+
+          <AppDownloadBanner targetMarket={newBlogPost.targetMarket || ['India']} />
 
           {/* CTA */}
           <div className="mt-10 p-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl text-white text-center">
@@ -623,25 +662,13 @@ const BlogPostPage = () => {
             <AdSense slot="3958402761" format="auto" responsive="true" />
           </div>
 
-          {/* Related posts */}
-          {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).length > 0 && (
-            <div className="mt-10">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Related Articles</h3>
-              <div className="grid sm:grid-cols-3 gap-4">
-                {blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 3).map(p => (
-                  <Link key={p.id} to={`/blog/${p.slug}`} className="group">
-                    <div className="rounded-xl overflow-hidden border hover:shadow-lg transition-shadow">
-                      <img src={p.image} alt={p.title} className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" />
-                      <div className="p-3">
-                        <p className="text-sm font-medium text-gray-800 group-hover:text-violet-600 line-clamp-2 leading-snug">{p.title}</p>
-                        <p className="text-xs text-gray-400 mt-1">{p.readTime}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+          <LeadCaptureForm />
+          <RelatedArticles
+            posts={publishedPosts.length > 0 ? publishedPosts : blogPostsData}
+            currentSlug={slug}
+            targetMarket={newBlogPost.targetMarket || ['India']}
+            category={newBlogPost.category}
+          />
 
           {/* Final ad */}
           <div className="mt-6">
@@ -654,6 +681,8 @@ const BlogPostPage = () => {
         </div>
         </div>
         </div>
+        <TimedPopup />
+        <StickyMobileCTA />
       </>
     );
   }

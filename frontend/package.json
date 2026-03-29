@@ -74,6 +74,7 @@
     "zod": "^3.24.4"
   },
   "scripts": {
+    "prebuild": "node scripts/generate-sitemap.js",
     "start": "cross-env DISABLE_ESLINT_PLUGIN=true craco start",
     "build": "cross-env DISABLE_ESLINT_PLUGIN=true craco build && node scripts/fix-build.js",
     "postbuild": "node scripts/ensure-public-dir.js && node src/utils/generateSitemap.js",

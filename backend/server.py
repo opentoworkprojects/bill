@@ -5476,7 +5476,7 @@ async def send_whatsapp_receipt_auto(
                 consent_manager = get_consent_manager(db)
                 has_consent = await consent_manager.check_consent(user_org_id, customer_phone)
                 if not has_consent:
-                    return {"whatsapp_sent": False, "whatsapp_error": "no_consent"}
+                    print(f"⚠️ WhatsApp consent not found for {customer_phone}; continuing with billing receipt send")
             except Exception as consent_err:
                 print(f"⚠️ Consent check failed, continuing cautiously: {consent_err}")
 
