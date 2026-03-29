@@ -48,13 +48,13 @@ const Sidebar = ({ timeLeft }) => (
             <span className="text-xs font-black tracking-widest uppercase">Flash Sale — Today Only</span>
           </div>
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-4xl font-black">40%</span>
+            <span className="text-4xl font-black">20%</span>
             <span className="text-xl font-bold">OFF</span>
           </div>
           <div className="flex items-center gap-2 mb-4">
             <span className="text-white/50 line-through text-sm">₹1999/yr</span>
-            <span className="text-white font-black text-xl">₹1199/yr</span>
-            <span className="bg-yellow-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded">SAVE ₹800</span>
+            <span className="text-white font-black text-xl">₹1599/yr</span>
+            <span className="bg-yellow-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded">SAVE ₹400</span>
           </div>
           {/* Countdown */}
           <div className="flex gap-1.5 mb-4">
@@ -67,7 +67,7 @@ const Sidebar = ({ timeLeft }) => (
           </div>
           <Link to="/login">
             <button className="w-full bg-white text-red-600 font-black py-2.5 rounded-xl text-sm hover:bg-yellow-50 transition-all shadow">
-              Claim 40% OFF Now →
+              Claim 20% OFF Now →
             </button>
           </Link>
           <p className="text-[10px] text-white/50 text-center mt-2">Resets at midnight • No credit card needed</p>
@@ -114,7 +114,7 @@ const Sidebar = ({ timeLeft }) => (
             ['500+', 'Restaurants using it'],
             ['80%', 'Fewer kitchen errors'],
             ['3x', 'Faster table turnover'],
-            ['₹100/mo', 'Yearly plan at 40% off'],
+            ['₹133/mo', 'Yearly plan at 20% off'],
             ['5 min', 'Setup time'],
             ['7 days', 'Free trial, no card'],
           ].map(([stat, label]) => (
@@ -283,7 +283,7 @@ const BlogPage = () => {
               {/* Countdown pill */}
               <div className="hidden sm:flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full">
                 <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-                <span className="text-xs font-bold text-red-600">40% OFF ends</span>
+                <span className="text-xs font-bold text-red-600">20% OFF ends</span>
                 <span className="font-mono text-xs font-black text-red-700 tabular-nums">
                   {String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
                 </span>
@@ -304,7 +304,7 @@ const BlogPage = () => {
               {/* Offer badge */}
               <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
                 <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
-                40% OFF — Restaurant Billing Software — Offer Ends Tonight
+                20% OFF — Restaurant Billing Software — Offer Ends Tonight
               </div>
               <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight">
                 BillByteKOT Blog
@@ -422,11 +422,11 @@ const BlogPage = () => {
                     {(idx + 1) % 12 === 0 && (
                       <div className="sm:col-span-2 xl:col-span-3 mt-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white text-center">
                         <Zap className="w-7 h-7 mx-auto mb-2 text-yellow-300" />
-                        <div className="font-black text-lg mb-1">🔥 40% OFF — Ends Tonight</div>
-                        <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1199/yr • Save ₹800</div>
+                        <div className="font-black text-lg mb-1">🔥 20% OFF — Ends Tonight</div>
+                        <div className="text-white/80 text-sm mb-3">₹1999/yr → ₹1599/yr • Save ₹400</div>
                         <Link to="/login">
                           <button className="bg-white text-orange-600 font-black px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-all">
-                            Claim 40% OFF →
+                            Claim 20% OFF →
                           </button>
                         </Link>
                       </div>
@@ -618,7 +618,7 @@ const BlogPage = () => {
           <div className="max-w-3xl mx-auto px-4 text-center">
             <div className="inline-flex items-center gap-2 bg-white/15 border border-white/20 px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
               <Flame className="w-4 h-4 text-yellow-300 animate-pulse" />
-              40% OFF — ₹1999 → ₹1199/year — Offer ends tonight
+              20% OFF — ₹1999 → ₹1599/year — Offer ends tonight
             </div>
             <h2 className="text-3xl md:text-4xl font-black mb-3">Ready to Transform Your Restaurant?</h2>
             <p className="text-white/75 text-base mb-8 max-w-lg mx-auto">
@@ -632,7 +632,7 @@ const BlogPage = () => {
               </Link>
               <Link to="/login">
                 <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 h-12 px-8 font-bold">
-                  🔥 Claim 40% OFF — ₹1199/yr
+                  🔥 Claim 20% OFF — ₹1599/yr
                 </Button>
               </Link>
             </div>
