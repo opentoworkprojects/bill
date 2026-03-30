@@ -48,13 +48,13 @@ const Sidebar = ({ timeLeft }) => (
             <span className="text-xs font-black tracking-widest uppercase">Flash Sale — Today Only</span>
           </div>
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-4xl font-black">20%</span>
+            <span className="text-4xl font-black">40%</span>
             <span className="text-xl font-bold">OFF</span>
           </div>
           <div className="flex items-center gap-2 mb-4">
             <span className="text-white/50 line-through text-sm">₹1999/yr</span>
-            <span className="text-white font-black text-xl">₹1599/yr</span>
-            <span className="bg-yellow-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded">SAVE ₹400</span>
+            <span className="text-white font-black text-xl">₹1199/yr</span>
+            <span className="bg-yellow-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded">SAVE ₹800</span>
           </div>
           {/* Countdown */}
           <div className="flex gap-1.5 mb-4">

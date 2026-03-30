@@ -41,11 +41,11 @@ const TrialBanner = ({ user }) => {
       setPricing({
         regular_price: 1999,
         regular_price_display: '₹1999',
-        trial_expired_discount: 5,
-        trial_expired_price: 1899,
-        trial_expired_price_display: '₹1899',
+        trial_expired_discount: 40,
+        trial_expired_price: 1199,
+        trial_expired_price_display: '₹1199',
         early_adopter: true,
-        early_adopter_discount: 5
+        early_adopter_discount: 40
       });
     } finally {
       setLoading(false);

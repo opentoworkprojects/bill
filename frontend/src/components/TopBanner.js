@@ -442,10 +442,10 @@ const TopBanner = ({ saleData: propSaleData = null }) => {
 
   // Design 11: Early Adopter Special - Orange/Red theme with scrolling text
   if (design === 'early-adopter') {
-    const monthlyPrice = bannerData.monthly_price || 159;
-    const yearlyPrice = bannerData.sale_price || 1899;
+    const monthlyPrice = bannerData.monthly_price || 100;
+    const yearlyPrice = bannerData.sale_price || 1199;
     const originalYearlyPrice = bannerData.original_price || 1999;
-    const discountPercent = bannerData.discount_percent || 5;
+    const discountPercent = bannerData.discount_percent || 40;
     
     return (
       <div className="relative overflow-hidden text-white" style={{
