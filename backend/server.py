@@ -10087,6 +10087,15 @@ async def send_whatsapp_receipt(
         "Thank you for dining at {restaurant_name}! Your bill of {currency}{total} has been paid. Order #{order_id}")
     
     restaurant_name = business.get("restaurant_name", "Our Restaurant")
+
+    try:
+        await ensure_customer_implicit_opt_in(
+            user_org_id,
+            message_data.phone_number,
+            message_data.customer_name or order.get("customer_name")
+        )
+    except Exception as consent_err:
+        print(f"⚠️ Manual WhatsApp receipt consent capture failed for {message_data.phone_number}: {consent_err}")
     
     # Build items list for message
     items_list = "\n".join([
@@ -10166,6 +10175,7 @@ Tax: {currency_symbol}{order['tax']:.2f}
                 "message": "Receipt sent via WhatsApp Cloud API",
                 "whatsapp_sent": True,
                 "whatsapp_mode": "cloud",
+                "template_based": True,
                 "whatsapp_error": None,
                 "message_id": result.get("messages", [{}])[0].get("id"),
                 "receipt_url": receipt_url,
@@ -10295,6 +10305,12 @@ async def send_receipt_via_cloud_api(
     business = current_user.get("business_settings", {})
     
     try:
+        await ensure_customer_implicit_opt_in(
+            user_org_id,
+            message_data.phone_number,
+            message_data.customer_name or order.get("customer_name")
+        )
+
         # Send via WhatsApp Cloud API
         receipt_url = build_public_receipt_url(order.get("tracking_token", ""), order=order, business=business) if order.get("tracking_token") else None
         result = await send_whatsapp_receipt_cloud(
@@ -10311,7 +10327,9 @@ async def send_receipt_via_cloud_api(
             "phone_number": message_data.phone_number,
             "receipt_url": receipt_url,
             "order_id": order_id,
-            "method": "cloud_api"
+            "method": "cloud_api",
+            "template_based": True,
+            "business_initiated": True
         }
     except Exception as e:
         raise HTTPException(

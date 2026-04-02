@@ -1543,9 +1543,19 @@ const OrdersPage = ({ user }) => {
     }
     
     try {
+      await apiSilent({
+        method: 'post',
+        url: `${API}/whatsapp/consent/on-phone-entry`,
+        params: {
+          phone_number: whatsappPhone,
+          customer_name: whatsappModal.customerName || '',
+          order_id: whatsappModal.orderId
+        }
+      });
+
       const response = await apiWithRetry({
         method: 'post',
-        url: `${API}/whatsapp/send-receipt/${whatsappModal.orderId}`,
+        url: `${API}/whatsapp/cloud/send-receipt/${whatsappModal.orderId}`,
         data: {
           phone_number: whatsappPhone,
           customer_name: whatsappModal.customerName || ''
@@ -1553,8 +1563,8 @@ const OrdersPage = ({ user }) => {
         timeout: 10000
       });
       
-      if (response.data?.whatsapp_sent) {
-        toast.success('✅ WhatsApp message sent!');
+      if (response.data?.success) {
+        toast.success('✅ WhatsApp invoice sent!');
       } else {
         toast.error(response.data?.whatsapp_error || 'WhatsApp Cloud API not configured');
         return;

@@ -142,6 +142,25 @@ const BillingPage = ({ user }) => {
   const [lastSearchTime, setLastSearchTime] = useState(0);
   const [searchDebounceTimer, setSearchDebounceTimer] = useState(null);
 
+  const captureWhatsappConsent = async (phoneNumber, name) => {
+    const trimmedPhone = (phoneNumber || '').trim();
+    if (!trimmedPhone) return;
+
+    try {
+      await apiSilent({
+        method: 'post',
+        url: `${API}/whatsapp/consent/on-phone-entry`,
+        params: {
+          phone_number: trimmedPhone,
+          customer_name: name || order?.customer_name || '',
+          order_id: orderId
+        }
+      });
+    } catch (error) {
+      console.warn('WhatsApp consent capture failed:', error);
+    }
+  };
+
   useEffect(() => {
     loadBillingDataOptimized();
     
@@ -1193,14 +1212,15 @@ const BillingPage = ({ user }) => {
 const handleWhatsappShare = async () => {
     if (!whatsappPhone.trim()) { toast.error('Enter phone number'); return; }
     try {
+      await captureWhatsappConsent(whatsappPhone, order?.customer_name);
       const response = await apiWithRetry({
         method: 'post',
-        url: `${API}/whatsapp/send-receipt/${orderId}`,
+        url: `${API}/whatsapp/cloud/send-receipt/${orderId}`,
         data: { phone_number: whatsappPhone, customer_name: order?.customer_name },
         timeout: 10000
       });
-      if (response.data?.whatsapp_sent) {
-        toast.success('WhatsApp receipt sent via Cloud API');
+      if (response.data?.success) {
+        toast.success('WhatsApp invoice sent');
         pushNotification({
           title: 'WhatsApp Sent',
           message: `Receipt sent to ${whatsappPhone}`,
@@ -2923,7 +2943,7 @@ const handleWhatsappShare = async () => {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={() => {
+                  onClick={async () => {
                     try {
                       if (!customerName.trim()) {
                         toast.error('Please enter customer name');
@@ -2933,6 +2953,7 @@ const handleWhatsappShare = async () => {
                         toast.error('Please enter phone number');
                         return;
                       }
+                      await captureWhatsappConsent(customerPhone, customerName);
                       setShowCustomerModal(false);
                       processPayment();
                     } catch (error) {
