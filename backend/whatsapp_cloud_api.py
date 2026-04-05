@@ -60,6 +60,20 @@ class WhatsAppCloudAPI:
     def get_bill_template_name(self) -> str:
         return self.template_bill_confirmation
 
+    def _is_utility_template(self, template_name: str) -> bool:
+        """Check if template is UTILITY category (required for outside 24h window).
+        
+        UTILITY templates: order updates, receipts, alerts
+        MARKETING templates: promotions (require 24h window)
+        """
+        # Common utility template patterns
+        utility_patterns = [
+            "bill", "receipt", "order", "payment", "confirm", 
+            "preparing", "ready", "completed", "pending", "status"
+        ]
+        template_lower = template_name.lower()
+        return any(pattern in template_lower for pattern in utility_patterns)
+
     def clean_phone(self, phone: str) -> str:
         """Normalize phone to digits only with country code."""
         cleaned = "".join(c for c in phone if c.isdigit())
@@ -145,6 +159,12 @@ class WhatsAppCloudAPI:
 
         # Validate and log parameters
         print(f"📨 WA template prep | to={phone} | template={template_name} | params_count={len(params)} | params={params}")
+        
+        # Check if template appears to be UTILITY category (required for outside 24h window)
+        if not self._is_utility_template(template_name):
+            print(f"⚠️ WARNING: Template '{template_name}' may not be UTILITY category!")
+            print(f"   Only UTILITY templates work outside 24h window. MARKETING templates require 24h.")
+            print(f"   Check Meta Business Manager: Template must be category=UTILITY")
 
         components = [{
             "type": "body",
