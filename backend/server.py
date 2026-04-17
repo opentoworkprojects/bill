@@ -491,18 +491,25 @@ async def whatsapp_webhook_receive(payload: dict = Body(...)):
                         }
                         for err in error_items
                     ]
-                    print(
-                        f"WA delivery webhook | entry_id={entry_id} | msg_id={msg_id} | "
-                        f"status={status} | recipient={recipient_id} | errors={json.dumps(error_summary)}"
+                    logging.warning(
+                        "WA delivery webhook | entry_id=%s | msg_id=%s | status=%s | recipient=%s | errors=%s",
+                        entry_id,
+                        msg_id,
+                        status,
+                        recipient_id,
+                        json.dumps(error_summary),
                     )
 
                 for message_event in value.get("messages", []) or []:
                     msg_id = message_event.get("id", "")
                     msg_type = message_event.get("type", "unknown")
                     from_number = message_event.get("from", "")
-                    print(
-                        f"WA inbound webhook | entry_id={entry_id} | msg_id={msg_id} | "
-                        f"type={msg_type} | from={from_number}"
+                    logging.warning(
+                        "WA inbound webhook | entry_id=%s | msg_id=%s | type=%s | from=%s",
+                        entry_id,
+                        msg_id,
+                        msg_type,
+                        from_number,
                     )
     except Exception:
         pass
