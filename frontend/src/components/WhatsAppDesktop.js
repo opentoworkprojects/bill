@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -19,6 +20,7 @@ import {
   X,
   Maximize2
 } from 'lucide-react';
+import { API } from '../App';
 
 const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
   // Auto-detect Electron environment - check multiple ways
@@ -39,7 +41,11 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
     console.log('WhatsApp Desktop - electronAPI functions:', window.electronAPI ? Object.keys(window.electronAPI) : 'N/A');
   }, [isElectron]);
   const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('order_ready');
+  const [customerName, setCustomerName] = useState('');
+  const [orderId, setOrderId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [restaurantName, setRestaurantName] = useState('');
   const [bulkContacts, setBulkContacts] = useState('');
   const [bulkMessage, setBulkMessage] = useState('');
   const [whatsappConnected, setWhatsappConnected] = useState(false);
@@ -52,29 +58,36 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
   const quickMessages = [
     {
       title: 'Order Ready',
-      message: 'Hi {name}! Your order is ready for pickup. Thank you for choosing us! 🍽️'
+      templateName: 'order_ready',
+      description: 'Approved utility template for ready orders.',
+      buildParams: ({ restaurantName: name, orderId, amount }) => [name || 'Restaurant', orderId || 'ORDER001', amount || 'INR 0.00']
     },
     {
       title: 'Order Confirmation',
-      message: 'Thank you for your order! We have received it and will prepare it shortly. Order ID: {orderId}'
+      templateName: 'bill_confirmation',
+      description: 'Approved utility template for order or bill confirmation.',
+      buildParams: ({ customerName: name, orderId, amount }) => [name || 'Customer', orderId || 'ORDER001', amount || 'INR 0.00']
     },
     {
-      title: 'Delivery Update',
-      message: 'Your order is out for delivery and will reach you in 15-20 minutes. Track: {trackingLink}'
+      title: 'Order Preparing',
+      templateName: 'order_preparing',
+      description: 'Approved utility template for preparing status.',
+      buildParams: ({ restaurantName: name, orderId, amount }) => [name || 'Restaurant', orderId || 'ORDER001', amount || 'INR 0.00']
     },
     {
-      title: 'Feedback Request',
-      message: 'Hi {name}! How was your dining experience? We would love to hear your feedback! ⭐'
-    },
-    {
-      title: 'Special Offer',
-      message: 'Hi {name}! We have a special 20% discount for you today. Use code SPECIAL20 on your next order! 🎉'
+      title: 'Payment Receipt',
+      templateName: 'payment_receipt',
+      description: 'Approved utility template for completed or paid orders.',
+      buildParams: ({ restaurantName: name, orderId, amount }) => [name || 'Restaurant', orderId || 'ORDER001', amount || 'INR 0.00']
     },
     {
       title: 'Payment Reminder',
-      message: 'Hi {name}! Your pending amount is ₹{amount}. Please complete the payment at your convenience. Thank you!'
+      templateName: 'bill_confirmation',
+      description: 'Use your approved bill template instead of freeform reminders.',
+      buildParams: ({ customerName: name, orderId, amount }) => [name || 'Customer', orderId || 'ORDER001', amount || 'INR 0.00']
     }
   ];
+  const selectedTemplateConfig = quickMessages.find((template) => template.templateName === selectedTemplate) || quickMessages[0];
 
   // Check WhatsApp status on mount and listen for updates
   const checkWhatsAppStatus = useCallback(async () => {
@@ -175,31 +188,40 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
   };
 
   const sendSingleMessage = async () => {
-    if (!phone || !message) {
-      toast.error('Please enter phone number and message');
+    if (!phone) {
+      toast.error('Please enter phone number');
+      return;
+    }
+
+    if (!selectedTemplate) {
+      toast.error('Please select an approved template');
       return;
     }
 
     setSending(true);
 
     try {
-      if (isElectron && window.electronAPI?.sendWhatsAppDirect) {
-        const result = await window.electronAPI.sendWhatsAppDirect(phone, message);
-        if (result.success) {
-          toast.success('Opening WhatsApp chat - click Send button in WhatsApp to send!');
-        } else {
-          toast.error('Failed to send: ' + result.error);
-        }
-      } else if (isElectron && window.electronAPI?.sendWhatsApp) {
-        window.electronAPI.sendWhatsApp(phone, message);
-        toast.success('Opening WhatsApp...');
+      const bodyParams = selectedTemplateConfig.buildParams({
+        customerName,
+        orderId,
+        amount,
+        restaurantName
+      });
+
+      const response = await axios.post(`${API}/whatsapp/cloud/send-template`, {
+        phone_number: phone,
+        template_name: selectedTemplate,
+        body_params: bodyParams,
+        customer_name: customerName || undefined
+      });
+
+      if (response.data?.success) {
+        toast.success('Approved utility template sent via WhatsApp Cloud API');
       } else {
-        const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
-        toast.success('Opening WhatsApp in browser...');
+        toast.error('Template send failed');
       }
     } catch (error) {
-      toast.error('Error sending message');
+      toast.error(error.response?.data?.detail || 'Error sending template');
     } finally {
       setSending(false);
     }
@@ -482,13 +504,50 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
               <p className="text-xs text-gray-500 mt-1">Include country code (e.g., +91 for India)</p>
             </div>
             <div>
-              <Label>Message</Label>
-              <textarea
-                className="w-full px-3 py-2 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-                rows={4}
-                placeholder="Type your message here..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
+              <Label>Approved Utility Template</Label>
+              <select
+                className="w-full px-3 py-2 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                value={selectedTemplate}
+                onChange={(e) => setSelectedTemplate(e.target.value)}
+              >
+                {quickMessages.map((template) => (
+                  <option key={`${template.templateName}-${template.title}`} value={template.templateName}>
+                    {template.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">{selectedTemplateConfig.description}</p>
+            </div>
+            <div>
+              <Label>Customer Name</Label>
+              <Input
+                placeholder="Customer"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Restaurant Name</Label>
+              <Input
+                placeholder="Restaurant"
+                value={restaurantName}
+                onChange={(e) => setRestaurantName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Order ID</Label>
+              <Input
+                placeholder="ORDER001"
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Amount</Label>
+              <Input
+                placeholder="INR 450.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
               />
             </div>
 
@@ -496,10 +555,10 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
             <div>
               <Label className="mb-2 block">Quick Templates</Label>
               <div className="grid grid-cols-3 gap-2">
-                {quickMessages.slice(0, 6).map((template, index) => (
+                {quickMessages.map((template, index) => (
                   <button
                     key={index}
-                    onClick={() => setMessage(template.message)}
+                    onClick={() => setSelectedTemplate(template.templateName)}
                     className="p-2 text-left border rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors text-xs"
                   >
                     <p className="font-medium truncate">{template.title}</p>
@@ -510,21 +569,19 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
 
             <Button
               onClick={sendSingleMessage}
-              disabled={sending || !phone || !message}
+              disabled={sending || !phone || !selectedTemplate}
               className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
             >
               {sending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening...</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
               ) : (
-                <><Send className="w-4 h-4 mr-2" /> Send Message</>
+                <><Send className="w-4 h-4 mr-2" /> Send Template</>
               )}
             </Button>
-            
-            {!whatsappConnected && (
-              <p className="text-xs text-center text-orange-600">
-                💡 Login to WhatsApp first for the best experience
-              </p>
-            )}
+
+            <p className="text-xs text-center text-orange-600">
+              Business-initiated WhatsApp sends must use approved utility templates outside the 24-hour window.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -597,7 +654,7 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
                   key={index}
                   className="p-4 border rounded-xl hover:bg-purple-50 hover:border-purple-300 transition-colors cursor-pointer"
                   onClick={() => {
-                    setMessage(template.message);
+                    setSelectedTemplate(template.templateName);
                     setActiveTab('single');
                     toast.success(`Template "${template.title}" loaded`);
                   }}
@@ -606,19 +663,19 @@ const WhatsAppDesktop = ({ isElectron: isElectronProp }) => {
                     <h4 className="font-medium">{template.title}</h4>
                     <Button size="sm" variant="outline" className="text-xs">Use</Button>
                   </div>
-                  <p className="text-sm text-gray-600 line-clamp-3">{template.message}</p>
+                  <p className="text-sm text-gray-600 line-clamp-3">{template.description}</p>
                 </div>
               ))}
             </div>
 
             <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
-              <h4 className="font-medium mb-2">Available Variables</h4>
-              <p className="text-xs text-gray-600 mb-3">Use these in your messages for personalization:</p>
+              <h4 className="font-medium mb-2">Template Parameters</h4>
+              <p className="text-xs text-gray-600 mb-3">These values are sent as template body parameters:</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <code className="bg-white px-2 py-1 rounded border">{'{name}'}</code>
-                <code className="bg-white px-2 py-1 rounded border">{'{orderId}'}</code>
-                <code className="bg-white px-2 py-1 rounded border">{'{trackingLink}'}</code>
-                <code className="bg-white px-2 py-1 rounded border">{'{amount}'}</code>
+                <code className="bg-white px-2 py-1 rounded border">customer_name</code>
+                <code className="bg-white px-2 py-1 rounded border">restaurant_name</code>
+                <code className="bg-white px-2 py-1 rounded border">order_id</code>
+                <code className="bg-white px-2 py-1 rounded border">amount</code>
               </div>
             </div>
           </CardContent>

@@ -10061,6 +10061,15 @@ class WhatsAppMessage(BaseModel):
     customer_name: Optional[str] = None
 
 
+class WhatsAppTemplateSendRequest(BaseModel):
+    phone_number: str
+    template_name: str
+    body_params: List[str] = []
+    button_url: Optional[str] = None
+    language: Optional[str] = None
+    customer_name: Optional[str] = None
+
+
 @api_router.post("/whatsapp/send-receipt/{order_id}")
 async def send_whatsapp_receipt(
     order_id: str,
@@ -10387,6 +10396,74 @@ async def send_status_via_cloud_api(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to send status update: {str(e)}"
+        )
+
+
+@api_router.post("/whatsapp/cloud/send-template")
+async def send_template_via_cloud_api(
+    request: WhatsAppTemplateSendRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Send an approved UTILITY template directly via WhatsApp Cloud API."""
+    if not _WHATSAPP_CLOUD_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="WhatsApp Cloud API not configured"
+        )
+
+    if not whatsapp_api or not whatsapp_api.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="WhatsApp Cloud API client not configured"
+        )
+
+    template_name = (request.template_name or "").strip()
+    if not template_name:
+        raise HTTPException(status_code=400, detail="template_name is required")
+
+    if not whatsapp_api._is_utility_template(template_name):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Only approved UTILITY templates can be sent from this endpoint. "
+                "Freeform/custom text still requires the 24-hour customer care window."
+            )
+        )
+
+    user_org_id = get_secure_org_id(current_user)
+
+    try:
+        await ensure_customer_implicit_opt_in(
+            user_org_id,
+            request.phone_number,
+            request.customer_name or "Customer"
+        )
+    except Exception as consent_err:
+        print(f"⚠️ Template send consent capture failed for {request.phone_number}: {consent_err}")
+
+    try:
+        result = await whatsapp_api.send_template_message(
+            to_phone=request.phone_number,
+            template_name=template_name,
+            params=request.body_params or [],
+            language=(request.language or whatsapp_api.template_lang or "en_US"),
+            button_url=request.button_url
+        )
+
+        return {
+            "success": True,
+            "message": "Template sent via WhatsApp Cloud API",
+            "message_id": result.get("messages", [{}])[0].get("id"),
+            "phone_number": request.phone_number,
+            "template_name": template_name,
+            "template_based": True,
+            "business_initiated": True,
+            "utility_template": True
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send template: {str(e)}"
         )
 
 
