@@ -468,13 +468,42 @@ async def whatsapp_webhook_verify(request: Request):
 @app.post("/webhooks/whatsapp")
 async def whatsapp_webhook_receive(payload: dict = Body(...)):
     """
-    Receive WhatsApp webhook events.
-    For now, just acknowledge. Extend to process message/status events.
+    Receive WhatsApp webhook events and log delivery state changes.
     """
     try:
-        # Minimal safe log to confirm delivery without dumping PII
-        event_id = payload.get("entry", [{}])[0].get("id")
-        print(f"WhatsApp webhook received. entry_id={event_id}")
+        entries = payload.get("entry", []) or []
+        for entry in entries:
+            entry_id = entry.get("id")
+            changes = entry.get("changes", []) or []
+            for change in changes:
+                value = change.get("value", {}) or {}
+
+                for status_event in value.get("statuses", []) or []:
+                    msg_id = status_event.get("id", "")
+                    status = status_event.get("status", "unknown")
+                    recipient_id = status_event.get("recipient_id", "")
+                    error_items = status_event.get("errors", []) or []
+                    error_summary = [
+                        {
+                            "code": err.get("code"),
+                            "title": err.get("title"),
+                            "message": err.get("message"),
+                        }
+                        for err in error_items
+                    ]
+                    print(
+                        f"WA delivery webhook | entry_id={entry_id} | msg_id={msg_id} | "
+                        f"status={status} | recipient={recipient_id} | errors={json.dumps(error_summary)}"
+                    )
+
+                for message_event in value.get("messages", []) or []:
+                    msg_id = message_event.get("id", "")
+                    msg_type = message_event.get("type", "unknown")
+                    from_number = message_event.get("from", "")
+                    print(
+                        f"WA inbound webhook | entry_id={entry_id} | msg_id={msg_id} | "
+                        f"type={msg_type} | from={from_number}"
+                    )
     except Exception:
         pass
     
