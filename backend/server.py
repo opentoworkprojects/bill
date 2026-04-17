@@ -101,6 +101,7 @@ except Exception:
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / ".env.whatsapp", override=False)
 
 # Import super admin router AFTER loading .env
 from super_admin import super_admin_router, set_database as set_super_admin_db, set_redis_cache as set_super_admin_cache

@@ -8,6 +8,7 @@ import os
 import httpx
 import asyncio
 import json
+import logging
 from typing import Optional, Dict, Any
 
 
@@ -16,7 +17,7 @@ class WhatsAppCloudAPI:
 
     # Error codes for classification
     ERROR_CODE_WINDOW_RESTRICTION = {131047, 131026}  # 24-hour window restriction
-    ERROR_CODE_INVALID_TEMPLATE = {131031}  # Invalid template
+    ERROR_CODE_INVALID_TEMPLATE = {131031, 132001}  # Invalid/missing template or translation
     ERROR_CODE_RATE_LIMIT = {131051}  # Rate limit exceeded
 
     # Retry configuration
@@ -34,11 +35,25 @@ class WhatsAppCloudAPI:
         self.template_bill_confirmation = os.getenv("WHATSAPP_TEMPLATE_BILL_CONFIRMATION", "bill_confirmation").strip()
         self.template_bill_uses_receipt_url = os.getenv("WHATSAPP_TEMPLATE_BILL_USES_RECEIPT_URL", "false").strip().lower() in ("1", "true", "yes", "on")
         self.template_bill_use_url_button = os.getenv("WHATSAPP_TEMPLATE_BILL_USE_URL_BUTTON", "false").strip().lower() in ("1", "true", "yes", "on")
-        self.template_status_pending = os.getenv("WHATSAPP_TEMPLATE_STATUS_PENDING", "").strip() or self.template_bill_confirmation
+        self.template_status_pending = os.getenv("WHATSAPP_TEMPLATE_STATUS_PENDING", "order_pending").strip()
         self.template_status_preparing = os.getenv("WHATSAPP_TEMPLATE_STATUS_PREPARING", "order_preparing").strip()
         self.template_status_ready = os.getenv("WHATSAPP_TEMPLATE_STATUS_READY", "order_ready").strip()
         self.template_status_completed = os.getenv("WHATSAPP_TEMPLATE_STATUS_COMPLETED", "payment_receipt").strip()
         self.template_status_cancelled = os.getenv("WHATSAPP_TEMPLATE_STATUS_CANCELLED", "").strip()
+        self._log_template_configuration()
+
+    def _log_template_configuration(self) -> None:
+        """Log the effective template mapping used by the running process."""
+        logging.warning(
+            "WhatsApp template config | lang=%s | bill=%s | pending=%s | preparing=%s | ready=%s | completed=%s | cancelled=%s",
+            self.template_lang or "<empty>",
+            self.template_bill_confirmation or "<empty>",
+            self.template_status_pending or "<empty>",
+            self.template_status_preparing or "<empty>",
+            self.template_status_ready or "<empty>",
+            self.template_status_completed or "<empty>",
+            self.template_status_cancelled or "<empty>",
+        )
 
     def is_configured(self) -> bool:
         return bool(self.phone_number_id and self.access_token)
@@ -122,8 +137,8 @@ class WhatsAppCloudAPI:
                 resp.raise_for_status()
                 return resp.json()
             except httpx.HTTPStatusError as e:
-                detail = e.response.json() if e.response.content else str(e)
-                raise Exception(f"WhatsApp API error: {detail}")
+                detail = e.response.json() if e.response.content else {"error": {"message": str(e)}}
+                raise Exception(f"WhatsApp API error: {json.dumps(detail)}")
 
     async def send_text_message(self, to_phone: str, message: str) -> Dict[str, Any]:
         """Send a plain text message."""
@@ -234,14 +249,15 @@ class WhatsAppCloudAPI:
                     print("This recipient is outside the 24-hour customer care window for this message context.")
                     print("Use an approved business-initiated utility template for bill/order updates.")
                     print("=" * 60 + "\n")
-                elif error_code == 131031:
+                elif error_code in {131031, 132001}:
                     print("\n" + "=" * 60)
-                    print("🚨 INVALID TEMPLATE NAME (Error 131031)")
+                    print("🚨 INVALID TEMPLATE NAME / LANGUAGE (Error 131031/132001)")
                     print("=" * 60)
-                    print(f"Template: '{template_name}' not found or not approved")
+                    print(f"Template: '{template_name}' not found in the requested language or not approved")
                     print("💡 SOLUTIONS:")
                     print("1. Check exact template name in Meta Business Manager")
-                    print("2. Ensure template is APPROVED (not PENDING)")
+                    print("2. Ensure template is APPROVED and available in the requested language")
+                    print("3. Check the language code matches the template translation exactly")
                     print("=" * 60 + "\n")
 
                 if not is_retryable:
