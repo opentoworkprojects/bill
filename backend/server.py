@@ -34,6 +34,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+# Import database models
+from database_models import WhatsAppTemplate
+
 # Global log suppression for cleaner output (set DEBUG_LOGS=true to enable verbose logs)
 _LOG_DEBUG = os.getenv("DEBUG_LOGS", "").lower() in ("1", "true", "yes", "on")
 _original_print = builtins.print
@@ -5426,15 +5429,73 @@ def generate_whatsapp_notification(phone: str, message: str) -> str:
 
 
 def normalize_phone_e164(phone: str) -> str:
-    """Normalize phone number to E.164 digits (no leading +). Defaults to India if 10 digits."""
+    """
+    Enhanced phone number normalization to E.164 digits (no leading +).
+    
+    This function now matches the WhatsApp Cloud API clean_phone() method
+    to ensure consistent formatting between storage and delivery.
+    
+    Args:
+        phone: Raw phone number string
+        
+    Returns:
+        str: Normalized phone number in E.164 format without + prefix
+        
+    Raises:
+        ValueError: If phone number is invalid
+    """
     if not phone:
         return ""
-    cleaned = "".join(c for c in str(phone) if c.isdigit())
-    if len(cleaned) == 10:
-        cleaned = "91" + cleaned
-    elif len(cleaned) == 11 and cleaned.startswith("0"):
-        cleaned = "91" + cleaned[1:]
-    return cleaned
+    
+    try:
+        # Use WhatsApp API normalization for consistency
+        from whatsapp_cloud_api import whatsapp_api
+        return whatsapp_api.clean_phone(phone)
+    except Exception as e:
+        # Fallback to original logic if WhatsApp API is not available
+        print(f"⚠️ WhatsApp API normalization failed, using fallback: {e}")
+        
+        cleaned = "".join(c for c in str(phone) if c.isdigit())
+        if not cleaned:
+            return ""
+            
+        if len(cleaned) == 10:
+            # Validate Indian mobile number
+            if cleaned[0] not in "6789":
+                print(f"⚠️ Invalid Indian mobile number prefix: {cleaned[0]}")
+                return ""
+            cleaned = "91" + cleaned
+        elif len(cleaned) == 11 and cleaned.startswith("0"):
+            mobile_part = cleaned[1:]
+            if mobile_part[0] not in "6789":
+                print(f"⚠️ Invalid Indian mobile number prefix after removing 0: {mobile_part[0]}")
+                return ""
+            cleaned = "91" + mobile_part
+        elif len(cleaned) == 12 and cleaned.startswith("91"):
+            mobile_part = cleaned[2:]
+            if len(mobile_part) != 10 or mobile_part[0] not in "6789":
+                print(f"⚠️ Invalid Indian mobile number format: {cleaned}")
+                return ""
+        elif len(cleaned) == 11 and cleaned.startswith("1"):
+            # US number - basic validation
+            area_code = cleaned[1:4]
+            if area_code[0] in "01":
+                print(f"⚠️ Invalid US area code: {area_code}")
+                return ""
+            # Accept as valid US number
+        elif len(cleaned) >= 10 and len(cleaned) <= 15:
+            # Other international formats - but reject obviously invalid ones
+            if len(cleaned) == 14:
+                # 14 digits is usually too long for most countries
+                print(f"⚠️ 14-digit number likely invalid: {phone}")
+                return ""
+            # Accept other lengths as potentially valid
+            pass
+        else:
+            print(f"⚠️ Unsupported phone number format: {phone} (length: {len(cleaned)})")
+            return ""
+            
+        return cleaned
 
 
 async def ensure_customer_implicit_opt_in(
