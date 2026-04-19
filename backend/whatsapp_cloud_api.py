@@ -21,6 +21,7 @@ class WhatsAppCloudAPI:
     ERROR_CODE_WINDOW_RESTRICTION = {131047, 131026}  # 24-hour window restriction
     ERROR_CODE_INVALID_TEMPLATE = {131031, 132001}  # Invalid/missing template or translation
     ERROR_CODE_RATE_LIMIT = {131051}  # Rate limit exceeded
+    ERROR_CODE_BUSINESS_ELIGIBILITY = {131042}  # Business eligibility payment issue
 
     # Retry configuration
     MAX_RETRY_ATTEMPTS = 3
@@ -495,6 +496,7 @@ class WhatsAppCloudAPI:
             "is_window_restriction": error_code in self.ERROR_CODE_WINDOW_RESTRICTION,
             "is_invalid_template": error_code in self.ERROR_CODE_INVALID_TEMPLATE,
             "is_rate_limit": error_code in self.ERROR_CODE_RATE_LIMIT,
+            "is_business_eligibility": error_code in self.ERROR_CODE_BUSINESS_ELIGIBILITY,
             "is_retryable": False
         }
 
@@ -506,6 +508,8 @@ class WhatsAppCloudAPI:
             classification["is_retryable"] = False  # Permanent failure
         elif error_code in self.ERROR_CODE_INVALID_TEMPLATE:
             classification["is_retryable"] = False  # Permanent failure
+        elif error_code in self.ERROR_CODE_BUSINESS_ELIGIBILITY:
+            classification["is_retryable"] = False  # Permanent failure - payment/billing issue
 
         return classification
 
@@ -593,7 +597,8 @@ class WhatsAppCloudAPI:
                 # Fallback: use phone_number_id directly (some setups use WABA ID as phone_number_id)
                 waba_id = self.phone_number_id
         
-        url = f"{self.base_url}/{waba_id}/{self.META_TEMPLATES_ENDPOINT}"
+        # FIXED: Use correct Meta Graph API endpoint for message templates
+        url = f"{self.base_url}/{waba_id}/message_templates"
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json"
@@ -1060,6 +1065,22 @@ class WhatsAppCloudAPI:
                     print("2. Ensure template is APPROVED and available in the requested language")
                     print("3. Check the language code matches the template translation exactly")
                     print("=" * 60 + "\n")
+                elif error_code == 131042:
+                    print("\n" + "=" * 60)
+                    print("🚨 BUSINESS ELIGIBILITY PAYMENT ISSUE (Error 131042)")
+                    print("=" * 60)
+                    print(f"WhatsApp Business Account has payment/billing issues")
+                    print("💡 CRITICAL SOLUTIONS:")
+                    print("1. Check Meta Business Manager for payment method issues")
+                    print("2. Verify WhatsApp Business Account (WABA) is in good standing")
+                    print("3. Check if there are outstanding payments or billing issues")
+                    print("4. Contact Meta Business Support if payment method is valid")
+                    print("5. Verify WABA has not been suspended or restricted")
+                    print("⚠️ This is a Meta account-level issue, not a template or code issue")
+                    print("=" * 60 + "\n")
+                    
+                    # Don't retry business eligibility errors - they won't succeed until account is fixed
+                    break
 
                 if not is_retryable:
                     print(f"⚠️ Permanent failure detected (error_code={error_code}), not retrying")
