@@ -9,7 +9,7 @@ is extracted one by one — the original file continues to work throughout. Fina
 
 ## Tasks
 
-- [~] 1. Create AdminContext.js
+- [ ] 1. Create AdminContext.js
   - Create `frontend/src/pages/superadmin/AdminContext.js`
   - Implement `AdminProvider` with `credentials`, `userType`, `teamUser`, `activeSection`, `setActiveSection`, and `hasPermission`
   - Export `useAdminContext` hook that throws if used outside provider
@@ -28,7 +28,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - _Requirements: 4.5_
 
 
-- [~] 2. Create shared components
+- [ ] 2. Create shared components
   - Create `frontend/src/pages/superadmin/shared/` directory with three files
 
   - [ ] 2.1 Create LoadingSkeleton.js
@@ -60,7 +60,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Validates: Requirements 7.3, 7.4, 7.5**
 
 
-- [~] 3. Create AdminSidebar.js
+- [ ] 3. Create AdminSidebar.js
   - Create `frontend/src/pages/superadmin/AdminSidebar.js`
   - Implement `NAV_GROUPS` constant with all 7 groups and 13 items as defined in the design
   - Filter nav items using `hasPermission` from `useAdminContext`; hide entire group if no items pass
@@ -86,7 +86,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - _Requirements: 2.7, 2.8_
 
 
-- [~] 4. Create AdminHeader.js
+- [ ] 4. Create AdminHeader.js
   - Create `frontend/src/pages/superadmin/AdminHeader.js`
   - Implement `SECTION_TITLES` map for all 12 section ids to human-readable labels
   - Display current section title from `activeSection` via `useAdminContext`
@@ -113,7 +113,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - _Requirements: 11.3_
 
 
-- [~] 5. Create AdminLayout.js
+- [ ] 5. Create AdminLayout.js
   - Create `frontend/src/pages/superadmin/AdminLayout.js`
   - Implement `renderTab()` switch for all 12 section ids (import all TabComponents as stubs initially — they will be filled in subsequent tasks)
   - Implement desktop sidebar (hidden on mobile via `hidden md:flex`)
@@ -143,7 +143,7 @@ is extracted one by one — the original file continues to work throughout. Fina
   - Ensure all tests pass, ask the user if questions arise.
 
 
-- [~] 7. Extract DashboardTab
+- [ ] 7. Extract DashboardTab
   - Create `frontend/src/pages/superadmin/DashboardTab.js`
   - Copy dashboard section state, fetch logic, and render from `SuperAdminPage.js`
   - Replace inline loading/empty UI with `LoadingSkeleton variant="kpi-grid"` and `EmptyState`
@@ -172,7 +172,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - _Requirements: 7.6, 7.8_
 
 
-- [~] 8. Extract UsersTab
+- [ ] 8. Extract UsersTab
   - Create `frontend/src/pages/superadmin/UsersTab.js`
   - Copy all users section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve: view, search, filter, sort, bulk actions, subscription management, invoice preview, data export, data import, user navigation (previous/next)
@@ -191,7 +191,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Validates: Requirements 10.5**
 
 
-- [~] 9. Extract LeadsTab
+- [ ] 9. Extract LeadsTab
   - Create `frontend/src/pages/superadmin/LeadsTab.js`
   - Copy all leads section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve: create lead, view leads, update lead status, send promotional emails with all existing templates
@@ -204,7 +204,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Property 16: Each TabComponent renders in isolation (LeadsTab)**
     - **Validates: Requirements 10.5**
 
-- [~] 10. Extract TeamTab
+- [ ] 10. Extract TeamTab
   - Create `frontend/src/pages/superadmin/TeamTab.js`
   - Copy all team section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve: create team member, edit team member, delete team member, manage permissions
@@ -218,7 +218,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Validates: Requirements 10.5**
 
 
-- [~] 11. Extract TicketsTab
+- [ ] 11. Extract TicketsTab
   - Create `frontend/src/pages/superadmin/TicketsTab.js`
   - Copy all tickets section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve: view tickets, filter by status, update ticket status
@@ -232,7 +232,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Property 16: Each TabComponent renders in isolation (TicketsTab)**
     - **Validates: Requirements 10.5**
 
-- [~] 12. Extract AnalyticsTab
+- [ ] 12. Extract AnalyticsTab
   - Create `frontend/src/pages/superadmin/AnalyticsTab.js`
   - Copy all analytics section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve all existing analytics views and data
@@ -246,7 +246,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Validates: Requirements 10.5**
 
 
-- [~] 13. Extract AppVersionsTab
+- [ ] 13. Extract AppVersionsTab
   - Create `frontend/src/pages/superadmin/AppVersionsTab.js`
   - Copy all app versions section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve: create, edit, delete, file upload with progress indicator
@@ -259,7 +259,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Property 16: Each TabComponent renders in isolation (AppVersionsTab)**
     - **Validates: Requirements 10.5**
 
-- [~] 14. Extract PromotionsTab
+- [ ] 14. Extract PromotionsTab
   - Create `frontend/src/pages/superadmin/PromotionsTab.js`
   - Copy all promotions section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve all sale/offer day configuration including all theme options and banner designs
@@ -273,7 +273,7 @@ is extracted one by one — the original file continues to work throughout. Fina
     - **Validates: Requirements 10.5**
 
 
-- [~] 15. Extract PricingTab
+- [ ] 15. Extract PricingTab
   - Create `frontend/src/pages/superadmin/PricingTab.js`
   - Copy all pricing section state, fetch logic, and render from `SuperAdminPage.js`
   - Preserve: campaign pricing, trial settings, referral discount configuration
