@@ -474,15 +474,70 @@ class WhatsAppCloudAPI:
         """
         Check if customer service window is open for this phone number.
         
-        EMERGENCY FIX: Basic implementation - in production this should
-        check actual conversation history from database.
+        A 24-hour window opens when a customer sends a message.
+        We can send any approved template within 24 hours of that message.
+        After 24 hours, only UTILITY templates can be sent.
+        
+        Returns True if window is open, False if closed/unknown.
         """
-        # TODO: Implement proper customer service window checking
-        # This would require checking when customer last messaged us
-        # For now, return False to be conservative
-        print(f"⚠️ Customer service window check not implemented for {phone}")
-        print(f"   Assuming window is CLOSED - only UTILITY templates will work")
-        return False
+        try:
+            from core.database import get_db
+            
+            db = await get_db()
+            if not db:
+                print(f"⚠️ Database not available, cannot check customer service window")
+                return False
+            
+            # Normalize phone number
+            normalized_phone = self.clean_phone(phone)
+            
+            # Query for the most recent customer message in the last 24 hours
+            # Check both whatsapp_messages and conversations collections
+            now = datetime.now(timezone.utc)
+            window_start = now - timedelta(hours=24)
+            
+            # Try different collection names that might store message history
+            message_collections = ["whatsapp_messages", "messages", "conversations"]
+            last_message_time = None
+            
+            for collection_name in message_collections:
+                try:
+                    # Look for incoming messages from the customer within 24 hours
+                    result = await db[collection_name].find_one(
+                        {
+                            "from": normalized_phone,
+                            "direction": "incoming",
+                            "timestamp": {"$gte": window_start}
+                        },
+                        sort=[("timestamp", -1)]
+                    )
+                    
+                    if result and "timestamp" in result:
+                        last_message_time = result["timestamp"]
+                        print(f"✅ Found customer message in {collection_name}: {result['timestamp']}")
+                        break
+                except Exception as e:
+                    # Collection might not exist or error querying
+                    print(f"  ℹ️ Could not query {collection_name}: {str(e)[:100]}")
+                    continue
+            
+            if last_message_time:
+                # Customer has messaged within 24 hours
+                time_since = now - last_message_time
+                hours_left = 24 - (time_since.total_seconds() / 3600)
+                print(f"✅ Customer service window OPEN: {hours_left:.1f} hours remaining")
+                return True
+            else:
+                # No customer message in last 24 hours
+                print(f"ℹ️ No customer messages in last 24 hours for {normalized_phone}")
+                print(f"   Only UTILITY templates can be sent (requires customer to message first)")
+                return False
+                
+        except Exception as e:
+            # If database check fails, be conservative
+            print(f"⚠️ Error checking customer service window: {str(e)[:100]}")
+            print(f"   Assuming window is CLOSED - only UTILITY templates will work")
+            return False
 
     def _classify_error(self, error_response: dict) -> Dict[str, Any]:
         """Classify WhatsApp API error and determine if it's retryable."""

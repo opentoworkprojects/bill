@@ -507,6 +507,8 @@ async def whatsapp_webhook_receive(payload: dict = Body(...)):
                     msg_id = message_event.get("id", "")
                     msg_type = message_event.get("type", "unknown")
                     from_number = message_event.get("from", "")
+                    timestamp_raw = message_event.get("timestamp", "")
+                    
                     logging.warning(
                         "WA inbound webhook | entry_id=%s | msg_id=%s | type=%s | from=%s",
                         entry_id,
@@ -514,6 +516,43 @@ async def whatsapp_webhook_receive(payload: dict = Body(...)):
                         msg_type,
                         from_number,
                     )
+                    
+                    # Store customer message for 24-hour window tracking
+                    try:
+                        from core.database import get_db
+                        import asyncio
+                        from datetime import datetime, timezone
+                        
+                        db = await get_db()
+                        if db and from_number:
+                            # Convert timestamp (usually Unix timestamp) to datetime
+                            try:
+                                if timestamp_raw:
+                                    msg_timestamp = datetime.fromtimestamp(int(timestamp_raw), tz=timezone.utc)
+                                else:
+                                    msg_timestamp = datetime.now(timezone.utc)
+                            except (ValueError, TypeError):
+                                msg_timestamp = datetime.now(timezone.utc)
+                            
+                            # Store the incoming message
+                            message_doc = {
+                                "message_id": msg_id,
+                                "from": from_number,
+                                "direction": "incoming",
+                                "type": msg_type,
+                                "timestamp": msg_timestamp,
+                                "received_at": datetime.now(timezone.utc),
+                            }
+                            
+                            # Try to store in whatsapp_messages collection
+                            try:
+                                await db["whatsapp_messages"].insert_one(message_doc)
+                                logging.info(f"Stored incoming message from {from_number} for 24h window tracking")
+                            except Exception as e:
+                                logging.debug(f"Could not store message to whatsapp_messages: {str(e)[:100]}")
+                    except Exception as e:
+                        # Don't fail the webhook if we can't store the message
+                        logging.debug(f"Error storing customer message for 24h tracking: {str(e)[:100]}")
     except Exception:
         pass
     
