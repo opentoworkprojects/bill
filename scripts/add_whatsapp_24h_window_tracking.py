@@ -19,7 +19,11 @@ Within 24 hours, any approved template can be sent.
 
 import asyncio
 import sys
+import os
 from datetime import datetime, timezone
+
+# Add backend to path so we can import core
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 async def setup_whatsapp_message_tracking():
     """Set up collections and indexes for 24-hour window tracking."""
