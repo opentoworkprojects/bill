@@ -1,0 +1,174 @@
+{
+  "identity": {
+    "name": "BillByteKOT - Cyber Tactical POS",
+    "persona": "E1 - Anti-AI Designer",
+    "aesthetic": "Cyber-Tactical & High-Performance",
+    "principles": [
+      "Fusion over Imitation: Mix Cyberpunk aesthetics with Swiss usability",
+      "Speed is a Feature: Every interaction must feel instant (under 100ms)",
+      "Dark Mode First: Optimized for low-light restaurant environments",
+      "Data Density: High information density without clutter"
+    ]
+  },
+  "typography": {
+    "strategy": "The 'Soft Utility' Archetype with a Cyber Twist",
+    "fonts": {
+      "headings": {
+        "family": "Chivo, sans-serif",
+        "weight": "700/900",
+        "usage": "All major headings (h1-h3). REPLACE Space Grotesk.",
+        "letterSpacing": "tracking-tight"
+      },
+      "body": {
+        "family": "Manrope, sans-serif",
+        "weight": "400/500",
+        "usage": "General UI text, descriptions"
+      },
+      "mono": {
+        "family": "JetBrains Mono, monospace",
+        "weight": "400",
+        "usage": "Receipt previews, order IDs, financial data, KOT tickets"
+      }
+    },
+    "instructions": "Remove 'Space Grotesk' from App.css and import 'Chivo' and 'JetBrains Mono' from Google Fonts."
+  },
+  "colors": {
+    "palette_name": "Electric Void",
+    "mode": "dark",
+    "base": {
+      "background": "#09090B",
+      "surface": "#18181B",
+      "surface_highlight": "#27272A",
+      "border": "#27272A"
+    },
+    "primary": {
+      "main": "#06B6D4",
+      "hover": "#0891B2",
+      "foreground": "#FFFFFF",
+      "description": "Electric Cyan for primary actions (Pay, Print, Add)"
+    },
+    "secondary": {
+      "main": "#8B5CF6",
+      "hover": "#7C3AED",
+      "foreground": "#FFFFFF",
+      "description": "Neon Purple for AI features and secondary highlights"
+    },
+    "functional": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "gradients": {
+      "cyber_glow": "linear-gradient(135deg, #06B6D4 0%, #8B5CF6 100%)",
+      "dark_glass": "rgba(24, 24, 27, 0.7)"
+    },
+    "forbidden": [
+      "#7351B7",
+      "#1B93A4"
+    ]
+  },
+  "layout": {
+    "spacing_system": "Generous but Dense",
+    "dashboard_grid": {
+      "type": "Bento Grid (Mode B)",
+      "columns": "grid-cols-1 md:grid-cols-4",
+      "gap": "gap-4",
+      "rules": "Use col-span-2 for main charts, col-span-1 for metrics. No jagged bottoms."
+    },
+    "pos_grid": {
+      "type": "High Density Grid",
+      "columns": "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+      "gap": "gap-3",
+      "rules": "Strict uniformity for touch targets. Minimum touch area 44px."
+    },
+    "containers": {
+      "card": "rounded-xl border border-white/10 bg-zinc-900/50 backdrop-blur-md",
+      "panel": "h-full border-r border-white/5 bg-zinc-950"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all hover:scale-[1.02]",
+      "secondary": "bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 rounded-lg",
+      "ghost": "hover:bg-white/5 text-zinc-400 hover:text-white",
+      "destructive": "bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"
+    },
+    "cards": {
+      "base": "bg-zinc-900/80 border border-white/5 rounded-xl p-6 hover:border-cyan-500/30 transition-colors",
+      "interactive": "cursor-pointer hover:bg-zinc-800/80 active:scale-[0.98] transition-all"
+    },
+    "inputs": {
+      "base": "bg-zinc-950 border-zinc-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg h-10"
+    },
+    "status_badges": {
+      "base": "px-2 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider",
+      "styles": {
+        "completed": "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
+        "pending": "bg-amber-500/10 text-amber-500 border border-amber-500/20",
+        "failed": "bg-red-500/10 text-red-500 border border-red-500/20"
+      }
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-black/40 border-b border-white/5",
+    "neon_borders": "border border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.1)]",
+    "textures": "Use subtle noise texture on the main background to reduce digital flatness.",
+    "animations": {
+      "hover": "hover:-translate-y-1 transition-transform duration-200",
+      "click": "active:scale-95 transition-transform duration-75",
+      "enter": "animate-in fade-in zoom-in-95 duration-300"
+    }
+  },
+  "image_urls": {
+    "food_items": [
+      {
+        "url": "https://images.unsplash.com/photo-1662452883375-9226ea22c765?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "burger",
+        "description": "Gourmet burger dark background"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1611309454921-16cef3438ee0?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "burger",
+        "description": "Burger with lettuce and tomato"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1672477179695-7276b0602fa9?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "indian",
+        "description": "Indian Thali Silver Plate"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1589778655375-3e622a9fc91c?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "indian",
+        "description": "Assorted Indian Foods"
+      }
+    ],
+    "ambiance": [
+      {
+        "url": "https://images.unsplash.com/photo-1760276148662-7f78634412f2?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "interior",
+        "description": "Neon Asian Restaurant Interior"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. REMOVE 'Space Grotesk' from App.css. Import 'Chivo' and 'JetBrains Mono'.",
+    "2. IMPLEMENT Dark Mode by default. Ensure 'dark' class is applied to html/body.",
+    "3. USE 'sonner' for all toast notifications.",
+    "4. DO NOT use generic gradients. Use the 'Electric Void' palette.",
+    "5. ENSURE all interactive elements have 'data-testid'.",
+    "6. FOR DASHBOARD: Use the Bento Grid layout. Avoid equal-sized cards.",
+    "7. FOR POS: Focus on speed. No layout shifts. Instant feedback.",
+    "8. PRINT PREVIEW: Use a monospace font (JetBrains Mono) and white background for the preview container to simulate thermal paper.",
+    "9. AI FEATURES: Use the 'Neon Purple' accent color to distinguish AI insights from regular data."
+  ],
+  "universal_guidelines": [
+    "Don't make generic centered layouts.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures, noise overlays, custom cursors.",
+    "NEVER use AI assistant Emoji characters."
+  ]
+}

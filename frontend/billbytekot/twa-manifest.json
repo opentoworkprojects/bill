@@ -1,0 +1,73 @@
+{
+  "packageId": "in.billbytekot.twa",
+  "host": "billbytekot.in",
+  "name": "BillByteKOT - Restaurant Billing & KOT",
+  "launcherName": "BillByteKOT",
+  "display": "standalone",
+  "themeColor": "#7C3AED",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
+  "startUrl": "/pwa",
+  "iconUrl": "https://billbytekot.in/icon-512.png",
+  "maskableIconUrl": "https://billbytekot.in/icon-512-maskable.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\shivs\\da\\restro-ai\\frontend\\billbytekot\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "30",
+  "appVersionCode": 30,
+  "shortcuts": [
+    {
+      "name": "New Order",
+      "shortName": "Order",
+      "url": "https://billbytekot.in/orders?action=new",
+      "chosenIconUrl": "https://billbytekot.in/icon-192.png"
+    },
+    {
+      "name": "Kitchen Display",
+      "shortName": "Kitchen",
+      "url": "https://billbytekot.in/kitchen",
+      "chosenIconUrl": "https://billbytekot.in/icon-192.png"
+    },
+    {
+      "name": "Reports",
+      "shortName": "Reports",
+      "url": "https://billbytekot.in/reports",
+      "chosenIconUrl": "https://billbytekot.in/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://billbytekot.in/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": false
+    },
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://billbytekot.in/",
+  "minSdkVersion": 21,
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "navigate-existing",
+  "displayOverride": [],
+  "appVersion": "30"
+}

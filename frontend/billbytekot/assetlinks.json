@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.billbytekot.twa",
+      "sha256_cert_fingerprints": [
+        "4F:84:00:E3:DE:51:70:1A:88:78:82:B9:3F:1E:48:91:18:73:1E:E5:22:6F:D4:92:06:A1:8C:99:7A:CD:7C:6D"
+      ]
+    }
+  }
+]
