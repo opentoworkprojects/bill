@@ -41,6 +41,7 @@ import CustomerOrderPage from './pages/CustomerOrderPage';
 import DownloadPage from './pages/DownloadPage';
 import BlogPage from './pages/BlogPage';
 import BlogPostPage from './pages/BlogPostPage';
+import BlogStudioPage from './pages/BlogStudioPage';
 import ContactPage from './pages/ContactPage';
 import OrderDisplayPage from './pages/OrderDisplayPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -1009,6 +1010,7 @@ function App() {
           <Route path="/ops" element={<OpsPanel />} />
           <Route path="/super-admin" element={<SuperAdminPage />} />
           <Route path="/admin" element={<SuperAdminPage />} />
+  <Route path="/admin/blog" element={<BlogStudioPage />} />
           <Route path="/pwa" element={<PWAHomePage />} />
           <Route path="/city/:citySlug" element={<CityLandingPage />} />
           <Route path="/compare/:comparisonSlug" element={<ComparisonPage />} />

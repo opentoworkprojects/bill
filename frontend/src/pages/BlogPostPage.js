@@ -9,6 +9,7 @@ import { BlogPostSEO } from '../seo';
 import AdSense from '../components/AdSense';
 import { useState, useEffect } from 'react';
 import { publishedPosts } from '../data/blogPosts';
+import { getAllBlogPosts, getPublishedBlogPosts } from '../utils/blogStore';
 import BreadcrumbNav from '../components/blog/BreadcrumbNav';
 import AppDownloadBanner from '../components/blog/AppDownloadBanner';
 import LeadCaptureForm from '../components/blog/LeadCaptureForm';
@@ -398,7 +399,7 @@ const BlogPostPage = () => {
 
           <LeadCaptureForm />
           <RelatedArticles
-            posts={publishedPosts.length > 0 ? publishedPosts : blogPostsData}
+            posts={getPublishedBlogPosts()}
             currentSlug={slug}
             targetMarket={['India']}
             category={category}
@@ -411,7 +412,7 @@ const BlogPostPage = () => {
         </article>
 
         {/* Sidebar */}
-        <ArticleSidebar timeLeft={timeLeft} relatedPosts={blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
+        <ArticleSidebar timeLeft={timeLeft} relatedPosts={getAllBlogPosts().filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
         </div>
         </div>
         </div>
@@ -422,7 +423,7 @@ const BlogPostPage = () => {
   }
 
   // Check if post exists in new blog posts data
-  const newBlogPost = (publishedPosts.length > 0 ? publishedPosts : blogPostsData).find(post => post.slug === slug);
+  const newBlogPost = getPublishedBlogPosts().find(post => post.slug === slug);
   
   if (newBlogPost) {
     return (
@@ -664,7 +665,7 @@ const BlogPostPage = () => {
 
           <LeadCaptureForm />
           <RelatedArticles
-            posts={publishedPosts.length > 0 ? publishedPosts : blogPostsData}
+            posts={getPublishedBlogPosts()}
             currentSlug={slug}
             targetMarket={newBlogPost.targetMarket || ['India']}
             category={newBlogPost.category}
@@ -677,7 +678,7 @@ const BlogPostPage = () => {
         </article>
 
         {/* Sidebar */}
-        <ArticleSidebar timeLeft={timeLeft} relatedPosts={blogPostsData.filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
+        <ArticleSidebar timeLeft={timeLeft} relatedPosts={getAllBlogPosts().filter(p => p.featured && p.slug !== slug).slice(0, 4)} />
         </div>
         </div>
         </div>

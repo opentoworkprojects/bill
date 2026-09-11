@@ -8,6 +8,7 @@ import {
   Download, CheckCircle, Globe, Wifi
 } from 'lucide-react';
 import { blogPosts as blogPostsData, publishedPosts } from '../data/blogPosts';
+import { getPublishedBlogPosts } from '../utils/blogStore';
 import { CategoryPageSEO } from '../seo';
 import AdSense from '../components/AdSense';
 import AppPromoCard from '../components/blog/AppPromoCard';
@@ -222,7 +223,7 @@ const BlogPage = () => {
     },
   ];
 
-  const allPosts = [...(publishedPosts.length > 0 ? publishedPosts : blogPostsData), ...extraPosts];
+  const allPosts = [...getPublishedBlogPosts(), ...extraPosts];
   const allMarkets = [...new Set(allPosts.flatMap(p => p.targetMarket || []))].filter(Boolean).sort();
   const featuredPosts = allPosts.filter(p => p.featured).slice(0, 4);
 
