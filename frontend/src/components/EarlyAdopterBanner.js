@@ -56,11 +56,15 @@ const EarlyAdopterBanner = ({ pricing, marketCountry }) => {
 
   // Use fallback values if pricing not loaded — 5% OFF
   const spotsLeft = pricing?.early_adopter_spots_left || 47;
-  const marketPricing = getMarketPricing(marketCountry || detectMarket(), pricing);
-  const monthlyPrice = Math.round(marketPricing.sale / 12);
-  const yearlyPrice = marketPricing.saleDisplay;
-  const originalYearlyPrice = marketPricing.regularDisplay;
-  const discountPercent = Math.round(((marketPricing.regular - marketPricing.sale) / marketPricing.regular) * 100);
+  const activeMarket = marketCountry || detectMarket();
+  const marketPricing = getMarketPricing(activeMarket, pricing);
+  // The India one-year launch offer is a fixed ₹199 price. Do not let the
+  // retired API campaign value (₹1,899) overwrite the public banner.
+  const isIndia = activeMarket === 'IN';
+  const monthlyPrice = isIndia ? 17 : Math.round(marketPricing.sale / 12);
+  const yearlyPrice = isIndia ? '₹199' : marketPricing.saleDisplay;
+  const originalYearlyPrice = isIndia ? '₹1,999' : marketPricing.regularDisplay;
+  const discountPercent = isIndia ? 90 : Math.round(((marketPricing.regular - marketPricing.sale) / marketPricing.regular) * 100);
 
   return (
     <div className="relative overflow-hidden text-white" style={{
