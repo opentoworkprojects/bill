@@ -30,7 +30,7 @@ const SubscriptionPage = ({ user }) => {
   const plans = {
     quarterly: { months: 3, priceINR: 521, originalPriceINR: 549, discount: 5, label: '3 Months', perMonthINR: 174 },
     halfYearly: { months: 6, priceINR: 949, originalPriceINR: 999, discount: 5, label: '6 Months', perMonthINR: 158 },
-    yearly: { months: 12, priceINR: 1899, originalPriceINR: 1999, discount: 5, label: '1 Year', perMonthINR: 158, popular: true }
+    yearly: { months: 12, priceINR: 199, originalPriceINR: 1999, discount: 90, label: '1 Year', perMonthINR: 17, popular: true }
   };
 
   const getLocalizedPlan = (plan) => ({
@@ -73,13 +73,13 @@ const SubscriptionPage = ({ user }) => {
         setPricing({
           regular_price: 1999,
           regular_price_display: '₹1999',
-          campaign_price: 1899,
-          campaign_price_display: '₹1899',
+          campaign_price: 199,
+          campaign_price_display: '₹199',
           campaign_active: true,
           campaign_discount_percent: 5,
           trial_expired_discount: 5,
-          trial_expired_price: 1899,
-          trial_expired_price_display: '₹1899',
+          trial_expired_price: 199,
+          trial_expired_price_display: '₹199',
           trial_days: 7
         });
       }
@@ -114,11 +114,11 @@ const SubscriptionPage = ({ user }) => {
       isActive: true,
       discountPercent: 5,
       originalPrice: 1999,
-      salePrice: 1899,
-      originalPriceDisplay: '₹1999',
-      salePriceDisplay: '₹1899',
-      campaignName: 'Special Offer',
-      savings: 100
+salePrice: 199,
+        originalPriceDisplay: '₹1999',
+        salePriceDisplay: '₹199',
+        campaignName: 'Live Sale',
+        savings: 1800
     };
   };
 
