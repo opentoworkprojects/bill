@@ -442,10 +442,8 @@ const TopBanner = ({ saleData: propSaleData = null }) => {
 
   // Design 11: Early Adopter Special - Orange/Red theme with scrolling text
   if (design === 'early-adopter') {
-  // Keep the public India sale banner aligned with the live one-year offer.
-  // The API may still return the retired ₹1,899 campaign values.
-  const monthlyPrice = 17;
-  const yearlyPrice = 199;
+  const monthlyPrice = 158;
+  const yearlyPrice = 1899;
   const originalYearlyPrice = 1999;
   const discountPercent = 5;
     

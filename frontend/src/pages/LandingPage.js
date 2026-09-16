@@ -397,7 +397,7 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing, marketPricing }) => {
   const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 5;
   const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   // Use sale offer prices if available, otherwise fall back to pricing
-  const salePrice = '₹199';
+  const salePrice = '₹1,899';
   const originalPrice = '₹1999';
   const bgColor = saleOffer?.bg_color || 'from-red-500 via-orange-500 to-yellow-500';
 
@@ -589,7 +589,7 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
 
   // Get dynamic values - use sale offer prices if available
   const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 5;
-  const salePrice = '₹199';
+  const salePrice = '₹1,899';
   const originalPrice = '₹1999';
   const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   const badgeText = saleOffer?.badge_text || 'SPECIAL OFFER';
@@ -833,15 +833,15 @@ const LandingPage = () => {
     
     let currentPrice, originalPrice, discountPercent;
     if (isSaleActive) {
-      currentPrice = '₹199';
+      currentPrice = '₹1,899';
       originalPrice = '₹1999';
       discountPercent = saleOffer.discount_percent || 5;
     } else if (isPricingCampaignActive) {
-      currentPrice = '₹199';
+      currentPrice = '₹1,899';
       originalPrice = '₹1999';
       discountPercent = pricing?.campaign_discount_percent || 5;
     } else {
-      currentPrice = '₹199';
+      currentPrice = '₹1,899';
       originalPrice = '₹1999';
       discountPercent = 5;
     }
@@ -1362,7 +1362,7 @@ const LandingPage = () => {
                 {pricing?.campaign_active ? (
                   <>
                     <Gift className="w-4 h-4 mr-2" />
-                    Get {'₹199'}/Year
+                    Get {'₹1,899'}/Year
                   </>
                 ) : (
                   <>
@@ -2056,7 +2056,7 @@ const LandingPage = () => {
                   <ul className="space-y-4">
                     {[
                       pricing?.campaign_active 
-                        ? `${'₹199'}/year - ${pricing?.campaign_name || 'Special Offer'} (${pricing?.campaign_discount_percent || 10}% OFF)`
+                        ? `${'₹1,899'}/year - ${pricing?.campaign_name || 'Special Offer'} (${pricing?.campaign_discount_percent || 10}% OFF)`
                         : `${pricing?.regular_price_display || '₹1999'}/year - Affordable pricing`,
                       `${pricing?.trial_days || 7}-day free trial, no credit card`,
                       "Cloud-based - Access anywhere",
