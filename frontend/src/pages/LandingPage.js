@@ -397,8 +397,8 @@ const SaleOfferSection = ({ navigate, saleOffer, pricing, marketPricing }) => {
   const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 5;
   const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   // Use sale offer prices if available, otherwise fall back to pricing
-  const salePrice = marketPricing?.saleDisplay || pricing?.campaign_price_display || '₹1899';
-  const originalPrice = marketPricing?.regularDisplay || pricing?.regular_price_display || '₹1999';
+  const salePrice = '₹199';
+  const originalPrice = '₹1999';
   const bgColor = saleOffer?.bg_color || 'from-red-500 via-orange-500 to-yellow-500';
 
   return (
@@ -589,8 +589,8 @@ const CampaignBanner = ({ saleOffer, pricing }) => {
 
   // Get dynamic values - use sale offer prices if available
   const discountPercent = saleOffer?.discount_percent || pricing?.campaign_discount_percent || 5;
-  const salePrice = marketPricing?.saleDisplay || pricing?.campaign_price_display || '₹1899';
-  const originalPrice = marketPricing?.regularDisplay || pricing?.regular_price_display || '₹1999';
+  const salePrice = '₹199';
+  const originalPrice = '₹1999';
   const discountText = saleOffer?.discount_text || `${discountPercent}% OFF`;
   const badgeText = saleOffer?.badge_text || 'SPECIAL OFFER';
   const bgColor = saleOffer?.bg_color || 'from-orange-500 via-red-500 to-pink-500';
@@ -833,16 +833,16 @@ const LandingPage = () => {
     
     let currentPrice, originalPrice, discountPercent;
     if (isSaleActive) {
-      currentPrice = marketPricing.saleDisplay;
-      originalPrice = marketPricing.regularDisplay;
+      currentPrice = '₹199';
+      originalPrice = '₹1999';
       discountPercent = saleOffer.discount_percent || 5;
     } else if (isPricingCampaignActive) {
-      currentPrice = pricing?.campaign_price_display || marketPricing.saleDisplay;
-      originalPrice = pricing?.regular_price_display || marketPricing.regularDisplay;
+      currentPrice = '₹199';
+      originalPrice = '₹1999';
       discountPercent = pricing?.campaign_discount_percent || 5;
     } else {
-      currentPrice = marketPricing.saleDisplay;
-      originalPrice = marketPricing.regularDisplay;
+      currentPrice = '₹199';
+      originalPrice = '₹1999';
       discountPercent = 5;
     }
     
@@ -983,7 +983,7 @@ const LandingPage = () => {
           // Enhanced pricing with brand positioning
           offers: {
             name: 'BillByteKOT Restaurant Software License',
-            price: '1999',
+            price: '199',
             priceCurrency: 'INR',
             availability: 'InStock',
             validFrom: '2024-01-01',
@@ -1362,7 +1362,7 @@ const LandingPage = () => {
                 {pricing?.campaign_active ? (
                   <>
                     <Gift className="w-4 h-4 mr-2" />
-                    Get {pricing?.campaign_price_display || '₹1799'}/Year
+                    Get {'₹199'}/Year
                   </>
                 ) : (
                   <>
@@ -2056,7 +2056,7 @@ const LandingPage = () => {
                   <ul className="space-y-4">
                     {[
                       pricing?.campaign_active 
-                        ? `${pricing?.campaign_price_display || '₹1799'}/year - ${pricing?.campaign_name || 'Special Offer'} (${pricing?.campaign_discount_percent || 10}% OFF)`
+                        ? `${'₹199'}/year - ${pricing?.campaign_name || 'Special Offer'} (${pricing?.campaign_discount_percent || 10}% OFF)`
                         : `${pricing?.regular_price_display || '₹1999'}/year - Affordable pricing`,
                       `${pricing?.trial_days || 7}-day free trial, no credit card`,
                       "Cloud-based - Access anywhere",
