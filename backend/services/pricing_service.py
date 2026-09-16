@@ -191,7 +191,7 @@ class PricingService:
             "id": "default_pricing",
             "regular_price": 1999.0,
             "campaign_price": 1799.0,
-            "referral_discount": 200.0,
+            "referral_discount": 199.0,
             "referral_reward": 300.0,
             "trial_days": 7,
             "subscription_months": 12,
