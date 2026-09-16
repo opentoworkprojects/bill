@@ -617,8 +617,8 @@ function App() {
         setPricing({
           regular_price: 1999,
           regular_price_display: '₹1999',
-          campaign_price: 1899,
-          campaign_price_display: '₹1899',
+campaign_price: 199,
+  campaign_price_display: '₹199',
           campaign_active: true,
           campaign_name: 'Early Adopter Special - 5% OFF',
           campaign_discount_percent: 5,
@@ -627,8 +627,8 @@ function App() {
           early_adopter_discount: 5,
           early_adopter_spots_left: 850,
           trial_expired_discount: 5,
-          trial_expired_price: 1899,
-          trial_expired_price_display: '₹1899'
+trial_expired_price: 199,
+  trial_expired_price_display: '₹199'
         });
       }
     };
