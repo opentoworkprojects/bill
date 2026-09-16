@@ -102,11 +102,11 @@ const SubscriptionPage = ({ user }) => {
         isActive: true,
         discountPercent: saleOffer.discount_percent || 5,
         originalPrice: saleOffer.original_price || 1999,
-        salePrice: saleOffer.sale_price || 1899,
+        salePrice: saleOffer.sale_price || 199,
         originalPriceDisplay: `₹${saleOffer.original_price || 1999}`,
-        salePriceDisplay: `₹${saleOffer.sale_price || 1899}`,
-        campaignName: saleOffer.title || 'Special Offer',
-        savings: (saleOffer.original_price || 1999) - (saleOffer.sale_price || 1899)
+        salePriceDisplay: `₹${saleOffer.sale_price || 199}`,
+        campaignName: saleOffer.title || 'Live Sale',
+        savings: (saleOffer.original_price || 1999) - (saleOffer.sale_price || 199)
       };
     }
     // 5% off
