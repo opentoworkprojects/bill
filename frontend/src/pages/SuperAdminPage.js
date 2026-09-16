@@ -382,7 +382,7 @@ const SuperAdminPage = () => {
     trial_expired_discount: 10,
     trial_days: 7,
     subscription_months: 12,
-    referral_discount: 200,
+    referral_discount: 99,
     referral_reward: 300
   });
   const [savingPricing, setSavingPricing] = useState(false);
@@ -3608,7 +3608,7 @@ const SuperAdminPage = () => {
                     </Label>
                     <Input
                       type="number"
-                      value={pricing.referral_discount || 200}
+                      value={pricing.referral_discount || 99}
                       onChange={(e) => setPricing({ ...pricing, referral_discount: parseFloat(e.target.value) || 0 })}
                       placeholder="200"
                       className="w-full"
@@ -3793,7 +3793,7 @@ const SuperAdminPage = () => {
                     <div className="text-sm text-gray-500">Campaign Price</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-2xl font-bold text-purple-600">â‚¹{pricing.referral_discount || 200}</div>
+                    <div className="text-2xl font-bold text-purple-600">â‚¹{pricing.referral_discount || 99}</div>
                     <div className="text-sm text-gray-500">Referral Discount</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">

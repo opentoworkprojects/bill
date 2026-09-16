@@ -30,7 +30,7 @@ class PricingConfig(BaseModel):
     id: Optional[str] = Field(default=None, description="Unique identifier")
     regular_price: float = Field(default=1999.0, description="Regular subscription price in INR")
     campaign_price: float = Field(default=1799.0, description="Campaign/promotional price in INR")
-    referral_discount: float = Field(default=200.0, description="Discount for new users using referral code in INR")
+    referral_discount: float = Field(default=99.0, description="Discount for new users using referral code in INR")
     referral_reward: float = Field(default=300.0, description="Reward for referrer when referee completes payment in INR")
     trial_days: int = Field(default=7, description="Number of trial days for new users")
     subscription_months: int = Field(default=12, description="Subscription duration in months")
@@ -203,7 +203,7 @@ DEFAULT_PRICING_CONFIG = {
     "id": "default_pricing",
     "regular_price": 1999.0,
     "campaign_price": 1799.0,
-    "referral_discount": 200.0,
+    "referral_discount": 99.0,
     "referral_reward": 300.0,
     "trial_days": 7,
     "subscription_months": 12,
