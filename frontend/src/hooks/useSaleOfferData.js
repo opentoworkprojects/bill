@@ -59,10 +59,10 @@ const useSaleOfferData = (marketCountry) => {
         setPricing({
           regular_price: 1999,
           regular_price_display: '₹1999',
-          campaign_price: 199,
-          campaign_price_display: '₹199',
+          campaign_price: 1899,
+          campaign_price_display: '₹1899',
           campaign_active: false,
-          campaign_discount_percent: 90,
+          campaign_discount_percent: 5,
           trial_days: 7
         });
       }

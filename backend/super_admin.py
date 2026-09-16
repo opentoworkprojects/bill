@@ -202,7 +202,7 @@ def verify_super_admin(username: str, password: str) -> bool:
 DEFAULT_PRICING_CONFIG = {
     "id": "default_pricing",
     "regular_price": 1999.0,
-    "campaign_price": 199.0,
+    "campaign_price": 1899.0,
     "referral_discount": 200.0,
     "referral_reward": 300.0,
     "trial_days": 7,

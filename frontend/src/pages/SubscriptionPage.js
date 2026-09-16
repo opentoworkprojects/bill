@@ -73,13 +73,13 @@ const SubscriptionPage = ({ user }) => {
         setPricing({
           regular_price: 1999,
           regular_price_display: '₹1999',
-          campaign_price: 199,
-          campaign_price_display: '₹199',
+campaign_price: 1899,
+  campaign_price_display: '₹1899',
           campaign_active: true,
           campaign_discount_percent: 5,
           trial_expired_discount: 5,
-          trial_expired_price: 199,
-          trial_expired_price_display: '₹199',
+trial_expired_price: 1899,
+  trial_expired_price_display: '₹1899',
           trial_days: 7
         });
       }
@@ -116,7 +116,7 @@ const SubscriptionPage = ({ user }) => {
       originalPrice: 1999,
 salePrice: 199,
         originalPriceDisplay: '₹1999',
-        salePriceDisplay: '₹199',
+        salePriceDisplay: '₹1,899',
         campaignName: 'Live Sale',
         savings: 1800
     };

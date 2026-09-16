@@ -8,7 +8,7 @@ export const MARKET_OPTIONS = [
 ];
 
 const MARKET_PRICES = {
-  IN: { regular: 1999, sale: 199 },
+  IN: { regular: 1999, sale: 1899 },
   US: { regular: 29, sale: 24 },
   GB: { regular: 24, sale: 20 },
   AE: { regular: 109, sale: 89 },
